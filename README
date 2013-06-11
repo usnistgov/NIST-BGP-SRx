@@ -1,0 +1,16 @@
+The NIST BGP Secure Routing Extension (NIST-BGP-SRx) is an open source
+reference implementation and research platform for investigating emerging BGP
+security extensions and supporting protocols such as RPKI Origin Validation
+and BGPsec Path Validation.
+
+Additional information can be found at
+https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype
+
+Please read the NIST disclaimer regarding the software of this project, the
+information it provides and the other resources it uses. In particular, note
+that these software prototypes are expressly provided as is and are intended
+for research and development purposes only.
+
+
+For questions or comments regarding this software please contact
+bgpsrx-dev@nist.gov.

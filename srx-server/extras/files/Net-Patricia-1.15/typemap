@@ -1,0 +1,5 @@
+Net::Patricia			T_PTROBJ
+Net::PatriciaNode		T_PTROBJ
+patricia_tree_t *		T_PTROBJ
+patricia_node_t *		T_PTROBJ
+in_addr_t			T_U_LONG

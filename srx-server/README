@@ -1,0 +1,29 @@
+GNU-Make Information:
+
+The make uses the GNU-Make extension "shell" command. In case
+this cases a problem, remove this command from Makefile_Common.
+Further documentation is available there. This extension is the 
+only reason for the -Wno-portability flag in config.ac
+
+It is recommended to specify the --prefix=<installation location> 
+parameter during configuration. Each call of make currently modifies 
+the include/srx folder. If will be changed in a later version.
+
+This software package includes the SRx server and the SRx server API. 
+In addition it provides additional tools to simulate an RPKI validation
+cache and a proxy client implementation.
+Please see the documentation for each tool or use the help command on 
+the command line.
+The srx server itself can be accessed using a telnet clinet. 
+
+For questions please contact the developers at bgpsrx-dev@nist.gov.
+To be informed for new releases or minor bug fixes, register with 
+bgpsrx-users@nist.gov.
+
+
+SRx server installation
+==========================
+1. tar xvfz srx-<VER>.tar.gz
+2. ./configure --prefix=<desired dir> --with-libconf --with-libpatr
+3. make all install  (You might need root permission when you install)
+

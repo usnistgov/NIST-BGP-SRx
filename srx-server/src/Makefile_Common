@@ -1,0 +1,27 @@
+
+SRC_DIR=$(top_srcdir)
+
+CLIENT_DIR = $(SRC_DIR)/client
+SERVER_DIR = $(SRC_DIR)/server
+SHARED_DIR = $(SRC_DIR)/shared
+UTIL_DIR = $(SRC_DIR)/util
+
+EXTRAS_DIR = $(SRC_DIR)/../extras/local
+EXTRAS_LIB = $(EXTRAS_DIR)/lib
+EXTRAS_INCLUDE = $(EXTRAS_DIR)/include
+
+
+# Most binaries use libutil and some libsrx
+LIB_UTIL = $(UTIL_DIR)/libutil.la
+LIB_SRX = $(CLIENT_DIR)/libsrx.la
+
+# Read the revision number of the revision file
+# This needs GNU-Make. if this is a problem, replace the 
+# assignment of SRX_REVISION=... with either an empty
+# string or the content of the revision file.
+SRX_REVISION=$(shell cat $(SRC_DIR)/$(SRX_REVISION_FILE))
+
+EXTRAS_INCLUDE_DIR=$(top_srcdir)/../extras/local/include
+AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir)
+AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION)
+

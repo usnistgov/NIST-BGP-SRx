@@ -1,0 +1,41 @@
+INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)/lib -I$(top_srcdir)/$(SRX_DIR)
+DEFS = @DEFS@ $(LOCAL_OPTS) -DSYSCONFDIR=\"$(sysconfdir)/\"
+
+AM_CFLAGS = $(PICFLAGS)
+AM_LDFLAGS = $(PILDFLAGS)
+
+noinst_PROGRAMS = testsig testbuffer testmemory heavy heavywq heavythread \
+		aspathtest testprivs teststream testbgpcap ecommtest \
+		testbgpmpattr testchecksum testbgpmpath tabletest
+
+testsig_SOURCES = test-sig.c
+testbuffer_SOURCES = test-buffer.c
+testmemory_SOURCES = test-memory.c
+testprivs_SOURCES = test-privs.c
+teststream_SOURCES = test-stream.c
+heavy_SOURCES = heavy.c main.c
+heavywq_SOURCES = heavy-wq.c main.c
+heavythread_SOURCES = heavy-thread.c main.c
+aspathtest_SOURCES = aspath_test.c
+testbgpcap_SOURCES = bgp_capability_test.c
+ecommtest_SOURCES = ecommunity_test.c
+testbgpmpattr_SOURCES =  bgp_mp_attr_test.c
+testchecksum_SOURCES = test-checksum.c
+testbgpmpath_SOURCES = bgp_mpath_test.c
+tabletest_SOURCES = table_test.c
+
+testsig_LDADD = ../lib/libzebra.la @LIBCAP@
+testbuffer_LDADD = ../lib/libzebra.la @LIBCAP@
+testmemory_LDADD = ../lib/libzebra.la @LIBCAP@
+testprivs_LDADD = ../lib/libzebra.la @LIBCAP@
+teststream_LDADD = ../lib/libzebra.la @LIBCAP@
+heavy_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
+heavywq_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
+heavythread_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
+aspathtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+testbgpcap_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+ecommtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+testbgpmpattr_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+testchecksum_LDADD = ../lib/libzebra.la @LIBCAP@ 
+testbgpmpath_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+tabletest_LDADD = ../lib/libzebra.la @LIBCAP@ -lm

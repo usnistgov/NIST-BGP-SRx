@@ -1,0 +1,62 @@
+Changelog for Version 0.3.0
+- Changed updated validation state from "Unknown" to "NotFound" - RFC6811
+- Ignore adding white-list entries for ROAS assigned to ASN's reserved for 
+  documentation examples only - RFC5398
+- Fixed missing requirement of RFC 6483 which states an origin cannot be found 
+  if an AS_SET exists. (Its a QuaggaSRx bug but also needs some tweeking here. 
+- Use sync=true as default setting
+- Remodeled the message communication management in srx proxy API. These 
+  management handler allows the user of the SRx proxy to implement an error 
+  handler as well as a generell message handler.
+- Disabled command rtr-goodbye in server console due to bugs. 
+  Will be differed to 0.3.1 or later
+- Fixed bugs during connect call and timeout.
+- Fixed the connect and run commands in srx server test harness.
+- Introduced LocalID to allow update management on proxy side.
+- Fixed problem with srx-serevr parameter --version or --full-version
+- Fixed problem with missing network to host translation for keepWindow values.
+- Removed misleading error output.
+- Fixed problem of duplicate updates in prefix cache. Each validation request 
+  must result in the creation of maximum one update within the prefix cache 
+  only if the update not already exists.
+- Added capability to pre-configure a client mapping from 4 byte proxy ID to  
+  one byte client ID.
+- Added mapping between updates and clients to prevent notification broadcast.
+- Modified socket handling in SRx-Proxy/API to allow the usage of non blocking 
+  sockets.
+- Fixed a bug while reading boolean values from the configuration file. 
+- Add server setting for default keepWindow value of 900 seconds.
+- Some fixes in configure and make. Also adding revision to makefile
+- Removed misleading error messages during shutdown of SRx server.
+- Fix problem with '-h' parameter of srx_server. BZ273
+- Added newline at the end of files to remove compiler warnings
+- Added stdarg.h to includes to allow compilation under Centos 5
+- Update to be compliant to RFC 6810 - No secure transport though.
+- Added command code completion info srx server test harness.
+- Added statistics framework to srx server test harness.
+- Added server side receiver queue. The queue can be deactivated 
+  using mode.no_receivequeue=true|false or --mode.no_receivequeue. 
+- Added server side sender queue. The queue can be deactivated 
+  using mode.no_senderqueue=true|false or --mode.no_senderqueue. 
+- Fixed some memory leaks on proxy side and added non-blocking socket on test 
+  harness
+- Added TCP sending flow control into proxy. In addition extended and fixed 
+  error handling of proxy (see api documentation inline). 
+- Extended logging framework of proxy to allow seamless integration into 
+  clients error logging framework.
+- Renamed some data structures to remove confusion and added documentation to 
+  sever_connection_handler.c
+- Fixed internal IP to int conversion to allow RESET_PROXY to set to IP address.
+- Changed default proxy from 1234 to 10.0.0.1 in test harness
+- Removed lots of dead code.
+- Added processing of update withdrawal. 
+- Added dump-ucache to server console to allow writing the content of the 
+  update cache to the console. 
+- Changed flow for verifyUpdate.
+- Solved problem of update ID collisions.
+- Added command show-proxies to server console.
+- Fixed error messages while connecting to RPKI cache.
+- Fixed problem of multi client support.
+- Added -f<config-file> to srx-server to allow passing different configuration 
+  files.
+- Modified API method signatures.

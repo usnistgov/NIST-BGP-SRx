@@ -1,0 +1,34 @@
+# $Id$
+
+--------------------------------------------------------------------------
+Building and Installing Quagga SRx client:
+
+
+Configuration Option:
+    --enable-srx	turn on SRx client to compile with Quagga bgp module
+
+
+Compile:
+    For compiling Quagga bgp module with SRx client which is able to connect
+    SRx server,
+
+    1. copy "srx" directory which is located in "include" directory of SRx server.
+	that is, "<SRx installed dir>/include/srx"
+	
+	or,
+
+       Must be specified with environment variables:
+	CPPFLAGS = -I<SRx installed dir>/include/
+	SRX_USER_INC = <SRx installed dir>/include/
+
+    2. paste into the quagga-<ver>.
+    3. run configure with configuration option.
+    4. make all install
+    
+
+
+ (Configuration example)
+#1 ./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx 
+
+#2 ./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx CPPFLAGS=-I<srx-installed dir>/include SRX_USER_INC=<srx-installed dir>/include/
+
