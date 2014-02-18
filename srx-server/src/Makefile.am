@@ -1,8 +1,8 @@
 ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST = $(SRX_REVISION_FILE)
+EXTRA_DIST = $(SRX_REVISION_FILE) $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 
 SUBDIRS = shared util client server tools
-.PHONY: clean-local tags-local echo $(SUBDIRS)
+.PHONY: clean-local tags-local echo $(SUBDIRS) rpmcheck srcrpm rpms
 
 
 # Extract the directory of this file out of the MAKEFILE_LIST
@@ -58,4 +58,31 @@ set-revision-1:
 	@cat $(SRX_REVISION_FILE)
 	@echo
 	@echo
+
+
+# RPM script and macros for SRx
+rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+
+rpmmacros =\
+ --define="_rpmdir $${PWD}"\
+ --define="_srcrpmdir $${PWD}"\
+ --define="_sourcedir $${PWD}/../extras/files/"\
+ --define="_specdir $${PWD}"\
+ --define="_builddir $${PWD}"
+
+RPMBUILD = rpmbuild
+RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+
+rpmcheck:
+	if [ which rpmbuild &> /dev/null ]; then \
+	 echo "*** This make target requires an rpm-based linux distribution."; \
+	(exit 1); exit 1; \
+	fi
+
+srcrpm: rpmcheck $(rpmspec)
+	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)
+
+rpms: rpmcheck $(rpmspec)
+	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)
+
 

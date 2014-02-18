@@ -462,7 +462,6 @@ static void
 attr_show_all_iterator (struct hash_backet *backet, struct vty *vty)
 {
   struct attr *attr = backet->data;
-
   vty_out (vty, "attr[%ld] nexthop %s%s", attr->refcnt, 
 	   inet_ntoa (attr->nexthop), VTY_NEWLINE);
 }
@@ -2411,8 +2410,14 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 	      pnt = attre->ecommunity->val + (i * 8);
 	      tbit = *pnt;
 
+#ifdef USE_SRX
+              if ((!CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY_EBGP)) \
+                  && (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE)))
+		continue;
+#else
 	      if (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE))
 		continue;
+#endif
 
 	      ecom_tr_size++;
 	    }
@@ -2436,10 +2441,14 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 		{
 		  pnt = attre->ecommunity->val + (i * 8);
 		  tbit = *pnt;
-
+#ifdef USE_SRX
+                  if (!CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY_EBGP) \
+                      && (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE)))
+                    continue;
+#else
 		  if (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE))
 		    continue;
-
+#endif
 		  stream_put (s, pnt, 8);
 		}
 	    }

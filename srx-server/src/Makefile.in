@@ -33,18 +33,19 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-target_triplet = @target@
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/configure AUTHORS COPYING COPYING.LIB ChangeLog \
-	INSTALL NEWS TODO compile config.guess config.sub depcomp \
-	install-sh ltmain.sh missing
+	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
+	compile config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_sys_weak_alias.m4 \
-	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
-	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/srx_m4_check_interanl_lib_ncurses_lib_readline.m4 \
+	$(top_srcdir)/m4/srx_m4_check_interanl_lib_patricia_lib_config.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -69,6 +70,7 @@ AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
 	distdir dist dist-all distcheck
 ETAGS = etags
 CTAGS = ctags
+DIST_SUBDIRS = $(SUBDIRS)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -112,20 +114,19 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
-BABELD = @BABELD@
-BGPD = @BGPD@
-BUILD_TESTS = @BUILD_TESTS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
-CONFDATE = @CONFDATE@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CURSES = @CURSES@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+CXXDEPMODE = @CXXDEPMODE@
+CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
-DOC = @DOC@
+DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -134,52 +135,27 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-GAWK = @GAWK@
 GREP = @GREP@
-HAVE_LIBPCREPOSIX = @HAVE_LIBPCREPOSIX@
-IF_METHOD = @IF_METHOD@
-IF_PROC = @IF_PROC@
-INCLUDES = @INCLUDES@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
-IOCTL_METHOD = @IOCTL_METHOD@
-IPFORWARD = @IPFORWARD@
-ISISD = @ISISD@
-ISIS_TOPOLOGY_DIR = @ISIS_TOPOLOGY_DIR@
-ISIS_TOPOLOGY_INCLUDES = @ISIS_TOPOLOGY_INCLUDES@
-ISIS_TOPOLOGY_LIB = @ISIS_TOPOLOGY_LIB@
-KERNEL_METHOD = @KERNEL_METHOD@
-LATEXMK = @LATEXMK@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
-LIBCAP = @LIBCAP@
-LIBM = @LIBM@
 LIBOBJS = @LIBOBJS@
-LIBPAM = @LIBPAM@
-LIBREADLINE = @LIBREADLINE@
 LIBS = @LIBS@
-LIBTOOL = @LIBTOOL@
-LIB_IPV6 = @LIB_IPV6@
-LIB_REGEX = @LIB_REGEX@
+LIBTOOL = libtool --tag=CC
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
+MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
-MULTIPATH_NUM = @MULTIPATH_NUM@
-NETSNMP_CONFIG = @NETSNMP_CONFIG@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
-OSPF6D = @OSPF6D@
-OSPFAPI = @OSPFAPI@
-OSPFCLIENT = @OSPFCLIENT@
-OSPFD = @OSPFD@
-OTHER_METHOD = @OTHER_METHOD@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -189,35 +165,20 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
-PDFLATEX = @PDFLATEX@
-PERL = @PERL@
-PICFLAGS = @PICFLAGS@
-PILDFLAGS = @PILDFLAGS@
 RANLIB = @RANLIB@
-RIPD = @RIPD@
-RIPNGD = @RIPNGD@
-RTREAD_METHOD = @RTREAD_METHOD@
-RT_METHOD = @RT_METHOD@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
-SOLARIS = @SOLARIS@
-SRX_CLI_LIB = @SRX_CLI_LIB@
-SRX_DIR = @SRX_DIR@
-SRX_LIB = @SRX_LIB@
-SRX_LIB_SO = @SRX_LIB_SO@
+SRX_REVISION_FILE = @SRX_REVISION_FILE@
 STRIP = @STRIP@
 VERSION = @VERSION@
-VTYSH = @VTYSH@
-WATCHQUAGGA = @WATCHQUAGGA@
-WEAK_ALIAS = @WEAK_ALIAS@
-WEAK_ALIAS_CROSSFILE = @WEAK_ALIAS_CROSSFILE@
-ZEBRA = @ZEBRA@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
+ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -235,10 +196,6 @@ datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
-enable_group = @enable_group@
-enable_user = @enable_user@
-enable_vty_group = @enable_vty_group@
-exampledir = @exampledir@
 exec_prefix = @exec_prefix@
 host = @host@
 host_alias = @host_alias@
@@ -253,65 +210,43 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
-pkgsrcdir = @pkgsrcdir@
-pkgsrcrcdir = @pkgsrcrcdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-quagga_statedir = @quagga_statedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
-target = @target@
 target_alias = @target_alias@
-target_cpu = @target_cpu@
-target_os = @target_os@
-target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = lib @ZEBRA@ @BGPD@ @RIPD@ @RIPNGD@ @OSPFD@ @OSPF6D@ @BABELD@ \
-         @ISISD@ @WATCHQUAGGA@ @VTYSH@ @OSPFCLIENT@ @DOC@ m4 @pkgsrcdir@ \
-         redhat @SOLARIS@ @BUILD_TESTS@
-
-DIST_SUBDIRS = lib zebra bgpd ripd ripngd ospfd ospf6d babeld \
-	  isisd watchquagga vtysh ospfclient doc m4 pkgsrc redhat tests \
-	  solaris
-
-EXTRA_DIST = aclocal.m4 SERVICES TODO REPORTING-BUGS INSTALL.quagga.txt \
-	update-autotools \
-	INSTALL.SRx_client.txt \
-	vtysh/Makefile.in vtysh/Makefile.am \
-	tools/mrlg.cgi tools/rrcheck.pl tools/rrlookup.pl tools/zc.pl \
-	tools/zebra.el tools/multiple-bgpd.sh \
-	fpm/fpm.h \
-	$(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
-
 ACLOCAL_AMFLAGS = -I m4
+EXTRA_DIST = $(SRX_REVISION_FILE) $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+SUBDIRS = shared util client server tools
 
-# RPM script and macros for QuaggaSRx
-RPM = rpm
+# Extract the directory of this file out of the MAKEFILE_LIST
+SRC_DIR = `pwd`
 
-#rpms srcrpm: dist extra_dist
-#	for dir in $(SUBDIRS); do \
-#,...,...(cd $$dir && $(MAKE) $(AM_MAKEFLAGS) $@) || exit 1; \
-#,...,...rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
-#,...,...test -z "$$dir/$$rpmarch" || ( mv $$dir/$$rpmarch/* . && rm -rf $$dir/$$rpmarch ); \
-#,...,...rm -rf $$dir/$(distdir); \
-#,...done
+# Exuberant Ctags
+READLINE_COPTS = -lreadline -lncurses
+CLEAN_SUBDIRS = .libs
+
+# For the revision
+SRX_VENDOR = antd.nist.gov
+SVN_DIR = .svn
+SVN_CMD = /usr/bin/svn
 
 # RPM script and macros for SRx
 rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 rpmmacros = \
  --define="_rpmdir $${PWD}"\
  --define="_srcrpmdir $${PWD}"\
- --define="_sourcedir $${PWD}"\
+ --define="_sourcedir $${PWD}/../extras/files/"\
  --define="_specdir $${PWD}"\
  --define="_builddir $${PWD}"
 
@@ -577,9 +512,6 @@ distdir: $(DISTFILES)
 	      || exit 1; \
 	  fi; \
 	done
-	$(MAKE) $(AM_MAKEFLAGS) \
-	  top_distdir="$(top_distdir)" distdir="$(distdir)" \
-	  dist-hook
 	-test -n "$(am__skip_mode_fix)" \
 	|| find "$(distdir)" -type d ! -perm -755 \
 		-exec chmod u+rwx,go+rx {} \; -o \
@@ -697,7 +629,7 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-recursive
-all-am: Makefile config.h
+all-am: Makefile config.h all-local
 installdirs: installdirs-recursive
 installdirs-am:
 install: install-recursive
@@ -725,7 +657,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-@HAVE_LATEX_FALSE@clean-local:
 clean: clean-recursive
 
 clean-am: clean-generic clean-libtool clean-local mostlyclean-am
@@ -800,51 +731,76 @@ uninstall-am:
 	ctags-recursive install-am install-strip tags-recursive
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
-	all all-am am--refresh check check-am clean clean-generic \
-	clean-libtool clean-local ctags ctags-recursive dist dist-all \
-	dist-bzip2 dist-gzip dist-hook dist-lzma dist-shar dist-tarZ \
-	dist-xz dist-zip distcheck distclean distclean-generic \
-	distclean-hdr distclean-libtool distclean-tags distcleancheck \
-	distdir distuninstallcheck dvi dvi-am html html-am info \
-	info-am install install-am install-data install-data-am \
-	install-dvi install-dvi-am install-exec install-exec-am \
-	install-html install-html-am install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
-	uninstall uninstall-am
+	all all-am all-local am--refresh check check-am clean \
+	clean-generic clean-libtool clean-local ctags ctags-recursive \
+	dist dist-all dist-bzip2 dist-gzip dist-lzma dist-shar \
+	dist-tarZ dist-xz dist-zip distcheck distclean \
+	distclean-generic distclean-hdr distclean-libtool \
+	distclean-tags distcleancheck distdir distuninstallcheck dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-recursive uninstall uninstall-am
 
+.PHONY: clean-local tags-local echo $(SUBDIRS) rpmcheck srcrpm rpms
 
-@HAVE_LATEX_TRUE@HACKING.pdf: HACKING.tex
-@HAVE_LATEX_TRUE@	$(LATEXMK) -pdf $<
+all-local: set-revision
 
-@HAVE_LATEX_TRUE@clean-local:
-@HAVE_LATEX_TRUE@	-$(LATEXMK) -C HACKING.tex
+tags-local:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir tags; \
+	done
+
+clean-local: 
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+echo:
+	for dir in $(SUBDIRS); do \
+	    (cd $$dir && $(MAKE) $(AM_MAKESET) $@ ); \
+	    done
+
+set-revision:
+	@echo "Check for revision framework"
+	@touch $(SRX_REVISION_FILE);
+	@if test -d $(SVN_DIR); then \
+	  if test -f $(SVN_CMD); then \
+	    $(SVN_CMD) info | grep $(SRX_VENDOR); \
+	    if test "$$?" = "0"; then \
+	      $(SVN_CMD) info | grep $(SRX_VENDOR); \
+	      if test "$$?" = "0"; then \
+		$(MAKE) set-revision-1; \
+	      fi; \
+	    fi; \
+	  fi; \
+	fi;
+
+set-revision-1:
+	@echo "Revision file=" $(SRX_REVISION_FILE)
+	@echo -n $$($(SVN_CMD) info | grep Revision | sed -e "s/\(Revision:[ ]*\)\(.*\)\([ ]*\)/R\2-/g") > $(SRX_REVISION_FILE)
+	@echo -n $$($(SVN_CMD) info | grep "Last Changed Rev" | sed -e "s/\(Last Changed Rev:[ ]*\)\(.*\)\([ ]*\)/LR\2/g") >> $(SRX_REVISION_FILE)
+	@echo -n "Full-Version = $(VERSION)-"
+	@cat $(SRX_REVISION_FILE)
+	@echo
+	@echo
 
 rpmcheck:
 	if [ which rpmbuild &> /dev/null ]; then \
 	 echo "*** This make target requires an rpm-based linux distribution."; \
-	 (exit 1); exit 1; \
+	(exit 1); exit 1; \
 	fi
 
-srcrpm: dist rpmcheck $(rpmspec)
-	($(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)) || exit 1
+srcrpm: rpmcheck $(rpmspec)
+	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)
 
-rpms: dist rpmcheck $(rpmspec)
-	($(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)) || exit 1
-	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
-	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
-	rm -rf $(distdir)
-
-dist-hook:
-	rm -rf `find $(distdir) -name .svn`
-
-# for preparing rpm sources
-#extra_dist:
-
-.PHONY: rpms srcrpm
+rpms: rpmcheck $(rpmspec)
+	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -7,12 +7,12 @@ SHARED_DIR = $(SRC_DIR)/shared
 UTIL_DIR = $(SRC_DIR)/util
 
 EXTRAS_DIR = $(SRC_DIR)/../extras/local
-EXTRAS_LIB = $(EXTRAS_DIR)/lib
+EXTRAS_LIB =/usr/local/lib -L$(EXTRAS_DIR)/lib
 EXTRAS_INCLUDE = $(EXTRAS_DIR)/include
 
 
-# Most binaries use libutil and some libsrx
-LIB_UTIL = $(UTIL_DIR)/libutil.la
+# Most binaries use libsrxutil and some libsrx
+LIB_UTIL = $(UTIL_DIR)/libsrxutil.la
 LIB_SRX = $(CLIENT_DIR)/libsrx.la
 
 # Read the revision number of the revision file

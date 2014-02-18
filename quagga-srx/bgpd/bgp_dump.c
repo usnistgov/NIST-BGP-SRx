@@ -412,34 +412,6 @@ bgp_dump_interval_func (struct thread *t)
   return 0;
 }
 
-#ifdef USE_SRX
-#define PATH_INFO "/tmp/my_fifo"
-static int connect2(struct thread *t)
-{
-    //printf(" ------ called by thread \n");
-
-
-#if 0
-  int fd, n_write=0;
-  char a_buf[0xff] = "testtesttest";
-
-  if ((fd = open(PATH_INFO, O_WRONLY, 0644)) == -1)
-  {
-      fprintf(stderr, "FAIL:open() (%s) \n", strerror(errno));
-      printf(" EXIT_FAILURE\n");
-  }
-
-    printf(" ----------- test event send -----------\n");
-  if ( (n_write = write(fd, a_buf, strlen(a_buf)) ) == -1)
-  {
-      printf( "[%1$d byte ] %2$.*1$s\n", n_write , a_buf);
-  }
-#endif
-
-    return 0;
-}
-#endif /* USE_SRX */
-
 /* Dump common information. */
 static void
 bgp_dump_common (struct stream *obuf, struct peer *peer, int forceas4)
@@ -896,10 +868,6 @@ bgp_dump_init (void)
   install_element (CONFIG_NODE, &dump_bgp_routes_cmd);
   install_element (CONFIG_NODE, &dump_bgp_routes_interval_cmd);
   install_element (CONFIG_NODE, &no_dump_bgp_routes_cmd);
-
-#ifdef USE_SRX
-  thread_add_event (master, connect2, NULL, 0);
-#endif /* USE_SRX */
 }
 
 void

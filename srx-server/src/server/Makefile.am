@@ -3,11 +3,11 @@ include $(top_srcdir)/Makefile_Common
 EXTRA_DIST = 
 lib_LTLIBRARIES = 
 
-LIBS = -lpthread -lconfig -lpatricia -lrt
+#LIBS = -lpthread -lconfig -lpatricia -lrt
+LIBS = -lpthread -lconfig -lrt
 L_FLAGS = -L$(EXTRAS_LIB) 
 
 srxdir=$(bindir)
-
 srx_PROGRAMS = srx_server
 srx_server_LDFLAGS = $(L_FLAGS) $(LIBS)
 srx_server_SOURCES = bgpsec_handler.c \
@@ -23,16 +23,20 @@ srx_server_SOURCES = bgpsec_handler.c \
 		     server_connection_handler.c \
 		     srx_packet_sender.c \
 		     update_cache.c 
-
-srx_configdir = $(bindir)
-dist_srx_config_DATA = srx_server.conf
-		     
 srx_server_LDADD = $(top_srcdir)/shared/srx_packets.lo  \
 		   $(top_srcdir)/shared/srx_identifier.lo \
 		   $(top_srcdir)/shared/crc32.lo \
-		   $(top_srcdir)/util/libutil.la \
-		   $(top_srcdir)/client/libsrx.la
+		   $(top_srcdir)/util/libsrxutil.la \
+		   $(top_srcdir)/client/libsrx.la \
+		   $(EXTRAS_DIR)/../libpatricia.a
 
+# srx server configuration file setting
+#srx_configdir = $(pkgdatadir)
+srx_configdir = $(sysconfdir)
+srx_libconfigdir = $(sysconfdir)/ld.so.conf.d
+dist_srx_config_DATA = srx_server.conf
+dist_srx_libconfig_DATA = srx_lib.conf
+	
 
 #srx_server_CPPFLAGS = -I$(EXTRAS_INCLUDE_DIR) -g
 
@@ -52,6 +56,15 @@ srx_server_LDADD = $(top_srcdir)/shared/srx_packets.lo  \
 		  $(top_srcdir)/shared/srx_packets.h \
 		  $(EXTRAS_INCLUDE_DIR)/patricia.h \
 		  $(EXTRAS_INCLUDE_DIR)/uthash.h
+
+# following headers will be used for the quaggasrx rpm 
+pkginclude_HEADERS = $(CLIENT_DIR)/$(PACKAGE)/uthash.h \
+					 $(CLIENT_DIR)/$(PACKAGE)/types.h \
+					 $(CLIENT_DIR)/$(PACKAGE)/srx_defs.h \
+					 $(CLIENT_DIR)/$(PACKAGE)/srx_api.h \
+					 $(CLIENT_DIR)/$(PACKAGE)/slist.h \
+					 $(CLIENT_DIR)/$(PACKAGE)/prefix.h
+
 
 tags-local:
 	@ctags $(CTAGS_OPTS) *.h $(SHARED_DIR)/*.h $(UTIL_DIR)/*.h \

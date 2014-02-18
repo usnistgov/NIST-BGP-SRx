@@ -25,10 +25,18 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define ECOMMUNITY_ENCODE_AS                0x00
 #define ECOMMUNITY_ENCODE_IP                0x01
 #define ECOMMUNITY_ENCODE_AS4               0x02
+#ifdef USE_SRX
+#define ECOMMUNITY_ENCODE_BGPSEC            0x43  /* opaque type */
+#define ECOMMUNITY_ENCODE_TRANSITIVE_BGESEC 0x03  /* opaque type */
+#endif
+
 
 /* Low-order octet of the Extended Communityes type field.  */
 #define ECOMMUNITY_ROUTE_TARGET             0x02
 #define ECOMMUNITY_SITE_ORIGIN              0x03
+#ifdef USE_SRX
+#define ECOMMUNITY_BGPSEC_SUB               0x00  /* TBD */
+#endif
 
 /* Extended communities attribute string format.  */
 #define ECOMMUNITY_FORMAT_ROUTE_MAP            0
@@ -40,6 +48,13 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 /* Extended Communities type flag.  */
 #define ECOMMUNITY_FLAG_NON_TRANSITIVE      0x40  
+
+/* Extended Communities BGPSEC validation state values */
+#ifdef USE_SRX
+#define ECOMMUNITY_BGPSEC_VALID             0x00
+#define ECOMMUNITY_BGPSEC_NOT_FOUND         0x01
+#define ECOMMUNITY_BGPSEC_INVALID           0x02
+#endif
 
 /* Extended Communities attribute.  */
 struct ecommunity
@@ -77,6 +92,9 @@ extern int ecommunity_cmp (const void *, const void *);
 extern void ecommunity_unintern (struct ecommunity **);
 extern unsigned int ecommunity_hash_make (void *);
 extern struct ecommunity *ecommunity_str2com (const char *, int, int);
+#ifdef USE_SRX
+extern struct ecommunity *ecommunity_bgpsec_str2com(int, unsigned int);
+#endif
 extern char *ecommunity_ecom2str (struct ecommunity *, int);
 extern int ecommunity_match (const struct ecommunity *, const struct ecommunity *);
 extern char *ecommunity_str (struct ecommunity *);

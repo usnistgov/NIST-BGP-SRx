@@ -7,7 +7,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSrx, 0.99.22-0.3.0.1, [https://bugzilla.quagga.net])
+AC_INIT(QuaggaSrx, 0.3.1.0, [https://bugzilla.quagga.net])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -1367,13 +1367,30 @@ if test "x${enable_srx}" == "xyes"; then
       SRX_CLI_LIB=../srx/libsrx.a
       #AC_MSG_RESULT([yes - srx directory exists])
   else
+      if test -f ${SRX_USER_INC}/srx/libsrx.a; then
       SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.a
+          INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
+      else
+          if test -f /usr/lib/srx/libsrx.a ; then
+              SRX_CLI_LIB="/usr/lib/srx/libsrx.a /usr/lib/srx/libsrxutil.a"
+              #INCLUDES="${INCLUDES} -I/usr/include/srx/" --> If already srx rpm installed, don't need to use 
+          else
+              AC_MSG_ERROR([
+                            --------------------------------------------------
+                            The srx library and header file required to be
+                            installed first.  Stopping...
+                            Check 'config.log' for more information.
+                            --------------------------------------------------])
+          fi
+      fi
       #AC_MSG_RESULT([no - srx directory  NOT exists])
   fi
 
       #CPPFLAGS= -I${SRX_USER_INC}
+  #INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
 
   AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
+  AC_MSG_RESULT([INCLUDES:${INCLUDES}])
   AC_MSG_RESULT([USER:${SRX_CLI_LIB}  srx dir:${SRX_DIR}])
   #AC_MSG_FAILURE([test])
 

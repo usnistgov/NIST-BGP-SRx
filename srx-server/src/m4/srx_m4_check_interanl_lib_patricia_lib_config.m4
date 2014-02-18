@@ -20,6 +20,7 @@ if test "x$var_libpatr" = xyes; then
                 chmod +x ./make-lp.sh
                 ./make-lp.sh > /dev/null 2>&1 
                 cd $orig_path && pwd
+                rm -rf ../extras/files/Net-Patricia-1.15/
             fi
 
         fi
@@ -36,13 +37,14 @@ AC_MSG_CHECKING([for using internal libconfig])
 if test "x$var_libconf" = xyes; then
     AC_MSG_RESULT([enabled: ${var_libconf}])
     if test -f ../extras/files/libconfig-1.4.1.tar.gz; then
-	AC_MSG_RESULT([ libconfig-1.4.1.tar.gz exists ])
-	orig_path=$PWD
-	cd ../extras/files/ && pwd
-	tar xvfz libconfig-1.4.1.tar.gz > /dev/null 2>&1 && cd libconfig-1.4.1
-	./configure --prefix=${PWD}/../../local --disable-cxx
-	make all install > /dev/null 2>&1 
-	cd $orig_path && pwd
+	    AC_MSG_RESULT([ libconfig-1.4.1.tar.gz exists ])
+	    orig_path=$PWD
+	    cd ../extras/files/ && pwd
+	    tar xvfz libconfig-1.4.1.tar.gz > /dev/null 2>&1 && cd libconfig-1.4.1
+	    ./configure --prefix=${PWD}/../../local --disable-cxx
+	    make all install > /dev/null 2>&1 
+	    cd $orig_path && pwd
+        rm -rf ../extras/files/libconfig-1.4.1/
     fi
 else
     AC_MSG_RESULT([null: ${var_libconf}])

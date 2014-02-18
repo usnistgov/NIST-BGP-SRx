@@ -28,32 +28,41 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.3.0
+ * @version 0.3.0.2
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *             update does not include the secure protocol section. The protocol
- *             will still use un-encrypted plain TCP
- *   0.2.2 - 2012/12/28 - oborchert
- *           * Modified update 0.2.1. Fix BZ165 caused no ROA to be 
- *             installed into the cache. Applied new fix.
- *   0.2.1 - 2012/07/25 - kyehwan
- *           * Fixed segmentation fault while adding ROAs.
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *           * M0000713: Cleaned console input string with trim()
- *           * Added capability of adding single "white list" entries through
- *           * console (add ...).
- *           * Added version information.
- *           * Added addNow and removeNow to bypass the 60 seconds delay timer.
- *           * Rewritten code for prototype 2.
- *           * following draft-ietf-sidr-rpki-rtr.10
- *   0.1.0 - 2010/06/02 - pgleichm
- *           * Code Created Prototype 1
- *           * following draft-ymbk-rtr-protocol-05
+ *   0.3.0.2 - 2013/07/08 - oborchert
+ *             * Added an ID for each command to allow acing on them after they
+ *               are executed.
+ *             * Allows the exit/quit/\q command to be executed from within a
+ *               script
+ *             * Allowed to end the program when a script is passed and the 
+ *               last command is quit BZ# 351
+ *             * Changed all command processing methods to return the proper
+ *               command id CMD_ID_<command>
+ *   0.3.0   - 2013/01/28 - oborchert
+ *             * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *               update does not include the secure protocol section. The 
+ *               protocol will still use un-encrypted plain TCP
+ *   0.2.2   - 2012/12/28 - oborchert
+ *             * Modified update 0.2.1. Fix BZ165 caused no ROA to be 
+ *               installed into the cache. Applied new fix.
+ *   0.2.1   - 2012/07/25 - kyehwan
+ *             * Fixed segmentation fault while adding ROAs.
+ *   0.2.0   - 2011/01/07 - oborchert
+ *             * Changelog added with version 0.2.0 and date 2011/01/07
+ *             * Version tag added
+ *             * M0000713: Cleaned console input string with trim()
+ *             * Added capability of adding single "white list" entries through
+ *             * console (add ...).
+ *             * Added version information.
+ *             * Added addNow and removeNow to bypass the 60 seconds delay timer.
+ *             * Rewritten code for prototype 2.
+ *             * following draft-ietf-sidr-rpki-rtr.10
+ *   0.1.0   - 2010/06/02 - pgleichm
+ *             * Code Created Prototype 1
+ *             * following draft-ymbk-rtr-protocol-05
  * -----------------------------------------------------------------------------
  */
 
@@ -106,11 +115,30 @@ typedef struct {
   UT_hash_handle  hh; ///< Hash handle
 } CacheClient;
 
+#define CMD_ID_QUIT       0
+#define CMD_ID_UNKNOWN    1
+#define CMD_ID_VERBOSE    2
+#define CMD_ID_CACHE      3
+#define CMD_ID_VERSION    4
+#define CMD_ID_HELP       5
+#define CMD_ID_CREDITS    6
+#define CMD_ID_SESSID     7
+#define CMD_ID_EMPTY      8
+#define CMD_ID_ADD        9
+#define CMD_ID_ADDNOW    10
+#define CMD_ID_REMOVE    11
+#define CMD_ID_REMOVENOW 12
+#define CMD_ID_ERROR     13
+#define CMD_ID_NOTIFY    14
+#define CMD_ID_RESET     15
+#define CMD_ID_CLIENTS   16
+#define CMD_ID_RUN       17
+#define CMD_ID_SLEEP     18
+
 /*----------
  * Constants
  */
-
-const char* RPKI_RTR_SRV_VER          ="0.3";
+const char* RPKI_RTR_SRV_VER          ="0.3.0.2";
 const char* RPKI_RTR_SRV_NAME         ="RPKI Cache Test Harness";
 const char* HISTORY_FILENAME          = ".rpkirtr_svr.history";
 const char* USER_PROMPT               = ">> ";
@@ -447,8 +475,10 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
 
 /**
  * Send a SERIAL NOTIFY to all clients of the test harness
+ * 
+ * @return CMD_ID_NOTIFY
  */
-void sendSerialNotifyToAllClients()
+int sendSerialNotifyToAllClients()
 {
   if (HASH_COUNT(clients) > 0)
   {
@@ -469,14 +499,16 @@ void sendSerialNotifyToAllClients()
 
     unlockReadLock(&cache.lock);
   }
+  
+  return CMD_ID_NOTIFY;
 }
 
 /**
  * Sends a Cache Reset message to all clients.
  * 
- * @return true;
+ * @return CMD_ID_RESET;
  */
-bool sendCacheResetToAllClients()
+int sendCacheResetToAllClients()
 {
   if (HASH_COUNT(clients) > 0)
   {
@@ -494,7 +526,8 @@ bool sendCacheResetToAllClients()
 
     unlockReadLock(&cache.lock);
   }
-  return true;
+  
+  return CMD_ID_RESET;
 }
 
 /**
@@ -1065,10 +1098,11 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
  *
  * @param argument if NULL display the current cache session id otherwise use
  *                 value to generate new once.
+ * 
+ * @return CMD_ID_SESSID
  */
-bool processSessionID(char* argument)
+int processSessionID(char* argument)
 {
-  bool result = true;
   if (argument == NULL)
   {
     printf("Current SESSION ID: %d (0x%04X)\n", sessionID, sessionID);
@@ -1087,7 +1121,6 @@ bool processSessionID(char* argument)
       else
       {
         printf("ERROR: New SESSION ID '%s' is not a number!\n", argument);
-        result = false;
       }
     }
     else
@@ -1096,7 +1129,6 @@ bool processSessionID(char* argument)
       {
         printf("ERROR: New SESSION ID %d must be greater than current SESSION "
                "IS %d!\n", newSessionID, sessionID);
-        result = false;
       }
       else
       {
@@ -1108,7 +1140,8 @@ bool processSessionID(char* argument)
       }
     }
   }
-  return result;
+  
+  return CMD_ID_SESSID;
 }
 
 /*----------------
@@ -1117,17 +1150,23 @@ bool processSessionID(char* argument)
 
 /**
  * Display the version information.
+ * 
+ * @return CMD_ID_VERSION
  */
-void showVersion()
+int showVersion()
 {
   printf("%s Version %s\n", RPKI_RTR_SRV_NAME, RPKI_RTR_SRV_VER);
+  
+  return CMD_ID_VERSION;
 }
 
 
 /**
  * Display the command help
+ * 
+ * @return CMD_ID_HELP
  */
-bool showHelp(char* command)
+int showHelp(char* command)
 {
   if (command == NULL)
   {
@@ -1167,7 +1206,10 @@ bool showHelp(char* command)
            "\n"
            "Program Commands:\n"
            "-----------------\n"
-           "  - quit, exit        : Quits the loop and terminates the server\n"
+           "  - quit, exit, \\q   : Quits the loop and terminates the server\n"
+           "                        This command is allowed within scripts\n"
+           "                        but only as the very last command!\n"
+           "                        Otherwise it will be ignored!\n"
            "  - clients           : Lists all clients\n"
            "  - run <filename>    : Executes a file line-by-line\n"
            "  - sleep <seconds>   : Pauses execution\n"
@@ -1237,22 +1279,32 @@ bool showHelp(char* command)
               command);
     }
   }
-  return true;
+  return CMD_ID_HELP;
 }
 
-void showCredits()
+/**
+ * Display the credits of the program 
+ * 
+ * @return CMD_ID_CREDITS
+ */
+int showCredits()
 {
   showVersion();
   printf(SRX_CREDITS);
+  
+  return CMD_ID_CREDITS;
 }
 
 /**
  * Turn Verbose mode on or off.
+ * 
+ * @return CMD_ID_VERBOSE
  */
-void toggleVerboseMode()
+int toggleVerboseMode()
 {
   verbose ^= true;
   printf("Verbose output: %s\n", verbose ? "on" : "off");
+  return CMD_ID_VERBOSE;
 }
 
 /**
@@ -1298,54 +1350,76 @@ bool appendPrefixData(char* arg, bool fromFile)
  *
  * @param line the cache entry.
  *
- * @return true if it could be added to the cache.
+ * @return CMD_ID_APPEND
  */
-bool appendPrefix(char* line)
+int appendPrefix(char* line)
 {
-  return appendPrefixData(line, false);
+  if (!appendPrefixData(line, false))
+  {
+    printf ("ERROR: The prefix information '%s' could not be added to the "
+            "cache\n", line);
+  }
+  return CMD_ID_ADD;
 }
 
 /**
- * This method adds the RPKI cache entry into the test hareness. The format
+ * This method adds the RPKI cache entry into the test harness. The format
  * is IP/len max AS. this method does not wait for the notification timer to
  * expire. The notification will be send out to all attached clients right away.
  *
  * @param line the cache entry.
  *
- * @return true if it could be added to the cache.
+ * @return CMD_ID_ADDNOW
  */
-bool appendPrefixNow(char* line)
+int appendPrefixNow(char* line)
 {
   bool returnVal = appendPrefixData(line, false);
   if (returnVal)
   {
     sendSerialNotifyToAllClients();
   }
-  return returnVal;
+  return CMD_ID_ADDNOW;
 }
 
-
-bool appendPrefixFile(char* fileName)
+/**
+ * Append the given prefix information in the given file.
+ * 
+ * @param fileName the filename containing the prefix information
+ * 
+ * @return CMD_ID_APPEND
+ */
+int appendPrefixFile(char* fileName)
 {
-    return appendPrefixData(fileName, true);
+  if (!appendPrefixData(fileName, true))
+  {
+    printf("Error appending prefix information of '%s'\n", fileName);    
+  }
+  
+  return CMD_ID_ADD;
 }
 
 /**
  * Clear the cache without sending a notify.
+ * 
+ * @return CMD_ID_EMPTY
  */
-void emptyCache()
+int emptyCache()
 {
   acquireWriteLock(&cache.lock);
   emptySList(&cache.entries);
   unlockWriteLock(&cache.lock);
 
   OUTPUTF(true, "Emptied the cache\n");
+  
+  return CMD_ID_EMPTY;
 }
 
 /**
  * Print the content of the cache test harness to the console.
+ * 
+ * @return CMD_ID_CACHE
  */
-void printCache()
+int printCache()
 {
   #define IPBUF_SIZE   MAX_IP_V6_STR_LEN
 
@@ -1396,6 +1470,8 @@ void printCache()
     }
   }
   unlockReadLock(&cache.lock);
+  
+  return CMD_ID_CACHE;
 }
 
 /**
@@ -1405,7 +1481,7 @@ void printCache()
  *
  * @return true if the entries could be removed.
  */
-bool removeEntries(char* arg)
+bool processEntryRemoval(char* arg)
 {
   int            startIndex, endIndex, currPos;
   char*          aptr;
@@ -1492,23 +1568,40 @@ bool removeEntries(char* arg)
   return true;
 }
 
+/** 
+ * This method is a wrapper for processEntryRemoval(char* arg) which does
+ * the actual work. This wrapper is necessary to return the correct integer 
+ * value.
+ * 
+ * @param arg list of entry-id's to be deleted from the cache.
+ *
+ * @return CMD_ID_REMOVE
+ * 
+ * @since 0.3.0.2
+ */
+int removeEntries(char* arg)
+{
+  processEntryRemoval(arg);
+  return CMD_ID_REMOVE;
+}
+
 /**
  * Same as removeEntries except the entries are removed this very second.
  * This method overwrites the sleeping period of the cache. It sends the
- * notification right away to the conencted client(s) without waiting.
+ * notification right away to the connected client(s) without waiting.
  *
  * @param arg The list of entries to be removed.
  *
- * @return true if everything coudl be done.
+ * @return CMD_ID_REMOVENOW
  */
-bool removeEntriesNow(char* arg)
+int removeEntriesNow(char* arg)
 {
   bool returnVal = removeEntries(arg);
   if (returnVal)
   {
     sendSerialNotifyToAllClients();
   }
-  return returnVal;
+  return CMD_ID_REMOVENOW;
 }
 
 /**
@@ -1516,9 +1609,9 @@ bool removeEntriesNow(char* arg)
  * 
  * @param arg <errorNo> <pdu | "-"> <msg | "-">
  * 
- * @return true if succesfull
+ * @return CMD_ID_ERROR
  */
-bool issueErrorReport(char* arg)
+int issueErrorReport(char* arg)
 {
   uint16_t  errNo;
   char*     msg;
@@ -1526,7 +1619,7 @@ bool issueErrorReport(char* arg)
   if (arg == NULL)
   {
     ERRORF("Error: No error-code and/or message given\n");
-    return false;
+    return CMD_ID_ERROR;
   }
 
   // Parse code and point to message
@@ -1534,7 +1627,7 @@ bool issueErrorReport(char* arg)
   if (msg == arg)
   {
     ERRORF("Error: Invalid error-code: %s\n", arg);
-    return false;
+    return CMD_ID_ERROR;
   }
   if (*msg != '\0')
   {
@@ -1544,13 +1637,15 @@ bool issueErrorReport(char* arg)
   // Send
   sendErrorReportToAllClients(errNo, msg);
 
-  return true;
+  return CMD_ID_ERROR;
 }
 
 /**
  * Print the list of clients to the console.
+ * 
+ * @return CMD_ID_CLIENTS
  */
-void listClients()
+int listClients()
 {
   #define BUF_SIZE (MAX_IP_V6_STR_LEN + 6)
   char          buf[BUF_SIZE];
@@ -1568,31 +1663,34 @@ void listClients()
       printf("%d: %s\n", idx, socketToStr(cl->fd, true, buf, BUF_SIZE));
     }
   }
+  
+  return CMD_ID_CLIENTS;
 }
 
 // Necessary forward declaration
-bool handleLine(char* line);
+int handleLine(char* line);
 
 /**
  * Load the file given and execute line by line.
  * 
  * @param arg The name of the file
  * 
- * @return true if the command could be processed successfully
+ * @return The last comment in the script or CMD_ID_RUN if unknown
  */
-bool executeScript(char* fileName)
+int executeScript(char* fileName)
 {
   #define MAX_LINE_LEN  128
 
   FILE* fh;
   char  cbuf[MAX_LINE_LEN];
   char* cpos;
+  int last_command = CMD_ID_UNKNOWN;
 
   fh = fopen(fileName, "rt");
   if (fh == NULL)
   {
     ERRORF("Error: Failed to open the script '%s'\n", fileName);
-    return false;
+    return CMD_ID_RUN;
   }
 
   while (fgets(cbuf, MAX_LINE_LEN, fh))
@@ -1613,11 +1711,12 @@ bool executeScript(char* fileName)
       continue;
     }
 
-    handleLine(cbuf);
+    last_command = handleLine(cbuf);
   }
 
   fclose(fh);
-  return true;
+  
+  return (last_command == CMD_ID_UNKNOWN) ? CMD_ID_RUN : last_command;
 }
 
 /**
@@ -1625,20 +1724,34 @@ bool executeScript(char* fileName)
  * 
  * @param noSeconds The time in seconds the program has to pause.
  * 
- * @return true if the program could pause.
+ * @return CMD_ID_SLEEP.
  */
-bool pauseExecution(char* noSeconds)
+int pauseExecution(char* noSeconds)
 {
   int sec;
 
   sec = strtol(noSeconds, NULL, 10);
-  if (sec == 0)
+  if (sec <= 0)
   {
     ERRORF("Error: Invalid number of seconds: %s\n", noSeconds);
-    return false;
   }
-  sleep(sec);
-  return true;
+  else
+  {
+    sleep(sec);
+  }
+  return CMD_ID_SLEEP;
+}
+
+/**
+ * Doesn't really do anything
+ * 
+ * @return CMD_ID_QUIT
+ * 
+ * @since 0.3.0.2
+ */
+int processQuit()
+{
+  return CMD_ID_QUIT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1648,53 +1761,56 @@ bool pauseExecution(char* noSeconds)
 /**
  * This method parses the line by splitting it into command and argument
  * separated by a blank. Depending on the command the appropriate method is
- * called.
+ * called. With version 0.3.0.2 this method will return true if the parser can 
+ * continue and false if not. (false does not necessarily mean an error.
  *
  * @param line The line to be parsed
  *
- * @return true if the command could be executed
+ * @return the integer value of the executed command.
  */
-bool handleLine(char* line)
-{
+int handleLine(char* line)
+{  
   char* cmd, *arg;
+  int retVal = CMD_ID_UNKNOWN;
 
   // Split into command and argument
   arg = line;
   cmd = strsep(&arg, " ");
 
   // Call function that is going to handle the command
-  #define VCMD_CASE(STR, FUNC) \
-    if (!strcmp(cmd, STR)) { FUNC(); return true; }
-
-  #define ACMD_CASE(STR, FUNC) \
+  #define CMD_CASE(STR, FUNC) \
     if (!strcmp(cmd, STR)) { return FUNC(arg); }
 
-  VCMD_CASE("verbose",   toggleVerboseMode);
-  VCMD_CASE("cache",     printCache);
-  VCMD_CASE("version",   showVersion);
-  ACMD_CASE("\\h",       showHelp);
-  ACMD_CASE("help",      showHelp);
-  VCMD_CASE("credits",   showCredits);
+  CMD_CASE("verbose",   toggleVerboseMode);
+  CMD_CASE("cache",     printCache);
+  CMD_CASE("version",   showVersion);
+  CMD_CASE("\\h",       showHelp);
+  CMD_CASE("help",      showHelp);
+  CMD_CASE("credits",   showCredits);
 
-  ACMD_CASE("sessionID", processSessionID);
+  CMD_CASE("sessionID", processSessionID);
 
-  VCMD_CASE("empty",     emptyCache);
-  ACMD_CASE("append",    appendPrefixFile);
-  ACMD_CASE("add",       appendPrefix);
-  ACMD_CASE("addNow",    appendPrefixNow);
-  ACMD_CASE("remove",    removeEntries);
-  ACMD_CASE("removeNow", removeEntriesNow);
-  ACMD_CASE("error",     issueErrorReport);
-  VCMD_CASE("notify",    sendSerialNotifyToAllClients);
-  VCMD_CASE("reset",     sendCacheResetToAllClients);
+  CMD_CASE("empty",     emptyCache);
+  CMD_CASE("append",    appendPrefixFile);
+  CMD_CASE("add",       appendPrefix);
+  CMD_CASE("addNow",    appendPrefixNow);
+  CMD_CASE("remove",    removeEntries);
+  CMD_CASE("removeNow", removeEntriesNow);
+  CMD_CASE("error",     issueErrorReport);
+  CMD_CASE("notify",    sendSerialNotifyToAllClients);
+  CMD_CASE("reset",     sendCacheResetToAllClients);
 
-  VCMD_CASE("clients",   listClients);
-  ACMD_CASE("run",       executeScript);
-  ACMD_CASE("sleep",     pauseExecution);
+  CMD_CASE("clients",   listClients);
+  CMD_CASE("run",       executeScript);
+  CMD_CASE("sleep",     pauseExecution);
+  
+  CMD_CASE("quit",      processQuit);
+  CMD_CASE("exit",      processQuit);
+  CMD_CASE("\\q",       processQuit);
 
   // Unknown
   printf("Error: Unknown command '%s'\n", cmd);
-  return false;
+  return retVal;
 }
 
 /**
@@ -1706,6 +1822,7 @@ void handleUserInput()
 
   using_history();
   read_history(HISTORY_FILENAME);
+  int cmd = CMD_ID_UNKNOWN;
   // Added trim = M0000713
   while((line = trim(readline(USER_PROMPT))))
   {
@@ -1716,20 +1833,20 @@ void handleUserInput()
       continue;
     }
 
-    // The user wants to quit
-    if (   strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0
-        || strcmp(line, "\\q") == 0 )
+    // Execute the line
+    
+    cmd = handleLine(line);
+    if (cmd == CMD_ID_QUIT)
     {
       free(line);
       break;
     }
-
-    // Store so that the user does not have to type it again
-    add_history(line);
-
-    // Execute and then free
-    handleLine(line);
-    free(line);
+    else if (cmd != CMD_ID_UNKNOWN)
+    {      
+      // Store so that the user does not have to type it again
+      add_history(line);       
+    }
+    free(line);        
   }
 
   write_history(HISTORY_FILENAME);
@@ -1843,7 +1960,7 @@ int main(int argc, const char* argv[])
   // Help and port number
   if (argc < 2)
   {
-    printf("Use default port 50001\n");
+    printf("Start RPKI-Cache test harness using default port 50001\n");
     port = 50001;
   }
   else
@@ -1889,11 +2006,15 @@ int main(int argc, const char* argv[])
     signal(SIGINT, handleSigInt);
 
     ret = 0;
+    bool doContiunue = true; 
     if (argc >= 3)
     {
-      executeScript((char*)argv[2]);
+      doContiunue = executeScript((char*)argv[2]) != CMD_ID_QUIT;
     }
-    handleUserInput();
+    if (doContiunue)
+    {
+      handleUserInput();
+    }
   }
   else
   {

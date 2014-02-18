@@ -40,6 +40,7 @@ ecommunity_new (void)
 					sizeof (struct ecommunity));
 }
 
+
 /* Allocate ecommunities.  */
 void
 ecommunity_free (struct ecommunity **ecom)
@@ -563,6 +564,37 @@ ecommunity_str2com (const char *str, int type, int keyword_included)
     }
   return ecom;
 }
+
+#ifdef USE_SRX
+/**
+ * @brief bgpsec ecommunity parsing function
+ *
+ * @param type
+ * @param state_value
+ *
+ * @return
+ */
+struct ecommunity *
+ecommunity_bgpsec_str2com(int type, unsigned int state_value)
+{
+  struct ecommunity *ecom = NULL;
+  struct ecommunity_val eval;
+
+  memset(&eval, 0x00, sizeof(struct ecommunity_val));
+  ecom = ecommunity_new ();
+
+  eval.val[0] = ECOMMUNITY_ENCODE_BGPSEC;   /* high order type */
+  //eval.val[0] = ECOMMUNITY_ENCODE_TRANSITIVE_BGESEC;   /* TEST high order type */
+  //eval.val[1] = ECOMMUNITY_BGPSEC_SUB;      /* low order type */
+  eval.val[1] = type;      /* low order type */
+  eval.val[7] = state_value;
+  //eval.val[7] = 0xAB; // for test
+
+  ecommunity_add_val (ecom, &eval);
+
+  return ecom;
+}
+#endif
 
 /* Convert extended community attribute to string.  
 

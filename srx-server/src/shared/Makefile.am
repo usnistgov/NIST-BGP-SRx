@@ -4,7 +4,7 @@ EXTRA_DIST =
 
 COPTS = -ggdb -I$(EXTRAS_INCLUDE_DIR) -I$(top_srcdir)
 
-lib_LTLIBRARIES = libsrx_packets.la
+pkglib_LTLIBRARIES = libsrx_packets.la
 libsrx_packets_la_SOURCES = srx_packets.c \
 			    srx_identifier.c \
 			    crc32.c
@@ -35,4 +35,5 @@ FORCE:
 #	$(MAKE) clean;
 #	$(MAKE) $(AM_MAKESET) $@
 	
+
 .PHONY: all FORCE

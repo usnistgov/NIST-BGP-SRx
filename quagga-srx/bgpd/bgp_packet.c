@@ -137,6 +137,59 @@ bgp_connect_check (struct peer *peer)
     }
 }
 
+#ifdef USE_SRX
+struct ecommunity* srxEcommunityChange(struct bgp *bgp, struct attr *attr, struct bgp_info *binfo)
+{
+  struct attr_extra *attre = attr->extra;
+  struct ecommunity *ecom=NULL, *ecom_orig=NULL;
+  unsigned int state;
+
+  switch(binfo->val_res_ROA)
+  {
+    case ECOMMUNITY_BGPSEC_VALID:
+      state = ECOMMUNITY_BGPSEC_VALID; break;
+    case ECOMMUNITY_BGPSEC_NOT_FOUND:
+      state = ECOMMUNITY_BGPSEC_NOT_FOUND; break;
+    case ECOMMUNITY_BGPSEC_INVALID:
+      state = ECOMMUNITY_BGPSEC_INVALID; break;
+    default:
+      state = ECOMMUNITY_BGPSEC_NOT_FOUND; break;
+  }
+
+  if(attre)
+  {
+    ecom = ecommunity_bgpsec_str2com (bgp->srx_ecommunity_subcode, state);
+    attr->flag |= ATTR_FLAG_BIT (BGP_ATTR_EXT_COMMUNITIES);
+    ecom_orig = attre->ecommunity;
+    attre->ecommunity = ecom;
+  }
+  else
+    return NULL;
+
+  return ecom_orig;
+}
+
+int srxEcommunityRestore(struct attr *attr, struct ecommunity* ecom_orig)
+{
+  struct attr_extra *attre = attr->extra;
+  struct ecommunity *ecom=NULL;
+  int ret=0;
+
+  if(attre && attre->ecommunity && (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_EXT_COMMUNITIES)))
+  {
+    attr->flag &= ~(ATTR_FLAG_BIT (BGP_ATTR_EXT_COMMUNITIES));
+    ecom = attre->ecommunity;
+    attre->ecommunity = ecom_orig;
+    ret = 1;
+  }
+
+  if(ecom)
+    free(ecom);
+
+  return ret;
+}
+#endif
+
 /* Make BGP update packet.  */
 static struct stream *
 bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
@@ -149,6 +202,9 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
   struct bgp_info *binfo = NULL;
   bgp_size_t total_attr_len = 0;
   unsigned long pos;
+#ifdef USE_SRX
+  u_char bFrag =0;
+#endif
 
   s = peer->work;
   stream_reset (s);
@@ -187,11 +243,20 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 	  stream_putw (s, 0);		
 	  pos = stream_get_endp (s);
 	  stream_putw (s, 0);
+#ifdef USE_SRX
+          struct ecommunity *ecom_orig;
+          if (CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY))
+            ecom_orig = srxEcommunityChange(peer->bgp, adv->baa->attr, binfo);
+#endif
 	  total_attr_len = bgp_packet_attribute (NULL, peer, s, 
 	                                         adv->baa->attr,
 	                                         &rn->p, afi, safi, 
 	                                         from, prd, tag);
 	  stream_putw_at (s, pos, total_attr_len);
+#ifdef USE_SRX
+          if (CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY))
+            bFrag = srxEcommunityRestore(adv->baa->attr, ecom_orig);
+#endif
 	}
 
       if (afi == AFI_IP && safi == SAFI_UNICAST)
@@ -209,7 +274,9 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 
       /* Synchnorize attribute.  */
       if (adj->attr)
+      {
 	bgp_attr_unintern (&adj->attr);
+      }
       else
 	peer->scount[afi][safi]++;
 
@@ -219,6 +286,46 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 
       if (! (afi == AFI_IP && safi == SAFI_UNICAST))
 	break;
+
+#ifdef USE_SRX
+      struct peer *from = NULL;
+      u_char bDoNotFrag =1;
+      if (binfo)
+      {
+        from = binfo->peer;
+        if(from)
+        {
+          if(from->as == 0) // only an update from this router
+            ;//bDoNotFrag =0;   // fragmentation set
+        }
+        bDoNotFrag =0; // not only this router, also other routers too
+      }
+
+      if (bFrag)
+      {
+        if(bDoNotFrag)
+          goto donot_frag;
+
+        size_t cp = stream_get_getp(s);
+        stream_set_getp (s, BGP_MARKER_SIZE + 2);
+        u_char type = stream_getc (s);
+        stream_set_getp(s, cp); // rewind
+
+        /* BGP_UPDATE fragmentation */
+        if(type == BGP_MSG_UPDATE)
+        {
+          bgp_packet_set_size (s);
+          packet = stream_dup (s);
+          bgp_packet_add (peer, packet);
+          BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
+          stream_reset (s);
+          return packet;
+        }
+      }
+
+donot_frag:
+      bDoNotFrag = 0;
+#endif
     }
 	 
   if (! stream_empty (s))
@@ -553,6 +660,7 @@ bgp_write_packet (struct peer *peer)
 		  }
 		else
 		  s = bgp_update_packet (peer, afi, safi);
+
 	      }
 
 	    if (s)
@@ -704,6 +812,7 @@ bgp_write (struct thread *thread)
   sockopt_cork (peer->fd, 0);
   return 0;
 }
+
 
 /* This is only for sending NOTIFICATION message to neighbor. */
 static int
@@ -2582,7 +2691,7 @@ int bgp_read2 (struct thread *thread)
   peer->t_read = NULL;
 
 
-    printf(" event read2 ---------\n");
+    zlog_debug(" event read2 ---------\n");
     BGP_READ_ON (peer->t_read, bgp_read2, peer->fd);
     return 0;
 }

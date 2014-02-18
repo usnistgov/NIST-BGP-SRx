@@ -2,14 +2,14 @@
 include $(top_srcdir)/Makefile_Common
 
 EXTRA_DIST = 
-lib_LTLIBRARIES = libsrx.la
+pkglib_LTLIBRARIES = libsrx.la
 libsrx_la_SOURCES = client_connection_handler.c \
 		    srx_api.c 
 		    
 libsrx_la_LIBADD = $(top_srcdir)/shared/srx_packets.lo \
 		   $(top_srcdir)/shared/srx_identifier.lo \
 		   $(top_srcdir)/shared/crc32.lo \
-		   $(top_srcdir)/util/libutil.la
+		   $(top_srcdir)/util/libsrxutil.la
 
 noinst_HEADERS = client_connection_handler.h \
 	     srx_api.h  \

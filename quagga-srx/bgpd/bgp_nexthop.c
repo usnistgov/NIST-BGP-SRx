@@ -1187,7 +1187,7 @@ zlookup_connect (struct thread *t)
 static int
 zlookup_connect2 (struct thread *t)
 {
-    printf(" ----------- test event read -----------\n");
+    zlog_debug(" ----------- test event read -----------\n");
   struct zclient *zlookup2;
 
   zlookup2 = THREAD_ARG (t);
@@ -1200,14 +1200,14 @@ zlookup_connect2 (struct thread *t)
   int accept_sock = THREAD_FD (t);
   fd = accept_sock;
 
-  printf(" accept_sock: %d , fd: %d\n", accept_sock, fd);
+  zlog_debug(" accept_sock: %d , fd: %d\n", accept_sock, fd);
 
   if ( (n_read= read(fd, a_buf, sizeof(a_buf)) ) == -1)
   {
       if (n_read== 0)
-	  printf(" broken pipe\n");  // exit(0);
+	  zlog_debug(" broken pipe\n");  // exit(0);
 
-      printf( "[%1$d byte ] %2$.*1$s\n", n_read, a_buf);
+      zlog_debug( "[%1$d byte ] %2$.*1$s\n", n_read, a_buf);
 
   }
 
@@ -1460,14 +1460,14 @@ bgp_scan_init (void)
       if(errno != EEXIST)
       {
 	  fprintf(stderr, "FAIL:mkfifo() (%s) \n", strerror(errno)); 
-	  printf(" EXIT_FAILURE\n");
+	  zlog_debug(" EXIT_FAILURE\n");
       }
   }
 
   if ((fd = open(PATH_INFO, O_RDWR, 0644)) == -1)
   {
       fprintf(stderr, "FAIL:open() (%s) \n", strerror(errno));
-      printf(" EXIT_FAILURE\n");
+      zlog_debug(" EXIT_FAILURE\n");
   }
 
   //printf(" fd:%d\n", fd);

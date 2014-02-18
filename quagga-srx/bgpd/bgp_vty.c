@@ -1525,6 +1525,19 @@ DEFUN (srx_show_config,
   vty_out (vty, "  connected......: %s%s", (isConnected(bgp->srxProxy) 
                                           ? "true" : "false"), VTY_NEWLINE);
   
+  if (CHECK_FLAG(bgp->srx_ecommunity_flags,SRX_BGP_FLAG_ECOMMUNITY))
+  {
+    vty_out (vty, "  ext community..: %d%s", bgp->srx_ecommunity_subcode,
+                                             VTY_NEWLINE);
+    vty_out (vty, "  incl-eBGP......: %s%s",
+             (CHECK_FLAG(bgp->srx_ecommunity_flags,SRX_BGP_FLAG_ECOMMUNITY_EBGP) 
+             ? "true" : "false"), VTY_NEWLINE);
+  }
+  else
+  {
+    vty_out (vty, "  ext community..: off%s", VTY_NEWLINE);    
+  }
+  
   return CMD_SUCCESS;
 }
 
@@ -1997,6 +2010,32 @@ DEFUN (no_srx_policy_prefer_valid,
   return srx_val_policy_unset (vty->index, SRX_VAL_POLICY_PREFER_VALID);
 }
 
+DEFUN (srx_send_extcommunity,
+       srx_send_extcommunity_cmd,
+       SRX_VTY_CMD_EXT_CSTR,
+       SRX_VTY_HLP_EXT_CSTR)      
+{
+  return srx_extcommunity_set (vty->index, atoi(argv[0]), "");
+}
+
+DEFUN (srx_send_extcommunity_ebgp,
+       srx_send_extcommunity_ebgp_cmd,
+       SRX_VTY_CMD_EXT_CSTR_EBGP,
+       SRX_VTY_HLP_EXT_CSTR_EBGP)      
+{
+  return srx_extcommunity_set (vty->index, atoi(argv[0]), argv[1]);
+  //return CMD_WARNING;
+}
+
+
+DEFUN (no_srx_send_extcommunity,
+       no_srx_send_extcommunity_cmd,
+       SRX_VTY_CMD_NO_EXT_CSTR,
+       NO_STR
+       SRX_VTY_HLP_NO_EXT_CSTR)
+{  
+  return srx_extcommunity_unset(vty->index);
+}
 #endif /* USE_SRX */
 
 static int
@@ -9857,6 +9896,10 @@ bgp_vty_init (void)
 
   install_element (BGP_NODE, &srx_policy_prefer_valid_cmd);
   install_element (BGP_NODE, &no_srx_policy_prefer_valid_cmd);  
+
+  install_element (BGP_NODE, &srx_send_extcommunity_cmd);
+  install_element (BGP_NODE, &srx_send_extcommunity_ebgp_cmd);
+  install_element (BGP_NODE, &no_srx_send_extcommunity_cmd);
 #endif /* USE_SRX */
 
   /* "neighbor remote-as" commands. */

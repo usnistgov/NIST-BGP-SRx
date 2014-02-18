@@ -40,7 +40,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_CMD_CONNECT_SHORT "srx connect"
 #define SRX_VTY_HLP_CONNECT_SHORT SRX_VTY_HLP_STR \
                                   "Connect the router with SRx server\n"
-#define SRX_VTY_CMD_CONNECT   SRX_VTY_CMD_CONNECT_SHORT " .LINE <0..65535>"
+#define SRX_VTY_CMD_CONNECT   SRX_VTY_CMD_CONNECT_SHORT " .LINE <0-65535>"
 #define SRX_VTY_OUT_CONNECT   "srx connect %s %d%s"
 #define SRX_VTY_HLP_CONNECT   SRX_VTY_HLP_CONNECT_SHORT \
                               "Specifies SRx server host name or IP address\n" \
@@ -82,7 +82,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 //The short version is not a stand alone command, it is needed for a vtty output
 #define SRX_VTY_CMD_SET_SERVER_SHORT "srx set-server"
-#define SRX_VTY_CMD_SET_SERVER  SRX_VTY_CMD_SET_SERVER_SHORT " .LINE <0--56535>"
+#define SRX_VTY_CMD_SET_SERVER  SRX_VTY_CMD_SET_SERVER_SHORT " .LINE <0-65535>"
 #define SRX_VTY_HLP_SET_SERVER  SRX_VTY_HLP_STR \
                                 "Set the SRx server connection parameters\n"
 
@@ -210,14 +210,28 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                   SRX_VTY_HLP_POL_LOCP_U \
                                   SRX_VTY_HLP_POL_LOCP_I \
 
-
-
 // POLICY PREFER-VALID
 #define SRX_VTY_CMD_POL_PREFV "srx policy prefer-valid"
 #define SRX_VTY_OUT_POL_PREFV SRX_VTY_CMD_POL_PREFV "%s"
 #define SRX_VTY_HLP_POL_PREFV SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
                               "Use the validation state as tie breaker " \
                               "with valid > any other\n" 
+
+// USE OF COMMUNITY STRING
+#define SRX_VTY_CMD_EXT_CSTR "srx extcommunity <0-255>"
+#define SRX_VTY_HLP_EXT_CSTR SRX_VTY_HLP_STR "Configure community string for" \
+                              " validation result transmission\n" \
+                             "The sub code of the extended community.\n"
+
+#define SRX_VTY_CMD_EXT_CSTR_EBGP SRX_VTY_CMD_EXT_CSTR " (include_ebgp|only_ibgp)"
+#define SRX_VTY_HLP_EXT_CSTR_EBGP SRX_VTY_HLP_EXT_CSTR \
+                                  "Include eBGP peers (optional)\n" \
+                                  "Only iBGP peers - also used to turn off eBGP peers\n" 
+
+#define SRX_VTY_CMD_NO_EXT_CSTR "no srx extcommunity"
+#define SRX_VTY_HLP_NO_EXT_CSTR  NO_STR SRX_VTY_HLP_STR \
+                                "Deactivate the extended community validation" \
+                                 " result transfer.\n"
 #endif /* USE_SRX */
 
 /* Typedef BGP specific types.  */
@@ -405,7 +419,7 @@ struct bgp
   int  srx_handshakeTimeout;
   // Time in seconds the SRx server is requested to keep data after a delete
   int  srx_keepWindow;
-  uint32_t  srx_proxyID;
+  uint32_t srx_proxyID;
   /** The local pref values for [0]valid, [1]notfound, and [2]invalid*/
   struct srx_local_pref  srx_val_local_pref[3];
 #define VAL_LOCPRF_VALID     0
@@ -428,6 +442,12 @@ struct bgp
   struct bgp_info_hash* info_uid_hash;
   /* The info hash for local id's */
   struct bgp_info_hash* info_lid_hash;
+
+  /** Contains the information if extended community is used and the subcode*/
+#define SRX_BGP_FLAG_ECOMMUNITY      (1 << 0)
+#define SRX_BGP_FLAG_ECOMMUNITY_EBGP (1 << 1)
+  u_int8_t srx_ecommunity_flags;
+  u_int8_t srx_ecommunity_subcode;
 #endif /* USE_SRX */
 };
 
@@ -1159,6 +1179,9 @@ extern int srx_val_local_preference_set (struct bgp *, int, int, uint32_t);
 extern int srx_val_local_preference_unset (struct bgp *, int);
 extern int srx_val_policy_set (struct bgp *, uint16_t);
 extern int srx_val_policy_unset (struct bgp *, uint16_t);
+
+extern int srx_extcommunity_set (struct bgp *, uint8_t, const char *);
+extern int srx_extcommunity_unset (struct bgp *);
 
 extern int srx_config_check (struct bgp *, uint16_t);
 

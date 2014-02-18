@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.3.0.1], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.3.0.3], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -26,6 +26,7 @@ case $host_os in
 	;;
     linux*)
 	# Do something specific for linux
+    #CFLAGS="-O0 -g -Wall"
 	;;
     *BSD*)
 	# Do something specific for BSD
@@ -68,7 +69,7 @@ AC_ARG_WITH([libread],
 
 # Checks for libraries.
 have_config=no
-AC_SEARCH_LIBS([config_read_file], [config], [have_config=yes])
+AC_SEARCH_LIBS([config_init], [config], [have_config=yes])
 if test "x${have_config}" = xno; then
     if test "x${var_libconf}" = xno; then
       AC_MSG_WARN([
@@ -77,7 +78,8 @@ if test "x${have_config}" = xno; then
 	Stopping...
 	Check 'config.log' for more information.
 
-	Use '--with--libconf' to be enable to install.
+        Please install the "libconfig" and 
+                           "libconfig-devel" library first.
 	--------------------------------------------------])
     fi
 
@@ -97,12 +99,12 @@ have_ncurses=no
 AC_CHECK_LIB([ncurses], [main], [have_ncurses=yes])
 if test "x${have_ncurses}" = xno; then
     if test "x${var_libncur}" = xno; then
-	AC_MSG_WARN([
+	AC_MSG_ERROR([
 	--------------------------------------------------
 	The ncurses library required to build srx_server.
 	Check 'config.log' for more information.
 
-	use '--with-libncur' to be enable to install
+        Please install the "libncurses" library first.
 	--------------------------------------------------])
     fi
 
@@ -119,13 +121,13 @@ AC_CHECK_LIB([patricia], [main], [have_patricia=yes])
 if test "x${have_patricia}" = xno; then
     #if test "x${libpatricia_inst}" = xyes; then
     if test "x${var_libpatr}" = xno; then
-	AC_MSG_ERROR([
+	AC_MSG_WARN([
         --------------------------------------------------
 	The patricia library required to build srx_server.
 	Stopping...
 	Check 'config.log' for more information.
 
-	Use '--with-libpatr' to be enable to install.
+        Please install the "libpatricia" library first.
 	--------------------------------------------------])
     fi
 
@@ -163,12 +165,13 @@ have_readline=no
 AC_CHECK_LIB([readline], [main], [have_readline=yes])
 if test "x${have_readline}" = xno; then
     if test "x${var_libread}" = xno; then
-    AC_MSG_WARN([
+    AC_MSG_ERROR([
     --------------------------------------------------
     The readline library required to build srx_server.
     Check 'config.log' for more information.
 
-	use '--with-libread' to be enable to install
+    Please install "readline" library first.
+                   "readline-devel" library first.
     --------------------------------------------------])
 fi
 

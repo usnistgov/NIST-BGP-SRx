@@ -193,5 +193,4 @@ extern int bgp_mp_reach_parse (struct bgp_attr_parser_args *args,
 			       struct bgp_nlri *);
 extern int bgp_mp_unreach_parse (struct bgp_attr_parser_args *args,
                                  struct bgp_nlri *);
-
 #endif /* _QUAGGA_BGP_ATTR_H */

@@ -835,6 +835,60 @@ void srx_bgp_requeue_all(struct bgp *bgp)
 
 
 /**
+ * @brief Check for bpg attribute whether it contains extra community values from peer
+ *
+ * @param attr
+ *
+ * @return Success or Failure
+ */
+int checkEcomSRxValid(struct attr* attr)
+{
+  int ret;
+
+  if (!attr->extra)
+    return -1;
+
+  struct attr_extra *attre = attr->extra;
+
+  if (!attre->ecommunity)
+    return -1;
+
+  struct ecommunity *ecom = attre->ecommunity;
+
+  if(!ecom->str || !ecom->val)
+    return -1;
+
+  if (BGP_DEBUG (update, UPDATE_IN))
+  {
+  zlog_debug("extended community: %s ", ecom->str );
+    zlog_debug("val: (type)0x%x, (ValidStatus)0x%x ", ecom->val[0], ecom->val[7]);
+  }
+
+  switch (ecom->val[7])
+  {
+    case ECOMMUNITY_BGPSEC_VALID:       // 0x0
+      if (BGP_DEBUG (update, UPDATE_IN))
+        zlog_debug(" QuaggaSRx Received \"SRx Ecommunity value VALID\" from peer ");
+      ret = ECOMMUNITY_BGPSEC_VALID;
+      break;
+    case ECOMMUNITY_BGPSEC_NOT_FOUND:   // 0x01
+      ret = ECOMMUNITY_BGPSEC_NOT_FOUND;
+      break;
+    case ECOMMUNITY_BGPSEC_INVALID:     // 0x02
+      ret = ECOMMUNITY_BGPSEC_INVALID;
+      break;
+    case 0xAB:      // test value
+      ret = 0x03;   // undefined
+      break;
+    default:        // unknown value
+      ret = -1;
+      break;
+  }
+
+  return ret;
+}
+
+/**
  * Modifies the BGP update information according to the SRX settings.
  * This will be done using the bgp_info data structure.
  * This method is called by the SRx callback to update the validation result.
@@ -2858,6 +2912,41 @@ uint32_t getNextLocalID()
 void verify_update (struct bgp *bgp, struct bgp_info *info,
                     SRxDefaultResult* defResult, bool doRegisterLocalID)
 {
+  /* the received extend community value handling */
+  if (CHECK_FLAG (bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY))
+  {
+  int retValid = -1;
+  retValid = checkEcomSRxValid(info->attr);
+
+  if(retValid >= 0 && retValid <= 3)
+  {
+    if(retValid == ECOMMUNITY_BGPSEC_VALID)
+    {
+        defResult->result.roaResult = SRx_RESULT_VALID;
+        if (BGP_DEBUG (update, UPDATE_IN))
+          zlog_debug(" Ecommunity Value [VALID] ");
+    }
+    else if(retValid == ECOMMUNITY_BGPSEC_NOT_FOUND)
+    {
+        defResult->result.roaResult = SRx_RESULT_NOTFOUND;
+        if (BGP_DEBUG (update, UPDATE_IN))
+          zlog_debug(" Ecommunity Value [NOT FOUND] ");
+    }
+    else if(retValid == ECOMMUNITY_BGPSEC_INVALID)
+    {
+        defResult->result.roaResult = SRx_RESULT_INVALID;
+        if (BGP_DEBUG (update, UPDATE_IN))
+          zlog_debug(" Ecommunity Value [INVALID] ");
+    }
+    else if(retValid == 0x03) // UNDEFINED
+    {
+        defResult->result.roaResult = SRx_RESULT_UNDEFINED;
+        if (BGP_DEBUG (update, UPDATE_IN))
+          zlog_debug(" Ecommunity VALUE AB [Undefined]");
+      }
+    }
+  }
+
   // first use the default result value as regular result value
   if (defResult->result.roaResult != SRx_RESULT_DONOTUSE)
   {
@@ -2867,6 +2956,7 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
   {
     info->val_res_BGPSEC = defResult->result.bgpsecResult;
   }
+
 
   // If this update has a local ID it might need to be registered. This will be
   // the first 
@@ -3998,12 +4088,6 @@ bgp_nlri_parse (struct peer *peer, struct attr *attr, struct bgp_nlri *packet)
   int psize;
   int ret;
 
-#ifdef USE_SRX
-  // For debug purpose only
-  //static int cntTemp=0;
-  //zlog_debug (" -------- nlri parse test %d", cntTemp++);
-#endif /* USE_SRX */
-        
   /* Check peer status. */
   if (peer->status != Established)
     return 0;
@@ -4407,7 +4491,9 @@ bgp_static_update_main (struct bgp *bgp, struct prefix *p,
       attr_new = bgp_attr_intern (&attr_tmp);
     }
   else
+  {
     attr_new = bgp_attr_intern (&attr);
+  }
 
   for (ri = rn->info; ri; ri = ri->next)
     if (ri->peer == bgp->peer_self && ri->type == ZEBRA_ROUTE_BGP
@@ -4687,7 +4773,6 @@ bgp_static_set (struct vty *vty, struct bgp *bgp, const char *ip_str,
 
       if (need_update)
 	bgp_static_withdraw (bgp, &p, afi, safi);
-
       if (! bgp_static->backdoor)
 	bgp_static_update (bgp, &p, bgp_static, afi, safi);
     }

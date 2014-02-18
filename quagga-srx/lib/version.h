@@ -38,7 +38,7 @@
 #ifdef USE_SRX
 #define QUAGGA_PROGNAME   "QuaggaSrx"
 
-#define QUAGGA_VERSION     "0.99.22-0.3.0.1" GIT_SUFFIX
+#define QUAGGA_VERSION     "0.3.0.2" GIT_SUFFIX
 #else /* USE_SRX */
 #define QUAGGA_PROGNAME   "Quagga"
 

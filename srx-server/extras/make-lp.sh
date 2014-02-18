@@ -28,7 +28,9 @@ else
   mkdir $TDIR
   $LIBTOOL --mode=compile gcc $OPTS -c patricia.c
   $LIBTOOL --mode=link gcc -o libpatricia.la patricia.lo -rpath $TDIR
+  #$LIBTOOL --mode=link gcc -o libpatricia.la patricia.lo 
   $LIBTOOL --mode=install cp libpatricia.la $TDIR
   $LIBTOOL --finish $TDIR
   cp patricia.h ../../../local/include/
+  cp -f $TDIR/libpatricia.a ../../../
 fi

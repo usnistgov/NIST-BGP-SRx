@@ -638,7 +638,7 @@ int srx_connect_proxy(struct bgp *bgp)
     }
     else
     {
-      zlog_err ("Could not connect to SRx server at %s:%d, check is server is"
+      zlog_err ("Could not connect to SRx server at %s:%d, check is server is "
                 "running", bgp->srx_host, bgp->srx_port);
     }
   }
@@ -771,7 +771,7 @@ int bgp_srx_unset (struct bgp *bgp)
  *
  * @param bgp the bgo router instance.
  * @param mode 0 == disable, otherwise the prefix-origin or BGPSEC processing,
- * @return 0
+ * @return CMD_SUCCESS
  */
 int bgp_srx_evaluation (struct bgp *bgp, int mode)
 {
@@ -792,7 +792,7 @@ int bgp_srx_evaluation (struct bgp *bgp, int mode)
       zlog_err("Invalid srx evaluation flag %u passed, ignore it!", mode);
       break;                  
   }
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -800,7 +800,7 @@ int bgp_srx_evaluation (struct bgp *bgp, int mode)
  *
  * @param bgp The bgp router instance
  * @param enable enable or disable the additional information output
- * @return 0
+ * @return CMD_SUCCESS
  */
 int bgp_srx_display (struct bgp *bgp, int enable)
 {
@@ -813,7 +813,7 @@ int bgp_srx_display (struct bgp *bgp, int enable)
     srx_config_unset (bgp, SRX_CONFIG_DISPLAY_INFO);
   }
 
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -822,7 +822,7 @@ int bgp_srx_display (struct bgp *bgp, int enable)
  * @param bgp The bgp router instance
  * @param type The type of result, origin validation or path validation
  * @param def_value The default value or the validation.
- * @return 0
+ * @return CMD_SUCCESS
  */
 int bgp_srx_conf_default_result(struct bgp *bgp, int type, int def_value)
 {
@@ -837,7 +837,7 @@ int bgp_srx_conf_default_result(struct bgp *bgp, int type, int def_value)
     default:
       zlog_err("Invalid default validation result type [%d]!", type);
   }
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -848,7 +848,7 @@ int bgp_srx_conf_default_result(struct bgp *bgp, int type, int def_value)
  * @param index the validation result (valid, notfound, invalid)
  * @param relative is this value relative or absolute
  * @param value the value itself. (negative = subtract, positive = add)
- * @return 0
+ * @return CMD_SUCCESS
  */
 int srx_val_local_preference_set (struct bgp *bgp, int index, int relative,
                               uint32_t value)
@@ -856,7 +856,7 @@ int srx_val_local_preference_set (struct bgp *bgp, int index, int relative,
   bgp->srx_val_local_pref[index].is_set = 1;
   bgp->srx_val_local_pref[index].relative = relative;
   bgp->srx_val_local_pref[index].value = value;
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -865,14 +865,14 @@ int srx_val_local_preference_set (struct bgp *bgp, int index, int relative,
  *
  * @param bgp the bgp router instance
  * @param index the validation result (valid, notfound, invalid)
- * @return 0
+ * @return CMD_SUCCESS
  */
 int srx_val_local_preference_unset (struct bgp *bgp, int index)
 {
   bgp->srx_val_local_pref[index].is_set = 0;
   bgp->srx_val_local_pref[index].relative = 1;
   bgp->srx_val_local_pref[index].value = 0;
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -880,12 +880,12 @@ int srx_val_local_preference_unset (struct bgp *bgp, int index)
  *
  * @param bgp the bgp router instance
  * @param policy the policy flag to be set
- * @return 0
+ * @return CMD_SUCCESS
  */
 int srx_val_policy_set (struct bgp *bgp, uint16_t policy)
 {
   SET_FLAG (bgp->srx_val_policy, policy);
-  return 0;
+  return CMD_SUCCESS;
 }
 
 /**
@@ -893,13 +893,58 @@ int srx_val_policy_set (struct bgp *bgp, uint16_t policy)
  *
  * @param bgp the bgp router instance.
  * @param opt the flag to be set
- * @return 0
+ * @return CMD_SUCCESS
  */
 int srx_val_policy_unset (struct bgp *bgp, uint16_t policy)
 {
   UNSET_FLAG (bgp->srx_val_policy, policy);
-  return 0;
+  return CMD_SUCCESS;
 }
+
+/**
+ * Activate the extended community string for validation result transfer. This 
+ * method allows to set the transfer not only for iBGP but also for eBGP
+ * 
+ * @param bgp the bgp router instance
+ * @param subcode the subcode value used in the extended community string
+ * @param cmd The command include_ebgp, only_ibgp, or an empty string
+ * @return CMD_SUCCESS
+ */
+int srx_extcommunity_set (struct bgp *bgp, uint8_t subcode, const char* cmd)
+{
+  SET_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY);
+          
+  // Modify EBGP flag only if command is given!
+  if(strlen(cmd) > 0)
+  {
+    if (strncmp("inc", cmd, 3) == 0)
+    { // In case the command starts with inc then set the flag for include eBGP
+      SET_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY_EBGP);
+    }
+    else
+    { // Otherwise remove the flag if set!!
+      UNSET_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY_EBGP);      
+    }
+  }
+  bgp->srx_ecommunity_subcode = subcode;
+  
+  return CMD_SUCCESS;
+}
+
+/**
+ * Deactivate the extended community string.
+ * 
+ * @param bgp the router instance
+ * @return CMD_SUCCESS
+ */
+int srx_extcommunity_unset (struct bgp *bgp)
+{
+  UNSET_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY);
+  UNSET_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY_EBGP);
+  bgp->srx_ecommunity_subcode = 0;
+  return CMD_SUCCESS;
+}
+
 #endif /* USE_SRX */
 
 /* If peer is RSERVER_CLIENT in at least one address family and is not member
@@ -5806,6 +5851,24 @@ static int srx_config_write_configuration (struct vty *vty, struct bgp *bgp)
   {
     vty_out (vty, " no srx evaluation%s", VTY_NEWLINE);
   }
+  
+  if (CHECK_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY))
+  {
+    if (CHECK_FLAG(bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY_EBGP))
+    {
+      vty_out (vty, " srx extcommunity %d include_ebgp%s", 
+                      bgp->srx_ecommunity_subcode, VTY_NEWLINE);
+    }
+    else
+    {
+      vty_out (vty, " srx extcommunity %d only_ibgp%s", 
+                      bgp->srx_ecommunity_subcode, VTY_NEWLINE);      
+    }
+  }
+  else
+  {
+      vty_out (vty, " no srx extcommunity%s", VTY_NEWLINE);          
+  }
 
   // ENABLE / DISABLE DISPLAY
   vty_out (vty, " %s%s%s",
@@ -5821,15 +5884,20 @@ static int srx_config_write_configuration (struct vty *vty, struct bgp *bgp)
   switch (bgp->srx_default_roaVal)
   {
     case SRx_RESULT_VALID:
-      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_VALID ); 
+      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_VALID );
+      break;
     case SRx_RESULT_NOTFOUND:
-      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_NOTFOUND ); 
+      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_NOTFOUND );
+      break;
     case SRx_RESULT_INVALID:
-      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_INVALID ); 
+      vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_INVALID );
+      break;
     case SRx_RESULT_UNDEFINED:
     default:
       vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_ROA_RES_UNDEFINED ); 
   }
+  // don't use VTY_NEWLINE because a \n is already added. \r might be missing.
+  vty_out (vty, "%s", (vty->type == VTY_TERM) ? "\r" : "");
 
   // srx set-path-value
   switch (bgp->srx_default_bgpsecVal)
@@ -5845,6 +5913,8 @@ static int srx_config_write_configuration (struct vty *vty, struct bgp *bgp)
       vty_out (vty, " %s", SRX_VTY_CMD_CONF_DEF_PATH_RES_UNDEFINED ); 
       break;
   }
+  // don't use VTY_NEWLINE because a \n is already added. \r might be missing.
+  vty_out (vty, "%s", (vty->type == VTY_TERM) ? "\r" : "");
 
   // VALIDATION POLICY LOCAL PREF
   for (index = 0; index < noElements; index++)

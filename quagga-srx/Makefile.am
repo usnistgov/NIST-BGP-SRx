@@ -14,7 +14,8 @@ EXTRA_DIST = aclocal.m4 SERVICES TODO REPORTING-BUGS INSTALL.quagga.txt \
 	vtysh/Makefile.in vtysh/Makefile.am \
 	tools/mrlg.cgi tools/rrcheck.pl tools/rrlookup.pl tools/zc.pl \
 	tools/zebra.el tools/multiple-bgpd.sh \
-	fpm/fpm.h
+	fpm/fpm.h \
+	$(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 
 if HAVE_LATEX
 
@@ -27,3 +28,55 @@ clean-local:
 endif
 
 ACLOCAL_AMFLAGS = -I m4
+
+# RPM script and macros for QuaggaSRx
+RPM = rpm
+
+#rpms srcrpm: dist extra_dist
+#	for dir in $(SUBDIRS); do \
+#,...,...(cd $$dir && $(MAKE) $(AM_MAKEFLAGS) $@) || exit 1; \
+#,...,...rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
+#,...,...test -z "$$dir/$$rpmarch" || ( mv $$dir/$$rpmarch/* . && rm -rf $$dir/$$rpmarch ); \
+#,...,...rm -rf $$dir/$(distdir); \
+#,...done
+
+
+# RPM script and macros for SRx
+rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+
+rpmmacros =\
+ --define="_rpmdir $${PWD}"\
+ --define="_srcrpmdir $${PWD}"\
+ --define="_sourcedir $${PWD}"\
+ --define="_specdir $${PWD}"\
+ --define="_builddir $${PWD}"
+
+RPMBUILD = rpmbuild
+RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+
+rpmcheck:
+	if [ which rpmbuild &> /dev/null ]; then \
+	 echo "*** This make target requires an rpm-based linux distribution."; \
+	 (exit 1); exit 1; \
+	fi
+
+srcrpm: dist rpmcheck $(rpmspec)
+	($(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)) || exit 1
+
+rpms: dist rpmcheck $(rpmspec)
+	($(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)) || exit 1
+	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
+	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
+	rm -rf $(distdir)
+
+dist-hook:
+	rm -rf `find $(distdir) -name .svn`
+
+
+
+# for preparing rpm sources
+#extra_dist:
+
+
+.PHONY: rpms srcrpm
+

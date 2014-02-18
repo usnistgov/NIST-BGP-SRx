@@ -2,8 +2,8 @@ include $(top_srcdir)/Makefile_Common
 
 EXTRA_DIST = 
 
-lib_LTLIBRARIES = libutil.la
-libutil_la_SOURCES = client_socket.c \
+pkglib_LTLIBRARIES = libsrxutil.la
+libsrxutil_la_SOURCES = client_socket.c \
 		     debug.c \
 		     directory.c \
 		     log.c \
