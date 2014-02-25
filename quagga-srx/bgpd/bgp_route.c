@@ -918,7 +918,7 @@ void bgp_info_set_validation_result (struct bgp_info *info,
     }
     if ((resType & SRX_FLAG_BGPSEC) == SRX_FLAG_BGPSEC)
     {
-      info->val_res_BGPSEC = roaResult;
+      info->val_res_BGPSEC = bgpsecResult;
     }
 
     // Check if it is fully valid and if not decide if the update has to be
@@ -7193,7 +7193,7 @@ static void srx_route_vty_out_detail(struct vty *vty, struct bgp *bgp,
                                              VTY_NEWLINE);
       if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH))
       {
-        vty_out (vty, "        path:   %s%s", INDEX_STR[binfo->val_res_ROA],
+        vty_out (vty, "        path:   %s%s", INDEX_STR[binfo->val_res_BGPSEC],
                                         VTY_NEWLINE);
         vty_out (vty, "        bgpsec: %s  (combination of prefix-origin and "
                       "path validation)%s",

@@ -1,4 +1,4 @@
-%define version 0.3.1.0
+%define version 0.3.1.1
 %define name quaggasrx
 
 Name:%{name}
