@@ -1,0 +1,89 @@
+SRxCryptoAPI is free software that manages Cryptography plug ins for BGPSEC 
+path processing.
+
+This Software is a wrapper that allows to configure crypto implementations 
+which can be used by software packages such as QuaggaSRx and SRX-Server to 
+switch cryptography implementations.
+
+This wrapper allows to switch implementations without the need of recompiling 
+QuaggaSRx or SRx-Server. Future versions of both mentioned packages require this
+API.
+
+This software package Contains the following modules:
+ - The SRx Crypto API itself
+ - An OpenSSL based BGPSEC path processing plugin
+ - A Test library
+ - Key generation tool using OpenSSL 
+
+For installation instructions see the INSTALL file.
+
+API Configuration:
+==================
+
+The API requires a configuration script which is located either in the 
+installation 'etc/' directory or in './'. The configuration has the following
+format:
+
+File: srxcryptoapi.conf
+--------------------------------------------------------------------------------
+# Contains the name of the library that will be loaded.
+#library_conf="bgpsec_openssl";
+library_conf="testlib";
+
+# Allows to specify the default key volt. Can be overwritten programatically.
+key_volt = "/";
+
+# this is the mapping information of the library to be loaded
+bgpsec_openssl: {
+  library_name = "libbgpsec_openssl.so";
+
+#
+# The following method mappings allow to customize the mapping. in case the 
+# mapping is disables using the hash tag, misspelled, or missing at all the 
+# default mapping of method names as specified in the header file will be used.
+# in case the default specified method names are not implemented, the 
+# SRxCryptoAPI wrapper functions are mapped.
+#
+  method_validate      = "validate";
+  method_sign_with_key = "sign_with_key";
+  method_sign_with_id  = "sign_with_id";
+
+  method_registerPrivateKey = "";
+  method_unregisterKey      = "";
+};
+
+# Some other example configuration 
+testlib: {
+  library_name="libcrypto_testlib.so";
+
+  method_validate      = "";
+  method_sign_with_key = "";
+  method_sign_with_id  = "";
+
+  method_registerPrivateKey = "";
+  method_unregisterKey      = "";
+};
+--------------------------------------------------------------------------------
+
+Key Generation Tools:
+=====================
+
+1. Generate a repository at /var/lib/bgpsec-keys
+
+This repository will contain keys and certificates. In this versions the
+certificates only contain the public key.
+
+2. Generate keys:
+        qsrx-make-key <name>
+3. Generate Certificate
+        qsrx-make-cert <name>
+4. public cert and install key
+        qsrx-publish <key>
+
+The last step generates a file containing the skis of all private keys for easy
+copy past into the bgpd.conf
+
+Questions:
+==========
+Email to bgpsrx-dev@nist.gov
+

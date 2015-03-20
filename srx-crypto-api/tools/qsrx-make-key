@@ -1,0 +1,23 @@
+#!/bin/sh
+
+#
+# This file belongs to the SRxCryptoAPI testbed. The certificates/keys 
+# generated here are for test purpose only and might not follow the BGPSEc 
+# certificate structure.
+# They are not intended to be used elsewhere than the test bed.
+# 
+
+EXT_KEY="key"
+EXT_CERT="cert"
+
+if [ "$1" == "" ] ; then
+  echo "Generate a key using './$0 <name>'"
+  exit 1
+fi
+
+if [ -e "$1.cert" ] ; then
+  echo "A certificate $1.$EXTCERT exists for $1. First remove certificate then generate a key!"
+  exit 2;
+else
+  openssl ecparam -name prime256v1 -genkey -out $1.$EXT_KEY
+fi

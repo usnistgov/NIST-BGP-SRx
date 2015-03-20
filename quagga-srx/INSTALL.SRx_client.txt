@@ -5,7 +5,9 @@ Building and Installing Quagga SRx client:
 
 
 Configuration Option:
-    --enable-srx	turn on SRx client to compile with Quagga bgp module
+    --enable-srx	    turn on SRx client to compile with Quagga bgp module
+    --enable-srxcryptoapi   to have the srxcryptoapi library to take care of
+                            verifying/signing functions
 
 
 Compile:
@@ -17,18 +19,62 @@ Compile:
 	
 	or,
 
-       Must be specified with environment variables:
-	CPPFLAGS = -I<SRx installed dir>/include/
-	SRX_USER_INC = <SRx installed dir>/include/
+  Might be specified with environment variables:
+ 	      CPPFLAGS = -I<SRx installed dir>/include/
+	      SRX_USER_INC = <SRx installed dir>/include/
+
+         (It can also be used as a default directory of the openssl installation)
+        CRYPTOAPI_DIR = <srxcryptoapi installed dir>
 
     2. paste into the quagga-<ver>.
     3. run configure with configuration option.
     4. make all install
     
 
-
  (Configuration example)
-#1 ./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx 
+#1 Simple version (in case the SRxServer rpm version is already installed)
+./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx --enable-srxcryptoapi
 
-#2 ./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx CPPFLAGS=-I<srx-installed dir>/include SRX_USER_INC=<srx-installed dir>/include/
+#2 With all switches (in case of installing the source tarball)
+./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx --enable-srxcryptoapi CPPFLAGS=-I<srx-installed dir>/include/ SRX_USER_INC=<srx-installed dir>/include/ CRYPTOAPI_DIR=<srxcryptoapi dir>
+
+
+Key Management and Installation for this Version
+-----------------------------------------------------------
+
+Current Features:
+- Single private key, no key rollover
+- Certificates and keys are self signed, stored on HDD (must be generated using
+  the provided qsrx-make tools)
+- Partial integration of QuaggaSRx and SRx server (BGPSEC currently within
+  QuaggaSRx)
+- BGPSEC for read/write, no selective configuration yet
+- BGPSEC per peering session
+
+Configuration:
+==================
+The current configuration has three parameters:
+bgpsec ski <key-ski>    : Private key
+neighbor A.B.C.D bgpsec : This session performs BGPSEC
+srx evaluation bgpsec   : Use bgpsec path validation result in update validation
+
+Setup:
+=========
+1. Generate a repository at
+/var/lib/bgpsec-keys
+This repository will contain keys and certificates. In this versions the
+certificates only contain the public key.
+
+2. Generate keys:
+        qsrx-make-key <name>
+3. Generate Certificate
+        qsrx-make-cert <name>
+4. public cert and install key
+        qsrx-publish <key>
+The last step generates a file containing the skis of all private keys for easy
+copy past into the bgpd.conf
+
+Questions:
+==========
+Email to bgpsrx-dev@nist.gov
 

@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.3.0.3], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.3.0.5], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -72,7 +72,7 @@ have_config=no
 AC_SEARCH_LIBS([config_init], [config], [have_config=yes])
 if test "x${have_config}" = xno; then
     if test "x${var_libconf}" = xno; then
-      AC_MSG_WARN([
+      AC_MSG_ERROR([
 	--------------------------------------------------
 	The config library required to build srx_server.
 	Stopping...
@@ -121,7 +121,7 @@ AC_CHECK_LIB([patricia], [main], [have_patricia=yes])
 if test "x${have_patricia}" = xno; then
     #if test "x${libpatricia_inst}" = xyes; then
     if test "x${var_libpatr}" = xno; then
-	AC_MSG_WARN([
+	AC_MSG_ERROR([
         --------------------------------------------------
 	The patricia library required to build srx_server.
 	Stopping...
@@ -199,6 +199,12 @@ AC_TYPE_UINT8_T
 # Create automake conditional variables
 #AM_CONDITIONAL([OS_TYPE], [`uname -s`])
 
+# Determine if it is 64 Bit. This is needed for the ld.conf.d. file.
+case "$HOSTTYPE" in
+  x86_64) AC_SUBST([CPU_ARCH],[-x86_64]) ;;
+  *) AC_SUBST([CPU_ARCH],[]) ;;
+esac
+
 AC_SUBST([SRX_REVISION_FILE],[srx-server-rev.txt])
 
 # Checks for library functions.
@@ -207,6 +213,7 @@ AC_FUNC_REALLOC
 AC_CHECK_FUNCS([bzero gethostbyname memset socket strchr strrchr strdup strerror strtol strtoul])
 
 AC_CONFIG_FILES([Makefile
+     srx-$PACKAGE_VERSION.spec:srx.spec.in
 		 shared/Makefile
 		 util/Makefile
      client/Makefile
@@ -224,4 +231,5 @@ echo "
   SRx Library....: ${SRXLIB:-INSTALLED}
   SRx Include....: ${SRXINC:-INSTALLED}
   Doxygen........: ${DOXYGEN:-NONE}
+  CPU Type.......: $CPU_ARCH
 "

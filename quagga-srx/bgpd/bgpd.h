@@ -49,7 +49,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_CMD_DISCONNECT  "srx disconnect"
 #define SRX_VTY_HLP_DISCONNECT  SRX_VTY_HLP_STR \
                                 "Disconnect from the SRx server\n"
-                                  
+
 #define SRX_VTY_CMD_DISPLAY     "srx display"
 #define SRX_VTY_OUT_DISPLAY     "srx diaplay%s"
 #define SRX_VTY_HLP_DISPLAY     SRX_VTY_HLP_STR \
@@ -58,7 +58,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_HLP_DISPLAY_NO  SRX_VTY_HLP_STR \
                                 "Hide SRx related output from the \"show\"" \
                                 " commands\n"
-                                   
+
 #define SRX_VTY_CMD_EVALUATE    "srx evaluation (" SRX_VTY_EVAL_ORIGIN_ONLY \
                                                  "|" SRX_VTY_EVAL_BGPSEC ")"
 #define SRX_VTY_OUT_EVALUATE    "srx evaluation %s%s"
@@ -126,7 +126,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_HLP_CONF_DEF_ROA_RES_UNDEFINED \
                                  SRX_VTY_HLP_CONF_DEF_ROA_RES_STR  "undefined\n"
 
-// DEFAULT VALIDATION RESULT FOR PATH VALIDATION                                                                 
+// DEFAULT VALIDATION RESULT FOR PATH VALIDATION
 #define SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "srx set-path-value "
 #define SRX_VTY_CMD_CONF_DEF_PATH_RES_VALID \
                                  SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "valid\n"
@@ -134,7 +134,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                  SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "invalid\n"
 #define SRX_VTY_CMD_CONF_DEF_PATH_RES_UNDEFINED \
                                  SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "undefined\n"
-                                 
+
 #define SRX_VTY_HLP_CONF_DEF_PATH_RES_STR SRX_VTY_HLP_STR \
                                  "Configure the default result value for " \
                                    "path validation\n" \
@@ -153,13 +153,13 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                  "Apply SRx policy changes to all updates in" \
                                  " the RIB.\n"
 
-// POLICY 
+// POLICY
 #define SRX_VTY_HLP_POLICY      "Evaluation policy command\n"
 #define SRX_VTY_HLP_POLICY_ROA  "Prefix-origin validation using ROA's\n"
 #define SRX_VTY_HLP_POLICY_PATH "Path validation (NOT IMPLEMENTED YET)\n"
 #define SRX_VTY_HLP_ORIGIN_ONLY "(" SRX_VTY_EVAL_ORIGIN_ONLY ") "
 
-// POLICY IGNORE NOTFOUND / INVALID 
+// POLICY IGNORE NOTFOUND / INVALID
 #define SRX_VTY_CMD_POL_IGNORE_NOTFOUND  "srx policy ignore-notfound"
 #define SRX_VTY_HLP_POL_IGNORE_NOTFOUND  SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
                                          SRX_VTY_HLP_ORIGIN_ONLY \
@@ -215,7 +215,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_OUT_POL_PREFV SRX_VTY_CMD_POL_PREFV "%s"
 #define SRX_VTY_HLP_POL_PREFV SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
                               "Use the validation state as tie breaker " \
-                              "with valid > any other\n" 
+                              "with valid > any other\n"
 
 // USE OF COMMUNITY STRING
 #define SRX_VTY_CMD_EXT_CSTR "srx extcommunity <0-255>"
@@ -226,7 +226,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_CMD_EXT_CSTR_EBGP SRX_VTY_CMD_EXT_CSTR " (include_ebgp|only_ibgp)"
 #define SRX_VTY_HLP_EXT_CSTR_EBGP SRX_VTY_HLP_EXT_CSTR \
                                   "Include eBGP peers (optional)\n" \
-                                  "Only iBGP peers - also used to turn off eBGP peers\n" 
+                                  "Only iBGP peers - also used to turn off eBGP peers\n"
 
 #define SRX_VTY_CMD_NO_EXT_CSTR "no srx extcommunity"
 #define SRX_VTY_HLP_NO_EXT_CSTR  NO_STR SRX_VTY_HLP_STR \
@@ -251,10 +251,10 @@ struct bgp_master
   /* work queues */
   struct work_queue *process_main_queue;
   struct work_queue *process_rsclient_queue;
-  
+
   /* Listening sockets */
   struct list *listen_sockets;
-  
+
   /* BGP port number.  */
   u_int16_t port;
 
@@ -273,8 +273,8 @@ struct bgp_master
 };
 
 #ifdef USE_SRX
-/** Data stored in this structure defines how the local pref has to be 
- * manipulated. 
+/** Data stored in this structure defines how the local pref has to be
+ * manipulated.
  */
 struct srx_local_pref {
   // Indicated if the local pref has to be manipulated.
@@ -287,14 +287,14 @@ struct srx_local_pref {
 #endif /* USE_SRX */
 
 /* BGP instance structure.  */
-struct bgp 
+struct bgp
 {
   /* AS number of this BGP instance.  */
   as_t as;
 
   /* Name of this BGP instance.  */
   char *name;
-  
+
   /* Reference count to allow peer_delete to finish after bgp_delete */
   int lock;
 
@@ -317,14 +317,14 @@ struct bgp
 #define BGP_CONFIG_CONFEDERATION          (1 << 2)
 #ifdef USE_SRX
 #define BGP_CONFIG_SRX                    (1 << 3)
-  
+
   /* SRX Configuration */
   u_int16_t srx_config;
 #define SRX_CONFIG_EVAL_ORIGIN   (1 << 1)
 // Below must be set in combination with VALORIGIN
 #define SRX_CONFIG_EVAL_PATH     (1 << 2)
 #define SRX_CONFIG_EVALUATE      (SRX_CONFIG_EVAL_ORIGIN | SRX_CONFIG_EVAL_PATH)
-  
+
 #define SRX_CONFIG_DISPLAY_INFO  (1 << 3)
 #endif /* USE_SRX */
 
@@ -388,7 +388,7 @@ struct bgp
   u_char distance_ebgp;
   u_char distance_ibgp;
   u_char distance_local;
-  
+
   /* BGP default local-preference.  */
   u_int32_t default_local_pref;
 
@@ -409,12 +409,12 @@ struct bgp
 #ifdef USE_SRX
   /* Configuration */
   // All the default configuration is set in the method srx_set_default
-  
+
   char *srx_host;
   int  srx_port;
 #define SRX_HANDHAKE_TIMEOUT  30
 #define SRX_KEEP_WINDOW      900
- 
+
   // The timeout during the session establishment
   int  srx_handshakeTimeout;
   // Time in seconds the SRx server is requested to keep data after a delete
@@ -429,19 +429,22 @@ struct bgp
   /** Contains the bit coded policy setting*/
   uint16_t srx_val_policy;
 #define SRX_VAL_POLICY_PREFER_VALID     (1 << 0)
-#define SRX_VAL_POLICY_IGNORE_NOTFOUND  (1 << 1) 
+#define SRX_VAL_POLICY_IGNORE_NOTFOUND  (1 << 1)
 #define SRX_VAL_POLICY_IGNORE_INVALID   (1 << 2)
 #define SRX_VAL_POLICY_IGNORE_UNDEFINED (1 << 3)
 
   uint16_t srx_default_roaVal;
   uint16_t srx_default_bgpsecVal;
-  
+
   /* Instance variables */
   SRxProxy* srxProxy;
   /* The info hash for update id's */
   struct bgp_info_hash* info_uid_hash;
   /* The info hash for local id's */
   struct bgp_info_hash* info_lid_hash;
+
+  /* bgpsec ski value */
+  char* bgpsec_ski;
 
   /** Contains the information if extended community is used and the subcode*/
 #define SRX_BGP_FLAG_ECOMMUNITY      (1 << 0)
@@ -459,7 +462,7 @@ struct peer_group
 
   /* Pointer to BGP.  */
   struct bgp *bgp;
-  
+
   /* Peer-group client list. */
   struct list *peer;
 
@@ -468,7 +471,7 @@ struct peer_group
 };
 
 /* BGP Notify message format. */
-struct bgp_notify 
+struct bgp_notify
 {
   u_char code;
   u_char subcode;
@@ -484,7 +487,7 @@ struct bgp_nexthop
 #ifdef HAVE_IPV6
   struct in6_addr v6_global;
   struct in6_addr v6_local;
-#endif /* HAVE_IPV6 */  
+#endif /* HAVE_IPV6 */
 };
 
 /* BGP router distinguisher value.  */
@@ -505,7 +508,7 @@ struct bgp_rd
 struct bgp_filter
 {
   /* Distribute-list.  */
-  struct 
+  struct
   {
     char *name;
     struct access_list *alist;
@@ -568,7 +571,7 @@ struct peer
   u_char af_group[AFI_MAX][SAFI_MAX];
 
   /* Peer's remote AS number. */
-  as_t as;			
+  as_t as;
 
   /* Peer's local AS number. */
   as_t local_as;
@@ -610,7 +613,7 @@ struct peer
   time_t uptime;		/* Last Up/Down time */
   time_t readtime;		/* Last read time */
   time_t resettime;		/* Last reset time */
-  
+
   unsigned int ifindex;		/* ifindex of the BGP connection. */
   char *ifname;			/* bind interface name. */
   char *update_if;
@@ -639,6 +642,9 @@ struct peer
 #define PEER_CAP_RESTART_RCV                (1 << 6) /* restart received */
 #define PEER_CAP_AS4_ADV                    (1 << 7) /* as4 advertised */
 #define PEER_CAP_AS4_RCV                    (1 << 8) /* as4 received */
+#ifdef USE_SRX
+#define PEER_CAP_BGPSEC_ADV                 (1 << 15)/* bgpsec advertised */
+#endif
 
   /* Capability flags (reset in bgp_stop) */
   u_int16_t af_cap[AFI_MAX][SAFI_MAX];
@@ -662,6 +668,10 @@ struct peer
 #define PEER_FLAG_DISABLE_CONNECTED_CHECK   (1 << 6) /* disable-connected-check */
 #define PEER_FLAG_LOCAL_AS_NO_PREPEND       (1 << 7) /* local-as no-prepend */
 #define PEER_FLAG_LOCAL_AS_REPLACE_AS       (1 << 8) /* local-as no-prepend replace-as */
+#ifdef USE_SRX
+#define PEER_FLAG_BGPSEC_CAPABILITY_RECV    (1 << 14)/* bgpsec capability - RECV */
+#define PEER_FLAG_BGPSEC_CAPABILITY         (1 << 15)/* bgpsec capability - SEND */
+#endif
 
   /* NSF mode (graceful restart) */
   u_char nsf[AFI_MAX][SAFI_MAX];
@@ -750,10 +760,10 @@ struct peer
   struct thread *t_pmax_restart;
   struct thread *t_gr_restart;
   struct thread *t_gr_stale;
-  
+
   /* workqueues */
   struct work_queue *clear_node_queue;
-  
+
   /* Statistics field */
   u_int32_t open_in;		/* Open message input count */
   u_int32_t open_out;		/* Open message output count */
@@ -916,6 +926,10 @@ struct bgp_nlri
 #define BGP_ATTR_AS4_PATH                       17
 #define BGP_ATTR_AS4_AGGREGATOR                 18
 #define BGP_ATTR_AS_PATHLIMIT                   21
+#ifdef USE_SRX
+//#define BGP_ATTR_BGPSEC                         11
+#define BGP_ATTR_BGPSEC                         30
+#endif
 
 /* BGP update origin.  */
 #define BGP_ORIGIN_IGP                           0
@@ -948,7 +962,10 @@ struct bgp_nlri
 #define BGP_NOTIFY_OPEN_AUTH_FAILURE             5
 #define BGP_NOTIFY_OPEN_UNACEP_HOLDTIME          6
 #define BGP_NOTIFY_OPEN_UNSUP_CAPBL              7
-#define BGP_NOTIFY_OPEN_MAX                      8
+#ifdef USE_SRX
+#define BGP_NOTIFY_OPEN_UNSUP_BGPSEC             8
+#endif
+#define BGP_NOTIFY_OPEN_MAX                      9
 
 /* BGP_NOTIFY_UPDATE_ERR sub codes.  */
 #define BGP_NOTIFY_UPDATE_MAL_ATTR               1
@@ -1013,7 +1030,7 @@ struct bgp_nlri
 #define BGP_INIT_START_TIMER                     5
 #define BGP_ERROR_START_TIMER                   30
 #define BGP_DEFAULT_HOLDTIME                   180
-#define BGP_DEFAULT_KEEPALIVE                   60 
+#define BGP_DEFAULT_KEEPALIVE                   60
 #define BGP_DEFAULT_ASORIGINATE                 15
 #define BGP_DEFAULT_EBGP_ROUTEADV               30
 #define BGP_DEFAULT_IBGP_ROUTEADV                5
@@ -1106,7 +1123,7 @@ extern void bgp_terminate (void);
 extern void bgp_reset (void);
 extern time_t bgp_clock (void);
 extern void bgp_zclient_reset (void);
-extern int bgp_nexthop_set (union sockunion *, union sockunion *, 
+extern int bgp_nexthop_set (union sockunion *, union sockunion *,
 		     struct bgp_nexthop *, struct peer *);
 extern struct bgp *bgp_get_default (void);
 extern struct bgp *bgp_lookup (as_t, const char *);
@@ -1186,6 +1203,7 @@ extern int srx_extcommunity_unset (struct bgp *);
 extern int srx_config_check (struct bgp *, uint16_t);
 
 extern int srx_connect_proxy(struct bgp *);
+#define DEBUG_TEST
 #endif /* USE_SRX */
 
 extern int peer_rsclient_active (struct peer *);

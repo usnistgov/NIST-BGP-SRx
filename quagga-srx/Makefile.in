@@ -37,9 +37,9 @@ target_triplet = @target@
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/configure AUTHORS COPYING COPYING.LIB ChangeLog \
-	INSTALL NEWS TODO compile config.guess config.sub depcomp \
-	install-sh ltmain.sh missing
+	$(srcdir)/quaggasrx.spec.in $(top_srcdir)/configure AUTHORS \
+	COPYING COPYING.LIB ChangeLog INSTALL NEWS TODO compile \
+	config.guess config.sub depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_sys_weak_alias.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -114,6 +114,7 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BABELD = @BABELD@
 BGPD = @BGPD@
+BGPD_INCLUDES = @BGPD_INCLUDES@
 BUILD_TESTS = @BUILD_TESTS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -175,6 +176,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_ECDSA_INC_DIR = @OPENSSL_ECDSA_INC_DIR@
 OSPF6D = @OSPF6D@
 OSPFAPI = @OSPFAPI@
 OSPFCLIENT = @OSPFCLIENT@
@@ -202,7 +204,9 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOLARIS = @SOLARIS@
+SRX_API_LIB = @SRX_API_LIB@
 SRX_CLI_LIB = @SRX_CLI_LIB@
+SRX_CRYPTO_API_LIBS = @SRX_CRYPTO_API_LIBS@
 SRX_DIR = @SRX_DIR@
 SRX_LIB = @SRX_LIB@
 SRX_LIB_SO = @SRX_LIB_SO@

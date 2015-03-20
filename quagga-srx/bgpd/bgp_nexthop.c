@@ -179,11 +179,11 @@ int
 bgp_nexthop_onlink (afi_t afi, struct attr *attr)
 {
   struct bgp_node *rn;
-  
+
   /* If zebra is not enabled return */
   if (zlookup->sock < 0)
     return 1;
-  
+
   /* Lookup the address is onlink or not. */
   if (afi == AFI_IP)
     {
@@ -227,7 +227,7 @@ bgp_nexthop_lookup_ipv6 (struct peer *peer, struct bgp_info *ri, int *changed,
   struct prefix p;
   struct bgp_nexthop_cache *bnc;
   struct attr *attr;
-  
+
   /* If lookup is not enabled, return valid. */
   if (zlookup->sock < 0)
     {
@@ -235,11 +235,11 @@ bgp_nexthop_lookup_ipv6 (struct peer *peer, struct bgp_info *ri, int *changed,
         ri->extra->igpmetric = 0;
       return 1;
     }
-  
+
   /* Only check IPv6 global address only nexthop. */
   attr = ri->attr;
 
-  if (attr->extra->mp_nexthop_len != 16 
+  if (attr->extra->mp_nexthop_len != 16
       || IN6_IS_ADDR_LINKLOCAL (&attr->extra->mp_nexthop_global))
     return 1;
 
@@ -313,7 +313,7 @@ bgp_nexthop_lookup (afi_t afi, struct peer *peer, struct bgp_info *ri,
   struct prefix p;
   struct bgp_nexthop_cache *bnc;
   struct in_addr addr;
-  
+
   /* If lookup is not enabled, return valid. */
   if (zlookup->sock < 0)
     {
@@ -321,7 +321,7 @@ bgp_nexthop_lookup (afi_t afi, struct peer *peer, struct bgp_info *ri,
         ri->extra->igpmetric = 0;
       return 1;
     }
-  
+
 #ifdef HAVE_IPV6
   if (afi == AFI_IP6)
     return bgp_nexthop_lookup_ipv6 (peer, ri, changed, metricchanged);
@@ -800,16 +800,16 @@ zlookup_read (void)
   nbytes = stream_read (s, zlookup->sock, length - 2);
   marker = stream_getc (s);
   version = stream_getc (s);
-  
+
   if (version != ZSERV_VERSION || marker != ZEBRA_HEADER_MARKER)
     {
       zlog_err("%s: socket %d version mismatch, marker %d, version %d",
                __func__, zlookup->sock, marker, version);
       return NULL;
     }
-    
+
   command = stream_getw (s);
-  
+
   raddr.s_addr = stream_get_ipv4 (s);
   metric = stream_getl (s);
   nexthop_num = stream_getc (s);
@@ -861,9 +861,9 @@ zlookup_query (struct in_addr addr)
   stream_reset (s);
   zclient_create_header (s, ZEBRA_IPV4_NEXTHOP_LOOKUP);
   stream_put_in_addr (s, &addr);
-  
+
   stream_putw_at (s, 0, stream_get_endp (s));
-  
+
   ret = writen (zlookup->sock, s->data, stream_get_endp (s));
   if (ret < 0)
     {
@@ -908,16 +908,16 @@ zlookup_read_ipv6 (void)
   nbytes = stream_read (s, zlookup->sock, length - 2);
   marker = stream_getc (s);
   version = stream_getc (s);
-  
+
   if (version != ZSERV_VERSION || marker != ZEBRA_HEADER_MARKER)
     {
       zlog_err("%s: socket %d version mismatch, marker %d, version %d",
                __func__, zlookup->sock, marker, version);
       return NULL;
     }
-    
+
   command = stream_getw (s);
-  
+
   stream_get (&raddr, s, 16);
 
   metric = stream_getl (s);
@@ -976,7 +976,7 @@ zlookup_query_ipv6 (struct in6_addr *addr)
   zclient_create_header (s, ZEBRA_IPV6_NEXTHOP_LOOKUP);
   stream_put (s, addr, 16);
   stream_putw_at (s, 0, stream_get_endp (s));
-  
+
   ret = writen (zlookup->sock, s->data, stream_get_endp (s));
   if (ret < 0)
     {
@@ -1024,12 +1024,12 @@ bgp_import_check (struct prefix *p, u_int32_t *igpmetric,
   s = zlookup->obuf;
   stream_reset (s);
   zclient_create_header (s, ZEBRA_IPV4_IMPORT_LOOKUP);
-  
+
   stream_putc (s, p->prefixlen);
   stream_put_in_addr (s, &p->u.prefix4);
-  
+
   stream_putw_at (s, 0, stream_get_endp (s));
-  
+
   /* Write the packet. */
   ret = writen (zlookup->sock, s->data, stream_get_endp (s));
 
@@ -1066,9 +1066,9 @@ bgp_import_check (struct prefix *p, u_int32_t *igpmetric,
                __func__, zlookup->sock, marker, version);
       return 0;
     }
-    
+
   command = stream_getw (s);
-  
+
   addr.s_addr = stream_get_ipv4 (s);
   metric = stream_getl (s);
   nexthop_num = stream_getc (s);
@@ -1112,7 +1112,7 @@ bgp_import (struct thread *t)
   afi_t afi;
   safi_t safi;
 
-  bgp_import_thread = 
+  bgp_import_thread =
     thread_add_timer (master, bgp_import, NULL, bgp_import_interval);
 
   if (BGP_DEBUG (events, EVENTS))
@@ -1187,15 +1187,15 @@ zlookup_connect (struct thread *t)
 static int
 zlookup_connect2 (struct thread *t)
 {
-    zlog_debug(" ----------- test event read -----------\n");
-  struct zclient *zlookup2;
+  //zlog_debug(" ----------- test event read -----------\n");
+  //struct zclient *zlookup2;
 
-  zlookup2 = THREAD_ARG (t);
+  //zlookup2 = THREAD_ARG (t);
   //zlookup2->t_connect = NULL;
 
 
   int fd, n_read=0;
-  char a_buf[0xff]; 
+  char a_buf[0xff];
 
   int accept_sock = THREAD_FD (t);
   fd = accept_sock;
@@ -1250,7 +1250,7 @@ bgp_multiaccess_check_v4 (struct in_addr nexthop, char *peer)
   if (! rn1)
     return 0;
   bgp_unlock_node (rn1);
-  
+
   rn2 = bgp_node_match (bgp_connected_table[AFI_IP], &p2);
   if (! rn2)
     return 0;
@@ -1276,7 +1276,7 @@ DEFUN (bgp_scan_time,
   if (bgp_scan_thread)
     {
       thread_cancel (bgp_scan_thread);
-      bgp_scan_thread = 
+      bgp_scan_thread =
 	thread_add_timer (master, bgp_scan_timer, NULL, bgp_scan_interval);
     }
 
@@ -1295,7 +1295,7 @@ DEFUN (no_bgp_scan_time,
   if (bgp_scan_thread)
     {
       thread_cancel (bgp_scan_thread);
-      bgp_scan_thread = 
+      bgp_scan_thread =
 	thread_add_timer (master, bgp_scan_timer, NULL, bgp_scan_interval);
     }
 
@@ -1353,8 +1353,8 @@ show_ip_bgp_scan_tables (struct vty *vty, const char detail)
 
 #ifdef HAVE_IPV6
   {
-    for (rn = bgp_table_top (bgp_nexthop_cache_table[AFI_IP6]); 
-         rn; 
+    for (rn = bgp_table_top (bgp_nexthop_cache_table[AFI_IP6]);
+         rn;
          rn = bgp_route_next (rn))
       if ((bnc = rn->info) != NULL)
 	{
@@ -1386,8 +1386,8 @@ show_ip_bgp_scan_tables (struct vty *vty, const char detail)
 #endif /* HAVE_IPV6 */
 
   vty_out (vty, "BGP connected route:%s", VTY_NEWLINE);
-  for (rn = bgp_table_top (bgp_connected_table[AFI_IP]); 
-       rn; 
+  for (rn = bgp_table_top (bgp_connected_table[AFI_IP]);
+       rn;
        rn = bgp_route_next (rn))
     if (rn->info != NULL)
       vty_out (vty, " %s/%d%s", inet_ntoa (rn->p.u.prefix4), rn->p.prefixlen,
@@ -1395,8 +1395,8 @@ show_ip_bgp_scan_tables (struct vty *vty, const char detail)
 
 #ifdef HAVE_IPV6
   {
-    for (rn = bgp_table_top (bgp_connected_table[AFI_IP6]); 
-         rn; 
+    for (rn = bgp_table_top (bgp_connected_table[AFI_IP6]);
+         rn;
          rn = bgp_route_next (rn))
       if (rn->info != NULL)
 	vty_out (vty, " %s/%d%s",
@@ -1459,7 +1459,7 @@ bgp_scan_init (void)
   {
       if(errno != EEXIST)
       {
-	  fprintf(stderr, "FAIL:mkfifo() (%s) \n", strerror(errno)); 
+	  fprintf(stderr, "FAIL:mkfifo() (%s) \n", strerror(errno));
 	  zlog_debug(" EXIT_FAILURE\n");
       }
   }
@@ -1469,8 +1469,6 @@ bgp_scan_init (void)
       fprintf(stderr, "FAIL:open() (%s) \n", strerror(errno));
       zlog_debug(" EXIT_FAILURE\n");
   }
-
-  //printf(" fd:%d\n", fd);
 
   //
   // READ QUEUE
@@ -1498,7 +1496,7 @@ bgp_scan_init (void)
 #endif /* HAVE_IPV6 */
 
   /* Make BGP scan thread. */
-  bgp_scan_thread = thread_add_timer (master, bgp_scan_timer, 
+  bgp_scan_thread = thread_add_timer (master, bgp_scan_timer,
                                       NULL, bgp_scan_interval);
   /* Make BGP import there. */
   bgp_import_thread = thread_add_timer (master, bgp_import, NULL, 0);

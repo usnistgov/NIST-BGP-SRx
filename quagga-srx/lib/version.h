@@ -35,17 +35,11 @@
 #define GIT_INFO ""
 #endif
 
-#ifdef USE_SRX
-#define QUAGGA_PROGNAME   "QuaggaSrx"
+#define QUAGGA_PROGNAME   "QuaggaSRx"
 
-#define QUAGGA_VERSION     "0.3.0.2" GIT_SUFFIX
-#else /* USE_SRX */
-#define QUAGGA_PROGNAME   "Quagga"
+#define QUAGGA_VERSION     "0.4.1.1" GIT_SUFFIX
 
-#define QUAGGA_VERSION     "0.99.22" GIT_SUFFIX
-#endif /* USE_SRX */
-
-#define ZEBRA_BUG_ADDRESS "https://bugzilla.quagga.net"
+#define ZEBRA_BUG_ADDRESS "http://bgpsrx.antd.nist.gov"
 
 #define QUAGGA_URL "http://www.quagga.net"
 

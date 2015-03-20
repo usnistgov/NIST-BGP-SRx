@@ -2,9 +2,9 @@
 @c doc/defines.texi.  Generated from defines.texi.in by configure.
 
 @c Set variables
-@set PACKAGE_NAME Quagga
-@set PACKAGE_TARNAME quagga
-@set PACKAGE_STRING Quagga 0.99.22
+@set PACKAGE_NAME QuaggaSRx
+@set PACKAGE_TARNAME quaggasrx
+@set PACKAGE_STRING QuaggaSRx 0.4.1.1
 @set AUTHORS Kunihiro Ishiguro, et al.
 @set COPYRIGHT_YEAR 1999-2005
 @set COPYRIGHT_STR Copyright @copyright{} @value{COPYRIGHT_YEAR} @value{AUTHORS}

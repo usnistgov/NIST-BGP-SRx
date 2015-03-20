@@ -1,40 +1,322 @@
 ! -*- bgp -*-
 !
-! BGPd sample configuratin file
+! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sample,v 1.1 2002/12/13 20:15:29 paul Exp $
+! $Id: bgpd.conf.sampleSRx,v 4.1 2014/12/03 16:53:29 ob Exp $
 !
 hostname bgpd
 password zebra
 !enable password please-set-at-here
 !
-!bgp mulitple-instance
+!bgp multiple-instance
 !
 router bgp 7675
   bgp router-id 10.0.0.1
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! QuaggaSRx Configuration Extension  
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
+! Display commands
+! =================
+! For the display, QuaggaSRx seamlessly integrates validation information into 
+!   the standard show [ip] bgp com-mands. The additional information must be 
+!   enabled or disabled within using the srx display command as de-scribed 
+!   above.
+!
+! Turn on/off additional SRx display information for default show commands.
+! [no] srx display
+
+
+
+! Specify Connection Settings for SRx Server. 
+! ===========================================
+!
+! The SRx proxy id MUST be set prior to using the connect command. The 
+!   srx-server uses the proxy ID to link updates to routers. This is can be 
+!   either scripted as IPv4 address or plain 4 byte integer decimal value. It is 
+!   recommended to use the router-id as proxy-id.
+! srx set-proxy-id <id>
   srx set-proxy-id 10.0.0.1
-  srx set-server localhost 17900
 
-  no srx policy ignore-undefined 
-  srx policy prefer-valid 
+! Configure the address of the server and its port without connecting.
+! srx set-server <host> <0..65535>
+  srx set-server 127.0.0.1 17900s
 
-! More srx settings
+! Connect the BGP server instance to the SRx server at the given location. The 
+!   preferred method to connect is using “srx set-server” to configure the srx 
+!   server connection and calling “srx connect” without any parameters. The 
+!   Quagga command show/write running-config uses the preferred sequence.
+! srx connect [<host> <0..65535>]
   srx connect
 
+! Disconnect the BGP server instance from the SRx server. For this command the 
+!   “keep-window” setting is used. (THIS COMMAND SHOULD ONLY BR USED IN CONSOLE)
+! srx disconnect
+
+! "keep-window" specifies the time in seconds the SRx is requested to hold 
+!   information after it is deleted! This allows a router reboot without losing 
+!   the validation result information within SRx.
+! srx keep-window <time>
+
+
+! Configure Transmission of Validation result using BGP updates
+! =============================================================
 !
-! network 10.0.0.0/8
-! neighbor 10.0.0.2 remote-as 7675
-! neighbor 10.0.0.2 route-map set-nexthop out
-! neighbor 10.0.0.2 ebgp-multihop
-! neighbor 10.0.0.2 next-hop-self
+! This setting is introduced with QuaggaSRx 0.3.1 and allows communicating 
+!   origin validation results to peers. The given integer value in the range of 
+!   0-255 is used to identify this extended community value string. It will be 
+!   used in the field currently marked as ‘TBD’ [draft-ietf-sidr-origin-validation-signaling].
+!   By default this enables the communication in send and receive mode for all 
+!   iBGP peers. In addition to the draft specification QuaggaSRx allows to 
+!   extend the community into eBGP by adding the parameter ‘include_ebgp’. 
+!   To disable eBGP reconfigure the router using ‘ibgp_only’
+! srx extcommunity <0-255> ( ibgp_only | include_ebgp)
+  srx extcommunity 200 include_ebgp
+
+! Disable the transfer of origin validation results.
+! no srx extcommunity
+
+
+! Configure RPKI Origin Validation and BGPSEC Path Validation
+! ===========================================================
+
+
+! The evaluation command enables or disables the policy processing within the 
+!   decision process as well as activating or deactivating setting of the ignore 
+!   flag due to an ignore-XXX policy. In addition to enabling the evaluation of 
+!   validation results this command specifies the mode the evaluation is 
+!   performed in. 
+!   * In the default mode "origin_only", only origin validation results are used
+!     for calculating the validation result. 
+!   * In the "bgpsec" mode, the origin validation result and the path validation 
+!     result, both are used to determine the final validation result.
+! srx evaluation (origin_only | bgpsec)
+  srx evaluation origin_only
+
+! "origin_only"
+! --------------
+! Using this setting only origin validation is evaluated. Path validation 
+! results will still be requested and notifications from SRx will be processed 
+! in regards to maintaining the correct data associated with each update but the 
+! results of path validation will not be included in the evaluation of 
+! validation results. 
+! The following results are possible with origin_only validation processing:
+!   valid       - A ROA exists that covers the announced prefix and origin.
+!   notfound    - No ROA exists for the announced prefix or a less specific.
+!   invalid     - A ROA exists that covers the announced prefix or a less 
+!                 specific prefix, but the origin AS does not match.
+!   (undefined) - Validation not performed yet.
+! QuaggaSRx introduces a fourth validation result type called “undefined”. This 
+! result type allows distinguishing between an actual validation result and the 
+! status when no connection from the Quagga router to SRx exists, or not enough
+! information is at available to make the final decision on the validation 
+! result for the particular update. As soon as QuaggaSRx is able to determine 
+! the outcome of the validation, then the validation result is set to the 
+! specific validation state.
+!
+! "bgpsec"
+! --------
+! This evaluation mode activates origin validation and path validation. 
+! QuaggaSRx uses the validation results of origin validation and path validation
+! to compute the final BGPSEC validation result (valid|invalid|undefined). 
+! SRx reports prefix-origin validation and path validation independently as soon
+! as they are available. Note that the SRx path validation refers only to the 
+! validation of the path signatures, NOT including the origin validation. 
+! QuaggaSRx merges the independent results of origin and path validation into 
+! one final BGPSEC validation. For BGPSEC Path validation configuration skip to
+! the end of this configuration section.
+!
+! The following table illustrates the possible BGPSEC validation results:
+!   +------------------------------------------------------+
+!   |  BGPSEC       |           Path Validation            |
+!   |               |   Valid    |  Invalid   | Undefined  |
+!   +---------------+------------+------------+------------+
+!   | Prefix Origin |            |            |            |
+!   | Validation    |     V      |     I      |     ?      |
+!   |         Valid |            |            |            |                   
+!   |    -----------|------------+------------+------------|                   
+!   |      NotFound |     I      |     I      |     I      |                   
+!   |    -----------|------------+------------+------------|                   
+!   |       Invalid |     I      |     I      |     I      |                   
+!   |    -----------|------------+------------+------------|                   
+!   |     Undefined |     ?      |     I      |     ?      |                   
+!   +---------------+------------+------------+------------+
+!
+!   Result values: V=Valid, I=Invalid, ?=Undefined
+!
+
+! Disable policy processing of the validation result. In this mode QuaggaSRx 
+!   performs normal BGP processing. Regardless to this setting, the QuaggaSRx 
+!   will send validation requests to SRx-server and process its notifications 
+!   but does not act upon it. To disable SRx communication disconnect from SRx.
+! no srx evaluation
+
+! Configure Default Validation Results
+! =====================================
+!
+! Set the default value for origin validation. This value is used until the 
+!   SRx-server provides the real validation value. 
+!   Accepted values are: “valid”, “notfound”, “invalid”, and “undefined”.
+! srx set-origin-value [value]
+  srx set-origin-value undefined
+!
+! Set the default value for path validation. This value is used until the 
+! SRx-server provides the real validation value. 
+! Accepted values are: “valid”, “invalid”, and “undefined”.
+! srx set-path-value [value]
+  srx set-path-value undefined
+
+
+! SRx Policy Configuration
+! =========================
+! QuaggaSRx provides three different policy types"
+! * Ignore updates with selected validation result
+! * Modify the local preference of updates depending on the validation result
+! * Prefer updates whose validation result is “valid”
+!
+! By default QuaggaSRx does not enable any policies with the exception of 
+!   the policy "ignore-undefined". Policies do influence the BGP decision 
+!   process in the following order:
+!   1. Ignore Policies:
+!      These policies prevent updates with a certain validation result from 
+!      entering the decision process. They are stored in the RIB in but will not
+!      be considered for route selection.
+!   2. Local Preference Modification policies:
+!      These policies allow a dynamic/fixed modification of each update’s local 
+!      preference value in accordance with its validation result. The dynamic 
+!      method allows combining other local preference policies with the 
+!      validation result policies. In case a dynamic local preference policy 
+!      reduces the local preference to a value less than zero “0” (underflow), 
+!      the local preference will be adjusted to zero.
+!   3. Prefer Valid:
+!      This policy prefers updates with the validation state “valid” to updates 
+!      whose values are different from “valid”. The policy “Prefer Valid” is 
+!      executed directly after local preference policies.
+!
+! The QuaggaSRx implementation changes the default decision process in the 
+!   following manner:
+!      1. Weight (kept as is)
+!      2. Local Preference:
+!            After determining the local preference, the srx policy will apply 
+!            changes to the local preference according to the validation result
+!      3. Prefer “valid” updates over updates with a different validation state.
+!      4. ... (kept as is)
+! It is possible that in certain circumstances updates of different validation 
+!   states are compared where none of the updates is valid. In this case, no 
+!   ranking is performed because this situation is transient and can occur 
+!   during the introduction of a new ROA where certain updates are already 
+!   re-evaluated but others are not re-evaluated yet.
+! ----------------
+! ** IMPORTANT **:
+! ----------------
+!   Policies should not be modified during operations. Changes in policies do 
+!   not trigger a re-evaluation of already installed routes. Only changes due 
+!   to the validation itself of update announcements or withdrawals trigger the 
+!   decision process for re-evaluation of the validation result!
+!
+! Ignore Policies:
+! ================
+! Activates or deactivates this set of policies that specify which update has to 
+! be ignored. This command must be scripted for each ignore policy separately.
+! The following validation results can be set to be ignored:
+! "ignore-notfound":
+!   Updates with the validation result “notfound” will be flagged as ignored and 
+!   will not be processed further in the decision process.
+! "ignore-invalid":
+!   Updates with the validation result “invalid” will be flagged as ignored and 
+!   will not be processed further in the decision process
+! "ignore-undefined": (default)
+!   Updates that have not yet been validated by the SRx server are considered 
+!   undefined. This is an intermediate state, and as soon as the SRx server was 
+!   able to process the validation for the update, it will receive one of the 
+!   final validation results (valid, notfound, invalid).
+! [no] srx policy (ignore-notfound | ignore-invalid | ignore-undefined)
+  no srx policy ignore-undefined
+!
+! Local Preference Policies:
+! ==========================
+! Local preference modification policies are only applied to updates with the 
+!   validation results “valid”, “invalid”, or “notfound”. The value is a 
+!   positive integer value that is used as a fixed local preference value 
+!   overwriting a pre-existing value or modifying the pre-existing value. The 
+!   later one is specified by adding the keywords “add” or “subtract” to the 
+!   policy configuration.
+!   Modifying the local preference by adding or subtracting allows combining 
+!   other policies with origin validation / path validation. An example could be
+!   a policy where an operator wants to configure the router in such way that 
+!   all routes of peer A are preferred over routes by peer B except if peer B 
+!   has a “valid” route while peer A has only an “invalid” one for the same 
+!   prefix. Also routes of peer A with the validation status “notfound” or 
+!   “undefined” are still preferred over “valid” routes of peer B. The following
+!   configuration would allow such a setup:
+!     Configure default local preference for peer A: 106
+!     Configure default local preference for peer B: 100
+!     srx policy local-preference valid 5 add
+!     srx policy local-preference invalid 5 subtract
+!
+!  +-------------------------------------------------------------------------+
+!  | U(A): v | n | ? -> LP >= 106, U(B): n | i | ? -> LP <= 100, select U(A) |
+!  +-------------------------------------------------------------------------+
+!  | U(A): v | n | ? -> LP >= 106, U(B):     v     -> LP  = 105, select U(A) |
+!  +-------------------------------------------------------------------------+
+!  | U(A):     i     -> LP  = 101, U(B): i | n | ? -> LP <= 100, select U(A) |
+!  +-------------------------------------------------------------------------+
+!  | U(A):     i     -> LP  = 101, U(B):     v     -> LP  = 105, select U(B) |
+!  +-------------------------------------------------------------------------+
+!    v = valid, n = notfound, i = invalid,? = undefined
+!
+! As illustrated above in scenario #4 with U(B) = “valid” and U(A) = “invalid”, 
+! the “valid” route of Peer B will be chosen over the “invalid” route of peer A.
+!
+! [no] srx policy local-preference (valid | notfound | invalid) <value> [add | subtract]
+!
+! To deactivate a particular policy the keyword “no” must be placed before the 
+! policy definition.
+!
+!
+! Prefer Policy:
+! ==============
+! This policy indicates that the tiebreaker between two BGP updates is the 
+!   validation state “valid”. This means updates that are “valid” are selected 
+!   over updates whose validation state differs from “valid”. In case both 
+!   updates are either “valid” or both are other than “valid”, other tie-
+!   breakers such as shortest path, MED, router id etc. will be used to 
+!   determine the route selection.
+! [no] srx policy prefer-valid
+  srx policy prefer-valid
+
+! Specify Local Prefixes
+! ======================
+ network 10.0.0.0/9
+
+! Specify BGPSEC private key
+! bgpsec ski <key>
+
+! Specify Neighbors
+! =================
+ neighbor 10.0.1.1 remote-as 7676
+ neighbor 10.0.1.1 ebgp-multihop
+! neighbor 10.0.1.1 route-map set-nexthop out
+
+! Specify type of BGPSEC connection
+! ---------------------------------
+! neighbor 10.0.2.1 bgpsec (send|receive|both)
+ neighbor 10.0.1.1 bgpsec both
+
 !
 ! access-list all permit any
 !
 !route-map set-nexthop permit 10
 ! match ip address all
-! set ip next-hop 10.0.0.1
+! set ip next-hop 10.0.1.1
 !
 !log file bgpd.log
 !
+
 log stdout
+
+!log stdout debugging
+!debug bgp updates
+!debug bgp bgpsec

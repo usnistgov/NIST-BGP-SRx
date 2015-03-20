@@ -45,6 +45,9 @@ unsigned long conf_bgp_debug_keepalive;
 unsigned long conf_bgp_debug_update;
 unsigned long conf_bgp_debug_normal;
 unsigned long conf_bgp_debug_zebra;
+#ifdef USE_SRX
+unsigned long conf_bgp_debug_bgpsec;
+#endif
 
 unsigned long term_bgp_debug_as4;
 unsigned long term_bgp_debug_fsm;
@@ -55,6 +58,9 @@ unsigned long term_bgp_debug_keepalive;
 unsigned long term_bgp_debug_update;
 unsigned long term_bgp_debug_normal;
 unsigned long term_bgp_debug_zebra;
+#ifdef USE_SRX
+unsigned long term_bgp_debug_bgpsec;
+#endif
 
 /* messages for BGP-4 status */
 const struct message bgp_status_msg[] = 
@@ -744,10 +750,146 @@ DEFUN (no_debug_bgp_all,
   TERM_DEBUG_OFF (fsm, FSM);
   TERM_DEBUG_OFF (filter, FILTER);
   TERM_DEBUG_OFF (zebra, ZEBRA);
+#ifdef USE_SRX
+  TERM_DEBUG_OFF (bgpsec, BGPSEC_DETAIL);
+  TERM_DEBUG_OFF (bgpsec, BGPSEC_IN);
+  TERM_DEBUG_OFF (bgpsec, BGPSEC_OUT);
+#endif
   vty_out (vty, "All possible debugging has been turned off%s", VTY_NEWLINE);
       
   return CMD_SUCCESS;
 }
+
+#ifdef USE_SRX
+DEFUN (debug_bgp_bgpsec,
+       debug_bgp_bgpsec_cmd,
+       "debug bgp bgpsec",
+       DEBUG_STR
+       BGP_STR
+       "BGPSEC actions\n"
+       "BGPSEC debugging info handling\n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_ON (bgpsec, BGPSEC_DETAIL);
+    DEBUG_ON (bgpsec, BGPSEC_IN);
+    DEBUG_ON (bgpsec, BGPSEC_OUT);
+  }
+  else
+  {
+    TERM_DEBUG_ON (bgpsec, BGPSEC_DETAIL);
+    TERM_DEBUG_ON (bgpsec, BGPSEC_IN);
+    TERM_DEBUG_ON (bgpsec, BGPSEC_OUT);
+    vty_out (vty, "BGP bgpsec debugging is on%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+
+DEFUN (debug_bgp_bgpsec_direct,
+       debug_bgp_bgpsec_direct_cmd,
+       "debug bgp bgpsec (in|out)",
+       DEBUG_STR
+       BGP_STR
+       "BGPSEC actions\n"
+       "Inbound actions\n"
+       "Outbound actions\n")
+{
+  if (vty->node == CONFIG_NODE)
+    {
+      if (strncmp ("i", argv[0], 1) == 0)
+	{
+	  DEBUG_OFF (bgpsec, BGPSEC_OUT);
+	  DEBUG_ON (bgpsec, BGPSEC_IN);
+	}
+      else
+	{
+	  DEBUG_OFF (bgpsec, BGPSEC_IN);
+	  DEBUG_ON (bgpsec, BGPSEC_OUT);
+	}
+    }
+  else
+    {
+      if (strncmp ("i", argv[0], 1) == 0)
+	{
+	  TERM_DEBUG_OFF (bgpsec, BGPSEC_OUT);
+	  TERM_DEBUG_ON (bgpsec, BGPSEC_IN);
+	  vty_out (vty, "BGP bgpsec  debugging is on (inbound)%s", VTY_NEWLINE);
+	}
+      else
+	{
+	  TERM_DEBUG_OFF (bgpsec, BGPSEC_IN);
+	  TERM_DEBUG_ON (bgpsec, BGPSEC_OUT);
+	  vty_out (vty, "BGP bgpsec debugging is on (outbound)%s", VTY_NEWLINE);
+	}
+    }
+  return CMD_SUCCESS;
+}
+
+DEFUN (debug_bgp_bgpsec_detail,
+       debug_bgp_bgpsec_detail_cmd,
+       "debug bgp bgpsec detail",
+       DEBUG_STR
+       BGP_STR
+       "BGPSEC detailed actions\n"
+       "BGPSEC debugging info detailed handling\n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_ON (bgpsec, BGPSEC_DETAIL);
+  }
+  else
+  {
+    TERM_DEBUG_ON (bgpsec, BGPSEC_DETAIL);
+    vty_out (vty, "BGP bgpsec detailed debugging is on%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_debug_bgp_bgpsec_detail,
+       no_debug_bgp_bgpsec_detail_cmd,
+       "no debug bgp bgpsec detail",
+       NO_STR
+       DEBUG_STR
+       BGP_STR
+       "BGPSEC messages\n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_OFF (bgpsec, BGPSEC_DETAIL);
+  }
+  else
+  {
+    TERM_DEBUG_OFF (bgpsec, BGPSEC_DETAIL);
+    vty_out (vty, "BGP bgpsec detailed debugging is off%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_debug_bgp_bgpsec,
+       no_debug_bgp_bgpsec_cmd,
+       "no debug bgp bgpsec",
+       NO_STR
+       DEBUG_STR
+       BGP_STR
+       "BGPSEC messages\n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_OFF (bgpsec, BGPSEC_DETAIL);
+    DEBUG_OFF (bgpsec, BGPSEC_IN);
+    DEBUG_OFF (bgpsec, BGPSEC_OUT);
+  }
+  else
+  {
+    TERM_DEBUG_OFF (bgpsec, BGPSEC_DETAIL);
+    TERM_DEBUG_OFF (bgpsec, BGPSEC_IN);
+    TERM_DEBUG_OFF (bgpsec, BGPSEC_OUT);
+    vty_out (vty, "BGP bgpsec debugging is off%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+#endif /* USE_SRX */
+
 
 ALIAS (no_debug_bgp_all,
        undebug_bgp_all_cmd,
@@ -787,6 +929,22 @@ DEFUN (show_debugging_bgp,
     vty_out (vty, "  BGP as4 debugging is on%s", VTY_NEWLINE);
   if (BGP_DEBUG (as4, AS4_SEGMENT))
     vty_out (vty, "  BGP as4 aspath segment debugging is on%s", VTY_NEWLINE);
+#ifdef USE_SRX
+  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL) && (BGP_DEBUG (bgpsec, BGPSEC_IN)) && (BGP_DEBUG (bgpsec, BGPSEC_OUT)))
+  {
+    vty_out (vty, "  BGP bgpsec debugging is all on %s", VTY_NEWLINE);
+    goto BGPSEC_display_done;
+  }
+  if (BGP_DEBUG (bgpsec, BGPSEC_IN))
+    vty_out (vty, "  BGP bgpsec debugging is on (inbound)%s", VTY_NEWLINE);
+
+  if (BGP_DEBUG (bgpsec, BGPSEC_OUT))
+    vty_out (vty, "  BGP bgpsec debugging is on (outbound)%s", VTY_NEWLINE);
+
+  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
+      vty_out (vty, "  BGP bgpsec debugging is on (detail)%s", VTY_NEWLINE);
+BGPSEC_display_done:
+#endif
   vty_out (vty, "%s", VTY_NEWLINE);
   return CMD_SUCCESS;
 }
@@ -859,7 +1017,29 @@ bgp_config_write_debug (struct vty *vty)
       vty_out (vty, "debug bgp zebra%s", VTY_NEWLINE);
       write++;
     }
-
+#ifdef USE_SRX
+  if (CONF_BGP_DEBUG (bgpsec, BGPSEC_DETAIL) && CONF_BGP_DEBUG (bgpsec, BGPSEC_IN)
+      && CONF_BGP_DEBUG (bgpsec, BGPSEC_OUT))
+    {
+      vty_out (vty, "debug bgp bgpsec%s", VTY_NEWLINE);
+      write++;
+    }
+  else if (CONF_BGP_DEBUG (bgpsec, BGPSEC_IN))
+    {
+      vty_out (vty, "debug bgp bgpsec in%s", VTY_NEWLINE);
+      write++;
+    }
+  else if (CONF_BGP_DEBUG (bgpsec, BGPSEC_OUT))
+    {
+      vty_out (vty, "debug bgp bgpsec out%s", VTY_NEWLINE);
+      write++;
+    }
+  else if (CONF_BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
+  {
+    vty_out (vty, "debug bgp bgpsec detail%s", VTY_NEWLINE);
+    write++;
+  }
+#endif
   return write;
 }
 
@@ -929,4 +1109,20 @@ bgp_debug_init (void)
   install_element (CONFIG_NODE, &no_debug_bgp_zebra_cmd);
   install_element (ENABLE_NODE, &no_debug_bgp_all_cmd);
   install_element (ENABLE_NODE, &undebug_bgp_all_cmd);
+#ifdef USE_SRX
+  install_element (ENABLE_NODE, &debug_bgp_bgpsec_cmd);
+  install_element (CONFIG_NODE, &debug_bgp_bgpsec_cmd);
+
+  install_element (ENABLE_NODE, &no_debug_bgp_bgpsec_cmd);
+  install_element (CONFIG_NODE, &no_debug_bgp_bgpsec_cmd);
+
+  install_element (ENABLE_NODE, &debug_bgp_bgpsec_direct_cmd);
+  install_element (CONFIG_NODE, &debug_bgp_bgpsec_direct_cmd);
+
+  install_element (ENABLE_NODE, &debug_bgp_bgpsec_detail_cmd);
+  install_element (CONFIG_NODE, &debug_bgp_bgpsec_detail_cmd);
+
+  install_element (ENABLE_NODE, &no_debug_bgp_bgpsec_detail_cmd);
+  install_element (CONFIG_NODE, &no_debug_bgp_bgpsec_detail_cmd);
+#endif
 }

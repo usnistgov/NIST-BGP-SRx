@@ -38,7 +38,11 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/05 - oborchert
+ *   0.3.0 - 2014/11/17 - oborchert
+ *           * Removed constant value for configuration file and replaced it 
+ *             with a defined one in config.h. Also modified the determination
+ *             process on how to figure out which configuration file to load. 
+ *         - 2013/02/05 - oborchert
  *           * Fixed parameter processing when help is requested
  *         - 2012/11/23 - oborchert
  *           * Extended version handling. - F for full version
@@ -87,13 +91,6 @@
 #define HDR "([0x%08X] Main): "
 
 ///////////////////
-// Global constants
-///////////////////
-
-/** contains an ordered list of configuration files. */
-static char* DEFAULT_CONFIG_FILE = "srx_server.conf";
-
-///////////////////
 // Global variables
 ///////////////////
 
@@ -110,10 +107,10 @@ static SRXConsole    console;
 
 
 
-/** Handles roa validation requests              - Currently only one cache. **/
+/** Handles ROA validation requests              - Currently only one cache. **/
 static RPKIHandler              rpkiHandler;
 
-/** Handles bgpsec path validation requests.     - Currently only one cache. **/
+/** Handles BGPSEC path validation requests.     - Currently only one cache. **/
 static BGPSecHandler            bgpsecHandler;
 
 
@@ -167,7 +164,8 @@ static int setupConfiguration (int argc, const char* argv[])
   int params;
   
   // Set to defaults
-  initConfiguration(&config, DEFAULT_CONFIG_FILE);
+  //initConfiguration(&config, DEFAULT_CONFIG_FILE);
+  initConfiguration(&config);
   // check if a user specific configuration file is requested!
   params = parseProgramArgs(&config, argc, argv, true);
   if (params != 1)
@@ -186,6 +184,8 @@ static int setupConfiguration (int argc, const char* argv[])
   }
   else
   {
+    // Check if configuration file is located in installed etc folder
+    
     printf("Cannot access \'%s\'\n", config.configFileName);
     return 0;      
   }

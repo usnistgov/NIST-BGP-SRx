@@ -1,4 +1,4 @@
-%define version 0.3.0.3
+%define version 0.3.0.5
 %define name srx
 %define lconf_name libconfig
 %define lconf_version 1.4.1
@@ -21,7 +21,7 @@ BuildRoot:/tmp/rpm/%{name}-%{version}
 Prefix:/usr/local/srx
 
 BuildRequires:automake	
-Requires:glibc libconfig >= 1.3
+Requires:glibc libconfig >= 1.3 srxcryptoapi >= 0.1.1
 
 %description
 srx rpm packaging file
@@ -42,7 +42,7 @@ cd %{lpatr_name}-%{lpatr_version}/libpatricia
 
 
 %build
-%configure --with-libpatr --with-libconf --sysconfdir=/etc
+%configure --prefix=/usr/local --sysconfdir=/etc --with-libpatr --with-libconf
 #./configure --prefix=/usr --with-libpatr --with-libconf
 make %{?_smp_mflags}
 pwd
@@ -70,39 +70,56 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 ldconfig
+#ln -s %{_bindir}/srx_server /usr/bin/srx_server
+#ln -s %{_bindir}/rpkirtr_client /usr/bin/rpkirtr_client
+#ln -s %{_bindir}/rpkirtr_svr /usr/bin/rpkirtr_svr
+#ln -s %{_bindir}/srxsvr_client /usr/srxsvr_client
+
+%postun
+ldconfig
+#rm -f /usr/bin/srx_server
+#rm -f /usr/bin/rpkirtr_client
+#rm -f /usr/bin/rpkirtr_svr
+#rm -f /usr/srxsvr_client
 
 %files
+#%defattr(644,root,root,755)
 %defattr(-,root,root,-)
 %doc
-/usr/lib/srx/libsrx_packets.so.0.0.0
-/usr/lib/srx/libsrx_packets.so.0
-/usr/lib/srx/libsrx_packets.so
-/usr/lib/srx/libsrx_packets.la
-/usr/lib/srx/libsrx_packets.a
-/usr/lib/srx/libsrxutil.so.0.0.0
-/usr/lib/srx/libsrxutil.so.0
-/usr/lib/srx/libsrxutil.so
-/usr/lib/srx/libsrxutil.la
-/usr/lib/srx/libsrxutil.a
-/usr/lib/srx/libsrx.so.0.0.0
-/usr/lib/srx/libsrx.so.0
-/usr/lib/srx/libsrx.so
-/usr/lib/srx/libsrx.la
-/usr/lib/srx/libsrx.a
-/etc/srx_server.conf
-/etc/ld.so.conf.d/srx_lib.conf
-/usr/bin/srx_server
-/usr/bin/rpkirtr_client
-/usr/bin/rpkirtr_svr
-/usr/bin/srxsvr_client
-/usr/include/patricia.h
-/usr/include/uthash.h
-/usr/include/srx/uthash.h
-/usr/include/srx/types.h
-/usr/include/srx/srx_defs.h
-/usr/include/srx/srx_api.h
-/usr/include/srx/slist.h
-/usr/include/srx/prefix.h
+%{_libdir}/srx/libsrx_packets.so.0.0.0
+%{_libdir}/srx/libsrx_packets.so.0
+%{_libdir}/srx/libsrx_packets.so
+%{_libdir}/srx/libsrx_packets.la
+%{_libdir}/srx/libsrx_packets.a
+%{_libdir}/srx/libsrxutil.so.0.0.0
+%{_libdir}/srx/libsrxutil.so.0
+%{_libdir}/srx/libsrxutil.so
+%{_libdir}/srx/libsrxutil.la
+%{_libdir}/srx/libsrxutil.a
+%{_libdir}/srx/libsrx.so.0.0.0
+%{_libdir}/srx/libsrx.so.0
+%{_libdir}/srx/libsrx.so
+%{_libdir}/srx/libsrx.la
+%{_libdir}/srx/libsrx.a
+%{_sysconfdir}/srx_server.conf
+%ifarch x86_64
+%{_sysconfdir}/ld.so.conf.d/srx_lib-x86_64.conf
+%else
+%{_sysconfdir}/ld.so.conf.d/srx_lib.conf
+%endif
+%{_bindir}/srx_server
+%{_bindir}/rpkirtr_client
+%{_bindir}/rpkirtr_svr
+%{_bindir}/srxsvr_client
+%{_includedir}/patricia.h
+%{_includedir}/uthash.h
+%{_includedir}/srx/uthash.h
+%{_includedir}/srx/types.h
+%{_includedir}/srx/srx_defs.h
+%{_includedir}/srx/srx_api.h
+%{_includedir}/srx/slist.h
+%{_includedir}/srx/prefix.h
+%{_includedir}/srx/prefix.h
 /usr/local/lib/libconfig.so.9.0.1
 /usr/local/lib/libconfig.so.9
 /usr/local/lib/libconfig.so
@@ -112,5 +129,3 @@ ldconfig
 /usr/local/lib/pkgconfig/libconfig.pc
 /usr/local/share/info/dir
 /usr/local/share/info/libconfig.info
-
-

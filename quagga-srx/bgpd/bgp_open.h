@@ -37,7 +37,7 @@ struct capability_mp_data
 };
 
 #pragma pack(1)
-struct capability_orf_entry 
+struct capability_orf_entry
 {
   struct capability_mp_data mpc;
   u_char num;
@@ -52,6 +52,22 @@ struct capability_as4
 {
   uint32_t as4;
 };
+
+#ifdef USE_SRX
+/* BGPSEC capability value */
+struct BgpsecCapVal
+{
+  uint8_t version_dir;
+#define BGPSEC_CAP_VERSION      (0 << 4)  /* current version of BGPSEC is 0 */
+#define BGPSEC_CAP_DIR_RECV     (0 << 3)
+#define BGPSEC_CAP_DIR_SEND     (1 << 3)
+
+  /* address family identifier */
+  uint16_t afi;
+#define BGPSEC_CAP_AFI_IPv4     1
+#define BGPSEC_CAP_AFI_IPv6     2
+};
+#endif
 
 struct graceful_restart_af
 {
@@ -75,6 +91,10 @@ struct capability_gr
 #define CAPABILITY_CODE_DYNAMIC        66 /* Dynamic Capability */
 #define CAPABILITY_CODE_REFRESH_OLD   128 /* Route Refresh Capability(cisco) */
 #define CAPABILITY_CODE_ORF_OLD       130 /* Cooperative Route Filtering Capability(cisco) */
+#ifdef USE_SRX
+//#define CAPABILITY_CODE_BGPSEC         99 /* BGPSEC capability code in accordance with BRID */
+#define CAPABILITY_CODE_BGPSEC         72 /* BGPSEC capability code in accordance with BRID */
+#endif /* USE_SRX */
 
 /* Capability Length */
 #define CAPABILITY_CODE_MP_LEN          4
@@ -82,17 +102,20 @@ struct capability_gr
 #define CAPABILITY_CODE_DYNAMIC_LEN     0
 #define CAPABILITY_CODE_RESTART_LEN     2 /* Receiving only case */
 #define CAPABILITY_CODE_AS4_LEN         4
+#ifdef USE_SRX
+#define CAPABILITY_CODE_BGPSEC_LEN      3
+#endif /* USE_SRX */
 
 /* Cooperative Route Filtering Capability.  */
 
 /* ORF Type */
-#define ORF_TYPE_PREFIX                64 
+#define ORF_TYPE_PREFIX                64
 #define ORF_TYPE_PREFIX_OLD           128
 
 /* ORF Mode */
-#define ORF_MODE_RECEIVE                1 
-#define ORF_MODE_SEND                   2 
-#define ORF_MODE_BOTH                   3 
+#define ORF_MODE_RECEIVE                1
+#define ORF_MODE_SEND                   2
+#define ORF_MODE_BOTH                   3
 
 /* Capability Message Action.  */
 #define CAPABILITY_ACTION_SET           0
@@ -107,5 +130,6 @@ extern void bgp_open_capability (struct stream *, struct peer *);
 extern void bgp_capability_vty_out (struct vty *, struct peer *);
 extern as_t peek_for_as4_capability (struct peer *, u_char);
 extern int bgp_afi_safi_valid_indices (afi_t, safi_t *);
+void makeBgpsecCapability(struct stream* s, uint8_t version, uint8_t dir, uint16_t afi);
 
 #endif /* _QUAGGA_BGP_OPEN_H */

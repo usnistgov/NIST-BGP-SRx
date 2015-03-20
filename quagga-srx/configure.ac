@@ -1,13 +1,14 @@
 ##
-## Configure template file for Quagga.
+## Configure template file for QuaggaSRx.
 ## autoconf will generate configure script.
 ##
-##  Copyright (c) 1996, 97, 98, 99, 2000 Kunihiro Ishiguro <kunihiro@zebra.org>
-##  Portions Copyright (c) 2003 Paul Jakma <paul@dishone.st>
+## Based on Quagga
+## Copyright (c) 1996, 97, 98, 99, 2000 Kunihiro Ishiguro <kunihiro@zebra.org>
+## Portions Copyright (c) 2003 Paul Jakma <paul@dishone.st>
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSrx, 0.3.1.1, [https://bugzilla.quagga.net])
+AC_INIT(QuaggaSRx, 0.4.1.1, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -282,6 +283,8 @@ AC_ARG_ENABLE(fpm,
 [  --enable-fpm            enable Forwarding Plane Manager support])
 AC_ARG_ENABLE(srx,
 [  --enable-srx           enable SRx])
+AC_ARG_ENABLE(srxcryptoapi,
+[  --enable-srxcryptoapi           enable srxcryptoapi])
 
 if test x"${enable_gcc_ultra_verbose}" = x"yes" ; then
   CFLAGS="${CFLAGS} -W -Wcast-qual -Wstrict-prototypes"
@@ -1364,29 +1367,50 @@ if test "x${enable_srx}" == "xyes"; then
 
   AC_MSG_CHECKING([srx client module])
   if test -f srx/libsrx.a ; then
-      SRX_CLI_LIB=../srx/libsrx.a
-      #AC_MSG_RESULT([yes - srx directory exists])
+    SRX_CLI_LIB=../srx/libsrx.a
+    #AC_MSG_RESULT([yes - srx directory exists])
   else
+    if test -f ${SRX_USER_INC}/srx/libsrx.la; then
+      SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.la
+      INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
+    else
       if test -f ${SRX_USER_INC}/srx/libsrx.a; then
-      SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.a
-          INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
+        SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.a
+        INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
       else
-          if test -f /usr/lib/srx/libsrx.a ; then
-              SRX_CLI_LIB="/usr/lib/srx/libsrx.a /usr/lib/srx/libsrxutil.a"
-              #INCLUDES="${INCLUDES} -I/usr/include/srx/" --> If already srx rpm installed, don't need to use 
+          if test -f /usr/lib64/srx/libsrx.la ; then
+            SRX_CLI_LIB="/usr/lib64/srx/libsrx.la /usr/lib64/srx/libsrxutil.la"
+            #INCLUDES="${INCLUDES} -I/usr/include/srx/" --> If already srx rpm installed, don't need to use.
           else
-              AC_MSG_ERROR([
+            if test -f /usr/lib/srx/libsrx.a ; then
+              SRX_CLI_LIB="/usr/lib/srx/libsrx.a /usr/lib/srx/libsrxutil.a"
+            else
+              have_libsrx=no
+              AC_SEARCH_LIBS([createSRxProxy], [srx], [have_libsrx=yes])
+              if test "x${have_libsrx}" = xyes; then
+                AC_MSG_RESULT([have_libsrx:${have_libsrx}])
+              else
+                if test -f /usr/local/lib/srx/libsrx.a; then
+                  SRX_CLI_LIB="/usr/local/lib/srx/libsrx.a /usr/local/lib/srx/libsrxutil.a"
+                  BGPD_INCLUDES="-I/usr/local/include/srx/"
+                  AC_SUBST(BGPD_INCLUDES)
+                else
+                  AC_MSG_ERROR([
                             --------------------------------------------------
                             The srx library and header file required to be
                             installed first.  Stopping...
                             Check 'config.log' for more information.
                             --------------------------------------------------])
+                fi
+              fi
+            fi
           fi
       fi
+    fi
       #AC_MSG_RESULT([no - srx directory  NOT exists])
   fi
 
-      #CPPFLAGS= -I${SRX_USER_INC}
+  #CPPFLAGS= -I${SRX_USER_INC}
   #INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
 
   AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
@@ -1394,6 +1418,108 @@ if test "x${enable_srx}" == "xyes"; then
   AC_MSG_RESULT([USER:${SRX_CLI_LIB}  srx dir:${SRX_DIR}])
   #AC_MSG_FAILURE([test])
 
+
+  dnl ---------------------------------
+  dnl  OpenSSL library and ECDSA check
+  dnl ---------------------------------
+  if test -f ${OPENSSL_ECDSA_INC}/openssl/ecdsa.h; then
+    OPENSSL_ECDSA_INC_DIR="${OPENSSL_ECDSA_INC}/"
+  else
+    if test -f /usr/local/ssl/include/openssl/ecdsa.h; then
+      OPENSSL_ECDSA_INC_DIR=/usr/local/ssl/include/
+    fi
+  fi
+
+  if test -n "$OPENSSL_ECDSA_INC_DIR"; then
+    OPENSSL_FLAGS="-I${OPENSSL_ECDSA_INC_DIR}"
+  fi
+
+  CPPFLAGS="${CPPFLAGS} ${OPENSSL_FLAGS}"
+  AC_MSG_RESULT([ openssl ecdsa dir: ${OPENSSL_ECDSA_INC_DIR}])
+
+  AC_CHECK_LIB([crypto],[CRYPTO_new_ex_data], [], [AC_MSG_ERROR([OpenSSL libraries required])])
+  AC_CHECK_LIB([ssl],[SSL_library_init], [], [AC_MSG_ERROR([OpenSSL libraries required])])
+  AC_CHECK_HEADERS([openssl/crypto.h openssl/x509.h openssl/pem.h openssl/ssl.h openssl/err.h],
+                                          [],[AC_MSG_ERROR([OpenSSL headers required])])
+  #AC_CHECK_FILE([${OPENSSL_ECDSA_INC_DIR}openssl/ecdsa.h],
+  #                 [],[AC_MSG_ERROR([OpenSSL ECDSA headers required])])
+  AC_CHECK_HEADER([openssl/ecdsa.h],
+                   [],[AC_MSG_ERROR([OpenSSL ECDSA headers required])])
+
+  if test -n "$OPENSSL_ECDSA_INC_DIR"; then
+    ldflags_temp=${OPENSSL_ECDSA_INC_DIR%include*}
+    LDFLAGS="$LDFLAGS -L${ldflags_temp}lib"
+  fi
+  AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
+  AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
+
+fi
+
+  dnl ---------------------------------
+  dnl   Dynamic Loader for using later.
+  dnl ---------------------------------
+
+  dnl The dlopen() function is in the C library for *BSD and in
+  dnl libdl on GLIBC-based systems
+  dnl #AC_SEARCH_LIBS([dlopen], [dl dld], [], [
+  dnl #  AC_MSG_ERROR([unable to find the dlopen() function])
+  dnl #])
+
+  dnl #AC_SEARCH_LIBS([createSRxProxy], [srx], [], [
+  dnl #  AC_MSG_ERROR([unable to find the createSRxProxy() function])
+  dnl #])
+
+  dnl ---------------------------------
+  dnl  SRxCrypto library  check
+  dnl ---------------------------------
+
+if test "x${enable_srxcryptoapi}" == "xyes"; then
+  have_srxcryptolib=no
+  AC_DEFINE(USE_SRX_CRYPTO_API,,using SRX CRYPTOAPI )
+  AC_MSG_CHECKING([for SRxCryptoLib])
+  AC_MSG_RESULT([])
+
+  AC_SEARCH_LIBS([dlopen], [dl dld], [], [
+                AC_MSG_ERROR([unable to find the dlopen() function])
+  ])
+  AC_SEARCH_LIBS([config_init], [config],[],[
+                AC_MSG_ERROR([unable to find the config_init() function])
+  ])
+
+  if test -f ${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la; then
+      SRX_API_LIB=${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la
+      INCLUDES="${INCLUDES} -I${CRYPTOAPI_DIR}/include"
+      AC_SUBST(SRX_API_LIB)
+      have_srxcryptolib=yes
+  else
+    if test -f /usr/local/lib/libSRxCryptoAPI.a; then
+      AC_MSG_RESULT([manually found libSRxCryptoAPI])
+      SRX_CRYPTO_API_LIBS="-lSRxCryptoAPI"
+      LDFLAGS="$LDFLAGS -L/usr/local/lib/ "
+      CPPFLAGS="${CPPFLAGS} -I/usr/local/include/"
+      AC_SUBST(SRX_CRYPTO_API_LIBS)
+      have_srxcryptolib=yes
+    else
+        AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], [have_srxcryptolib=yes])
+        if test "x${have_srxcryptolib}" = xyes; then
+          AC_CHECK_HEADERS([srxcryptoapi.h], [], [have_srxcryptolib=no])
+        else
+            AC_MSG_ERROR([
+                  --------------------------------------------------
+                  The SRxCrypto library and header file required to
+                  build srx.  Stopping...
+                  Check 'config.log' for more information.
+                  --------------------------------------------------])
+        fi
+    fi
+  fi
+
+  AC_MSG_RESULT([have_srxcryptolib:${have_srxcryptolib}])
+  AC_MSG_RESULT([USER srxcryptoapi dir:${SRX_API_LIB}])
+  AC_MSG_RESULT([INCLUDES:${INCLUDES}])
+  AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
+  AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
+  AC_MSG_RESULT([LIBS="$LIBS"])
 fi
 
 case "${enable_ripngd}" in
@@ -1451,6 +1577,7 @@ AC_SUBST(SRX_CLI_LIB)
 AC_SUBST(SRX_DIR)
 AC_SUBST(SRX_LIB)
 AC_SUBST(SRX_LIB_SO)
+AC_SUBST(OPENSSL_ECDSA_INC_DIR)
 AC_CHECK_LIB(c, inet_ntop, [AC_DEFINE(HAVE_INET_NTOP,,inet_ntop)])
 AC_CHECK_LIB(c, inet_pton, [AC_DEFINE(HAVE_INET_PTON,,inet_pton)])
 AC_CHECK_LIB(crypt, crypt)
@@ -1755,7 +1882,9 @@ AC_CACHE_VAL(ac_cv_htonl_works,
 )
 AC_MSG_RESULT($ac_cv_htonl_works)
 
-AC_CONFIG_FILES([Makefile lib/Makefile zebra/Makefile ripd/Makefile 
+AC_CONFIG_FILES([Makefile
+    quaggasrx-$PACKAGE_VERSION.spec:quaggasrx.spec.in     
+    lib/Makefile zebra/Makefile ripd/Makefile 
 	  ripngd/Makefile bgpd/Makefile ospfd/Makefile watchquagga/Makefile
 	  ospf6d/Makefile isisd/Makefile babeld/Makefile vtysh/Makefile
           doc/Makefile ospfclient/Makefile tests/Makefile m4/Makefile

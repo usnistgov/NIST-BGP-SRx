@@ -2,7 +2,7 @@ INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)
 DEFS = @DEFS@ $(LOCAL_OPTS) -DSYSCONFDIR=\"$(sysconfdir)/\"
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -ldl
 
 noinst_PROGRAMS = testsig testbuffer testmemory heavy heavywq heavythread \
 		aspathtest testprivs teststream testbgpcap ecommtest \
@@ -32,10 +32,10 @@ teststream_LDADD = ../lib/libzebra.la @LIBCAP@
 heavy_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
 heavywq_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
 heavythread_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
-aspathtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testbgpcap_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-ecommtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testbgpmpattr_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testchecksum_LDADD = ../lib/libzebra.la @LIBCAP@ 
-testbgpmpath_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+aspathtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testbgpcap_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+ecommtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testbgpmpattr_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testchecksum_LDADD = ../lib/libzebra.la @LIBCAP@
+testbgpmpath_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
 tabletest_LDADD = ../lib/libzebra.la @LIBCAP@ -lm

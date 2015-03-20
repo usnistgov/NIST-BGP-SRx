@@ -160,6 +160,9 @@
 /* Define to 1 if you have the `crypt' library (-lcrypt). */
 #undef HAVE_LIBCRYPT
 
+/* Define to 1 if you have the `crypto' library (-lcrypto). */
+#undef HAVE_LIBCRYPTO
+
 /* Define to 1 if you have the `kvm' library (-lkvm). */
 #undef HAVE_LIBKVM
 
@@ -177,6 +180,9 @@
 
 /* Define to 1 if you have the `socket' library (-lsocket). */
 #undef HAVE_LIBSOCKET
+
+/* Define to 1 if you have the `ssl' library (-lssl). */
+#undef HAVE_LIBSSL
 
 /* Define to 1 if you have the `umem' library (-lumem). */
 #undef HAVE_LIBUMEM
@@ -262,6 +268,21 @@
 /* Have openpam.h */
 #undef HAVE_OPENPAM_H
 
+/* Define to 1 if you have the <openssl/crypto.h> header file. */
+#undef HAVE_OPENSSL_CRYPTO_H
+
+/* Define to 1 if you have the <openssl/err.h> header file. */
+#undef HAVE_OPENSSL_ERR_H
+
+/* Define to 1 if you have the <openssl/pem.h> header file. */
+#undef HAVE_OPENSSL_PEM_H
+
+/* Define to 1 if you have the <openssl/ssl.h> header file. */
+#undef HAVE_OPENSSL_SSL_H
+
+/* Define to 1 if you have the <openssl/x509.h> header file. */
+#undef HAVE_OPENSSL_X509_H
+
 /* OSPF TE */
 #undef HAVE_OSPF_TE
 
@@ -321,6 +342,9 @@
 
 /* getpflags */
 #undef HAVE_SOLARIS_CAPABILITIES
+
+/* Define to 1 if you have the <srxcryptoapi.h> header file. */
+#undef HAVE_SRXCRYPTOAPI_H
 
 /* Stack symbol decoding */
 #undef HAVE_STACK_TRACE
@@ -743,6 +767,9 @@
 
 /* SRX */
 #undef USE_SRX
+
+/* using SRX CRYPTOAPI */
+#undef USE_SRX_CRYPTO_API
 
 /* Enable extensions on AIX 3, Interix.  */
 #ifndef _ALL_SOURCE

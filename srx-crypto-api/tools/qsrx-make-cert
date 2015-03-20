@@ -1,0 +1,48 @@
+#!/bin/sh
+
+#
+# This file belongs to the SRxCryptoAPI testbed. The certificates/keys 
+# generated here are for test purpose only and might not follow the BGPSEc 
+# certificate structure.
+# They are not intended to be used elsewhere than the test bed.
+# 
+
+EXT_KEY="key"
+EXT_CERT="cert"
+EXT_CSR="csr"
+
+if [ "$QSRX_CONF_HOME" == "" ] ; then
+  QSRX_CONF_HOME="/etc"
+fi
+
+QSRX_CONF_FILE=$QSRX_CONF_HOME/qsrx-router-key.cnf
+QSRX_VIEW=qsrx-view-subject
+QSRX_MAKE_KEY=qsrx-make-key
+QSRX_SERIAL=20140220001
+
+if [ "$1" == "" ] ; then
+  echo "call $0 <keyname>"
+  exit 1
+fi
+
+if [ -e "$1.$EXT_KEY" ] ; then
+  # Create Certificate Request
+  echo "Create Certificate Request for $1..."
+  openssl req -new -batch -config $QSRX_CONF_FILE -key $1.$EXT_KEY -out $1.$EXT_CSR
+  SUBJECT=$($QSRX_VIEW $1)
+  echo "Subject='$SUBJECT'"
+  openssl req -new -batch -subj /CN=$SUBJECT -config $QSRX_CONF_FILE -key $1.$EXT_KEY -out $1.$EXT_CSR
+  echo "Request created."
+
+  # Create Certificate
+  echo "Create Certificate for $1"
+  openssl x509 -sha256 -extfile $QSRX_CONF_FILE -extensions bgpsec_router_ext -set_serial $QSRX_SERIAL -in $1.$EXT_CSR -outform DER -out $1.$EXT_CERT -req -signkey $1.$EXT_KEY -days 365
+
+  # Remove certificate request
+  rm -f $1.$EXT_CSR
+else
+  echo "Key file $1.$EXT_KEY not found!"
+  echo "Generate a key using '$QSRX_MAKE_KEY $1'"
+  exit 2
+fi
+

@@ -27,7 +27,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include <srx/srx_api.h>
 #endif /* USE_SRX */
 
-/* Ancillary information to struct bgp_info, 
+/* Ancillary information to struct bgp_info,
  * used for uncommonly used data (aggregation, MPLS, etc.)
  * and lazily allocated to save memory.
  */
@@ -43,7 +43,7 @@ struct bgp_info_extra
   u_int32_t igpmetric;
 
   /* MPLS label.  */
-  u_char tag[3];  
+  u_char tag[3];
 };
 
 struct bgp_info
@@ -51,16 +51,16 @@ struct bgp_info
   /* For linked list. */
   struct bgp_info *next;
   struct bgp_info *prev;
-  
+
   /* Peer structure.  */
   struct peer *peer;
 
   /* Attribute structure.  */
   struct attr *attr;
-  
+
   /* Extra information */
   struct bgp_info_extra *extra;
-  
+
 
   /* Multipath information */
   struct bgp_info_mpath *mpath;
@@ -70,7 +70,7 @@ struct bgp_info
 
   /* reference count */
   int lock;
-  
+
   /* BGP information status.  */
   u_int16_t flags;
 #define BGP_INFO_IGP_CHANGED    (1 << 0)
@@ -99,7 +99,7 @@ struct bgp_info
 #define BGP_ROUTE_NORMAL       0
 #define BGP_ROUTE_STATIC       1
 #define BGP_ROUTE_AGGREGATE    2
-#define BGP_ROUTE_REDISTRIBUTE 3 
+#define BGP_ROUTE_REDISTRIBUTE 3
 
 #ifdef USE_SRX
   struct bgp_node        *node;
@@ -129,7 +129,7 @@ struct bgp_static
 
   /* Atomic set reference count (ie cause of pathlimit) */
   u_int32_t atomic;
-  
+
   /* BGP redistribute route-map.  */
   struct
   {
@@ -153,14 +153,14 @@ struct SRxThread
     void* proxy;
 };
 
-// Global variable used to manage the SRx proxy socket - initialized in 
+// Global variable used to manage the SRx proxy socket - initialized in
 // bgp_route.c::initUnSocket and also modified in bgpd.c::srx_connect(...)
 struct SRxThread *g_rq;
-// helper to allow connection command to be set during configuration. This 
+// helper to allow connection command to be set during configuration. This
 // variable is either NULL or the bgp instance. It only will be set to the
-// bgp instance when in configuration mode, not when configuration will be 
-// altered from console. The only methods that alter this variable are 
-// bgpd.c::bgp_srx_set and bgp_route.c::initUnSocket. The later on is the only 
+// bgp instance when in configuration mode, not when configuration will be
+// altered from console. The only methods that alter this variable are
+// bgpd.c::bgp_srx_set and bgp_route.c::initUnSocket. The later on is the only
 // function reading this value.sfinitUnSocket
 void* flagDoConnectSrx;
 
@@ -257,6 +257,9 @@ int initUnSocket(struct thread *t);
 int checkSendQueue(struct thread *t);
 void threadControlCall(int type);
 extern void srx_set_default(struct bgp *bgp);
+int checkEcomSRxValid(struct attr* attr);
+uint32_t getNextLocalID(void);
+
 #endif /* USE_SRX */
 
 extern int bgp_nlri_sanity_check (struct peer *, int, u_char *, bgp_size_t);
@@ -274,16 +277,16 @@ extern void bgp_static_delete (struct bgp *);
 extern void bgp_static_update (struct bgp *, struct prefix *, struct bgp_static *,
 			afi_t, safi_t);
 extern void bgp_static_withdraw (struct bgp *, struct prefix *, afi_t, safi_t);
-                     
-extern int bgp_static_set_vpnv4 (struct vty *vty, const char *, 
+
+extern int bgp_static_set_vpnv4 (struct vty *vty, const char *,
                           const char *, const char *);
 
-extern int bgp_static_unset_vpnv4 (struct vty *, const char *, 
+extern int bgp_static_unset_vpnv4 (struct vty *, const char *,
                             const char *, const char *);
 
 /* this is primarily for MPLS-VPN */
 extern int bgp_update (struct peer *, struct prefix *, struct attr *,
-		       afi_t, safi_t, int, int, struct prefix_rd *, 
+		       afi_t, safi_t, int, int, struct prefix_rd *,
 		       u_char *, int);
 extern int bgp_withdraw (struct peer *, struct prefix *, struct attr *,
 			 afi_t, safi_t, int, int, struct prefix_rd *, u_char *);

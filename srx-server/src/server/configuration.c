@@ -24,7 +24,11 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/19 - oborchert
+ *   0.3.0 - 3014/11/17 - oborchert
+ *           * Modified the function signature of initConfiguration
+ *           * Added mechanism to detect the location of the configuration file
+ *             in case it is not specified.
+ *         - 2013/02/19 - oborchert
  *           * Fixed parameter processing when version/full-version is requested
  *         - 2013/02/05 - oborchert
  *           * Fixed parameter processing when help is requested
@@ -48,6 +52,7 @@
 #include "util/log.h"
 #include "util/prefix.h"
 #include "shared/srx_defs.h"
+#include "util/directory.h"
 
 #define CFG_PARAM_CREDITS 1
 
@@ -67,6 +72,14 @@
 #define CFG_PARAM_MODE_NO_RCV_QUEUE  11
 
 #define HDR "([0x%08X] Configuration): "
+
+#ifndef SYSCONFDIR
+#define SYSCONFDIR               "/etc"
+#endif // SYSCONFDIR
+
+#define CFG_FILE_NAME           "srx_server.conf"
+#define SYS_CFG_FILE SYSCONFDIR "/" CFG_FILE_NAME
+#define LOC_CFG_FILE            "./" CFG_FILE_NAME
 
 // Forward declaration
 static bool _copyString(char** dest, char* var, const char* desc);
@@ -153,10 +166,13 @@ static const char* _USAGE_TEXT =
  * 
  * @param defaultConfigFile The default name of a configuration file.
  */
-void initConfiguration(Configuration* self, char* defaultConfigFile)
+void initConfiguration(Configuration* self)
+//void initConfiguration(Configuration* self, char* defaultConfigFile)
 {
-  _copyString(&self->configFileName, defaultConfigFile, 
-              "Configuration filename");
+  //_copyString(&self->configFileName, defaultConfigFile, 
+  //            "Configuration filename");
+  self->configFileName = fileIsReadable(LOC_CFG_FILE) ? LOC_CFG_FILE 
+                         : fileIsReadable(SYS_CFG_FILE) ? SYS_CFG_FILE : NULL;
   self->verbose  = false;
   self->loglevel = LEVEL_ERROR;
   self->syncAfterConnEstablished = false;

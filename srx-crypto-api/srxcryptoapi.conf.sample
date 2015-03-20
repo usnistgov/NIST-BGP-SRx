@@ -1,0 +1,59 @@
+# Contains the name of the library that will be loaded.
+#library_conf="bgpsec_openssl";
+library_conf="testlib";
+
+# Allows to specify the default key volt. Can be overwritten programatically.
+key_volt = "/var/lib/bgpsec-keys/";
+
+#debug type
+debug-type = 3;
+
+# this is the mapping information of the library to be loaded
+bgpsec_openssl: {
+  library_name = "libSRxBGPSecOpenSSL.so";
+
+#
+# The following method mappings allow to customize the mapping. in case the 
+# mapping is disables using the hash tag, misspelled, or missing at all the 
+# default mapping of method names as specified in the header file will be used.
+# in case the default specified method names are not implemented, the 
+# SRxCryptoAPI wrapper functions are mapped.
+#
+
+# Minimum required functions to operate
+  method_validate             = "validate";
+  method_sign_with_key        = "sign_with_key";
+
+# In case public key management is available
+  method_isExtended           = "isExtended";
+  method_extValidate          = "extValidate";
+  method_registerPublicKey    = "registerPublicKey";
+  method_unregisterPublicKey  = "unregisterPublicKey";
+
+# In case private key management is available
+  method_isPrivateKeyStorage  = "isPrivateKeyStorage";
+  method_sign_with_id         = "sign_with_id";
+  method_registerPrivateKey   = "registerPrivateKey";
+  method_unregisterPrivateKey = "unregisterPrivateKey";
+};
+
+# Some other example configuration 
+testlib: {
+  library_name="libSRxCryptoTestlib.so";
+
+# Minimum required functions to operate
+  method_validate             = "validate";
+  method_sign_with_key        = "sign_with_key";
+
+# In case public key management is available
+  method_isExtended           = "isExtended";
+  method_extValidate          = "extValidate";
+  method_registerPublicKey    = "registerPublicKey";
+  method_unregisterPublicKey  = "unregisterPublicKey";
+
+# In case private key management is available
+  method_isPrivateKeyStorage  = "isPrivateKeyStorage";
+  method_sign_with_id         = "sign_with_id";
+  method_registerPrivateKey   = "registerPrivateKey";
+  method_unregisterPrivateKey = "unregisterPrivateKey";
+};

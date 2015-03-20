@@ -1,6 +1,6 @@
 /*
  * Memory type definitions. This file is parsed by memtypes.awk to extract
- * MTYPE_ and memory_list_.. information in order to autogenerate 
+ * MTYPE_ and memory_list_.. information in order to autogenerate
  * memtypes.h.
  *
  * The script is sensitive to the format (though not whitespace), see
@@ -72,7 +72,7 @@ struct memory_list memory_list_lib[] =
   { -1, NULL },
 };
 
-struct memory_list memory_list_zebra[] = 
+struct memory_list memory_list_zebra[] =
 {
   { MTYPE_RTADV_PREFIX,		"Router Advertisement Prefix"	},
   { MTYPE_VRF,			"VRF"				},
@@ -157,6 +157,12 @@ struct memory_list memory_list_bgp[] =
   { MTYPE_SRX_HOST,           "SRx host name" },
   { MTYPE_BGP_INFO_HASH,      "BGP info hash" },
   { MTYPE_BGP_INFO_HASH_ITEM, "BGP info hash item" },
+  { MTYPE_BGP_INFO_HASH_MUTEX,    ""},
+  { MTYPE_BGPSEC_SKI,           "BGPSEC SKI string"},
+  { MTYPE_BGPSEC_PATH,          "BGPSEC PATH structure"},
+  { MTYPE_BGPSEC_PATH_SEG,      "BGPSEC PATH segment" },
+  { MTYPE_BGPSEC_SIG_SEG,       "Signal segment"},
+  { MTYPE_BGPSEC_SIG_BLK,       "Signal block"},
 #endif /* USE_SRX */
   { -1, NULL }
 };

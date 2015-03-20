@@ -75,8 +75,8 @@ install-exec-hook:
 	-cp -rf $(INC_OUT)/* $(pkgincludedir)
 
 uninstall-hook:
-	@echo "------- uninstall user data -------"
-	-rm -rf $(pkgincludedir)
+#	@echo "------- uninstall user data -------"
+#	-rm -rf $(pkgincludedir)
 
 
 .PHONY: all includes

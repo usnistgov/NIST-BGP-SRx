@@ -28,26 +28,28 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 /* When to refresh */
 #define REFRESH_IMMEDIATE 1
-#define REFRESH_DEFER     2 
+#define REFRESH_DEFER     2
 
 /* ORF Common part flag */
-#define ORF_COMMON_PART_ADD        0x00 
-#define ORF_COMMON_PART_REMOVE     0x80 
-#define ORF_COMMON_PART_REMOVE_ALL 0xC0 
-#define ORF_COMMON_PART_PERMIT     0x00 
-#define ORF_COMMON_PART_DENY       0x20 
+#define ORF_COMMON_PART_ADD        0x00
+#define ORF_COMMON_PART_REMOVE     0x80
+#define ORF_COMMON_PART_REMOVE_ALL 0xC0
+#define ORF_COMMON_PART_PERMIT     0x00
+#define ORF_COMMON_PART_DENY       0x20
 
 /* Packet send and receive function prototypes. */
 extern int bgp_read (struct thread *);
 #ifdef USE_SRX
 extern int bgp_read2 (struct thread *);
+struct ecommunity* srxEcommunityChange(struct bgp *, struct attr *, struct bgp_info *);
+int srxEcommunityRestore(struct attr *, struct ecommunity* );
 #endif /* USE_SRX */
 extern int bgp_write (struct thread *);
 
 extern void bgp_keepalive_send (struct peer *);
 extern void bgp_open_send (struct peer *);
 extern void bgp_notify_send (struct peer *, u_int8_t, u_int8_t);
-extern void bgp_notify_send_with_data (struct peer *, u_int8_t, u_int8_t, 
+extern void bgp_notify_send_with_data (struct peer *, u_int8_t, u_int8_t,
                                 u_int8_t *, size_t);
 extern void bgp_route_refresh_send (struct peer *, afi_t, safi_t, u_char, u_char, int);
 extern void bgp_capability_send (struct peer *, afi_t, safi_t, int, int);

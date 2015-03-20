@@ -801,6 +801,21 @@ aspath_parse (struct stream *s, size_t length, int use32bit)
    */
   if (length % AS16_VALUE_SIZE )
     return NULL;
+#ifdef USE_SRX
+  if (BGP_DEBUG (as4, AS4_SEGMENT))
+  {
+    size_t i = stream_get_getp (s);
+    zlog_debug ("[AS4SEG] aspath_parse: dump stream length:%d - getp:%d ",\
+        length, stream_getc_from(s, i) );
+    size_t tot = length + i, inc=0;
+    for(i; i < tot; i++)
+    {
+      if(++inc%16 ==0) printf("\n");
+      printf("%02x ", s->data[i]);
+    }
+    printf(" - from[%s]\n", __FUNCTION__);
+  }
+#endif /* USE_SRX */
 
   memset (&as, 0, sizeof (struct aspath));
   if (assegments_parse (s, length, &as.segments, use32bit) < 0)

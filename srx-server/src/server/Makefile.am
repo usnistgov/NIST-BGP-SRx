@@ -7,6 +7,8 @@ lib_LTLIBRARIES =
 LIBS = -lpthread -lconfig -lrt
 L_FLAGS = -L$(EXTRAS_LIB) 
 
+DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
+
 srxdir=$(bindir)
 srx_PROGRAMS = srx_server
 srx_server_LDFLAGS = $(L_FLAGS) $(LIBS)
@@ -35,8 +37,7 @@ srx_server_LDADD = $(top_srcdir)/shared/srx_packets.lo  \
 srx_configdir = $(sysconfdir)
 srx_libconfigdir = $(sysconfdir)/ld.so.conf.d
 dist_srx_config_DATA = srx_server.conf
-dist_srx_libconfig_DATA = srx_lib.conf
-	
+dist_srx_libconfig_DATA = srx_lib$(CPU_ARCH).conf
 
 #srx_server_CPPFLAGS = -I$(EXTRAS_INCLUDE_DIR) -g
 
@@ -81,6 +82,14 @@ echo:
 	@echo " srcdir: $(srcdir)  top_srcdir: $(top_srcdir) "
 	@echo " prefix: $(prefix)  pwd : `pwd` "
 	@echo " abs_srcdir: $(abs_srcdir) abs_top_srcdir: $(abs_top_srcdir)"
+
+install-exec-hook:
+	-chmod go+rw -R $(pkgincludedir)
+	-chmod go+r -R $(pkglibdir)
+
+uninstall-hook:
+	@echo "------- uninstall all installation data -------"
+	-rm -rf ${pkgdatadir} ${pkgincludedir} ${pkglibexecdir} ${pkglibdir}
 
 
 

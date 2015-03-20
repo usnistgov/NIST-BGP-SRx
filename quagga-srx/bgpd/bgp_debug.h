@@ -77,6 +77,9 @@ extern unsigned long term_bgp_debug_keepalive;
 extern unsigned long term_bgp_debug_update;
 extern unsigned long term_bgp_debug_normal;
 extern unsigned long term_bgp_debug_zebra;
+#ifdef USE_SRX
+extern unsigned long term_bgp_debug_bgpsec;
+#endif
 
 #define BGP_DEBUG_AS4                 0x01
 #define BGP_DEBUG_AS4_SEGMENT         0x02
@@ -90,6 +93,12 @@ extern unsigned long term_bgp_debug_zebra;
 #define BGP_DEBUG_UPDATE_OUT          0x02
 #define BGP_DEBUG_NORMAL              0x01
 #define BGP_DEBUG_ZEBRA               0x01
+#ifdef USE_SRX
+#define BGP_DEBUG_BGPSEC_DETAIL       0x01
+#define BGP_DEBUG_BGPSEC              0x01 // alias of the bgpsec detail
+#define BGP_DEBUG_BGPSEC_IN           0x02
+#define BGP_DEBUG_BGPSEC_OUT          0x04
+#endif
 
 #define BGP_DEBUG_PACKET_SEND         0x01
 #define BGP_DEBUG_PACKET_SEND_DETAIL  0x02

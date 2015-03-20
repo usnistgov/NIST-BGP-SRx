@@ -1,0 +1,18 @@
+#!/bin/sh
+
+#
+# This file belongs to the SRxCryptoAPI testbed. The certificates/keys 
+# generated here are for test purpose only and might not follow the BGPSEc 
+# certificate structure.
+# They are not intended to be used elsewhere than the test bed.
+# 
+
+EXT_CSR="csr"
+
+if [ -e $1.$EXT_CSR ] ; then
+  QSRX_VIEW_CMD="qsrx-view-csr"
+else
+  QSRX_VIEW_CMD="qsrx-view-cert"
+fi
+
+echo $($QSRX_VIEW_CMD $1 | grep -n "Subject Key Identifier:" | sed -e "s/\([0-9][0-9]*\):.*/echo \"$\(\(\1+1\\))\"/g" | sh | sed -e "s/\(.*\)/$QSRX_VIEW_CMD $1 | head -n \1 | tail -n 1/g" | sh | sed -e "s/ //g" | sed -e "s/://g")

@@ -1,0 +1,55 @@
+#!/bin/sh
+
+#
+# This file belongs to the SRxCryptoAPI testbed. The certificates/keys 
+# generated here are for test purpose only and might not follow the BGPSEc 
+# certificate structure.
+# They are not intended to be used elsewhere than the test bed.
+# 
+
+EXT_KEY="key"
+EXT_CERT="cert"
+SKI_LIST="ski-list.txt"
+
+QSRX_VIEW=qsrx-view-subject
+QSRX_MAKE_KEY=qsrx-make-key
+QSRX_MAKE_CERT=qsrx-make-cert
+
+if [ "$1" == "" ] ; then
+  echo "$0 <cert-name> [<repository path>]"
+  exit 1
+fi
+
+REPO_ROOT="/var/lib/bgpsec-keys"
+if [ "$2" != "" ] ; then
+  REPO_ROOT=$2
+fi
+
+if [ -e "$1.$EXT_CERT" ] ; then
+  if [ -e "$1.$EXT_KEY" ] ; then
+    SUBJECT=$($QSRX_VIEW $1)
+    DIR1=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\).*/\1/g")
+    DIR2=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\)\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\).*/\2/g")
+    FILE=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\)\(.*\)/\2/g")
+
+    REPOSITORY=$REPO_ROOT/$DIR1/$DIR2
+    KEYVOLT=$REPO_ROOT/$DIR1/$DIR2
+    #KEYVOLT=$REPO_ROOT/keys
+
+    echo "Publish cert and key into $REPOSITORY"
+    mkdir -p $REPOSITORY
+    mkdir -p $KEYVOLT
+
+    cp $1.$EXT_CERT $REPOSITORY/$FILE.$EXT_CERT
+    cp $1.$EXT_KEY  $KEYVOLT/$FILE.$EXT_KEY
+    echo "$1-SKI=$SUBJECT"
+    echo "$1-SKI: $SUBJECT" >> $REPO_ROOT/$SKI_LIST
+  else
+    echo "Key $1.$EXT_KEY not found! Please generate a key and certificate first using:"
+    echo "- Generate a key using '$QSRX_MAKE_KEY $1'"
+    echo "- Generate a certificate '$QSRX_MAKE_CERT $1'"
+  fi
+else
+  echo "Certificate $1.$EXT_CERT not found! Please generate a certificate first using:"
+  echo "- Generate a certificate '$QSRX_MAKE_CERT $1'"
+fi

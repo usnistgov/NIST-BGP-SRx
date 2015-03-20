@@ -59,10 +59,12 @@ am_aspathtest_OBJECTS = aspath_test.$(OBJEXT)
 aspathtest_OBJECTS = $(am_aspathtest_OBJECTS)
 am__DEPENDENCIES_1 =
 aspathtest_DEPENDENCIES = ../bgpd/libbgp.a ../lib/libzebra.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_ecommtest_OBJECTS = ecommunity_test.$(OBJEXT)
 ecommtest_OBJECTS = $(am_ecommtest_OBJECTS)
 ecommtest_DEPENDENCIES = ../bgpd/libbgp.a ../lib/libzebra.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_heavy_OBJECTS = heavy.$(OBJEXT) main.$(OBJEXT)
 heavy_OBJECTS = $(am_heavy_OBJECTS)
@@ -79,14 +81,17 @@ tabletest_DEPENDENCIES = ../lib/libzebra.la
 am_testbgpcap_OBJECTS = bgp_capability_test.$(OBJEXT)
 testbgpcap_OBJECTS = $(am_testbgpcap_OBJECTS)
 testbgpcap_DEPENDENCIES = ../bgpd/libbgp.a ../lib/libzebra.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_testbgpmpath_OBJECTS = bgp_mpath_test.$(OBJEXT)
 testbgpmpath_OBJECTS = $(am_testbgpmpath_OBJECTS)
 testbgpmpath_DEPENDENCIES = ../bgpd/libbgp.a ../lib/libzebra.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_testbgpmpattr_OBJECTS = bgp_mp_attr_test.$(OBJEXT)
 testbgpmpattr_OBJECTS = $(am_testbgpmpattr_OBJECTS)
 testbgpmpattr_DEPENDENCIES = ../bgpd/libbgp.a ../lib/libzebra.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_testbuffer_OBJECTS = test-buffer.$(OBJEXT)
 testbuffer_OBJECTS = $(am_testbuffer_OBJECTS)
@@ -144,6 +149,7 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BABELD = @BABELD@
 BGPD = @BGPD@
+BGPD_INCLUDES = @BGPD_INCLUDES@
 BUILD_TESTS = @BUILD_TESTS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -205,6 +211,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_ECDSA_INC_DIR = @OPENSSL_ECDSA_INC_DIR@
 OSPF6D = @OSPF6D@
 OSPFAPI = @OSPFAPI@
 OSPFCLIENT = @OSPFCLIENT@
@@ -232,7 +239,9 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOLARIS = @SOLARIS@
+SRX_API_LIB = @SRX_API_LIB@
 SRX_CLI_LIB = @SRX_CLI_LIB@
+SRX_CRYPTO_API_LIBS = @SRX_CRYPTO_API_LIBS@
 SRX_DIR = @SRX_DIR@
 SRX_LIB = @SRX_LIB@
 SRX_LIB_SO = @SRX_LIB_SO@
@@ -307,7 +316,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -ldl
 testsig_SOURCES = test-sig.c
 testbuffer_SOURCES = test-buffer.c
 testmemory_SOURCES = test-memory.c
@@ -331,12 +340,12 @@ teststream_LDADD = ../lib/libzebra.la @LIBCAP@
 heavy_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
 heavywq_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
 heavythread_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
-aspathtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testbgpcap_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-ecommtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testbgpmpattr_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
-testchecksum_LDADD = ../lib/libzebra.la @LIBCAP@ 
-testbgpmpath_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ -lm
+aspathtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testbgpcap_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+ecommtest_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testbgpmpattr_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
+testchecksum_LDADD = ../lib/libzebra.la @LIBCAP@
+testbgpmpath_LDADD = ../bgpd/libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ -lm
 tabletest_LDADD = ../lib/libzebra.la @LIBCAP@ -lm
 all: all-am
 

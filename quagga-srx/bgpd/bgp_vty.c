@@ -1524,7 +1524,6 @@ DEFUN (srx_show_config,
   
   vty_out (vty, "  connected......: %s%s", (isConnected(bgp->srxProxy) 
                                           ? "true" : "false"), VTY_NEWLINE);
-  
   if (CHECK_FLAG(bgp->srx_ecommunity_flags,SRX_BGP_FLAG_ECOMMUNITY))
   {
     vty_out (vty, "  ext community..: %d%s", bgp->srx_ecommunity_subcode,
@@ -1603,6 +1602,37 @@ DEFUN (srx_connect_short,
   
   /* Set configuration */
   return bgp_srx_set (bgp, vty, bgp->srx_host, bgp->srx_port, true);
+}
+
+DEFUN (bgpsec_ski,
+       bgpsec_ski_cmd,
+       "bgpsec ski WORD",
+       "bgpsec ski value")
+{
+  struct bgp *bgp;
+  bgp = vty->index;
+
+  //vty_out(vty, "argc:%d, argv:%s%s", argc, argv[0], VTY_NEWLINE);
+  if (argc != 1)
+  {
+    return CMD_ERR_INCOMPLETE;
+  }
+
+  if (strlen(argv[0]) == 0)
+  {
+    // TODO: SKI length sould be checked here as 20-letter long hex-string
+    vty_out (vty, "%% Empty SKI %s", VTY_NEWLINE);
+    return CMD_ERR_INCOMPLETE;
+  }
+
+  if(bgp->bgpsec_ski==NULL)
+  {
+    if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
+      vty_out (vty, "[BGPSEC] bgpsec SKI: %s%s", argv[0], VTY_NEWLINE);
+    bgp->bgpsec_ski = XSTRDUP (MTYPE_BGPSEC_SKI, argv[0]);
+  }
+
+  return CMD_SUCCESS;
 }
 
 DEFUN (srx_connect,
@@ -2024,9 +2054,7 @@ DEFUN (srx_send_extcommunity_ebgp,
        SRX_VTY_HLP_EXT_CSTR_EBGP)      
 {
   return srx_extcommunity_set (vty->index, atoi(argv[0]), argv[1]);
-  //return CMD_WARNING;
 }
-
 
 DEFUN (no_srx_send_extcommunity,
        no_srx_send_extcommunity_cmd,
@@ -2617,6 +2645,34 @@ DEFUN (no_neighbor_dont_capability_negotiate,
   return peer_flag_unset_vty (vty, argv[0], PEER_FLAG_DONT_CAPABILITY);
 }
 
+#ifdef USE_SRX
+/* bgpsec neighbor capability */
+DEFUN (neighbor_capability_bgpsec,
+       neighbor_capability_bgpsec_cmd,
+       NEIGHBOR_CMD2 "bgpsec (snd|rec|both)",
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "bgpsec capability to the peer\n"
+       "snd  Send BGPSEC but receive BGP4 only\n"
+       "rec  Receive BGPSEC but send BGP4 only\n"
+       "both Send BGPSEC and receive BGPSEC\n")
+{
+  // TODO: Implement snd and rcv
+  return peer_flag_set_vty(vty, argv[0], PEER_FLAG_BGPSEC_CAPABILITY);
+}
+
+DEFUN (no_neighbor_capability_bgpsec,
+       no_neighbor_capability_bgpsec_cmd,
+       NO_NEIGHBOR_CMD2 "bgpsec",
+       NO_STR
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "bgpsec capability to the peer\n")
+{
+  return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_BGPSEC_CAPABILITY);
+}
+#endif /* USE_SRX */
+
 static int
 peer_af_flag_modify_vty (struct vty *vty, const char *peer_str, afi_t afi,
 			 safi_t safi, u_int32_t flag, int set)
@@ -9896,7 +9952,7 @@ bgp_vty_init (void)
 
   install_element (BGP_NODE, &srx_policy_prefer_valid_cmd);
   install_element (BGP_NODE, &no_srx_policy_prefer_valid_cmd);  
-
+  install_element (BGP_NODE, &bgpsec_ski_cmd);
   install_element (BGP_NODE, &srx_send_extcommunity_cmd);
   install_element (BGP_NODE, &srx_send_extcommunity_ebgp_cmd);
   install_element (BGP_NODE, &no_srx_send_extcommunity_cmd);
@@ -10223,6 +10279,10 @@ bgp_vty_init (void)
   /* "neighbor capability dynamic" commands.*/
   install_element (BGP_NODE, &neighbor_capability_dynamic_cmd);
   install_element (BGP_NODE, &no_neighbor_capability_dynamic_cmd);
+#ifdef USE_SRX
+  install_element (BGP_NODE, &neighbor_capability_bgpsec_cmd);
+  install_element (BGP_NODE, &no_neighbor_capability_bgpsec_cmd);
+#endif
 
   /* "neighbor dont-capability-negotiate" commands. */
   install_element (BGP_NODE, &neighbor_dont_capability_negotiate_cmd);

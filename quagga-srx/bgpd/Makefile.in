@@ -66,14 +66,16 @@ am_libbgp_a_OBJECTS = bgpd.$(OBJEXT) bgp_fsm.$(OBJEXT) \
 	bgp_dump.$(OBJEXT) bgp_snmp.$(OBJEXT) bgp_ecommunity.$(OBJEXT) \
 	bgp_mplsvpn.$(OBJEXT) bgp_nexthop.$(OBJEXT) bgp_damp.$(OBJEXT) \
 	bgp_table.$(OBJEXT) bgp_advertise.$(OBJEXT) bgp_vty.$(OBJEXT) \
-	bgp_mpath.$(OBJEXT) bgp_info_hash.$(OBJEXT)
+	bgp_mpath.$(OBJEXT) bgp_info_hash.$(OBJEXT) \
+	bgp_validate.$(OBJEXT)
 libbgp_a_OBJECTS = $(am_libbgp_a_OBJECTS)
 am__installdirs = "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(examplesdir)"
 PROGRAMS = $(sbin_PROGRAMS)
 am_bgpd_OBJECTS = bgp_main.$(OBJEXT)
 bgpd_OBJECTS = $(am_bgpd_OBJECTS)
 am__DEPENDENCIES_1 =
-bgpd_DEPENDENCIES = libbgp.a ../lib/libzebra.la $(am__DEPENDENCIES_1)
+bgpd_DEPENDENCIES = libbgp.a ../lib/libzebra.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -124,6 +126,7 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BABELD = @BABELD@
 BGPD = @BGPD@
+BGPD_INCLUDES = @BGPD_INCLUDES@
 BUILD_TESTS = @BUILD_TESTS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -149,7 +152,7 @@ GREP = @GREP@
 HAVE_LIBPCREPOSIX = @HAVE_LIBPCREPOSIX@
 IF_METHOD = @IF_METHOD@
 IF_PROC = @IF_PROC@
-INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)/lib -I$(top_srcdir)/$(SRX_DIR)
+INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)/lib -I$(top_srcdir)/$(SRX_DIR) $(BGPD_INCLUDES)
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -185,6 +188,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_ECDSA_INC_DIR = @OPENSSL_ECDSA_INC_DIR@
 OSPF6D = @OSPF6D@
 OSPFAPI = @OSPFAPI@
 OSPFCLIENT = @OSPFCLIENT@
@@ -212,7 +216,9 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOLARIS = @SOLARIS@
+SRX_API_LIB = @SRX_API_LIB@
 SRX_CLI_LIB = @SRX_CLI_LIB@
+SRX_CRYPTO_API_LIBS = @SRX_CRYPTO_API_LIBS@
 SRX_DIR = @SRX_DIR@
 SRX_LIB = @SRX_LIB@
 SRX_LIB_SO = @SRX_LIB_SO@
@@ -295,17 +301,19 @@ libbgp_a_SOURCES = \
 	bgp_debug.c bgp_route.c bgp_zebra.c bgp_open.c bgp_routemap.c \
 	bgp_packet.c bgp_network.c bgp_filter.c bgp_regex.c bgp_clist.c \
 	bgp_dump.c bgp_snmp.c bgp_ecommunity.c bgp_mplsvpn.c bgp_nexthop.c \
-	bgp_damp.c bgp_table.c bgp_advertise.c bgp_vty.c bgp_mpath.c bgp_info_hash.c
+	bgp_damp.c bgp_table.c bgp_advertise.c bgp_vty.c bgp_mpath.c bgp_info_hash.c \
+	bgp_validate.c
 
 noinst_HEADERS = \
 	bgp_aspath.h bgp_attr.h bgp_community.h bgp_debug.h bgp_fsm.h \
 	bgp_network.h bgp_open.h bgp_packet.h bgp_regex.h bgp_route.h \
 	bgpd.h bgp_filter.h bgp_clist.h bgp_dump.h bgp_zebra.h \
 	bgp_ecommunity.h bgp_mplsvpn.h bgp_nexthop.h bgp_damp.h bgp_table.h \
-	bgp_advertise.h bgp_snmp.h bgp_vty.h bgp_mpath.h bgp_info_hash.h
+	bgp_advertise.h bgp_snmp.h bgp_vty.h bgp_mpath.h bgp_info_hash.h \
+	bgp_validate.h
 
 bgpd_SOURCES = bgp_main.c
-bgpd_LDADD = libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) @LIBCAP@ @LIBM@
+bgpd_LDADD = libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ @LIBM@ -ldl
 examplesdir = $(exampledir)
 dist_examples_DATA = bgpd.conf.sample bgpd.conf.sample2 bgpd.conf.sampleSRx
 EXTRA_DIST = BGP4-MIB.txt
@@ -427,6 +435,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_routemap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_snmp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_table.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_validate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_vty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgp_zebra.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpd.Po@am__quote@

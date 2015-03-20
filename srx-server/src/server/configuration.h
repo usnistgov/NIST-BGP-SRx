@@ -25,7 +25,9 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/12 - oborchert
+ *   0.3.0 - 3014/11/17 - oborchert
+ *           * Modified the function signature of initConfiguration
+ *         - 2013/02/12 - oborchert
  *           * Added keepWindow to the configuration.
  *         - 2013/01/28 - oborchert
  *           * Added experimental mode parameters
@@ -113,10 +115,8 @@ typedef struct {
  * Initialize the configuration with default values
  * 
  * @param self the configuration instance
- * 
- * @param defaultConfigFile The default name of a configuration file.
  */
-void initConfiguration(Configuration* self, char* defaultConfigFile);
+void initConfiguration(Configuration* self);
 
 /**
  * Frees all allocated resources.

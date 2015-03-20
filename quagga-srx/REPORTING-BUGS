@@ -31,4 +31,9 @@ Please supply the following information:
    reproduce it.
 8. Patches, workarounds, fixes are always welcome.
 
+IMPORTANT:
+==========
+Bugs related to the RPKI/BGPSEC addition for Quagga (included in bgpd and the 
+configuration for RPKI and BGPSEC) should be send to bgpsrx-dev@nist.gov. 
+
 Thank You.

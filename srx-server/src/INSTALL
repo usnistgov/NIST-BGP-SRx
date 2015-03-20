@@ -363,10 +363,3 @@ operates.
 `configure' also accepts some other, not widely useful, options.  Run
 `configure --help' for more details.
 
-
-`srx server' installation
-==========================
-1. tar xvfz srx-<VER>.tar.gz
-2. ./configure --prefix=<desired dir> --with-libconf --with-libpatr
-3. make all install  (You might need root permission when you install)
-

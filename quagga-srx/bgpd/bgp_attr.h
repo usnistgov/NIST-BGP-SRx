@@ -87,6 +87,7 @@ struct attr_extra
   u_char mp_nexthop_len;
 };
 
+
 /* BGP core attribute structure. */
 struct attr
 {
@@ -112,6 +113,10 @@ struct attr
   
   /* Path origin attribute */
   u_char origin;
+
+#ifdef USE_SRX
+  struct BgpsecPathAttr *bgpsecPathAttr;
+#endif
 };
 
 /* Router Reflector related structure. */

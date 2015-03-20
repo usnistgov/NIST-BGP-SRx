@@ -1,0 +1,86 @@
+%define package_num  @PKG_VER@
+%define major_ver    @MAJOR_VER@
+%define minor_ver    @MINOR_VER@
+%define update_num   @UPD_VER@
+%define lib_ver_info @VER_INFO@
+
+%define lib_version_info %{lib_ver_info}
+%define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
+%define version %{package_version}
+%define name srxcryptoapi
+
+Name:%{name}
+Version:%{version}
+Release:	1%{?dist}
+Summary:srxcryptoapi Summary
+
+Group:Networking/Daemons
+License:LGPL	
+URL:www.antd.nist.gov
+Source0:%{name}-%{version}.tar.gz
+BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+#Prefix:/usr/local
+
+BuildRequires:automake	
+Requires:glibc libconfig >= 1.3 openssl >= 1.0.1e
+
+%description
+srxcryptoapi rpm packaging file
+
+%prep
+%setup -q
+
+%build
+%configure --prefix=/usr --sysconfdir=/etc --enable-testlib --enable-bgpsec-openssl
+make %{?_smp_mflags}
+
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+mkdir -p /var/lib/bgpsec-keys
+if [ ! -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
+  cp %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf
+fi
+if [ ! -e %{_sysconfdir}/srxcryptoapi.conf.sample ]; then
+  cp %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf
+fi
+
+%postun
+rmdir /var/lib/bgpsec-keys >> /dev/null
+
+%files
+%defattr(-,root,root,-)
+%doc
+%{_libdir}/libSRxCryptoAPI.so.%{lib_version_info}
+%{_libdir}/libSRxCryptoAPI.so.%{major_ver}
+%{_libdir}/libSRxCryptoAPI.so
+%{_libdir}/libSRxCryptoAPI.la
+%{_libdir}/libSRxCryptoAPI.a
+%{_libdir}/libSRxBGPSecOpenSSL.so.%{lib_version_info}
+%{_libdir}/libSRxBGPSecOpenSSL.so.%{major_ver}
+%{_libdir}/libSRxBGPSecOpenSSL.so
+%{_libdir}/libSRxBGPSecOpenSSL.la
+%{_libdir}/libSRxBGPSecOpenSSL.a
+%{_libdir}/libSRxCryptoTestlib.so.%{lib_version_info}
+%{_libdir}/libSRxCryptoTestlib.so.%{major_ver}
+%{_libdir}/libSRxCryptoTestlib.so
+%{_libdir}/libSRxCryptoTestlib.la
+%{_libdir}/libSRxCryptoTestlib.a
+%{_bindir}/srx_crypto_tester
+%{_sbindir}/qsrx-make-cert
+%{_sbindir}/qsrx-make-key
+%{_sbindir}/qsrx-publish
+%{_sbindir}/qsrx-view-cert
+%{_sbindir}/qsrx-view-csr
+%{_sbindir}/qsrx-view-subject
+%{_includedir}/srxcryptoapi.h
+%{_includedir}/bgpsec_openssl.h
+%{_sysconfdir}/srxcryptoapi.conf.sample
+%{_sysconfdir}/qsrx-router-key.cnf.sample
