@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.3.0.5], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.3.0.6], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])

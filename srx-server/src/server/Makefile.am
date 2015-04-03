@@ -1,6 +1,8 @@
 include $(top_srcdir)/Makefile_Common
 
-EXTRA_DIST = 
+EXTRA_DIST = $(top_srcdir)/server/srx_lib.conf \
+	     $(top_srcdir)/server/srx_lib-x86_64.conf
+	
 lib_LTLIBRARIES = 
 
 #LIBS = -lpthread -lconfig -lpatricia -lrt
@@ -90,7 +92,3 @@ install-exec-hook:
 uninstall-hook:
 	@echo "------- uninstall all installation data -------"
 	-rm -rf ${pkgdatadir} ${pkgincludedir} ${pkglibexecdir} ${pkglibdir}
-
-
-
-

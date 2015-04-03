@@ -967,13 +967,10 @@ void bgp_info_set_validation_result (struct bgp_info *info,
     // TODO: Use quagga configuration to determine if IT ALSO CAN BE DONE FOR.
     // iBGP. Also Confederation shold be handled here.
 
+#ifdef USE_SRX_CRYPTO_API
     if(info->peer->sort == BGP_PEER_EBGP && fBgpsecSanity != -1)
     {
-#ifdef USE_SRX_CRYPTO_API
       switch (bgpsecVerifyCaller(info->peer, info->attr->bgpsecPathAttr, info->node->p))
-#else
-      switch (bgpsecVerify(info->peer, info->attr->bgpsecPathAttr, info->node->p))
-#endif
       {
         case BGPSEC_VERIFY_SUCCESS:
           info->val_res_BGPSEC = SRx_RESULT_VALID;
@@ -983,6 +980,7 @@ void bgp_info_set_validation_result (struct bgp_info *info,
           break;
       }
     }
+#endif
 
     // Check if it is fully valid and if not decide if the update has to be
     // ignored

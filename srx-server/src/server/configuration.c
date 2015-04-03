@@ -4,27 +4,33 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.3.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 3014/11/17 - oborchert
+ * 0.3.0.6 - 2015/04/03 - oborchert
+ *           * Modified CFG_FILE_NAME to be \0 terminated
+ *           * Added documentation to readConfigFile
+ *           * Added pointer initialization to readConfigFile 
+ *         - 2015/04/03 - kyehwanl
+ *           * Fixes Memory Error in readConfigFile 
+ * 0.3.0   - 2014/11/17 - oborchert
  *           * Modified the function signature of initConfiguration
  *           * Added mechanism to detect the location of the configuration file
  *             in case it is not specified.
@@ -35,9 +41,9 @@
  *         - 2013/01/28 - oborchert
  *           * Added experimental mode parameters
  *           * Added mapping configuration
- *   0.2.0 - 2011/11/01 - oborchert
+ * 0.2.0   - 2011/11/01 - oborchert
  *           * Extended.
- *   0.1.0 - 2009/12/23 - pgleichm
+ * 0.1.0   - 2009/12/23 - pgleichm
  *           * Code Created
  * -----------------------------------------------------------------------------
  */
@@ -77,7 +83,7 @@
 #define SYSCONFDIR               "/etc"
 #endif // SYSCONFDIR
 
-#define CFG_FILE_NAME           "srx_server.conf"
+#define CFG_FILE_NAME           "srx_server.conf\0"
 #define SYS_CFG_FILE SYSCONFDIR "/" CFG_FILE_NAME
 #define LOC_CFG_FILE            "./" CFG_FILE_NAME
 
@@ -91,30 +97,30 @@ static const char* _SHORT_OPTIONS = "hf:v:::sl:CkpcP::::::";
 static const struct option _LONG_OPTIONS[] = {
   { "help",         no_argument, NULL, 'h'},
   { "config",       required_argument, NULL, 'f'},
-  
-  { "credits",      no_argument, NULL, CFG_PARAM_CREDITS},  
-  
+
+  { "credits",      no_argument, NULL, CFG_PARAM_CREDITS},
+
   { "verbose",      no_argument, NULL, 'v'},
-  
+
   { "version",      no_argument, NULL, CFG_PARAM_VERSION},
-  { "full-version", no_argument, NULL, CFG_PARAM_FULL_VERSION},  
+  { "full-version", no_argument, NULL, CFG_PARAM_FULL_VERSION},
   { "loglevel",     required_argument, NULL, CFG_PARAM_LOGLEVEL},
-  
+
   { "sync",         no_argument, NULL, 's'},
   { "log",          required_argument, NULL, 'l'},
-  
+
   { "syslog",       no_argument, NULL, CFG_PARAM_SYSLOG},
-  
+
   { "proxy-clients", required_argument, NULL, 'C'},
   { "keep-window", required_argument, NULL, 'k'},
-  
+
   { "port",             required_argument, NULL, 'p'},
   { "console.port",     required_argument, NULL, 'c'},
   { "console.password", required_argument, NULL, 'P'},
-  
+
   { "rpki.host",    required_argument, NULL, CFG_PARAM_RPKI_HOST},
   { "rpki.port",    required_argument, NULL, CFG_PARAM_RPKI_PORT},
-  
+
   { "bgpsec.host",  required_argument, NULL, CFG_PARAM_BGPSEC_HOST},
   { "bgpsec.port",  required_argument, NULL, CFG_PARAM_BGPSEC_PORT},
 
@@ -161,39 +167,39 @@ static const char* _USAGE_TEXT =
 
 /**
  * Initialize the configuration with default values
- * 
+ *
  * @param self the configuration instance
- * 
+ *
  * @param defaultConfigFile The default name of a configuration file.
  */
 void initConfiguration(Configuration* self)
 //void initConfiguration(Configuration* self, char* defaultConfigFile)
 {
-  //_copyString(&self->configFileName, defaultConfigFile, 
+  //_copyString(&self->configFileName, defaultConfigFile,
   //            "Configuration filename");
-  self->configFileName = fileIsReadable(LOC_CFG_FILE) ? LOC_CFG_FILE 
+  self->configFileName = fileIsReadable(LOC_CFG_FILE) ? LOC_CFG_FILE
                          : fileIsReadable(SYS_CFG_FILE) ? SYS_CFG_FILE : NULL;
   self->verbose  = false;
   self->loglevel = LEVEL_ERROR;
   self->syncAfterConnEstablished = false;
   self->msgDest = MSG_DEST_STDERR;
   self->msgDestFilename = NULL;
-  
+
   self->server_port  = 17900;
   self->console_port = 17901;
   self->console_password = NULL;
-  
+
   self->rpki_host = NULL;
   self->rpki_port = -1;
-  
+
   self->bgpsec_host = NULL;
   self->bgpsec_port = -1;
   self->expectedProxies = 1;
-  
+
   self->mode_no_sendqueue = false;
   self->mode_no_receivequeue = false;
-  
-  self->defaultKeepWindow = SRX_DEFAULT_KEEP_WINDOW; // from srx_defs.h 
+
+  self->defaultKeepWindow = SRX_DEFAULT_KEEP_WINDOW; // from srx_defs.h
   memset(self->mapping_routerID, 0, MAX_PROXY_MAPPINGS);
 }
 
@@ -234,27 +240,27 @@ static bool _copyString(char** dest, char* var, const char* desc)
 }
 
 /**
- * Parse the given command line parameters. This function also is allowed to 
+ * Parse the given command line parameters. This function also is allowed to
  * only parse for the specification of a configuration file. This is -f/--file
- * 
+ *
  * @param self The configuration object itself
  * @param argc The command line arguments.
  * @param argv The command line parameters.
  * @param onlyCfgFileName only parse for the configuration file.
- * 
- * @return 1 = successful, 0 = invalid parameters found, -1 exit silent (for 
+ *
+ * @return 1 = successful, 0 = invalid parameters found, -1 exit silent (for
  *         example -h)
  */
-int parseProgramArgs(Configuration* self, int argc, const char** argv, 
+int parseProgramArgs(Configuration* self, int argc, const char** argv,
                      bool onlyCfgFileName)
 {
   int optc;
-  int processed = 0; 
-  
+  int processed = 0;
+
   optind = 0; // Reset
   // parameters that do not have "-" set are ignored in the while loop. we do
   // not allow parameters without "-"
-  while ((optc = getopt_long(argc, (char* const*)argv, 
+  while ((optc = getopt_long(argc, (char* const*)argv,
                              _SHORT_OPTIONS, _LONG_OPTIONS, NULL)) != -1)
   {
     // Process the first one
@@ -264,7 +270,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
     {
       processed++;
     }
-    
+
     if (onlyCfgFileName)
     {
       switch (optc)
@@ -275,14 +281,14 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         case CFG_PARAM_FULL_VERSION: // --full-version
           break;
         default:
-          optc = -1; 
+          optc = -1;
       }
     }
-    
+
     switch (optc)
     {
-      case -1 : 
-        // Skip because this is a parse for 'f', 'h', --version, --full-version 
+      case -1 :
+        // Skip because this is a parse for 'f', 'h', --version, --full-version
         // only
         break;
       case 'f':
@@ -303,7 +309,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         self->expectedProxies = (uint32_t)strtol(optarg, NULL, 10);
         break;
       case'k' :
-        self->defaultKeepWindow = (uint16_t)strtol(optarg, NULL, 
+        self->defaultKeepWindow = (uint16_t)strtol(optarg, NULL,
                                                    SRX_DEFAULT_KEEP_WINDOW);
         break;
       case 'l':
@@ -359,14 +365,14 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           RAISE_SYS_ERROR("Invalid SRx console port ('%s')", optarg);
           return 0;
         }
-        break;                
+        break;
       case 'P':
         if (optarg == NULL)
         {
           RAISE_ERROR("Console password missing!");
           return 0;
         }
-        if (!_copyString(&self->console_password, optarg, 
+        if (!_copyString(&self->console_password, optarg,
                         "Console remote shutdown password"))
         {
           return 0;
@@ -426,54 +432,64 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         break;
       case CFG_PARAM_CREDITS:
         printf ("%s\n", SRX_CREDITS);
-        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_VERSION);          
+        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_VERSION);
         return -1;
         break;
       case 'h':
         printf("Usage: %s %s", argv[0], _USAGE_TEXT);
-        printf("%s proxy protocol version %i\n", SRX_SERVER_NAME, 
-               SRX_PROTOCOL_VER);          
+        printf("%s proxy protocol version %i\n", SRX_SERVER_NAME,
+               SRX_PROTOCOL_VER);
         return -1;
         break;
       case CFG_PARAM_VERSION:
-        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_VERSION);      
+        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_VERSION);
         return -1;
         break;
       case CFG_PARAM_FULL_VERSION:
-        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_FULL_VER);      
+        printf("%s Version %s\n", SRX_SERVER_NAME, SRX_SERVER_FULL_VER);
         return -1;
         break;
       case CFG_PARAM_MODE_NO_SEND_QUEUE:
         self->mode_no_sendqueue = true;
-        printf("Turn off send queue!\n");      
+        printf("Turn off send queue!\n");
         break;
       case CFG_PARAM_MODE_NO_RCV_QUEUE:
         self->mode_no_receivequeue = true;
-        printf("Turn off receive queue!\n");      
+        printf("Turn off receive queue!\n");
         break;
-      default:        
-        RAISE_ERROR("Usage: %s %s", argv[0], _USAGE_TEXT);          
+      default:
+        RAISE_ERROR("Usage: %s %s", argv[0], _USAGE_TEXT);
         return 0;
     }
   }
 
-  // Processed is always one less than argc because the first parameter is the 
+  // Processed is always one less than argc because the first parameter is the
   // file name itself.
   if ((processed+1) != argc)
   {
     RAISE_ERROR("Usage: %s %s", argv[0], _USAGE_TEXT);
     return 0;
   }
-  
+
   return 1;
 }
 
+/**
+ * Configure the provided configuration object by reading the configurartion 
+ * file. The configuration object MUST be pre-allocated and the filename
+ * MUST be \0 terminated.
+ * 
+ * @param self Pointer to the Configuration object. 
+ * @param filename Null terminated string.
+ * 
+ * @return false in case an error occured, otherwise true. 
+ */
 bool readConfigFile(Configuration* self, const char* filename)
 {
   bool ret = false; // By default something went wrong
-  config_t cfg;
-  config_setting_t* sett;
-  const char* strtmp;
+  static config_t cfg; // BZ647 changed to static.
+  config_setting_t* sett = NULL;
+  const char* strtmp = NULL;
   bool useSyslog;
   int boolVal;
 
@@ -496,8 +512,8 @@ bool readConfigFile(Configuration* self, const char* filename)
   (void)config_lookup_bool(&cfg, "sync", (int*)&boolVal);
         self->syncAfterConnEstablished = (bool)boolVal;
 
-  (void)config_lookup_int(&cfg, "keep-window", (int*)&self->defaultKeepWindow);  
-  
+  (void)config_lookup_int(&cfg, "keep-window", (int*)&self->defaultKeepWindow);
+
   // Global - message destination
   (void)config_lookup_bool(&cfg, "syslog", (int*)&boolVal);
         useSyslog = (bool)boolVal;
@@ -534,8 +550,8 @@ bool readConfigFile(Configuration* self, const char* filename)
     }
     (void)config_setting_lookup_int(sett, "port", &self->console_port);
   }
-  
-  
+
+
   // RPKI
   sett = config_lookup(&cfg, "rpki");
   if (sett != NULL)
@@ -575,7 +591,7 @@ bool readConfigFile(Configuration* self, const char* filename)
     (void)config_setting_lookup_bool(sett, "no-receivequeue", (int*)&boolVal);
           self->mode_no_receivequeue - (bool)boolVal;
   }
-  
+
   // mapping configuration
   sett = config_lookup(&cfg, "mapping");
   if (sett != NULL)
@@ -583,7 +599,7 @@ bool readConfigFile(Configuration* self, const char* filename)
     uint32_t routerID;
     char buff[256];
     int clientID = 0;
-    
+
     for (clientID=1; clientID < MAX_PROXY_MAPPINGS; clientID++)
     {
       memset(buff, '\0', 256);
@@ -591,11 +607,11 @@ bool readConfigFile(Configuration* self, const char* filename)
       if (config_setting_lookup_string(sett, buff, &strtmp))
       {
         routerID = IPtoInt(strtmp);
-        self->mapping_routerID[clientID] = routerID;  
+        self->mapping_routerID[clientID] = routerID;
       }
     }
   }
-  
+
   // No errors
   ret = true;
 

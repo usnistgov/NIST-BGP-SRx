@@ -1,4 +1,6 @@
 Changelog for Version 0.3.0
+- Fixed Memory issue in configuration.c which crashes the server on Ubuntu based
+  Systems. 
 - Changed updated validation state from "Unknown" to "NotFound" - RFC6811
 - Ignore adding white-list entries for ROAS assigned to ASN's reserved for 
   documentation examples only - RFC5398

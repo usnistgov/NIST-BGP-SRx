@@ -1,0 +1,5 @@
+Version 0.1.1.1 - Arpil 2015
+  - Fixed bug in configuration that could cause memory issues
+  - Fixed linking problems on Ubuntu systems
+Version 0.1.1.0 - March 2015
+  - Initial Release

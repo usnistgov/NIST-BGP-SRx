@@ -1,4 +1,4 @@
-%define version 0.3.0.5
+%define version 0.3.0.6
 %define name srx
 %define lconf_name libconfig
 %define lconf_version 1.4.1

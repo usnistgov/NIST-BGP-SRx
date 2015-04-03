@@ -37,7 +37,7 @@
 
 #define QUAGGA_PROGNAME   "QuaggaSRx"
 
-#define QUAGGA_VERSION     "0.4.1.1" GIT_SUFFIX
+#define QUAGGA_VERSION     "0.4.1.2" GIT_SUFFIX
 
 #define ZEBRA_BUG_ADDRESS "http://bgpsrx.antd.nist.gov"
 

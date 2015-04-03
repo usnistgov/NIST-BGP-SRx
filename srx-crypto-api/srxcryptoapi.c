@@ -56,11 +56,13 @@
 #include <ltdl.h>
 int ltdl;
 lt_dlhandle module;
-
+/* libltdl is now patched, following preload symbols lines are no longer needed */
+/*
 #ifndef lt__PROGRAM__LTX_preloaded_symbols
 #define lt_preloaded_symbols    lt_libltdl_LTX_preloaded_symbols
 extern LT_DLSYM_CONST lt_dlsymlist lt_libltdl_LTX_preloaded_symbols[];
 #endif
+*/
 #endif
 
 
@@ -337,7 +339,7 @@ int srxCryptoInit(SRxCryptoAPI* api)
   api->validate = NULL;
 
   // Read Configuration script
-  config_t         cfg;
+  static config_t  cfg;
   config_setting_t *set = NULL;
 
   const char* str_library_name = NULL;

@@ -256,7 +256,9 @@ SRX_REVISION = $(shell cat $(SRC_DIR)/$(SRX_REVISION_FILE))
 EXTRAS_INCLUDE_DIR = $(top_srcdir)/../extras/local/include
 AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir)
 AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION)
-EXTRA_DIST = 
+EXTRA_DIST = $(top_srcdir)/server/srx_lib.conf \
+	     $(top_srcdir)/server/srx_lib-x86_64.conf
+
 lib_LTLIBRARIES = 
 L_FLAGS = -L$(EXTRAS_LIB) 
 srxdir = $(bindir)

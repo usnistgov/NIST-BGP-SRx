@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # This file belongs to the SRxCryptoAPI testbed. The certificates/keys 

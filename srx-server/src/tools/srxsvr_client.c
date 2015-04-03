@@ -22,11 +22,13 @@
  *
  * This program allows to test the SRX server implementation.
  *
- * @version 0.3.0
+ * @version 0.3.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/03/05 - oborchert
+ * 0.3.0.6 - 2014/04/03 - oborchert
+ *           * Fixed formating error in printout ($i -> %i)
+ * 0.3.0   - 2013/03/05 - oborchert
  *           * Fixed logLevel management
  *           * Fixed initial creation of proxy by passing the communication 
  *             management handler.
@@ -78,12 +80,12 @@
  *           * Internally changed verify update to new API
  *           * Added reconnect command "doReConnect"
  *           * Changed parameter input for connect "doConnect"
- *   0.2.0 - 2011/01/07 - oborchert
+ * 0.2.0   - 2011/01/07 - oborchert
  *           * Changelog added with version 0.2.0 and date 2011/01/07
  *           * Version tag added
  *           * Fixed some output to be less confusing.
  *           * Trimmed all input.
- *   0.0.0 - 2010/05/11 - pgleichm
+ * 0.0.0   - 2010/05/11 - pgleichm
  *           * Code Created
  * -----------------------------------------------------------------------------
  *
@@ -881,7 +883,7 @@ void commManagement(SRxProxyCommCode mainCode, int subCode, void* userPtr)
     {
       // Currently undefined error.
       case COM_ERR_PROXY_UNKNOWN:
-        printf ("SRx-Error: Unknown error with sub code $i.\n", subCode);
+        printf ("SRx-Error: Unknown error with sub code %i.\n", subCode);
         break;
 
       // Error while assigning the proxy id - connecting to srx server. */

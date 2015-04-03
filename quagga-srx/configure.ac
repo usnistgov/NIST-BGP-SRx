@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.1.1, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.1.2, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -105,6 +105,7 @@ else
        AC_MSG_RESULT([yes])]
   )
 fi
+
 
 dnl ---------------------------------------------
 dnl If CLFAGS doesn\'t exist set default value
@@ -1418,6 +1419,14 @@ if test "x${enable_srx}" == "xyes"; then
   AC_MSG_RESULT([USER:${SRX_CLI_LIB}  srx dir:${SRX_DIR}])
   #AC_MSG_FAILURE([test])
 
+  AC_CANONICAL_HOST
+  AS_CASE([$host_cpu],
+          [i?86], [ARCHDIR=arch/i386],
+          [x86_64], [ARCHDIR=arch/x86_64],
+          [AC_MSG_WARN("No assembler code for CPU $host_cpu")]
+          )
+  AC_SUBST([ARCHDIR])
+  AC_MSG_RESULT([ cpu architecture: $host_cpu hosttype: $HOSTTYPE])
 
   dnl ---------------------------------
   dnl  OpenSSL library and ECDSA check
@@ -1425,8 +1434,17 @@ if test "x${enable_srx}" == "xyes"; then
   if test -f ${OPENSSL_ECDSA_INC}/openssl/ecdsa.h; then
     OPENSSL_ECDSA_INC_DIR="${OPENSSL_ECDSA_INC}/"
   else
-    if test -f /usr/local/ssl/include/openssl/ecdsa.h; then
-      OPENSSL_ECDSA_INC_DIR=/usr/local/ssl/include/
+    AS_CASE([$host_cpu],
+            [i?86], [OPENSSL_ECDSA_INC_DIR="/usr/include/"],
+            [x86_64], [OPENSSL_ECDSA_INC_DIR="/usr/include/"],
+            [AC_MSG_WARN("No assembler code for CPU $host_cpu")]
+            )
+    if test -f ${OPENSSL_ECDSA_INC_DIR}/openssl/ecdsa.h; then
+      :
+    else
+      if test -f /usr/local/ssl/include/openssl/ecdsa.h; then
+        OPENSSL_ECDSA_INC_DIR=/usr/local/ssl/include/
+      fi
     fi
   fi
 
@@ -1448,11 +1466,20 @@ if test "x${enable_srx}" == "xyes"; then
 
   if test -n "$OPENSSL_ECDSA_INC_DIR"; then
     ldflags_temp=${OPENSSL_ECDSA_INC_DIR%include*}
-    LDFLAGS="$LDFLAGS -L${ldflags_temp}lib"
+    if test "$HOSTTYPE" = x86_64; then
+      LDFLAGS="$LDFLAGS -L${ldflags_temp}lib64"
+    else
+      LDFLAGS="$LDFLAGS -L${ldflags_temp}lib"
+    fi
   fi
   AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
   AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
-
+else
+  AC_MSG_WARN( [
+               --------------------------------------------------
+               The SRx extension is not enabled !!!!
+               To enable SRx extension use --enable-srx
+               --------------------------------------------------])
 fi
 
   dnl ---------------------------------
@@ -1520,6 +1547,12 @@ if test "x${enable_srxcryptoapi}" == "xyes"; then
   AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
   AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
   AC_MSG_RESULT([LIBS="$LIBS"])
+else
+  AC_MSG_WARN( [
+               --------------------------------------------------
+               The SRxCryptoAPI is not enabled !!!!
+               To enable SRxCryptoAPI use --enable-srxcryptoapi
+               --------------------------------------------------])
 fi
 
 case "${enable_ripngd}" in
