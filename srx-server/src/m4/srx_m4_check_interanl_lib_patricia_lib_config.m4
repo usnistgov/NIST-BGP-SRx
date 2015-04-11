@@ -1,7 +1,7 @@
 # SRX_M4_CHECK_INTERNAL_LIB_PATRICIA & LIB_CONFIG
 # -------------------------------------------------
 #
-# Define this macro for chekcing extra files
+# Define this macro for checling extra files
 #  and installing libpatricia tree.
 #
 AC_DEFUN([SRX_M4_CHECK_INTERNAL_LIB_PATRICIA], [
@@ -29,26 +29,5 @@ else
     AC_MSG_RESULT([null: ${var_libpatr}])
 fi
 ])#SRX_M4_CHECK_INTERNAL_LIB_PATRICIA
-
-
-
-AC_DEFUN([SRX_M4_CHECK_INTERNAL_LIB_CONFIG], [
-AC_MSG_CHECKING([for using internal libconfig])
-if test "x$var_libconf" = xyes; then
-    AC_MSG_RESULT([enabled: ${var_libconf}])
-    if test -f ../extras/files/libconfig-1.4.1.tar.gz; then
-	    AC_MSG_RESULT([ libconfig-1.4.1.tar.gz exists ])
-	    orig_path=$PWD
-	    cd ../extras/files/ && pwd
-	    tar xvfz libconfig-1.4.1.tar.gz > /dev/null 2>&1 && cd libconfig-1.4.1
-	    ./configure --prefix=${PWD}/../../local --disable-cxx
-	    make all install > /dev/null 2>&1 
-	    cd $orig_path && pwd
-        rm -rf ../extras/files/libconfig-1.4.1/
-    fi
-else
-    AC_MSG_RESULT([null: ${var_libconf}])
-fi
-])#SRX_M4_CHECK_INTERNAL_LIB_CONFIG
 
 

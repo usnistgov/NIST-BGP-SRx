@@ -221,10 +221,9 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 
 #ifdef USE_SRX
       if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-        //zlog_debug("[BGPSEC] [%s] stream remain:%d prefix size: %d rn->p:%08x attr:%p ",
-        zlog_debug("[BGPSEC] [%s] stream remain:%d prefix size: %d attr:%p ",
+        zlog_debug("[BGPSEC] [%s] stream remain:%d prefix size: %d rn->p:%08x attr:%p ",
             __FUNCTION__, STREAM_REMAIN (s),  PSIZE (rn->p.prefixlen), \
-            /*rn->p.u.prefix4,*/ adv->baa->attr);
+          rn->p.u.prefix4, adv->baa->attr);
 #endif
       /* When remaining space can't include NLRI and it's length.  */
       if (STREAM_REMAIN (s) <= BGP_NLRI_LENGTH + PSIZE (rn->p.prefixlen))
@@ -266,6 +265,9 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 #endif
 	}
 
+#ifdef USE_SRX
+      if ( !CHECK_FLAG (peer->flags, PEER_FLAG_MPE_IPV4) )
+#endif
       if (afi == AFI_IP && safi == SAFI_UNICAST)
 	stream_put_prefix (s, &rn->p);
 
@@ -301,6 +303,11 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
 	break;
 
 #ifdef USE_SRX
+      if ( CHECK_FLAG (peer->flags, PEER_FLAG_MPE_IPV4) )
+	break;
+#endif
+
+#ifdef USE_SRX
       struct peer *from = NULL;
       u_char bDoNotFrag =0;
       if (binfo)
@@ -308,35 +315,49 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
         from = binfo->peer;
         if(from)
         {
-          if( (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY) \
+          /* if and only if, the peer's recv capability set and this node's send capability set,
+           * BGPSec Update message can be sent to the peer */
+          if( (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) \
                 && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV)) )
           {
+            /* debug */
             if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
               zlog_debug("[BGPSEC] from:%p from->as:%d from->cap:%04x", \
                   from, from->as, from->cap);
 
+            /* in case, when the previous(from) node sends to the current node which is connected
+             * to the next node(peer), to determine whether to send BGPSec or BGPv4 */
             if(from->as >0 && from->as != peer->as)
             {
-              if (!CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV)
-                  || !CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY)
-                 )
+              if (!CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV_SEND)
+                  || !CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
+              {
                 bDoNotFrag =1;   // fragmentation set
+              }
             }
           }
         }
       }
 
       /*
-       * only if bgpsec enabled and the from peer has joined the bgpsec
+       * only if bgpsec enabled and the from-peer has joined the bgpsec
        * or in case of sending ecommunity string to its peer
        */
-      if( (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY) \
+      if( (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) \
             && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV)) \
           || ((CHECK_FLAG (peer->bgp->srx_ecommunity_flags, SRX_BGP_FLAG_ECOMMUNITY)) \
             && bFrag && from)
         )
       {
         if(bDoNotFrag)
+          goto donot_frag;
+
+        /* in case, received BGPv4 Update from the previous node of the previous peer or more preivou in turn.
+         * If 'aspath->segments' exists, it means 'attr' comes from the peer node
+         * If 'attr->bgpsecPathAttr' NOT exists, it means attr doesn't include BGPSec Update
+         * */
+        if(adj->attr->aspath && adj->attr->aspath->segments &&
+            adj->attr->aspath->segments->length > 0 && !adj->attr->bgpsecPathAttr)
           goto donot_frag;
 
         size_t cp = stream_get_getp(s);
@@ -359,7 +380,7 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
       }
 donot_frag:
       bDoNotFrag = 0;
-#endif
+#endif /* USE-SRX */
     }
 
   if (! stream_empty (s))

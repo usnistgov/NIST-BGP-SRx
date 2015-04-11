@@ -469,7 +469,8 @@ static struct SigBlock* sigBlock_New(void)
  * @return
  */
 struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
-                                     size_t length, int *errCode)
+                                     size_t length, afi_t afi,
+                                     struct bgp_nlri *mp_update, int *errCode)
 {
   struct BgpsecPdu pdu;
   u_char *startp, *endp;
@@ -498,27 +499,61 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
   struct prefix p;
   int psize;
   size_t nlrip = start_getp + length;
-
-  p.family = AF_INET;
-  p.prefixlen = stream_getc_from(s, nlrip++);
-  psize = PSIZE (p.prefixlen);
-
   u_int32_t nlri=0;
 
-  int i;
-  for(i=0; i<psize; i++)
+  p.family = (afi == AFI_IP)? AF_INET: AF_INET6;
+
+  /* IPv4 nlri parsing */
+  if(afi == AFI_IP )
   {
-    nlri |= stream_getc_from(s, nlrip+i) <<  8 *i;
+    p.prefixlen = stream_getc_from(s, nlrip++);
+    psize = PSIZE (p.prefixlen);
+
+    int i;
+    for(i=0; i<psize; i++)
+    {
+      nlri |= stream_getc_from(s, nlrip+i) <<  8 *i;
+    }
+
+    memcpy (&p.u.prefix, &nlri, psize);
   }
+#ifdef HAVE_IPV6
+  /* parsing IPv6 nlri from MP-NLRI attribute */
+  else if(afi == AFI_IP6)
+  {
+    u_char *pnt = mp_update->nlri;
+
+    /* Fetch prefix length. */
+    p.prefixlen = *pnt++;
+    psize = PSIZE (p.prefixlen);
+    bgp_size_t nlri_len = mp_update->length;
+
+    /* Fetch prefix from NLRI packet. */
+    memcpy (&p.u.prefix, pnt, psize);
+
+    /* Check address. */
+    if (mp_update->afi == AFI_IP6 && mp_update->safi == SAFI_UNICAST)
+    {
+      if (IN6_IS_ADDR_LINKLOCAL (&p.u.prefix6))
+      {
+        char buf[BUFSIZ];
+
+        zlog (peer->log, LOG_WARNING,
+            "IPv6 link-local NLRI received %s ignore this NLRI",
+            inet_ntop (AF_INET6, &p.u.prefix6, buf, BUFSIZ));
+
+        return NULL;
+      }
+    }
+  }
+#endif /* HAVE_IPV6 */
 
   if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+  {
     zlog_debug("[IN] - -- - nlri: %08x ntolh(nlri): %08x", nlri, ntohl(nlri));
-
-  memcpy (&p.u.prefix, &nlri, psize);
-
-  if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
     zlog_debug("[IN] prefixlen:%d psize:%d nlri:%08x p.u.prefix:%08x",
         p.prefixlen, psize, nlri, p.u.prefix);
+  }
 
   int numSecurePathSegment = 0;
   //u_char *bptr;
@@ -983,7 +1018,7 @@ int bgpsecPathAttribute(struct bgp *bgp, struct peer *peer,
   size_t cp;
   u_int8_t sigbuff[BGPSEC_MAX_SIG_LENGTH];
   /* hashbuff must also be >= 24, but this should be >= 24 */
-  u_int8_t hashbuff[BGPSEC_MAX_SIG_LENGTH + 10];
+  u_int8_t hashbuff[BGPSEC_MAX_SIG_LENGTH + 10 + BGPSEC_AFI_LENGTH];
   u_int8_t bski[BGPSEC_SKI_LENGTH];
   u_int8_t pCount = 0;
   u_int8_t spFlags = 0x00;
@@ -1087,6 +1122,10 @@ int bgpsecPathAttribute(struct bgp *bgp, struct peer *peer,
     size_t psize = PSIZE (p->prefixlen);
     memcpy((hashbuff+12), &p->u.prefix, psize); // NLRI prefix
 
+#ifdef HAVE_IPV6
+    hashbuff[12+psize] = (p->family == AF_INET6) ? AFI_IP6 : AFI_IP;
+#endif /* HAVE_IPV6 */
+
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       zlog_debug("[OUT] prefix_length: %d psize: %d, prefix: 0x%08x", \
           p->prefixlen, psize, p->u.prefix);
@@ -1096,7 +1135,12 @@ int bgpsecPathAttribute(struct bgp *bgp, struct peer *peer,
     BGPSecKey* outKeyInfo=NULL;
 
     BGPSecSignData bgpsecSignData = {
+#ifdef HAVE_IPV6
+      .dataLength       = (p->family == AF_INET6)? 12+psize+BGPSEC_AFI_LENGTH:
+                                                                     12+psize,
+#else
       .dataLength       = (12+psize),
+#endif /* HAVE_IPV6 */
       .data             = hashbuff,
       .algoID           = BGPSEC_ALGO_ID,
       .sigLen           = BGPSEC_MAX_SIG_LENGTH,
@@ -1142,7 +1186,8 @@ int bgpsecPathAttribute(struct bgp *bgp, struct peer *peer,
 
 #ifdef SIGN_WITH_ID_ENABLED
     sig_length = g_capi->libHandle == NULL ? 0
-                 : g_capi->sign_with_id((12+psize), hashbuff, keyID, BGPSEC_MAX_SIG_LENGTH, sigbuff);
+                : g_capi->sign_with_id(bgpsecSignData.dataLength, hashbuff,
+                    keyID, BGPSEC_MAX_SIG_LENGTH, sigbuff);
 #else /* SIGN_WITH_ID_ENABLED */
     sig_length = g_capi->libHandle == NULL ? 0
                  : g_capi->sign_with_key(&bgpsecSignData, outKeyInfo);

@@ -42,7 +42,6 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/m4/srx_m4_check_interanl_lib_ncurses_lib_readline.m4 \
 	$(top_srcdir)/m4/srx_m4_check_interanl_lib_patricia_lib_config.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -234,8 +233,10 @@ LIB_SRX = $(CLIENT_DIR)/libsrx.la
 # string or the content of the revision file.
 SRX_REVISION = $(shell cat $(SRC_DIR)/$(SRX_REVISION_FILE))
 EXTRAS_INCLUDE_DIR = $(top_srcdir)/../extras/local/include
-AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir)
-AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION)
+AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir) \
+            -DSRX_REVISION=$(SRX_REVISION) \
+            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
+
 EXTRA_DIST = 
 pkglib_LTLIBRARIES = libsrx.la
 libsrx_la_SOURCES = client_connection_handler.c \
@@ -581,6 +582,8 @@ uninstall-am: uninstall-pkglibLTLIBRARIES
 	tags uninstall uninstall-am uninstall-hook \
 	uninstall-pkglibLTLIBRARIES
 
+
+#AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION) -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
 
 tags-local:
 	@ctags $(CTAGS_OPTS) *.h $(SHARED_DIR)/*.h $(UTIL_DIR)/*.h

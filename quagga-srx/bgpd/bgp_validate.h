@@ -7,6 +7,7 @@
 #define BGPSEC_ALGO_ID              1
 #define BGPSEC_ALGO_ID_LENGTH       1
 #define BGPSEC_MAX_SIG_LENGTH       128
+#define BGPSEC_AFI_LENGTH           1
 #define BGPSEC_MAX_INFO_ATTR_LENGTH 0
 
 
@@ -116,7 +117,8 @@ int bgpsecPathAttribute(struct bgp *, struct peer *, struct aspath *, struct pre
 int bgpsecVerifySingle(struct peer *, struct BgpsecPathAttr *, struct prefix);
 int bgpsecVerify(struct peer *, struct BgpsecPathAttr *, struct prefix);
 int bgpsecSanityCheck(struct BgpsecPathAttr *);
-struct BgpsecPathAttr *bgpsec_parse(struct peer *, struct stream *, size_t, int*);
+struct BgpsecPathAttr *bgpsec_parse(struct peer *, struct stream *, size_t,
+                                    afi_t, struct bgp_nlri *, int*);
 struct BgpsecPathAttr * bgpsec_parse_iBGP(struct peer *, struct stream *, size_t);
 int bgpsecPathAttribute_iBGP(struct bgp *, struct peer *, struct aspath *,
                         struct prefix *, struct stream *, struct BgpsecPathAttr *);

@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.1.2, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.1.3a, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -1514,18 +1514,22 @@ if test "x${enable_srxcryptoapi}" == "xyes"; then
   ])
 
   if test -f ${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la; then
-      SRX_API_LIB=${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la
+    if test -f ${CRYPTOAPI_DIR}/lib/libCryptoImple.la; then
+      SRX_API_LIB="${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la ${CRYPTOAPI_DIR}/lib/libCryptoImple.la"
       INCLUDES="${INCLUDES} -I${CRYPTOAPI_DIR}/include"
       AC_SUBST(SRX_API_LIB)
       have_srxcryptolib=yes
+    fi
   else
     if test -f /usr/local/lib/libSRxCryptoAPI.a; then
-      AC_MSG_RESULT([manually found libSRxCryptoAPI])
-      SRX_CRYPTO_API_LIBS="-lSRxCryptoAPI"
-      LDFLAGS="$LDFLAGS -L/usr/local/lib/ "
-      CPPFLAGS="${CPPFLAGS} -I/usr/local/include/"
-      AC_SUBST(SRX_CRYPTO_API_LIBS)
-      have_srxcryptolib=yes
+      if test -f /usr/local/lib/libCryptoImple.a; then
+        AC_MSG_RESULT([manually found libSRxCryptoAPI])
+        SRX_CRYPTO_API_LIBS="-lSRxCryptoAPI -lCryptoImple"
+        LDFLAGS="$LDFLAGS -L/usr/local/lib/ "
+        CPPFLAGS="${CPPFLAGS} -I/usr/local/include/"
+        AC_SUBST(SRX_CRYPTO_API_LIBS)
+        have_srxcryptolib=yes
+      fi
     else
         AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], [have_srxcryptolib=yes])
         if test "x${have_srxcryptolib}" = xyes; then
@@ -1950,8 +1954,8 @@ linker flags            : ${LDFLAGS} ${LIBS} ${LIBCAP} ${LIBREADLINE} ${LIBM}
 state file directory    : ${quagga_statedir}
 config file directory   : `eval echo \`echo ${sysconfdir}\``
 example directory       : `eval echo \`echo ${exampledir}\``
-user to run as		: ${enable_user}
-group to run as		: ${enable_group}
+user to run as          : ${enable_user}
+group to run as         : ${enable_group}
 group for vty sockets	: ${enable_vty_group}
 config file mask        : ${enable_configfile_mask}
 log file mask           : ${enable_logfile_mask}

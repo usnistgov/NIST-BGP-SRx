@@ -68,9 +68,6 @@ static struct bgp_table *bgp_connected_table[AFI_MAX];
 
 /* BGP nexthop lookup query client. */
 struct zclient *zlookup = NULL;
-#ifdef USE_SRX
-struct zclient *zlookup2 = NULL;
-#endif /* USE_SRX */
 
 /* Add nexthop to the end of the list.  */
 static void
@@ -1181,42 +1178,6 @@ zlookup_connect (struct thread *t)
   return 0;
 }
 
-#ifdef USE_SRX
-#define PATH_INFO "/tmp/my_fifo"
-/* Connect to zebra for nexthop lookup. */
-static int
-zlookup_connect2 (struct thread *t)
-{
-  //zlog_debug(" ----------- test event read -----------\n");
-  //struct zclient *zlookup2;
-
-  //zlookup2 = THREAD_ARG (t);
-  //zlookup2->t_connect = NULL;
-
-
-  int fd, n_read=0;
-  char a_buf[0xff];
-
-  int accept_sock = THREAD_FD (t);
-  fd = accept_sock;
-
-  zlog_debug(" accept_sock: %d , fd: %d\n", accept_sock, fd);
-
-  if ( (n_read= read(fd, a_buf, sizeof(a_buf)) ) == -1)
-  {
-      if (n_read== 0)
-	  zlog_debug(" broken pipe\n");  // exit(0);
-
-      zlog_debug( "[%1$d byte ] %2$.*1$s\n", n_read, a_buf);
-
-  }
-
-  //thread_add_read (master, zlookup_connect2, NULL, fd);
-
-
-  return 0;
-}
-#endif /* USE_SRX */
 
 /* Check specified multiaccess next-hop. */
 int
@@ -1446,38 +1407,6 @@ bgp_scan_init (void)
   zlookup = zclient_new ();
   zlookup->sock = -1;
   zlookup->t_connect = thread_add_event (master, zlookup_connect, zlookup, 0);
-
-#ifdef USE_SRX
-  zlookup2 = zclient_new ();
-  zlookup2->sock = -1;
-  //zlookup->t_connect = thread_add_event (master, zlookup_connect2, zlookup, 0);
-
-  int fd; //, n_read=0;
-  //char a_buf[0xff];
-
-  if(mkfifo(PATH_INFO, 0644) == -1)
-  {
-      if(errno != EEXIST)
-      {
-	  fprintf(stderr, "FAIL:mkfifo() (%s) \n", strerror(errno));
-	  zlog_debug(" EXIT_FAILURE\n");
-      }
-  }
-
-  if ((fd = open(PATH_INFO, O_RDWR, 0644)) == -1)
-  {
-      fprintf(stderr, "FAIL:open() (%s) \n", strerror(errno));
-      zlog_debug(" EXIT_FAILURE\n");
-  }
-
-  //
-  // READ QUEUE
-  //zlookup2->t_connect = thread_add_event (master, zlookup_connect2, zlookup2, fd);
-  zlookup2->t_read = thread_add_read (master, zlookup_connect2, zlookup2, fd);
-
-  //thread_execute (master, zlookup_connect2, zlookup2, fd);
-
-#endif /* USE_SRX */
 
   bgp_scan_interval = BGP_SCAN_INTERVAL_DEFAULT;
   bgp_import_interval = BGP_IMPORT_INTERVAL_DEFAULT;

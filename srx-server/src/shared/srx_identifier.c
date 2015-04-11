@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,7 +18,7 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
  */
 #include <stdio.h>
@@ -35,7 +35,7 @@
  *
  * @param originAS The origin AS of the data
  * @param prefix The prefix to be announced (IPPrefix)
- * @param dataLength the legth of the following data blob
+ * @param dataLength the length of the following data blob
  * @param data The data blob.
  *
  * @return return an ID.

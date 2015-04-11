@@ -20,11 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.3.0.7
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/03/20 - oborchert
+ * 0.3.0.7 - 2015/04/21 - oborchert
+ *           * Modified the version output.
+ * 0.3.0.0 - 2013/03/20 - oborchert
  *           * Added information about receive queue settings to output of
  *             'show-srxconfig'
  *         - 2013/02/27 - oborchert
@@ -42,7 +44,7 @@
  *           * Fixed formating of max 80 characters per line.
  *         - 2012/12/17 - oborchert
  *           * updated num-proxies to allow showing all proxy mappings
- *   0.1.0 - 2011/05/24 - oborchert
+ * 0.1.0.0 - 2011/05/24 - oborchert
  *           * Code created.
  */
 #include <stdio.h>
@@ -825,7 +827,7 @@ void doShowVersion(SRXConsole* self, char* cmd, char* param)
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   char out[256];
   memset(out, '\0', 256);
-  sprintf (out, "SRx-Server Version %s\r\n", SRX_SERVER_FULL_VER);
+  sprintf (out, "SRx-Server Version%s\r\n", SRX_SERVER_FULL_VER);
   sendToConsoleClient(self, out, true);    
 }
 

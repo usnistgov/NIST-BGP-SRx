@@ -46,7 +46,6 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/m4/srx_m4_check_interanl_lib_ncurses_lib_readline.m4 \
 	$(top_srcdir)/m4/srx_m4_check_interanl_lib_patricia_lib_config.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -77,8 +76,8 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(srxdir)" \
-	"$(DESTDIR)$(srx_configdir)" "$(DESTDIR)$(srx_libconfigdir)" \
-	"$(DESTDIR)$(pkgincludedir)"
+	"$(DESTDIR)$(disr_srx_initddir)" "$(DESTDIR)$(srx_configdir)" \
+	"$(DESTDIR)$(srx_libconfigdir)" "$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 PROGRAMS = $(srx_PROGRAMS)
 am_srx_server_OBJECTS = bgpsec_handler.$(OBJEXT) \
@@ -111,7 +110,8 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(srx_server_SOURCES)
 DIST_SOURCES = $(srx_server_SOURCES)
-DATA = $(dist_srx_config_DATA) $(dist_srx_libconfig_DATA)
+DATA = $(disr_srx_initd_DATA) $(dist_srx_config_DATA) \
+	$(dist_srx_libconfig_DATA)
 HEADERS = $(noinst_HEADERS) $(pkginclude_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -254,10 +254,13 @@ LIB_SRX = $(CLIENT_DIR)/libsrx.la
 # string or the content of the revision file.
 SRX_REVISION = $(shell cat $(SRC_DIR)/$(SRX_REVISION_FILE))
 EXTRAS_INCLUDE_DIR = $(top_srcdir)/../extras/local/include
-AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir)
-AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION)
+AM_CFLAGS = -I$(EXTRAS_INCLUDE_DIR)  -I$(top_srcdir) \
+            -DSRX_REVISION=$(SRX_REVISION) \
+            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
+
 EXTRA_DIST = $(top_srcdir)/server/srx_lib.conf \
-	     $(top_srcdir)/server/srx_lib-x86_64.conf
+	     $(top_srcdir)/server/srx_lib-x86_64.conf \
+	     $(top_srcdir)/server/srx_serverd
 
 lib_LTLIBRARIES = 
 L_FLAGS = -L$(EXTRAS_LIB) 
@@ -289,8 +292,10 @@ srx_server_LDADD = $(top_srcdir)/shared/srx_packets.lo  \
 #srx_configdir = $(pkgdatadir)
 srx_configdir = $(sysconfdir)
 srx_libconfigdir = $(sysconfdir)/ld.so.conf.d
+disr_srx_initddir = $(sysconfdir)/rc.d/init.d
 dist_srx_config_DATA = srx_server.conf
 dist_srx_libconfig_DATA = srx_lib$(CPU_ARCH).conf
+disr_srx_initd_DATA = srx_serverd
 
 #srx_server_CPPFLAGS = -I$(EXTRAS_INCLUDE_DIR) -g
 noinst_HEADERS = bgpsec_handler.h \
@@ -313,11 +318,11 @@ noinst_HEADERS = bgpsec_handler.h \
 
 # following headers will be used for the quaggasrx rpm 
 pkginclude_HEADERS = $(CLIENT_DIR)/$(PACKAGE)/uthash.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/types.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/srx_defs.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/srx_api.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/slist.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/prefix.h
+		  $(CLIENT_DIR)/$(PACKAGE)/types.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/srx_defs.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/srx_api.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/slist.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/prefix.h
 
 all: all-am
 
@@ -477,6 +482,26 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-disr_srx_initdDATA: $(disr_srx_initd_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(disr_srx_initddir)" || $(MKDIR_P) "$(DESTDIR)$(disr_srx_initddir)"
+	@list='$(disr_srx_initd_DATA)'; test -n "$(disr_srx_initddir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(disr_srx_initddir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(disr_srx_initddir)" || exit $$?; \
+	done
+
+uninstall-disr_srx_initdDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(disr_srx_initd_DATA)'; test -n "$(disr_srx_initddir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(disr_srx_initddir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(disr_srx_initddir)" && rm -f $$files
 install-dist_srx_configDATA: $(dist_srx_config_DATA)
 	@$(NORMAL_INSTALL)
 	test -z "$(srx_configdir)" || $(MKDIR_P) "$(DESTDIR)$(srx_configdir)"
@@ -624,7 +649,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(DATA) $(HEADERS)
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(srxdir)" "$(DESTDIR)$(srx_configdir)" "$(DESTDIR)$(srx_libconfigdir)" "$(DESTDIR)$(pkgincludedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(srxdir)" "$(DESTDIR)$(disr_srx_initddir)" "$(DESTDIR)$(srx_configdir)" "$(DESTDIR)$(srx_libconfigdir)" "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -675,9 +700,9 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_srx_configDATA \
-	install-dist_srx_libconfigDATA install-pkgincludeHEADERS \
-	install-srxPROGRAMS
+install-data-am: install-disr_srx_initdDATA \
+	install-dist_srx_configDATA install-dist_srx_libconfigDATA \
+	install-pkgincludeHEADERS install-srxPROGRAMS
 
 install-dvi: install-dvi-am
 
@@ -724,9 +749,10 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_srx_configDATA \
-	uninstall-dist_srx_libconfigDATA uninstall-libLTLIBRARIES \
-	uninstall-pkgincludeHEADERS uninstall-srxPROGRAMS
+uninstall-am: uninstall-disr_srx_initdDATA \
+	uninstall-dist_srx_configDATA uninstall-dist_srx_libconfigDATA \
+	uninstall-libLTLIBRARIES uninstall-pkgincludeHEADERS \
+	uninstall-srxPROGRAMS
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
 .MAKE: install-am install-exec-am install-strip uninstall-am
@@ -736,21 +762,23 @@ uninstall-am: uninstall-dist_srx_configDATA \
 	clean-srxPROGRAMS ctags distclean distclean-compile \
 	distclean-generic distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dist_srx_configDATA \
-	install-dist_srx_libconfigDATA install-dvi install-dvi-am \
-	install-exec install-exec-am install-exec-hook install-html \
-	install-html-am install-info install-info-am \
-	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
-	install-pkgincludeHEADERS install-ps install-ps-am \
-	install-srxPROGRAMS install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-dist_srx_configDATA \
-	uninstall-dist_srx_libconfigDATA uninstall-hook \
-	uninstall-libLTLIBRARIES uninstall-pkgincludeHEADERS \
-	uninstall-srxPROGRAMS
+	install-data install-data-am install-disr_srx_initdDATA \
+	install-dist_srx_configDATA install-dist_srx_libconfigDATA \
+	install-dvi install-dvi-am install-exec install-exec-am \
+	install-exec-hook install-html install-html-am install-info \
+	install-info-am install-libLTLIBRARIES install-man install-pdf \
+	install-pdf-am install-pkgincludeHEADERS install-ps \
+	install-ps-am install-srxPROGRAMS install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-disr_srx_initdDATA \
+	uninstall-dist_srx_configDATA uninstall-dist_srx_libconfigDATA \
+	uninstall-hook uninstall-libLTLIBRARIES \
+	uninstall-pkgincludeHEADERS uninstall-srxPROGRAMS
 
+
+#AM_CPPFLAGS = -DSRX_REVISION=$(SRX_REVISION) -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
 
 tags-local:
 	@ctags $(CTAGS_OPTS) *.h $(SHARED_DIR)/*.h $(UTIL_DIR)/*.h \
@@ -768,8 +796,10 @@ echo:
 	@echo " abs_srcdir: $(abs_srcdir) abs_top_srcdir: $(abs_top_srcdir)"
 
 install-exec-hook:
+	@echo "Modify access rights"
 	-chmod go+rw -R $(pkgincludedir)
 	-chmod go+r -R $(pkglibdir)
+	-chmod 755 $(disr_srx_initddir)/$(disr_srx_initd_DATA)
 
 uninstall-hook:
 	@echo "------- uninstall all installation data -------"

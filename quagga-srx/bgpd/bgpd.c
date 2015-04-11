@@ -638,7 +638,7 @@ int srx_connect_proxy(struct bgp *bgp)
     }
     else
     {
-      zlog_err ("Could not connect to SRx server at %s:%d, check is server is "
+      zlog_err ("Could not connect to SRx server at %s:%d, check is server is"
                 "running", bgp->srx_host, bgp->srx_port);
     }
   }
@@ -2961,7 +2961,9 @@ static const struct peer_flag_action peer_flag_action_list[] =
     { PEER_FLAG_DYNAMIC_CAPABILITY,       0, peer_change_reset },
     { PEER_FLAG_DISABLE_CONNECTED_CHECK,  0, peer_change_reset },
 #ifdef USE_SRX
-    { PEER_FLAG_BGPSEC_CAPABILITY,        0, peer_change_none },
+    { PEER_FLAG_BGPSEC_CAPABILITY_SEND,   0, peer_change_none },
+    { PEER_FLAG_BGPSEC_CAPABILITY_RECV,   0, peer_change_none },
+    { PEER_FLAG_MPE_IPV4,                 0, peer_change_none },
 #endif
     { 0, 0, 0 }
   };
@@ -5546,6 +5548,16 @@ bgp_config_write_peer (struct vty *vty, struct bgp *bgp,
 	    ! CHECK_FLAG (g_peer->flags, PEER_FLAG_DONT_CAPABILITY))
 	vty_out (vty, " neighbor %s dont-capability-negotiate%s", addr,
 		 VTY_NEWLINE);
+#ifdef USE_SRX
+      /* bgpsec capability */
+      if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) &&
+        CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
+        vty_out (vty, " neighbor %s bgpsec both%s", addr, VTY_NEWLINE);
+      else if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
+        vty_out (vty, " neighbor %s bgpsec snd %s", addr, VTY_NEWLINE);
+      else if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
+	vty_out (vty, " neighbor %s bgpsec rec %s", addr, VTY_NEWLINE);
+#endif /* USE_SRX */
 
       /* override capability negotiation. */
       if (CHECK_FLAG (peer->flags, PEER_FLAG_OVERRIDE_CAPABILITY))
@@ -6025,6 +6037,11 @@ bgp_config_write (struct vty *vty)
       if (CHECK_FLAG (bgp->config, BGP_CONFIG_ROUTER_ID))
 	vty_out (vty, " bgp router-id %s%s", inet_ntoa (bgp->router_id),
 		 VTY_NEWLINE);
+#ifdef USE_SRX
+      /* bgpsec ski value */
+      if(bgp->bgpsec_ski)
+        vty_out (vty, " bgpsec ski %s%s", bgp->bgpsec_ski, VTY_NEWLINE);
+#endif /* USE_SRX */
 
       /* BGP log-neighbor-changes. */
       if (bgp_flag_check (bgp, BGP_FLAG_LOG_NEIGHBOR_CHANGES))

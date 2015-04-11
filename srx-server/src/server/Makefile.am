@@ -1,7 +1,8 @@
 include $(top_srcdir)/Makefile_Common
 
 EXTRA_DIST = $(top_srcdir)/server/srx_lib.conf \
-	     $(top_srcdir)/server/srx_lib-x86_64.conf
+	     $(top_srcdir)/server/srx_lib-x86_64.conf \
+	     $(top_srcdir)/server/srx_serverd
 	
 lib_LTLIBRARIES = 
 
@@ -38,8 +39,10 @@ srx_server_LDADD = $(top_srcdir)/shared/srx_packets.lo  \
 #srx_configdir = $(pkgdatadir)
 srx_configdir = $(sysconfdir)
 srx_libconfigdir = $(sysconfdir)/ld.so.conf.d
+disr_srx_initddir = $(sysconfdir)/rc.d/init.d
 dist_srx_config_DATA = srx_server.conf
 dist_srx_libconfig_DATA = srx_lib$(CPU_ARCH).conf
+disr_srx_initd_DATA = srx_serverd
 
 #srx_server_CPPFLAGS = -I$(EXTRAS_INCLUDE_DIR) -g
 
@@ -62,11 +65,11 @@ dist_srx_libconfig_DATA = srx_lib$(CPU_ARCH).conf
 
 # following headers will be used for the quaggasrx rpm 
 pkginclude_HEADERS = $(CLIENT_DIR)/$(PACKAGE)/uthash.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/types.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/srx_defs.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/srx_api.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/slist.h \
-					 $(CLIENT_DIR)/$(PACKAGE)/prefix.h
+		  $(CLIENT_DIR)/$(PACKAGE)/types.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/srx_defs.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/srx_api.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/slist.h \
+		  $(CLIENT_DIR)/$(PACKAGE)/prefix.h
 
 
 tags-local:
@@ -86,8 +89,10 @@ echo:
 	@echo " abs_srcdir: $(abs_srcdir) abs_top_srcdir: $(abs_top_srcdir)"
 
 install-exec-hook:
+	@echo "Modify access rights"
 	-chmod go+rw -R $(pkgincludedir)
 	-chmod go+r -R $(pkglibdir)
+	-chmod 755 $(disr_srx_initddir)/$(disr_srx_initd_DATA)
 
 uninstall-hook:
 	@echo "------- uninstall all installation data -------"

@@ -1,16 +1,16 @@
-This folder containts NIST BGP-SRx Software Suite V4.1.2
- * quagga-srx V0.99.22.srx-0.4.1.2_release
- * srx-server V0.3.0.6_release
+This folder containts NIST BGP-SRx Software Suite V4.1.3
+ * quagga-srx V0.99.22.srx-0.4.1.3a_release
+ * srx-server V0.3.0.8_release
  * srx-crypto-api V0.1.1.1_release
 
 Comments for this software package:
 ===================================
-* quagga-srx 0.99.22.srx-0.4.1.2_release was developed and tested under CentOS.
+* quagga-srx 0.99.22.srx-0.4.1.3a_release was developed and tested under CentOS.
   - requires srx-server (Proxy API)
   - requires srx-crypto-api
   - requires openssl-devel
   - requires libconfig-devel
-* srx-server 0.3.0.6_release developed and tested under CentOS.
+* srx-server 0.3.0.8_release developed and tested under CentOS.
   Use telnet for login into the srx-server!
   - requires readline-devel
   - requires ncurses-devel

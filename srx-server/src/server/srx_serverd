@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# srx_serverd Starts/stop the "srx_server" daemon
+#
+# chkconfig:   345 95 5
+# description: Start the SRx Server deamon.
+
+### BEGIN INIT INFO
+# Provides: srx_serverd
+# Required-Start: $local_fs
+# Required-Stop: $local_fs
+# Default-Start: 345
+# Default-Stop: 95
+# Short-Description: Starts/stop the "srx_serverd" daemon
+# Description:      Start the SRx Server deamon.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+exec=/usr/bin/srx_server
+prog="srx_server"
+config="-f /etc/srx_server.conf"
+pid=0
+
+start() {
+    echo -n Starting $prog"d:"
+    config=""
+
+    status
+    if [ $pid -eq 0 ] ; then
+      $exec $config >/dev/null 2>&1 &
+      sleep 1
+      status
+    else
+      pid=0
+    fi
+    
+    if [ $pid -eq 0 ] ; then
+      failure
+    else
+      success
+    fi
+    echo
+}
+
+stop() {
+    echo -n $"Stopping " $prog"d:"
+    status
+    retval=1
+
+    if [ $pid -ne 0 ] ; then
+      kill -9 $pid >/dev/null 2>&1 
+      retval=$? 
+    fi
+
+    if [ $retval -eq 0 ] ; then
+      success
+    else
+      failure
+    fi
+
+    echo
+}
+
+restart() {
+    stop
+    start
+    return $?
+}
+
+status() {
+  pid=0$(ps -e | grep "$prog$" | sed -e "s/\(^[0-9]\+ \).*/echo \1/g" | sh)
+  return $pid
+}
+
+case "$1" in
+    start)
+        $1
+        ;;
+    stop)
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    status)
+        echo -n Service $prog"d is...."
+        $1
+        if [ $pid -eq 0 ] ; then
+          echo "stopped!"
+        else
+          echo "running!"
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 2
+esac
+exit $?

@@ -643,7 +643,8 @@ struct peer
 #define PEER_CAP_AS4_ADV                    (1 << 7) /* as4 advertised */
 #define PEER_CAP_AS4_RCV                    (1 << 8) /* as4 received */
 #ifdef USE_SRX
-#define PEER_CAP_BGPSEC_ADV                 (1 << 15)/* bgpsec advertised */
+#define PEER_CAP_BGPSEC_ADV_SEND            (1 << 14)/* bgpsec advertised send capability */
+#define PEER_CAP_BGPSEC_ADV                 (1 << 15)/* bgpsec advertised recv capability */
 #endif
 
   /* Capability flags (reset in bgp_stop) */
@@ -669,7 +670,9 @@ struct peer
 #define PEER_FLAG_LOCAL_AS_NO_PREPEND       (1 << 7) /* local-as no-prepend */
 #define PEER_FLAG_LOCAL_AS_REPLACE_AS       (1 << 8) /* local-as no-prepend replace-as */
 #ifdef USE_SRX
+#define PEER_FLAG_MPE_IPV4                  (1 << 10) /* mp extension for ipv4 */
 #define PEER_FLAG_BGPSEC_CAPABILITY_RECV    (1 << 14)/* bgpsec capability - RECV */
+#define PEER_FLAG_BGPSEC_CAPABILITY_SEND    (1 << 15)/* bgpsec capability - SEND */
 #define PEER_FLAG_BGPSEC_CAPABILITY         (1 << 15)/* bgpsec capability - SEND */
 #endif
 

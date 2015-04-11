@@ -4,27 +4,36 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- *
+ * 
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- *
- * We would appreciate acknowledgement if the software is used.
- *
+ * 
+ * We would appreciate acknowledgment if the software is used.
+ * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
+ * 
+ * This file contains functions and macros for logging output. It is recommended 
+ * to set the log method at the beginning of the application - otherwise 
+ * eventual message will be discarded.
+ *  
+ * @version 0.3.0.7
  *
- *
- * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required
- * by thsi software.
- *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.7 - 2015/04/21 - oborchert
+ *           * Added ChangeLog.
+ * 0.1.1.0 - 2010/06/25 - borchert
+ *           * Added level WARNING
+ *             A wonderful description on how and when to use each level can be 
+ *             found at: 
+ *             http://www.kiwisyslog.com/kb/info:-syslog-message-levels/
+ * 0.1.0.0 - 2009/12/28 - pgleichm
+ *           * Code Created
+ * -----------------------------------------------------------------------------
  */
-/**
- * @date 12/28/2009
- */
-
 #include <time.h>
 #include <syslog.h>
 #include "log.h"

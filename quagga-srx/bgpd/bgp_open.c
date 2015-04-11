@@ -590,13 +590,22 @@ bgp_capability_parse (struct peer *peer, size_t length, int *mp_capability,
               }
 
               /* check if the connected peer has the recv-direction capability */
-              //if( (cv.version_dir & 0x08) == 0)    // 0x08 : dir bit
-              if( (cv.version_dir & ~(BGPSEC_CAP_DIR_RECV)) == 0)    // 0x08 : dir bit
+              if( (cv.version_dir & ~(BGPSEC_CAP_DIR_RECV)) == 0)    // 0x00 : dir bit
               {
                 SET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV);
 
                 if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-                  zlog_debug("[BGPSEC] Capability RECV set");
+                  zlog_debug("[BGPSEC] peer Capability RECV set");
+              }
+
+              /* check if the connected peer has the send-direction capability */
+              //if( (cv.version_dir & 0x08) == 0)    // 0x08 : dir bit
+              if( cv.version_dir & (BGPSEC_CAP_DIR_SEND))    // 0x08 : dir bit
+              {
+                SET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV_SEND);
+
+                if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+                  zlog_debug("[BGPSEC] peer Capability SEND set");
               }
               break;
 #endif
@@ -1070,7 +1079,7 @@ bgp_open_capability (struct stream *s, struct peer *peer)
      }
 #ifdef USE_SRX
   /* BGPSEC Capability */
-  if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY))
+  if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
   {
     /* direction - send, IPv4 capability */
     stream_putc (s, BGP_OPEN_OPT_CAP);
@@ -1079,7 +1088,12 @@ bgp_open_capability (struct stream *s, struct peer *peer)
     stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN);
     makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_SEND, BGPSEC_CAP_AFI_IPv4);
 
+    if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      zlog_debug("[BGPSEC]  %s: BGPSEC SEND Capability set", __FUNCTION__);
+  }
 
+  if(CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
+  {
     /* direction -  recv, IPv4 capability */
     stream_putc (s, BGP_OPEN_OPT_CAP);
     stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN + 2);
@@ -1088,9 +1102,9 @@ bgp_open_capability (struct stream *s, struct peer *peer)
     makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_RECV, BGPSEC_CAP_AFI_IPv4);
 
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC]  %s: BGPSEC Capability set", __FUNCTION__);
+      zlog_debug("[BGPSEC]  %s: BGPSEC RECV Capability set", __FUNCTION__);
   }
-  else
+  else if(!CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
   {
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       zlog_debug("[BGPSEC]  %s: BGPSEC Capability NOT set", __FUNCTION__);

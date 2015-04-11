@@ -15,29 +15,25 @@
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
- * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
- * by this software.
+ * This file contains functions and macros for logging output. It is recommended 
+ * to set the log method at the beginning of the application - otherwise 
+ * eventual message will be discarded.
+ *  
+ * @version 0.3.0.7
  *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.7 - 2015/04/21 - oborchert
+ *           * Added ChangeLog.
+ * 0.1.1.0 - 2010/06/25 - borchert
+ *           * Added level WARNING
+ *             A wonderful description on how and when to use each level can be 
+ *             found at: 
+ *             http://www.kiwisyslog.com/kb/info:-syslog-message-levels/
+ * 0.1.0.0 - 2009/12/28 - pgleichm
+ *           * Code Created
+ * -----------------------------------------------------------------------------
  */
-/**
- * @file log.h
- * @date Created: 12/28/2009
- * @date Changed to log: 6/25/2010
- * 
- * Added level WARNING
- * A wonderful description on how and when to use each level can be found at 
- * http://www.kiwisyslog.com/kb/info:-syslog-message-levels/
- * 
- * This module provides a standardized way to report log messages. This is 
- * necessary because in a lot of cases is no standard output stream is
- * (e.g. daemon) available.
- *
- * @note It is recommended to set the log method at the beginning of the
- *       application - otherwise eventual message will be discarded.
- */
-
 #ifndef __LOG_H__
 #define __LOG_H__
 

@@ -25,17 +25,25 @@
  *
  * Uses log.h for error reporting
  * 
- * @version 0.3.0
+ * @version 0.3.0.7
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
+ * 0.3.0.7 - 2015/04/17 - oborchert
+ *           * BZ599 - Changed typecase from (int) to (uintptr_t) to prevent 
+ *             compiler warnings and other nasty side affects while compiling
+ *             on 32 and 64 bit OS.
+ * 0.3.0.0 - 2013/01/28 - oborchert
  *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
  *             update does not include the secure protocol section. The protocol
  *             will still use un-encrypted plain TCP
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Rewritten
- *   0.1.0 - 2010/03/08 - pgleichm
+ *         - 2012/12/17 - oborchert
+ *           * Adapted to the changes in the underlying client socket structure.
+ *           * Fixed some spellers in documentation
+ *           * Added documentation TODO
+ * 0.2.0.0 - 2011/03/27 - oborchert
+ *           * Changed implementation to follow draft-ietf-rpki-rtr-10
+ * 0.1.0.0 - 2010/03/11 - pgleichm
  *           * Code Created
  * -----------------------------------------------------------------------------
  */

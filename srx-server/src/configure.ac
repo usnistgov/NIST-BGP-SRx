@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.3.0.6], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.3.0.8], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -49,30 +49,11 @@ AC_ARG_WITH([libpatr],
 	    [var_libpatr=yes], [var_libpatr=no])
 
 
-AC_ARG_WITH([libconf],
-	    [AS_HELP_STRING([--with-libconf],
-			    [use the internal libconfig library package])],
-	    [var_libconf=yes], [var_libconf=no])
-
-
-AC_ARG_WITH([libncur],
-	    [AS_HELP_STRING([--with-libncur],
-			    [use the internal ncurses library package])],
-	    [var_libncur=yes], [var_libncur=no])
-
-AC_ARG_WITH([libread],
-	    [AS_HELP_STRING([--with-libread],
-			    [use the internal readline library package])],
-	    [var_libread=yes], [var_libread=no])
-
-
-
 # Checks for libraries.
 have_config=no
 AC_SEARCH_LIBS([config_init], [config], [have_config=yes])
 if test "x${have_config}" = xno; then
-    if test "x${var_libconf}" = xno; then
-      AC_MSG_ERROR([
+  AC_MSG_ERROR([
 	--------------------------------------------------
 	The config library required to build srx_server.
 	Stopping...
@@ -81,13 +62,6 @@ if test "x${have_config}" = xno; then
         Please install the "libconfig" and 
                            "libconfig-devel" library first.
 	--------------------------------------------------])
-    fi
-
-    if test "x${var_libconf}" = xyes; then
-	AC_MSG_CHECKING([--srx-- using the extra library dir libconfig])
-	AC_MSG_RESULT([$var_libconf])
-	SRX_M4_CHECK_INTERNAL_LIB_CONFIG
-    fi
 fi
 
 # FIXME: Replace `main' with a function in `-ldl':
@@ -98,7 +72,6 @@ have_ncurses=no
 # FIXME: Replace `main' with a function in `-lncurses':
 AC_CHECK_LIB([ncurses], [main], [have_ncurses=yes])
 if test "x${have_ncurses}" = xno; then
-    if test "x${var_libncur}" = xno; then
 	AC_MSG_ERROR([
 	--------------------------------------------------
 	The ncurses library required to build srx_server.
@@ -106,48 +79,40 @@ if test "x${have_ncurses}" = xno; then
 
         Please install the "libncurses" library first.
 	--------------------------------------------------])
-    fi
-
-    if test "x${var_libncur}" = xyes; then
-	AC_MSG_CHECKING([--srx-- using the extra library dir and installing libncurses ])
-	AC_MSG_RESULT([$var_libncur])
-	SRX_M4_CHECK_INTERNAL_LIB_NCURSES
-    fi
 fi
 
 have_patricia=no
 # FIXME: Replace `main' with a function in `-lpatricia':
 AC_CHECK_LIB([patricia], [main], [have_patricia=yes])
 if test "x${have_patricia}" = xno; then
-    #if test "x${libpatricia_inst}" = xyes; then
-    if test "x${var_libpatr}" = xno; then
-	AC_MSG_ERROR([
-        --------------------------------------------------
+  if test "x${var_libpatr}" = xno; then
+  	AC_MSG_ERROR([
+  --------------------------------------------------
 	The patricia library required to build srx_server.
 	Stopping...
 	Check 'config.log' for more information.
 
         Please install the "libpatricia" library first.
 	--------------------------------------------------])
-    fi
+  fi
 
-    if test "x${var_libpatr}" = xyes; then
-	AC_MSG_CHECKING([--srx-- using the extra library dir and installing libpatricia])
-	AC_MSG_RESULT([$libpatricia_inst $var_libpatr])
-	SRX_M4_CHECK_INTERNAL_LIB_PATRICIA
-    else
-	AC_MSG_RESULT([nothing else])
-    fi
-    libpatricia_inst=no
+  if test "x${var_libpatr}" = xyes; then
+  	AC_MSG_CHECKING([--srx-- using the extra library dir and installing libpatricia])
+  	AC_MSG_RESULT([$libpatricia_inst $var_libpatr])
+  	SRX_M4_CHECK_INTERNAL_LIB_PATRICIA
+  else
+	  AC_MSG_RESULT([nothing else])
+  fi
+  libpatricia_inst=no
 fi
 
 have_pthreads=no
 AC_SEARCH_LIBS([pthread_create], [pthread], [have_pthreads=yes])
 if test "x${have_pthreads}" = xyes; then
-    AC_CHECK_HEADERS([pthread.h], [], [have_pthreads=no])
-    if test "x${have_pthreads}" = xyes; then
-	AC_DEFINE([_REENTRANT],, pthread reentrant nature)
-    fi
+  AC_CHECK_HEADERS([pthread.h], [], [have_pthreads=no])
+  if test "x${have_pthreads}" = xyes; then
+	  AC_DEFINE([_REENTRANT],, pthread reentrant nature)
+  fi
 fi
 
 if test "x${have_pthreads}" = xno; then
@@ -164,7 +129,7 @@ have_readline=no
 # FIXME: Replace `main' with a function in `-lreadline':
 AC_CHECK_LIB([readline], [main], [have_readline=yes])
 if test "x${have_readline}" = xno; then
-    if test "x${var_libread}" = xno; then
+  if test "x${var_libread}" = xno; then
     AC_MSG_ERROR([
     --------------------------------------------------
     The readline library required to build srx_server.
@@ -173,14 +138,7 @@ if test "x${have_readline}" = xno; then
     Please install "readline" library first.
                    "readline-devel" library first.
     --------------------------------------------------])
-fi
-
-    if test "x${var_libread}" = xyes; then
-	AC_MSG_CHECKING([--srx-- using the extra library dir and installing libreadline ])
-	AC_MSG_RESULT([$var_libread])
-	SRX_M4_CHECK_INTERNAL_LIB_READLINE
-    fi
-#    AC_MSG_FAILURE([readline failure test] )
+  fi
 fi
 
 

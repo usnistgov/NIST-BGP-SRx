@@ -1802,12 +1802,14 @@ bgp_attr_unknown (struct bgp_attr_parser_args *args)
  * @return BGP_ATTR_PARSE_PROCEED or BGP_ATTR_PARSE_ERROR.
  */
 /* BGP bgpsec attribute treatment. */
-static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args)
+static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args,
+                                            struct bgp_nlri *mp_update)
 {
   // already flag, type and length byte were read by the previous function
   struct peer *const peer = args->peer;
   struct attr *const attr = args->attr;
   const bgp_size_t length = args->length;
+  afi_t afi = AFI_IP;
 
   int errCode=BGPSEC_VERIFY_MISMATCH;
   if (attr->aspath)
@@ -1822,10 +1824,24 @@ static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args)
     zlog_debug("[BGPSEC] startp:%p length:%d total:%d", \
         args->startp, args->length, args->total);
   }
+#ifdef HAVE_IPV6
+  /* not IPv4 nexthop flag set */
+  if (!CHECK_FLAG (attr->flag, ATTR_FLAG_BIT (BGP_ATTR_NEXT_HOP)))
+  {
+    /* extra attribute exist */
+    if (attr->extra)
+    {
+      /* Add MP case. */
+      if (attr->extra->mp_nexthop_len == 16
+          || attr->extra->mp_nexthop_len == 32)
+        afi = AFI_IP6;
+    }
+  }
+#endif /* HAVE_IPV6 */
 
   /* bgpsec pdu parsing */
   if (peer->sort == BGP_PEER_EBGP)
-    attr->bgpsecPathAttr = bgpsec_parse(peer, peer->ibuf, length, &errCode);
+    attr->bgpsecPathAttr = bgpsec_parse(peer, peer->ibuf, length, afi, mp_update, &errCode);
   else if (peer->sort == BGP_PEER_IBGP) \
     attr->bgpsecPathAttr = bgpsec_parse_iBGP(peer, peer->ibuf, length);
 
@@ -1852,8 +1868,10 @@ static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args)
    *  - syntatic error happens */
   else
   {
-    UNSET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV);      // this flag used for receiving capabilty
-    UNSET_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY); // this flag used for sending capability
+    /* this flag used for receiving capabilty of the peer */
+    UNSET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV);
+    /* this flag used for sending capability of this node */
+    UNSET_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND);
 
     /* SRx server's default policy overwritten with this valude */
     peer->bgp->srx_default_bgpsecVal = SRx_RESULT_INVALID;
@@ -2120,7 +2138,7 @@ bgp_attr_parse (struct peer *peer, struct attr *attr, bgp_size_t size,
 	  break;
 #ifdef USE_SRX
         case BGP_ATTR_BGPSEC:
-          ret = bgp_attr_bgpsec(&attr_args);
+          ret = bgp_attr_bgpsec(&attr_args, mp_update);
           if (ret == BGP_ATTR_PARSE_ERROR)
           {
             ret = BGP_ATTR_PARSE_WITHDRAW; // Treat it as Withdraw (section 5.2)
@@ -2355,11 +2373,16 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 
 #ifdef USE_SRX
   int fSetAspath = 0;
-  if ( (!CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY)  \
-      ||!CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV)))
-      //||(from->as && from->as != peer->as && !CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY))
-      //||(from->as && from->as != peer->as && !CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV))
-     //)
+ /* if and only if, the peer's recv capability set and this node's send capability set,
+   * BGPSec Update message can be sent to the peer
+   */
+  if ( (!CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND)  \
+      ||!CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV))
+      ||( from && from->as && from->as != peer->as &&
+          (!CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV) ||
+           !CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV_SEND))
+        )
+     )
   {
     fSetAspath = 1;
     if (BGP_DEBUG (as4, AS4_SEGMENT))
@@ -2562,6 +2585,39 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 	}
     }
 
+#ifdef USE_SRX
+  if ( CHECK_FLAG (peer->flags, PEER_FLAG_MPE_IPV4) )
+  {
+    /* IPv4 MP format   */
+    if (p->family == AF_INET)
+    {
+      unsigned long sizep;
+      struct attr_extra *attre = attr->extra;
+
+      assert (attr->extra);
+
+      stream_putc (s, BGP_ATTR_FLAG_OPTIONAL);
+      stream_putc (s, BGP_ATTR_MP_REACH_NLRI);
+      sizep = stream_get_endp (s);
+      stream_putc (s, 0);	/* Marker: Attribute length. */
+      stream_putw (s, AFI_IP);	/* AFI */
+      stream_putc (s, safi);	/* SAFI */
+
+      stream_putc (s, 4); // nexthop length
+      stream_put (s, &attr->nexthop, 4);
+
+      /* SNPA */
+      stream_putc (s, 0);
+
+      /* Prefix write. */
+      stream_put_prefix (s, p);
+
+      /* Set MP attribute length. */
+      stream_putc_at (s, sizep, (stream_get_endp (s) - sizep) - 1);
+    }
+  }
+#endif
+
 #ifdef HAVE_IPV6
   /* If p is IPv6 address put it into attribute. */
   if (p->family == AF_INET6)
@@ -2692,10 +2748,12 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 #ifdef USE_SRX
               if ((!CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY_EBGP)) \
                   && (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE)))
-		continue;
+              {
+                continue;
+              }
 #else
-	      if (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE))
-		continue;
+              if (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE))
+                continue;
 #endif
 
 	      ecom_tr_size++;
@@ -2723,7 +2781,9 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 #ifdef USE_SRX
                   if (!CHECK_FLAG (peer->bgp->srx_ecommunity_flags,  SRX_BGP_FLAG_ECOMMUNITY_EBGP) \
                       && (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE)))
+                  {
                     continue;
+                  }
 #else
                   if (CHECK_FLAG (tbit, ECOMMUNITY_FLAG_NON_TRANSITIVE))
                     continue;
@@ -2777,8 +2837,38 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 
 #ifdef USE_SRX
   /* here BGPSEC_Path attribute manipulation */
-  if ( CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY)
-      && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV))
+  /* TODO: need to have a check routine for BGPv4 or BGPSec update message */
+
+  // --> if(attr->bgpsecPathAttr) skip ??
+
+  /* if and only if, the peer's recv capability set and this node's send capability set,
+   * BGPSec Update message can be sent to the peer */
+
+  /* this is different condition compared to what the following if-confditions */
+#if 0
+  if (from
+      && CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) // this node has the send capability
+      && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV) // peer node has the recv capability
+      && (from->as == 0  // in case, this is Origin node
+          || (from->as && from->as != peer->as  // if the prev node exist and different from the next peer
+              && CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV) // this, recv-cap
+              && CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV_SEND) // prev, send-cap
+             )
+         )
+     )
+#endif
+
+  if ( from && (from->as == 0) && // in case, this is Origin node
+      (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) // this node has the send capability
+       && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV))               // peer node has the recv capability
+
+      ||(from && from->as && from->as != peer->as // if the prev node exist and different from the next peer
+        && (CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV) &&   // this, recv-cap
+          CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV_SEND))                 // prev, send-cap
+        && (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) &&   // this, send-cap
+          CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV))                      // next, recv-cap
+        )
+     )
   {
     size_t bgpsec_sp;
     size_t bgpsec_sizep;
@@ -2794,24 +2884,32 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
     bgpsec_sizep = stream_get_endp (s);
     stream_putw (s,0);
     if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC] [%s] attr->aspath:%p segments:%p", \
-          __FUNCTION__, attr->aspath, attr->aspath->segments);
+    {
+      zlog_debug("[BGPSEC] [%s] attr->aspath:%p segments:%p",
+                 __FUNCTION__, attr->aspath, attr->aspath->segments);
+    }
 
       /* call main function */
     if (peer->sort == BGP_PEER_EBGP)
-      bgpsec_ret = bgpsecPathAttribute(bgp, peer, aspath_bgpsec, p, s, attr->bgpsecPathAttr);
-    else if (peer->sort == BGP_PEER_IBGP ) \
-      bgpsec_ret = bgpsecPathAttribute_iBGP(bgp, peer, aspath_bgpsec, p, s, attr->bgpsecPathAttr);
+    {
+      bgpsec_ret = bgpsecPathAttribute (bgp, peer, aspath_bgpsec, p, s,
+                                        attr->bgpsecPathAttr);
+    }
+    else if (peer->sort == BGP_PEER_IBGP )
+    {
+      bgpsec_ret = bgpsecPathAttribute_iBGP (bgp, peer, aspath_bgpsec, p, s,
+                                             attr->bgpsecPathAttr);
+    }
 
     /* rewind stream to the previous point */
-    if(bgpsec_ret < 0)
+    if (bgpsec_ret < 0)
     {
-      stream_set_endp(s, bgpsec_sp); // rewind
-      UNSET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV);
-      UNSET_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY);
+      stream_set_endp (s, bgpsec_sp); // rewind
+      //UNSET_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV);
+      //UNSET_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND);
 
       /* generate as-path when bgpsecPathAttribute function failed */
-      if(!fSetAspath)
+      if (!fSetAspath)
       {
         stream_putc (s, BGP_ATTR_FLAG_TRANS|BGP_ATTR_FLAG_EXTLEN);
         stream_putc (s, BGP_ATTR_AS_PATH);
@@ -2823,9 +2921,11 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
       if( peer->sort == BGP_PEER_IBGP)
       {
         /* call aspath_parse() here  */
-        if(!attr->aspath)
+        if (!attr->aspath)
+        {
           attr->aspath = aspath_parse (peer->ibuf, 0,
-              CHECK_FLAG (peer->cap, PEER_CAP_AS4_RCV));
+                                      CHECK_FLAG (peer->cap, PEER_CAP_AS4_RCV));
+        }
         /* Set aspath attribute flag. */
         attr->flag |= ATTR_FLAG_BIT (BGP_ATTR_AS_PATH);
       }
@@ -2833,14 +2933,18 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
     else
     {
       if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
+      {
         zlog_debug("[BGPSEC] total length: %d ", bgpsec_ret);
+      }
       stream_putw_at(s, bgpsec_sizep, bgpsec_ret); /* attr_length */
     }
   }
 
   /* release aspath pointer used for bgpsec */
-  if(aspath_bgpsec)
+  if (aspath_bgpsec)
+  {
     aspath_free (aspath_bgpsec);
+  }
 
 #endif /* USE_SRX */
 

@@ -1,7 +1,5 @@
-%define version 0.3.0.6
+%define version 0.3.0.8
 %define name srx
-%define lconf_name libconfig
-%define lconf_version 1.4.1
 %define lpatr_name Net-Patricia
 %define lpatr_version 1.15
 
@@ -14,7 +12,6 @@ Group:Networking/Daemons
 License:LGPL	
 URL:www.antd.nist.gov
 Source0:%{name}-%{version}.tar.gz
-Source1:%{lconf_name}-%{lconf_version}.tar.gz
 Patch: Net-Patricia-1.15-fixes-20100513.patch
 BuildRoot:/tmp/rpm/%{name}-%{version}	
 #%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
@@ -31,7 +28,6 @@ srx rpm packaging file
 %setup -q
 #%setup -q -D -T -a 1 
 cd extras
-/usr/bin/gzip -dc $RPM_SOURCE_DIR/%{lconf_name}-%{lconf_version}.tar.gz | tar -xvvf - > /dev/null
 /usr/bin/gzip -dc $RPM_SOURCE_DIR/%{lpatr_name}-%{lpatr_version}.tar.gz | tar -xvvf - > /dev/null
 STATUS=0
 
@@ -42,15 +38,11 @@ cd %{lpatr_name}-%{lpatr_version}/libpatricia
 
 
 %build
-%configure --prefix=/usr/local --sysconfdir=/etc --with-libpatr --with-libconf
-#./configure --prefix=/usr --with-libpatr --with-libconf
+%configure --prefix=/usr/local --sysconfdir=/etc --with-libpatr
 make %{?_smp_mflags}
 pwd
-cd extras/%{lconf_name}-%{lconf_version}
-./configure --prefix=/usr/local --disable-cxx
-make
 
-cd ../%{lpatr_name}-%{lpatr_version}/libpatricia
+cd extras/%{lpatr_name}-%{lpatr_version}/libpatricia
 perl Makefile.PL
 make
 pwd
@@ -61,8 +53,6 @@ cp -f libpatricia.a ../../
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 pwd
-cd extras/%{lconf_name}-%{lconf_version}
-make install DESTDIR=$RPM_BUILD_ROOT
 
 
 %clean
@@ -70,17 +60,19 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 ldconfig
-#ln -s %{_bindir}/srx_server /usr/bin/srx_server
-#ln -s %{_bindir}/rpkirtr_client /usr/bin/rpkirtr_client
-#ln -s %{_bindir}/rpkirtr_svr /usr/bin/rpkirtr_svr
-#ln -s %{_bindir}/srxsvr_client /usr/srxsvr_client
+chmod go+rx %{_initddir}/srx_serverd
+chkconfig --add srx_serverd
+chkconfig srx_serverd off
+
+%preun
+chkconfig --del srx_serverd
+if [ -e %{_sysconfdir}/srx_server.conf ] ; then
+ echo "  - save server configuration as %{_sysconfdir}/srx_server.conf.rpmsafe"
+ cp -f %{_sysconfdir}/srx_server.conf %{_sysconfdir}/srx_server.conf.rpmsafe
+fi
 
 %postun
 ldconfig
-#rm -f /usr/bin/srx_server
-#rm -f /usr/bin/rpkirtr_client
-#rm -f /usr/bin/rpkirtr_svr
-#rm -f /usr/srxsvr_client
 
 %files
 #%defattr(644,root,root,755)
@@ -102,6 +94,7 @@ ldconfig
 %{_libdir}/srx/libsrx.la
 %{_libdir}/srx/libsrx.a
 %{_sysconfdir}/srx_server.conf
+%{_initddir}/srx_serverd
 %ifarch x86_64
 %{_sysconfdir}/ld.so.conf.d/srx_lib-x86_64.conf
 %else
@@ -119,13 +112,3 @@ ldconfig
 %{_includedir}/srx/srx_api.h
 %{_includedir}/srx/slist.h
 %{_includedir}/srx/prefix.h
-%{_includedir}/srx/prefix.h
-/usr/local/lib/libconfig.so.9.0.1
-/usr/local/lib/libconfig.so.9
-/usr/local/lib/libconfig.so
-/usr/local/lib/libconfig.la
-/usr/local/lib/libconfig.a
-/usr/local/include/libconfig.h
-/usr/local/lib/pkgconfig/libconfig.pc
-/usr/local/share/info/dir
-/usr/local/share/info/libconfig.info

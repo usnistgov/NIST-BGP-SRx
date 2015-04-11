@@ -21,14 +21,16 @@
  *
  * This file does provide CONSTANT declarations ONLY
  *
- * Version 0.3.0
+ * Version 0.3.0.7
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/04 - oborchert
+ * 0.3.0.7 - 2015/04/21 - oborchert
+ *         * Modified Version numbering by referring specification to Makefile.
+ * 0.3.0.0 - 2013/02/04 - oborchert
  *         * Added REVISION number that will be taken from the compiler using
  *           the compiler setting -DSRX_REVISION
- *   0.2.0 - 2011/05/24 - oborchert
+ * 0.2.0.0 - 2011/05/24 - oborchert
  *         * File created
  * 
  */
@@ -37,7 +39,7 @@
 #define	SRX_SERVER_H
 
 // Some Macros to deal with the SRX_REVISION compiler parameter
-#define SRX_STRINGIFY_ARG(ARG) "." #ARG
+#define SRX_STRINGIFY_ARG(ARG) " " #ARG
 #define SRX_STRINGIFY_IND(ARG) SRX_STRINGIFY_ARG(ARG)
 
 #define SRX_DO_CHECKVAL(VAL) VAL ## 1
@@ -46,9 +48,10 @@
 
 #define SRX_SERVER_NAME     "SRX Server"
 
-#define SRX_SERVER_MAJOR    "0"
-#define SRX_SERVER_MINOR    "3"
-#define SRX_SERVER_UPDATE   "0"
+#ifndef SRX_SERVER_PACKAGE
+// Is provided by Makefile as CFLAGS -I
+#define SRX_SERVER_PACKAGE  "NA"
+#endif
 
 // Compiler setting -D SRX_REVISION
 #ifdef SRX_REVISION
@@ -62,19 +65,18 @@
   #define SRX_SERVER_REVISION ""
 #endif
 
-// Used version number
-#define SRX_SERVER_VERSION  SRX_SERVER_MAJOR "." SRX_SERVER_MINOR
+// Used version number -  make a string of the define
+#define SRX_SERVER_VERSION  SRX_STRINGIFY_IND(SRX_SERVER_PACKAGE)
 // Used full version number
-#define SRX_SERVER_FULL_VER SRX_SERVER_VERSION "." SRX_SERVER_UPDATE \
-                            SRX_SERVER_REVISION
+#define SRX_SERVER_FULL_VER SRX_SERVER_VERSION SRX_SERVER_REVISION
 
 #define SRX_CREDITS "This program was developed at the National Institute "  \
                 "of Standards and Technology (NIST - www.nist.gov) in "      \
                 "Gaithersburg, Maryland, U.S.A\r\n\r\n"                      \
                 "Developers:\r\n"                                            \
                 "------------------------------------------------------\r\n" \
-                "  Oliver Borchert    (borchert@nist.gov) (2010-2013)\r\n"   \
-                "  Kyehwan Lee        (kyehwanl@nist.gov) (2011-2013)\r\n"   \
+                "  Oliver Borchert    (borchert@nist.gov) (2010-present)\r\n"  \
+                "  Kyehwan Lee        (kyehwanl@nist.gov) (2011-present)\r\n"  \
                 "  Patrick Gleichmann (pgleichm@nist.gov) (2010)\r\n"        \
                 "------------------------------------------------------\r\n" \
                 "\n"

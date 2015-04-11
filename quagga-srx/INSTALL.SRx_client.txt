@@ -54,27 +54,13 @@ Current Features:
 Configuration:
 ==================
 The current configuration has three parameters:
-bgpsec ski <key-ski>    : Private key
-neighbor A.B.C.D bgpsec : This session performs BGPSEC
-srx evaluation bgpsec   : Use bgpsec path validation result in update validation
+bgpsec ski <key-ski>                   : Private key
+neighbor A.B.C.D bgpsec (snd|rec|both) : This session performs BGPSEC
+srx evaluation bgpsec                  : Use bgpsec path validation result in 
+                                         update validation
 
-Setup:
-=========
-1. Generate a repository at
-/var/lib/bgpsec-keys
-This repository will contain keys and certificates. In this versions the
-certificates only contain the public key.
-
-2. Generate keys:
-        qsrx-make-key <name>
-3. Generate Certificate
-        qsrx-make-cert <name>
-4. public cert and install key
-        qsrx-publish <key>
-The last step generates a file containing the skis of all private keys for easy
-copy past into the bgpd.conf
+For Key Generation and setup see SRxCryptoAPI
 
 Questions:
 ==========
 Email to bgpsrx-dev@nist.gov
-

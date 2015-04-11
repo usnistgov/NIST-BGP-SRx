@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.3.0
+ * @version 0.3.0.7
  *
  * EXIT Values:
  *
@@ -38,7 +38,9 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2014/11/17 - oborchert
+ * 0.3.0.7 - 2015/04/21 - oborchert
+ *           * Modified version output.
+ * 0.3.0.0 - 2014/11/17 - oborchert
  *           * Removed constant value for configuration file and replaced it 
  *             with a defined one in config.h. Also modified the determination
  *             process on how to figure out which configuration file to load. 
@@ -47,13 +49,13 @@
  *         - 2012/11/23 - oborchert
  *           * Extended version handling. - F for full version
  *           * Added capability to pass configuration file as parameter (-f)
- *   0.2.0 - 2011/01/07 - oborchert
+ * 0.2.0.0 - 2011/01/07 - oborchert
  *           * Changelog added with version 0.2.0 and date 2011/01/07
  *           * Version tag added
  *           * Added handling of SIGKILL to allow a clean shutdown when killing
  *             the server. this helps saving time especially during debugging
  *           * Added documentation.
- *   0.1.0 - 2010/04/26 - pgleichm
+ * 0.1.0.0 - 2010/04/26 - pgleichm
  *           * Code Created
  * -----------------------------------------------------------------------------
  *
@@ -528,7 +530,7 @@ int main(int argc, const char* argv[])
   setLogMethodToFile(stderr);
   setLogLevel(LEVEL_ERROR);
   
-  printf ("Start %s Version %s (%s)\n", SRX_SERVER_NAME, SRX_SERVER_VERSION, 
+  printf ("Start %s Version%s (%s)\n", SRX_SERVER_NAME, SRX_SERVER_VERSION, 
           __TIME__);
   passedConfig = setupConfiguration(argc, argv);
   LOG(LEVEL_DEBUG, "([0x%08X]) > Start Main SRx server thread.", pthread_self());

@@ -932,11 +932,12 @@ void bgp_info_set_validation_result (struct bgp_info *info,
       zlog_debug("[BGPSEC] handleSRxValidation_Result() --> bgp_info_set_validation_result()");
       zlog_debug("[BGPSEC] From info-fetch()  info->attr: %p info->attr->bgpsecPathAtt:%p ", \
           info->attr, info->attr->bgpsecPathAttr);
-    }
 
-    //TODO: this below might be removed. Sanity check should not be done here.
-    // anymore, if we get here than the update passes a sanity check already
-    // nevertheless, in this case update turns invalid....
+      // In case, on receiving a BGPv4 Update message from the peer
+      if(info->attr->aspath && info->attr->aspath->segments &&
+            info->attr->aspath->segments->length > 0 && !info->attr->bgpsecPathAttr)
+        zlog_debug("[BGPSEC] this is BGPv4 Update message");
+    }
 
     /* this flag prevents bgpsecVerifyCaller from making notification message
      * back to peer when bgpsecPathAttribute is NULL */
@@ -945,11 +946,12 @@ void bgp_info_set_validation_result (struct bgp_info *info,
     if(bgpsecSanityCheck(info->attr->bgpsecPathAttr) != 0)
     {
       fBgpsecSanity = -1;
-      // SHOULD NEVER HAPPEN HERE, AND IF THEN BUG IN CODE
+
+      // In case, on receiving a BGPv4 Update message from the peer, it can be reached here
       if(info->peer->sort == BGP_PEER_EBGP)
       {
         if (BGP_DEBUG (bgpsec, BGPSEC))
-          zlog_debug("[BGPSEC] bgpsec Path Attr structure error or Already removed due to Failed to Validation ");
+          zlog_debug("[BGPSEC] bgpsec Path Attr structure error caused by either already removed due to failed to validation OR on receiving a BGPv4 Update");
         info->val_res_BGPSEC = SRx_RESULT_INVALID;
       }
       else /* iBGP */

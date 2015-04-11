@@ -2,7 +2,7 @@
 !
 ! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sampleSRx,v 4.1 2014/12/03 16:53:29 ob Exp $
+! $Id: bgpd.conf.sampleSRx,v 4.1 2015/04/20 15:55:38 ob Exp $
 !
 hostname bgpd
 password zebra
@@ -42,7 +42,7 @@ router bgp 7675
 
 ! Configure the address of the server and its port without connecting.
 ! srx set-server <host> <0..65535>
-  srx set-server 127.0.0.1 17900s
+  srx set-server 127.0.0.1 17900
 
 ! Connect the BGP server instance to the SRx server at the given location. The 
 !   preferred method to connect is using “srx set-server” to configure the srx 
@@ -302,7 +302,7 @@ router bgp 7675
 
 ! Specify type of BGPSEC connection
 ! ---------------------------------
-! neighbor 10.0.2.1 bgpsec (send|receive|both)
+! neighbor 10.0.2.1 bgpsec (snd|rec|both)
  neighbor 10.0.1.1 bgpsec both
 
 !
