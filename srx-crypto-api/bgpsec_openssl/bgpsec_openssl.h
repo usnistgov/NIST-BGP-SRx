@@ -1,4 +1,38 @@
-
+/**
+ * This software was developed at the National Institute of Standards and
+ * Technology by employees of the Federal Government in the course of
+ * their official duties. Pursuant to title 17 Section 105 of the United
+ * States Code this software is not subject to copyright protection and
+ * is in the public domain.
+ *
+ * NIST assumes no responsibility whatsoever for its use by other parties,
+ * and makes no guarantees, expressed or implied, about its quality,
+ * reliability, or any other characteristic.
+ *
+ * We would appreciate acknowledgment if the software is used.
+ *
+ * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
+ * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM THE USE OF THIS SOFTWARE.
+ *
+ * This plugin provides an OpenSSL ECDSA implementation for BGPSEC.
+ *
+ * @version 0.1.2.1
+ *
+ * ChangeLog:
+ * -----------------------------------------------------------------------------
+ *   0.1.2.1 - 2016/02/09 - oborchert
+ *             * removed key loading functions, code is provided by srxcryptoapi
+ *           - 2016/02/04 - kyehwanl
+ *             * deprecated codes removed
+ *   0.1.2.0 - 2015/12/03 - oborchert
+ *             * moved location of srxcryptoapi.h
+ *           - 2015/09/22 - oborchert
+ *             * Added ChangeLog to file.
+ *             * Modified macro IS_DEBUG_ENABLED
+ *   0.1.0.0 - 2015 - kyehwanl
+ *             * Created File.
+ */
 #ifndef _BGPSEC_OPENSSL_H
 #define _BGPSEC_OPENSSL_H
 
@@ -12,7 +46,7 @@
 #endif
 
 #include <sys/types.h>
-#include "../srxcryptoapi.h"
+#include "../srx/srxcryptoapi.h"
 #include <stdarg.h>
 #include <string.h>
 
@@ -23,41 +57,28 @@
 #include <openssl/err.h>
 
 /* Macro Definitions */
-#define API_BGPSEC_VERIFY_SUCCESS       0
-#define API_BGPSEC_VERIFY_ERROR         1
-#define API_BGPSEC_VERIFY_FAILURE       2
+#define API_BGPSEC_VERIFY_SUCCESS       1
+#define API_BGPSEC_VERIFY_ERROR         -1
+#define API_BGPSEC_VERIFY_FAILURE       0
 
 #define API_BGPSEC_SUCCESS 0
 #define API_BGPSEC_FAILURE -1
 
 #define API_BGPSEC_ALGO_ID_256          1
 #define API_BGPSEC_OPENSSL_ID_SHA256_ECDSA_P_256 NID_X9_62_prime256v1
-#define API_BGPSEC_DEFAULT_CURVE API_BGPSEC_ALGO_ID_256
-
-#define DEFAULT_KEYFILE_EXT   "key"
-#define DEFAULT_CERTFILE_EXT  "cert"
-#define DEFAULT_KEYBFILE_EXT  "key.bin"
-#define DEFAULT_CERTBFILE_EXT "cert.bin"
-
-#define API_DISABLE_LOAD_PRIV_KEY      0
-#define API_ENABLE_LOAD_PRIV_KEY       1
 
 #define BGPSEC_SKI_LENGTH           20
 #define BGPSEC_ALGO_ID              1
-#define BGPSEC_ALGO_ID_LENGTH       1
 #define BGPSEC_MAX_SIG_LENGTH       128
-#define BGPSEC_MAX_INFO_ATTR_LENGTH 0
-
+#define BGPSEC_AFI_LENGTH           1
 
 #define OCTET_SECURE_PATH_SEGMENT   6
 #define OCTET_SECURE_PATH_LEN       2
-#define OCTET_ALGORITHM_ID          1
-#define OCTET_SIG_BLOCK_LEN         2
-#define OCTET_SIGNATURE_LEN         2
 
 /* debug macro */
-#define TERM_DEBUG LOG_DEBUG//0x07
-#define IS_DEBUG_ENABLED (term_debug == (TERM_DEBUG))
+// #define TERM_DEBUG LOG_DEBUG//0x07
+// #define IS_DEBUG_ENABLED (term_debug == (TERM_DEBUG))
+#define IS_DEBUG_ENABLED (sca_getCurrentLogLevel() == LOG_DEBUG)
 
 #define RET_ID_OFFSET 1
 #define ID_NUM_MAX 32
@@ -88,23 +109,19 @@ int validate(BgpsecPathAttr *bpa, u_int16_t number_keys,
 
 int sign_with_key(BGPSecSignData* bgpsec_data, BGPSecKey* key);
 
-int sign_with_id(u_int16_t dataLength, u_int8_t* data, u_int8_t keyID,
-                      u_int16_t sigLen, u_int8_t* signature);
+int sign_with_id(BGPSecSignData* bgpsec_data, u_int8_t keyID);
 
 
 /*  function declaration for openssl related functions */
-int cl_BgpsecDoVerifySignature (u_int8_t *, int , EC_KEY    *, int , u_int8_t *, int );
-int cl_BgpsecSetEcKey(const char *, EC_KEY **, int , int );
-int cl_BgpsecSetEcPrivateKey(const char *, EC_KEY **, int );
-int cl_BgpsecSetEcPublicKey(const char *, EC_KEY **, int );
-int cl_BgpsecECDSA_Sign (u_int8_t *, int , EC_KEY *, u_int8_t *, int );
-EVP_PKEY * cl_GetPrivateKey(const char *);
-X509 * cl_GetPublicKey(const char *);
+int cl_BgpsecDoVerifySignature (u_int8_t *, int , EC_KEY *, u_int8_t *, int );
+int cl_BgpsecECDSA_Sign (u_int8_t *, int , EC_KEY *, u_int8_t *, int * );
 int cl_BgpsecVerify (BgpsecPathAttr *, u_int16_t , BGPSecKey** , void *, u_int32_t);
 int cl_BgpsecSanityCheck(BgpsecPathAttr *);
 int cl_SignParamSanityCheck(BGPSecSignData *, BGPSecKey *);
 unsigned char* cl_BgpsecOctetDigest(const unsigned char* , unsigned int , unsigned char* );
 int IS_DER_PRIVATE(unsigned char *p, unsigned short length);
+u_int8_t registerPublicKey(BGPSecKey* outKey);
+inline void printHex(int , unsigned char* );
 
 /*
    this structure is defined in 'ec_lcl.h',
@@ -147,6 +164,16 @@ struct prefix
   } u __attribute__ ((aligned (8)));
 };
 
+#include <sys/socket.h>
+/* AFI and SAFI type. */
+typedef u_int16_t afi_t;
+typedef u_int8_t safi_t;
+
+/* Address family numbers from RFC1700. */
+#define AFI_IP                    1
+#define AFI_IP6                   2
+#define AFI_MAX                   3
+#define SAFI_UNICAST              1
 
 /* hash data processing */
 //#include "bgpsec_openssl/uthash.h"

@@ -4,26 +4,35 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0.7
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2016/01/21 - kyehwanl
+ *            * added pthread cancel function for enabling keyboard interrupt
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *           * Removed unused variables.
+ *           * Replaced string comparison "==" with "strcmp(...)" in doShowRPKI
+ *           * Fixed bug in doShowRPKI which did use cmd in lieu of param.
+ *           * Fixed bug that prevented the recognition of broken telnet console
+ *             sessions.
+ *           * Changed internal functions to static
  * 0.3.0.7 - 2015/04/21 - oborchert
  *           * Modified the version output.
  * 0.3.0.0 - 2013/03/20 - oborchert
@@ -37,7 +46,7 @@
  *         - 2013/01/24 - oborchert
  *           * Modified command set-log to display the current log level if none
  *             is provided.
- *           * Removed uneccessary static statement from functions.
+ *           * Removed unnecessary static statement from functions.
  *           * extended the num-updates to also include the PC-updates
  *         - 2012/12/31 - oborchert
  *           * Added dump-ucache
@@ -52,15 +61,15 @@
 #include <string.h>
 #include <signal.h>
 
-#include "update_cache.h"
-#include "prefix_cache.h"
-#include "configuration.h"
-#include "console.h"
-#include "srx_server.h"
-#include "srx_packet_sender.h"
+#include "server/configuration.h"
+#include "server/console.h"
+#include "server/prefix_cache.h"
+#include "server/srx_server.h"
+#include "server/srx_packet_sender.h"
+#include "server/update_cache.h"
 #include "shared/srx_defs.h"
 
-// Needed for the reset command to allow sending resets to the rpki validation 
+// Needed for the reset command to allow sending resets to the rpki validation
 // caches
 #include "command_handler.h"
 #include "rpki_handler.h"
@@ -92,35 +101,35 @@ typedef enum {
   CST_VERSION = 4
 } ConsoleShowType;
 
-void* consoleLoop(void* selfPtr);
-bool sendToConsoleClient(SRXConsole* self, char* message, bool prompt);
-bool processConsoleCommand(SRXConsole* self, char* buffer, 
+static void* consoleLoop(void* selfPtr);
+static bool sendToConsoleClient(SRXConsole* self, char* message, bool prompt);
+static bool processConsoleCommand(SRXConsole* self, char* buffer,
                                    int buffLength);
-bool doProcessCommand(SRXConsole* self);
-void doHelp(SRXConsole* self, char* cmd, char* param);
-void doShowVersion(SRXConsole* self, char* cmd, char* param);
-void doClose(SRXConsole* self, char* cmd, char* param);
-bool doShutdown(SRXConsole* self, char* cmd, char* param);
-void doChangeLogLevel(SRXConsole* self, char* cmd, char* param);
+static bool doProcessCommand(SRXConsole* self);
+static void doHelp(SRXConsole* self, char* cmd, char* param);
+static void doShowVersion(SRXConsole* self, char* cmd, char* param);
+static void doClose(SRXConsole* self, char* cmd, char* param);
+static bool doShutdown(SRXConsole* self, char* cmd, char* param);
+static void doChangeLogLevel(SRXConsole* self, char* cmd, char* param);
 
-void doValCacheReset(SRXConsole* self, char* cmd, char* param);
-void doClearPrefixCache(SRXConsole* self, char* cmd, char* param);
+static void doValCacheReset(SRXConsole* self, char* cmd, char* param);
+static void doClearPrefixCache(SRXConsole* self, char* cmd, char* param);
 
-void doRtrSync(SRXConsole* self, char* cmd, char* param);
-void doRtrGoodbye(SRXConsole* self, char* cmd, char* param);
+static void doRtrSync(SRXConsole* self, char* cmd, char* param);
+static void doRtrGoodbye(SRXConsole* self, char* cmd, char* param);
 
-void doShow(SRXConsole* self, char* cmd, char* param, 
+static void doShow(SRXConsole* self, char* cmd, char* param,
             ConsoleShowType type);
 
-void doNumUpdates(SRXConsole* self, char* cmd, char* param);
-void doNumPrefixes(SRXConsole* self, char* cmd, char* param);
-void doNumProxies(SRXConsole* self, char* cmd, char* param);
+static void doNumUpdates(SRXConsole* self, char* cmd, char* param);
+static void doNumPrefixes(SRXConsole* self, char* cmd, char* param);
+static void doNumProxies(SRXConsole* self, char* cmd, char* param);
 
-void doCommandQueue(SRXConsole* self, char* cmd, char* param);
-void doDumpPCache(SRXConsole* self, char* cmd, char* param);
-void doDumpUCache(SRXConsole* self, char* cmd, char* param);
+static void doCommandQueue(SRXConsole* self, char* cmd, char* param);
+static void doDumpPCache(SRXConsole* self, char* cmd, char* param);
+static void doDumpUCache(SRXConsole* self, char* cmd, char* param);
 
-uint32_t hexToInt(char[]);
+static uint32_t hexToInt(char[]);
 
 char* CON_WELCOME_RESP = "\r\nWelcome to BGP-SRx!\r\n"
                          "=======================================\r\n";
@@ -215,7 +224,7 @@ char* CON_CLOSE_RESP = "Goodbye!\r\n";
 char* CON_LOGL_CMD   = "log-level";
 
 char* CON_SHUT_CMD      = "shutdown";
-char* CON_SHUT_RESP_OK  = "Shutdown in progress...\r\nGoodbye!\r\n"; 
+char* CON_SHUT_RESP_OK  = "Shutdown in progress...\r\nGoodbye!\r\n";
 char* CON_SHUT_RESP_NOK = "Shutdown aborted, invalid password!\r\n";
 char* CON_RESET_VALCACHE_CMD = "reset-valcache";
 char* CON_EMPTY_ROACACHE_CMD = "empty-roacache";
@@ -252,12 +261,12 @@ const char* STR_QUESTIONMARK  = "????";
 
 /**
  * Used to allow displaying the result value as string.
- * 
+ *
  * @param resSrc The result source
- * 
+ *
  * @return the string representation
  */
-const char* getSRxResultStr(SRxValidationResultVal resVal)
+static const char* getSRxResultStr(SRxValidationResultVal resVal)
 {
   switch (resVal)
   {
@@ -273,12 +282,12 @@ const char* getSRxResultStr(SRxValidationResultVal resVal)
 
 /**
  * Used to allow displaying the result source value as string.
- * 
+ *
  * @param resSrc The result source
- * 
+ *
  * @return the string representation
  */
-const char* getSRxResultSrcStr(SRxResultSource resSrc)
+static const char* getSRxResultSrcStr(SRxResultSource resSrc)
 {
   switch (resSrc)
   {
@@ -295,15 +304,15 @@ const char* getSRxResultSrcStr(SRxResultSource resSrc)
  * Create the server console and binds to the server port.
  * @param self The Console itself.
  * @param port The server port to listen on.
- * @param sysConfig The system configuration 
+ * @param sysConfig The system configuration
  * @param shutDown The shutdown method.
  * @param rpkiHandler The instance of the rpkiHandler.
  * @param commandHandler The command handler of the application.
- * 
+ *
  * @return true if the console could be established and bound to the port.
  */
-bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown, 
-                   Configuration* sysConfig, RPKIHandler* rpkiHandler, 
+bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown,
+                   Configuration* sysConfig, RPKIHandler* rpkiHandler,
                    CommandHandler* commHandler)
 {
   int ret = 1;
@@ -319,7 +328,7 @@ bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown,
   self->param          = malloc(INITIAL_BUFFER_SIZE);
   memset(self->cmd,   '\0', INITIAL_BUFFER_SIZE);
   memset(self->param, '\0', INITIAL_BUFFER_SIZE);
-  
+
   struct sockaddr_in srvAddr;
   int yes = 1;
 
@@ -337,24 +346,24 @@ bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown,
   srvAddr.sin_addr.s_addr = INADDR_ANY; // inet_pton
   srvAddr.sin_port = htons(port);
 
-  // Inserted to be able to restart after crash without having to wait for the 
+  // Inserted to be able to restart after crash without having to wait for the
   // socket to be released by the OS.
   setsockopt(self->srvSockFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof (yes));
 
-  if (bind(self->srvSockFd, (struct sockaddr*)&srvAddr, 
+  if (bind(self->srvSockFd, (struct sockaddr*)&srvAddr,
            sizeof (struct sockaddr_in)) < 0)
   {
     RAISE_ERROR("Failed to bind the socket to the address");
     close(self->srvSockFd);
     return false;
   }
-  
-  ret = pthread_create(&self->consoleThread, NULL, consoleLoop, (void*)self);  
+
+  ret = pthread_create(&self->consoleThread, NULL, consoleLoop, (void*)self);
   if (ret > 0)
   {
     RAISE_ERROR("Failed to create the console Thread!");
     close(self->srvSockFd);
-    return false;    
+    return false;
   }
 
   LOG(LEVEL_INFO, "Server console on port [%u] created.", port);
@@ -363,25 +372,25 @@ bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown,
 
 /**
  * Stops and releases the server console.
- * 
+ *
  * @param self the server console.
- * 
- * @return ture if the server console could be stopped. 
+ *
+ * @return ture if the server console could be stopped.
  */
 bool releaseConsole(SRXConsole* self)
 {
   bool retVal = true;
-  
+
   if (self->keepGoing)
   {
     // prepare the server thread to stop
     self->keepGoing = false;
     // Close the server socket
     close(self->srvSockFd);
-    
-    retVal = pthread_join(self->consoleThread, NULL);
+
+    retVal = pthread_cancel(self->consoleThread);
   }
-  
+
   free(self->cmd);
   free(self->param);
 
@@ -390,32 +399,34 @@ bool releaseConsole(SRXConsole* self)
 
 /**
  * Keeps the console open. Once this method comes back the console is closed.
- * 
+ *
  * @param selfPtr The pointer to the console instance.
  */
-void* consoleLoop(void* selfPtr)
+static void* consoleLoop(void* selfPtr)
 {
   SRXConsole* self = (SRXConsole*)selfPtr;
   socklen_t clientLen;
   struct sockaddr_in clientAddr;
 
-  int buffLength = MIN_CONSOLE_BUFFER;  
-  char* buffer = malloc(buffLength); 
- 
-  int bytesRead, bytesSend;
-  
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
+  int buffLength = MIN_CONSOLE_BUFFER;
+  char* buffer = malloc(buffLength);
+
+  int bytesRead;
+
   listen(self->srvSockFd,1);
   clientLen = sizeof(clientAddr);
-  
+
   bool keepSession;
 
-  LOG (LEVEL_DEBUG, "([0x%08X]) > SRx Server Console Thread started!", 
-                    pthread_self());    
-  
+  LOG (LEVEL_DEBUG, "([0x%08X]) > SRx Server Console Thread started!",
+                    pthread_self());
+
   while(self->keepGoing)
-  { 
-    self->clientSockFd = accept(self->srvSockFd, 
-                                (struct sockaddr *) &clientAddr, 
+  {
+    self->clientSockFd = accept(self->srvSockFd,
+                                (struct sockaddr *) &clientAddr,
                                 &clientLen);
     if (self->clientSockFd < 0)
     {
@@ -423,23 +434,30 @@ void* consoleLoop(void* selfPtr)
     }
     else
     {
-      LOG(LEVEL_DEBUG, CP1 "New console connection established!", 
+      LOG(LEVEL_DEBUG, CP1 "New console connection established!",
                        self->clientSockFd);
       bytesRead = 0;
       keepSession = sendToConsoleClient(self, CON_WELCOME_RESP, true);
       while (keepSession)
-      {                
+      {
         bzero(buffer, buffLength);
-        bytesRead = read(self->clientSockFd, buffer, buffLength);        
-        if (bytesRead < 0)
+        bytesRead = read(self->clientSockFd, buffer, buffLength);
+        if (bytesRead <= 0)
         {
           keepSession = false;
-          LOG(LEVEL_INFO, "Error reading console data, close connection!");
+          if (bytesRead != 0)
+          {
+            LOG(LEVEL_INFO, "Error reading console data, close connection!");
+          }
+          else
+          {
+            LOG(LEVEL_INFO, "Peer closed connection!");
+          }
         }
         else
         {
           // Shorten \r\n\t and white space
-          while (    (buffer[bytesRead] == '\n') 
+          while (    (buffer[bytesRead] == '\n')
                   || (buffer[bytesRead] == '\r')
                   || (buffer[bytesRead] == ' ')
                   || (buffer[bytesRead] == '\t'))
@@ -447,30 +465,30 @@ void* consoleLoop(void* selfPtr)
             bytesRead--;
           }
           keepSession = processConsoleCommand(self, buffer, bytesRead);
-        }        
+        }
       }
     }
     close (self->clientSockFd);
   }
   free (buffer);
-  
-  LOG (LEVEL_DEBUG, "([0x%08X]) > SRx Server Console Thread stopped!", 
+
+  LOG (LEVEL_DEBUG, "([0x%08X]) > SRx Server Console Thread stopped!",
                     pthread_self());
-  
+
   pthread_exit(0);
 }
 
 /**
  * This function processes the console command.
- * 
+ *
  * @param self The pointer to the console.
  * @param buffer The data buffer received from the client.
  * @param buffLength The length of data within the buffer.
- * 
- * @return false if the connection has to be closed. True, the connection has 
+ *
+ * @return false if the connection has to be closed. True, the connection has
  *               to be kept open.
  */
-bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
+static bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
 {
   char* strStart  = buffer;
   char* strPtr    = buffer;
@@ -479,36 +497,36 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
   int pos         = 0;
   bool retVal     = true;
   bool newCmd     = false;
-  
+
   // Determine if the telnet client needs \n in the message
   if (buffLength > 0)
   {
     if (buffLength > 1)
     {
-      self->prependNextLine =    (buffer[buffLength-1] != '\n') 
+      self->prependNextLine =    (buffer[buffLength-1] != '\n')
                               && (buffer[buffLength-2] != '\n');
     }
     else
     {
-      self->prependNextLine =    (buffer[buffLength-1] != '\n');      
+      self->prependNextLine =    (buffer[buffLength-1] != '\n');
     }
   }
   else
   {
     self->prependNextLine = true;
   }
-  
+
   // Not get the command and parameter
-  
-  // Find first non white character 
+
+  // Find first non white character
   while((pos < buffLength) && ((*strPtr == ' ') || (*strPtr == '\t')))
   {
     strPtr++; // skip all leading blanks.
     pos++;
-  }  
+  }
   strStart = strPtr;
   // now determine the length of the command
-  while((pos < buffLength) && (   (*strPtr != ' ' ) && (*strPtr != '\t') 
+  while((pos < buffLength) && (   (*strPtr != ' ' ) && (*strPtr != '\t')
                                && (*strPtr != '\n') && (*strPtr != '\r')))
   {
     cmdLen++; // calculate the cmd length
@@ -516,8 +534,8 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
     pos++;    // The position within the string buffer.
   }
   // Generate the memory needed for the command string
-  
-  // Check if a new command or the old one is to repeated! 
+
+  // Check if a new command or the old one is to repeated!
   if (strncmp(strStart, CON_LASTCMD_CMD, cmdLen) != 0)
   {
      // New command. adjust the buffer size if needed.
@@ -528,7 +546,7 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
     }
     newCmd = true;
   }
-  
+
   // If new command, write it into the command field.
   if (newCmd)
   {
@@ -538,9 +556,9 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
   }
   // now redetermine the command length
   cmdLen = strlen(self->cmd);
-  
+
   // Now move the pointer to the first parameter
-  while((pos < buffLength) && (   (*strPtr == ' ' ) || (*strPtr == '\t') 
+  while((pos < buffLength) && (   (*strPtr == ' ' ) || (*strPtr == '\t')
                                || (*strPtr == '\n') || (*strPtr == '\r')))
   {
     strPtr++; // skip all leading blanks.
@@ -548,7 +566,7 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
   }
   // Set the string start to the parameter (if it exists that is)
   strStart = strPtr;
-  
+
   // now determine the length of the parameters
   while((pos < buffLength) && ((*strPtr != '\n') && (*strPtr != '\r')))
   {
@@ -557,11 +575,11 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
     pos++;
   }
 
-  // In case it is not a new parameter => the repeat command "!!" and the 
+  // In case it is not a new parameter => the repeat command "!!" and the
   // parameter length is 0 then use the previous parameter
   if (paramLen > 0)
   {
-    // Determine if the parameter buffer is big enough or if it has to be 
+    // Determine if the parameter buffer is big enough or if it has to be
     // adjusted
     if (self->paramBuffSize < (paramLen+1))
     {
@@ -572,11 +590,11 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
     memcpy(self->param, strStart, paramLen);
   }
   else if (newCmd)
-  { 
+  {
     // new Command and no parameter, clear the parameter buffer
-    memset(self->param, '\0', self->paramBuffSize);    
+    memset(self->param, '\0', self->paramBuffSize);
   }
-  
+
   if (cmdLen > 0)
   {
     retVal = doProcessCommand(self);
@@ -585,26 +603,26 @@ bool processConsoleCommand(SRXConsole* self, char* buffer, int buffLength)
   {
     sendToConsoleClient(self, "", true);
   }
-  
+
   return retVal;
 }
 
 /**
  * Send the given string using the provided file descriptor.
- * 
+ *
  * @param self The server console
  * @param message The message to be send.
  * @param prompt Add the prompt at the end or just '\r\n'.
- * 
+ *
  * @return true if the data could be send, otherwise false.
  */
-bool sendToConsoleClient(SRXConsole* self, char* message, bool prompt)
+static bool sendToConsoleClient(SRXConsole* self, char* message, bool prompt)
 {
   int noBytes = strlen(message);
   bool retVal = false;
-  char* end = self->prependNextLine ? (prompt ? "\n" CP1_PROMPT 
+  char* end = self->prependNextLine ? (prompt ? "\n" CP1_PROMPT
                                               : "\n" CP1_NOPROMPT)
-                                    : (prompt ? CP2_PROMPT 
+                                    : (prompt ? CP2_PROMPT
                                               : CP2_NOPROMPT);
   if (write(self->clientSockFd, message, noBytes) == noBytes)
   {
@@ -616,31 +634,31 @@ bool sendToConsoleClient(SRXConsole* self, char* message, bool prompt)
 
 /**
  * Answer to client that the provided command is not supported yet!.
- * 
+ *
  * @param self The console instance
- * 
+ *
  * @return true if the data could be send, otherwise false.
  */
-bool cmdNotSupportedYet(SRXConsole* self)
-{  
+static bool cmdNotSupportedYet(SRXConsole* self)
+{
   return sendToConsoleClient(self, CON_NOTSUPPORTED_CMD, true);
 }
 
 /**
  * Process the given command.
- * 
+ *
  * @param self The command console.
  * @param cmd The command (NOT NULL).
  * @param param The parameter (NOT NULL).
- * 
+ *
  * @return false the session has to be closed, otherwise true.
  */
-bool doProcessCommand(SRXConsole* self)
+static bool doProcessCommand(SRXConsole* self)
 {
   bool retVal = true;
   char* cmd  = self->cmd;
   char*param = self->param;
-  
+
   if (cmd == NULL)
   {
     RAISE_SYS_ERROR("console Command MUST not be NULL!");
@@ -651,18 +669,18 @@ bool doProcessCommand(SRXConsole* self)
     RAISE_SYS_ERROR("Console Parameter MUST not be NULL!");
     return false;
   }
-  
+
   int cmdLen = strlen(cmd);
 
   // Now check what was received
   // HELP RECEIVED
-  if (    (cmdLen == strlen(CON_HELP_CMD)) 
+  if (    (cmdLen == strlen(CON_HELP_CMD))
        && (strncmp(CON_HELP_CMD, cmd, cmdLen)==0))
   {
     doHelp(self, cmd, param);
   }
   // show-version received
-  else if (    (cmdLen == strlen(CON_VERSION_CMD)) 
+  else if (    (cmdLen == strlen(CON_VERSION_CMD))
        && (strncmp(CON_VERSION_CMD, cmd, cmdLen)==0))
   {
     doShow(self, cmd, param, CST_VERSION);
@@ -707,13 +725,13 @@ bool doProcessCommand(SRXConsole* self)
             && (strncmp(CON_RESET_VALCACHE_CMD, cmd, cmdLen)==0))
   {
     doValCacheReset(self, cmd, param);
-  }    
+  }
   // CLEAR INTERNAL VALIDATION CACHE
   else if (    (cmdLen == strlen(CON_EMPTY_ROACACHE_CMD))
             && (strncmp(CON_EMPTY_ROACACHE_CMD, cmd, cmdLen)==0))
   {
     doClearPrefixCache(self, cmd, param);
-  }      
+  }
   // GOODBYE RECEIVED
   else if (    (cmdLen == strlen(CON_RTR_GOODBYE_CMD))
             && (strncmp(CON_RTR_GOODBYE_CMD, cmd, cmdLen)==0))
@@ -777,20 +795,20 @@ bool doProcessCommand(SRXConsole* self)
   else if (    (cmdLen == strlen(CON_DUMP_PCACHE_CMD))
             && (strncmp(CON_DUMP_PCACHE_CMD, cmd, cmdLen)==0))
   {
-    doDumpPCache(self, cmd, param);    
+    doDumpPCache(self, cmd, param);
   }
   // dump the update cache
   else if (    (cmdLen == strlen(CON_DUMP_UCACHE_CMD))
             && (strncmp(CON_DUMP_UCACHE_CMD, cmd, cmdLen)==0))
   {
-    doDumpUCache(self, cmd, param);    
+    doDumpUCache(self, cmd, param);
   }
-  
+
   else
   {
     sendToConsoleClient(self, CON_UNKNOWN_CMD, true);
   }
-    
+
   return retVal;
 }
 
@@ -800,14 +818,14 @@ bool doProcessCommand(SRXConsole* self)
 
 /**
  * Processes the help command and displays the commands available.
- * 
+ *
  * @param self The Console instance
  * @param cmd The help command
  * @param param The help parameter
- * 
+ *
  * @return true if the command was processed properly.
  */
-void doHelp(SRXConsole* self, char* cmd, char* param)
+static void doHelp(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   sendToConsoleClient(self, CON_HELP_RESP, true);
@@ -815,53 +833,53 @@ void doHelp(SRXConsole* self, char* cmd, char* param)
 
 /**
  * Processes the help command and displays the commands available.
- * 
+ *
  * @param self The Console instance
  * @param cmd The help command
  * @param param The help parameter
- * 
+ *
  * @return true if the command was processed properly.
  */
-void doShowVersion(SRXConsole* self, char* cmd, char* param)
+static void doShowVersion(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   char out[256];
   memset(out, '\0', 256);
   sprintf (out, "SRx-Server Version%s\r\n", SRX_SERVER_FULL_VER);
-  sendToConsoleClient(self, out, true);    
+  sendToConsoleClient(self, out, true);
 }
 
 /**
  * The console closes, send a goodbye.
- * 
+ *
  * @param self The console itself
  * @param cmd The console command
  * @param param The command parameter
  */
-void doClose(SRXConsole* self, char* cmd, char* param)
+static void doClose(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
-  sendToConsoleClient(self, CON_CLOSE_RESP, true);  
+  sendToConsoleClient(self, CON_CLOSE_RESP, true);
 }
 
 /**
  * Checks if a shutdown is allowed. If so the return value is true, otherwise it
- * if false. In case a shutdown is allowed the shutdown flag of the console 
+ * if false. In case a shutdown is allowed the shutdown flag of the console
  * instance is set to true.
- * 
+ *
  * @param self The console instance.
  * @param cmd The shutdown command
  * @param param The password that must match the configuration password.
- * 
+ *
  * @return true if a shutdown can be performed.
  */
-bool doShutdown(SRXConsole* self, char* cmd, char* param)
+static bool doShutdown(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   bool retVal = true;
-  char* pwd = self->sysConfig->console_password == NULL 
+  char* pwd = self->sysConfig->console_password == NULL
         ? "\0" : self->sysConfig->console_password;
-  
+
   if (   (strlen(param) == strlen(pwd))
       && (strncmp(param, pwd, strlen(pwd)) == 0))
   {
@@ -889,28 +907,28 @@ bool doShutdown(SRXConsole* self, char* cmd, char* param)
                               "         Incident is logged!\r\n", true);
     retVal = false;
   }
-  
+
   return retVal;
 }
 
 /**
  * Change or display the current log-level of the SRx server.
- * 
+ *
  * @param self The console itself.
  * @param cmd the console command.
  * @param param The parameter of the command.
  */
-void doChangeLogLevel(SRXConsole* self, char* cmd, char* param)
+static void doChangeLogLevel(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   char* changed    = "LogLevel changed to %u!\r\n%s";
   char* invalid    = "Invalid LogLevel '%s'!\r\n%s";
   char* current    = "Current Level: %u - %s\r\n%s";
   char* legend     = "  [3=ERROR, 4=WARNING, 5=NOTICE, 6=INFO, 7=DEBUG]\r\n";
-  
+
   char buffer[256];
   memset(buffer, '\0', 256);
-  
+
   if (strlen(param) > 0)
   {
     switch (*param)
@@ -933,7 +951,7 @@ void doChangeLogLevel(SRXConsole* self, char* cmd, char* param)
     LogLevel ll = getLogLevel();
     switch (ll)
     {
-      case LEVEL_ERROR: 
+      case LEVEL_ERROR:
         levelStr = "ERROR";
         break;
       case LEVEL_WARNING:
@@ -949,9 +967,9 @@ void doChangeLogLevel(SRXConsole* self, char* cmd, char* param)
         levelStr = "DEBUG";
         break;
       default:
-        levelStr = "**INVALID**";       
+        levelStr = "**INVALID**";
     }
-      
+
     sprintf(buffer, current, ll, levelStr, legend);
   }
   sendToConsoleClient(self, buffer, true);
@@ -959,12 +977,12 @@ void doChangeLogLevel(SRXConsole* self, char* cmd, char* param)
 
 /**
  * Send a reset query to the validation cache.
- * 
+ *
  * @param self The console
  * @param cmd the rpki-clear command
  * @param param zero length/
  */
-void doValCacheReset(SRXConsole* self, char* cmd, char* param)
+static void doValCacheReset(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   char* message = NULL;
@@ -980,38 +998,38 @@ void doValCacheReset(SRXConsole* self, char* cmd, char* param)
   {
     message = "ERROR: Could not send reset query to RPKI validation cache!\r\n";
   }
-  sendToConsoleClient(self, message, true);    
+  sendToConsoleClient(self, message, true);
 }
 
 /**
- * This method initiates the reset of prefix cache. After the reset the cache 
+ * This method initiates the reset of prefix cache. After the reset the cache
  * is empty.
- * 
+ *
  * @param self The console
  * @param cmd the console command
  * @param param The command parameter.
  */
-void doClearPrefixCache(SRXConsole* self, char* cmd, char* param)
+static void doClearPrefixCache(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   //cmdNotSupportedYet(self);
-  
-  sendToConsoleClient(self, "Start resetting the complete rpki cache!\r\n", 
+
+  sendToConsoleClient(self, "Start resetting the complete rpki cache!\r\n",
                       false);
   emptyCache(self->rpkiHandler->prefixCache);
-  sendToConsoleClient(self, "Reset of RPKI prefix cache done.!\r\n", 
-                      true);  
+  sendToConsoleClient(self, "Reset of RPKI prefix cache done.!\r\n",
+                      true);
 }
 
 /**
  * Send a synchronization request to all attached router/proxy clients.
- * 
+ *
  * @param self THe console itself
  * @param cmd The command parameter
  * @param param The parameter itself.
  */
-void doRtrSync(SRXConsole* self, char* cmd, char* param)
-{  
+static void doRtrSync(SRXConsole* self, char* cmd, char* param)
+{
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   ServerSocket srvSock = self->commandHandler->svrConnHandler->svrSock;
 
@@ -1021,10 +1039,10 @@ void doRtrSync(SRXConsole* self, char* cmd, char* param)
   if (self->commandHandler->svrConnHandler->clients.size > 0)
   {
     // Walk through the list of proxies
-    FOREACH_SLIST(&self->commandHandler->svrConnHandler->clients, cnode) 
+    FOREACH_SLIST(&self->commandHandler->svrConnHandler->clients, cnode)
     {
       clientPtr = (ServerClient**)getDataOfSListNode(cnode);
-      if (clientPtr != NULL) 
+      if (clientPtr != NULL)
       {
         if (!sendSynchRequest(&srvSock, clientPtr, false))
         {
@@ -1033,49 +1051,49 @@ void doRtrSync(SRXConsole* self, char* cmd, char* param)
       }
     }
     sendToConsoleClient(self, "Send out synchronization request to all "
-                        "clients!\r\n", true);  
+                        "clients!\r\n", true);
   }
   else
   {
-    sendToConsoleClient(self, "No routers are connected, sync aborted!\r\n", 
+    sendToConsoleClient(self, "No routers are connected, sync aborted!\r\n",
                         true);
-  }  
+  }
 }
 
 /**
  * Disconnect the proxy client.
- * 
+ *
  * @param self The console itself.
  * @param cmd The command.
  * @param param the command parameter.
  */
-void doRtrGoodbye(SRXConsole* self, char* cmd, char* param)
+static void doRtrGoodbye(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "goodbye %s", self->clientSockFd, param);
-  
+
   // Will be disabled due to BUG, scheduled for 0.3.1 see BZ290
-  sendToConsoleClient(self, "Disabled in this version!!\r\n", true);  
+  sendToConsoleClient(self, "Disabled in this version!!\r\n", true);
   return;
-  
-  
+
+
   ServerSocket srvSock = self->commandHandler->svrConnHandler->svrSock;
-  
+
   SListNode*      cnode;
   ServerClient**  clientPtr;
 
  if (self->commandHandler->svrConnHandler->clients.size > 0)
   {
     // Walk through the list of proxies
-    FOREACH_SLIST(&self->commandHandler->svrConnHandler->clients, cnode) 
+    FOREACH_SLIST(&self->commandHandler->svrConnHandler->clients, cnode)
     {
       clientPtr = (ServerClient**)getDataOfSListNode(cnode);
-      if (clientPtr != NULL) 
+      if (clientPtr != NULL)
       {
-        sendGoodbye(&srvSock, *clientPtr, false);        
+        sendGoodbye(&srvSock, *clientPtr, false);
       }
     }
     sendToConsoleClient(self, "Send out goodbye request to all"
-                        "clients!\r\n", true);  
+                        "clients!\r\n", true);
   }
 
   //cmdNotSupportedYet(self);
@@ -1083,52 +1101,51 @@ void doRtrGoodbye(SRXConsole* self, char* cmd, char* param)
 
 /**
  * Get update information for the given AS and display it.
- * 
+ *
  * @param self The console instance
  * @param asn The as number all updates have to be displayed for.
  */
-void doShowUpdateAS(SRXConsole* self, uint32_t asn)
-
+static void doShowUpdateAS(SRXConsole* self, uint32_t asn)
 {
-  cmdNotSupportedYet(self);  
+  cmdNotSupportedYet(self);
 }
 
 /**
  * Get update information for the given prefix and displays it.
- * 
+ *
  * @param self The console instance
  * @param prefixStr The prefix all updates have to be displayed for.
  */
-void doShowUpdatePrefix(SRXConsole* self, char* prefixStr)
-{  
-  cmdNotSupportedYet(self);  
+static void doShowUpdatePrefix(SRXConsole* self, char* prefixStr)
+{
+  cmdNotSupportedYet(self);
 }
 
 /**
- * This method looks for all (max) number of ROAS that render this update 
- * valid.  Check all parent nodes plus this one for covering roa's until roa 
+ * This method looks for all (max) number of ROAS that render this update
+ * valid.  Check all parent nodes plus this one for covering roa's until roa
  * match number is met.
- * 
+ *
  * @param msgPtr The message string where to write the data into.
  * @param updAS The origin as of the update.
  * @param prefixLen The length of the prefix.
- * @param currentPrefix The current pc-prefix to examine for roas that cover the 
+ * @param currentPrefix The current pc-prefix to examine for roas that cover the
  *                      given prefix length.
  * @param missingROAs The number of remaining ROAs that cover the prefix.
  * @param noLines the number of lines to be printed.
- * 
+ *
  * @return The msgPtr
  */
-char* _showROACoverage_VALID(char* msgPtr, uint32_t updAS, 
-                             uint8_t prefixLen, PC_Prefix* currentPrefix,  
-                             uint16_t missingROAs, int noLines)
+static char* _showROACoverage_VALID(char* msgPtr, uint32_t updAS,
+                                    uint8_t prefixLen, PC_Prefix* currentPrefix,
+                                    uint16_t missingROAs, int noLines)
 {
   SListNode* asListNode;
   SListNode* roaListNode;
-    
+
   PC_AS*  pcAS;
   PC_ROA* pcROA;
-  
+
   // Check each as in the current prefix.
   FOREACH_SLIST(&currentPrefix->asn, asListNode)
   {
@@ -1139,19 +1156,19 @@ char* _showROACoverage_VALID(char* msgPtr, uint32_t updAS,
     }
     else
     {
-      pcAS = (PC_AS*)asListNode->data;      
+      pcAS = (PC_AS*)asListNode->data;
       // Check if the As contains ROAs and if the ROAs cover this update
       FOREACH_SLIST(&pcAS->roas, roaListNode)
       {
         // Check if this ROA covers any update
         pcROA = (PC_ROA*)roaListNode->data;
         if (pcROA->update_count > 0)
-        {          
+        {
           // Check each roa if the max length covers the update
           if (prefixLen <= pcROA->max_len)
-          { 
+          {
             msgPtr += sprintf(msgPtr, "                   AS(%i), "
-                             "Prefix (%s/%u-%u), ROACount %i\r\n", updAS, 
+                             "Prefix (%s/%u-%u), ROACount %i\r\n", updAS,
                              ipOfPrefix_tToStr(currentPrefix->treeNode->prefix),
                              currentPrefix->treeNode->prefix->bitlen,
                              pcROA->max_len, pcROA->roa_count);
@@ -1159,17 +1176,17 @@ char* _showROACoverage_VALID(char* msgPtr, uint32_t updAS,
             noLines--;
           }
         }
-      }        
+      }
       //asListNode->data
     }
   }
-  
+
   if ((missingROAs * noLines) > 0)
   {
     currentPrefix = getParent(currentPrefix->treeNode);
     if (currentPrefix != NULL)
     {
-      msgPtr = _showROACoverage_VALID(msgPtr, updAS, prefixLen, currentPrefix, 
+      msgPtr = _showROACoverage_VALID(msgPtr, updAS, prefixLen, currentPrefix,
                                       missingROAs, noLines);
     }
   }
@@ -1177,31 +1194,31 @@ char* _showROACoverage_VALID(char* msgPtr, uint32_t updAS,
   {
     msgPtr += sprintf(msgPtr, "                  %u additional ROA's do "
                               "cover this prefix!\r\n",  missingROAs);
-    
+
   }
-  
+
   return msgPtr;
 }
 
 /**
- * This method looks for all (max) number of ROAS that render this update 
- * invalid.  Check all parent nodes plus this one for covering roa's until roa 
+ * This method looks for all (max) number of ROAS that render this update
+ * invalid.  Check all parent nodes plus this one for covering roa's until roa
  * match number is met.
- * 
+ *
  * @param self The Console itself
  * @param pcUpdate The Update.
- * 
+ *
  * @return The msgPtr
  */
-char* _showROACoverage_INVALID(char* msgPtr, uint8_t prefixLen,
-                               PC_Prefix* currentPrefix, int noLines)
+static char* _showROACoverage_INVALID(char* msgPtr, uint8_t prefixLen,
+                                      PC_Prefix* currentPrefix, int noLines)
 {
   SListNode* asListNode;
   SListNode* roaListNode;
-    
+
   PC_AS*  pcAS;
   PC_ROA* pcROA;
-  
+
   if (currentPrefix->state_of_other == SRx_RESULT_NOTFOUND)
   {
     // This as well as all prefixes above are not covered by any prefix.
@@ -1227,23 +1244,23 @@ char* _showROACoverage_INVALID(char* msgPtr, uint8_t prefixLen,
         pcROA = (PC_ROA*)roaListNode->data;
         // Check each roa if the max length covers the update
         msgPtr += sprintf(msgPtr, "                   AS(%i), "
-                         "Prefix (%s/%u-%u), ROACount %i\r\n", pcROA->as, 
+                         "Prefix (%s/%u-%u), ROACount %i\r\n", pcROA->as,
                          ipOfPrefix_tToStr(currentPrefix->treeNode->prefix),
                          currentPrefix->treeNode->prefix->bitlen,
                          pcROA->max_len, pcROA->roa_count);
         noLines--;
-      }        
+      }
       //asListNode->data
     }
   }
-  
+
   // If more lines are allowed, go up to parent prefix
   if (noLines > 0)
   {
     currentPrefix = getParent(currentPrefix->treeNode);
     if (currentPrefix != NULL)
     {
-      msgPtr = _showROACoverage_INVALID(msgPtr, prefixLen, currentPrefix, 
+      msgPtr = _showROACoverage_INVALID(msgPtr, prefixLen, currentPrefix,
                                         noLines);
     }
   }
@@ -1252,36 +1269,36 @@ char* _showROACoverage_INVALID(char* msgPtr, uint8_t prefixLen,
     msgPtr += sprintf(msgPtr, "                   More covered ROA's"
                       " might exist...\r\n");
   }
-  
-  return msgPtr;  
+
+  return msgPtr;
 }
 
 /**
  * This method scans through the prefix tree and gathers all ROA information
  * related to the given update.
- * 
+ *
  * @param self The console itself
  * @param msg The message
  * @param update the Update.
  * @param resultType The ROA result of the update.
  * @param noLines Determine how many distinct ROAs (max) should be displayed!
  */
-void _showRoaCoverage(SRXConsole* self, SRxUpdateID updateID, 
-                      SRxValidationResultVal roaResultType, 
-                      uint16_t noLines)
+static void _showRoaCoverage(SRXConsole* self, SRxUpdateID updateID,
+                             SRxValidationResultVal roaResultType,
+                             uint16_t noLines)
 {
   uint32_t msgLen = 1024;
   char  msg[msgLen];
   memset(msg, '\0', msgLen);
   char* msgPtr = msg;
   PC_Update* pcUpdate = NULL;
-  
+
   msgPtr += sprintf(msgPtr, " -ROA Coverage...: ");
-      
+
   // Get the Update
   PrefixCache* pCache = self->rpkiHandler->prefixCache;
   SListNode* node = pCache->updates.root;
-  
+
   // Not very efficient but to be changed in version 0.3
   while ((node != NULL) && (pcUpdate == NULL))
   {
@@ -1293,7 +1310,7 @@ void _showRoaCoverage(SRXConsole* self, SRxUpdateID updateID,
     }
   }
   if (pcUpdate == NULL)
-  {        
+  {
     msgPtr += sprintf(msgPtr, "ERROR: No data found in prefix cache!\r\n");
   }
   else
@@ -1312,24 +1329,24 @@ void _showRoaCoverage(SRXConsole* self, SRxUpdateID updateID,
                                   "point!\r\n");
         break;
       case SRx_RESULT_VALID:
-        // Check all parent nodes plus this one for covering roa's until roa 
+        // Check all parent nodes plus this one for covering roa's until roa
         // match number is met.
         msgPtr += sprintf(msgPtr, "ROAs that render the update VALID...\r\n");
         pcPrefix = (PC_Prefix*)pcUpdate->treeNode->data;
-        msgPtr = _showROACoverage_VALID(msgPtr, pcUpdate->as, 
-                                        pcPrefix->treeNode->bit, pcPrefix, 
+        msgPtr = _showROACoverage_VALID(msgPtr, pcUpdate->as,
+                                        pcPrefix->treeNode->bit, pcPrefix,
                                         pcUpdate->roa_match, noLines);
         break;
       case SRx_RESULT_INVALID:
-        // Show all ROA's that render invalid.        
+        // Show all ROA's that render invalid.
         msgPtr += sprintf(msgPtr, "ROAs that render the update INVALID...\r\n");
         pcPrefix = (PC_Prefix*)pcUpdate->treeNode->data;
-        _showROACoverage_INVALID(msgPtr, pcPrefix->treeNode->bit, pcPrefix, 
+        _showROACoverage_INVALID(msgPtr, pcPrefix->treeNode->bit, pcPrefix,
                                  noLines);
         break;
-      default:        
-        msgPtr += sprintf(msgPtr, "??? Invalid validation result %u\r\n", 
-                          roaResultType);        
+      default:
+        msgPtr += sprintf(msgPtr, "??? Invalid validation result %u\r\n",
+                          roaResultType);
     }
   }
   sendToConsoleClient(self, msg, true);
@@ -1337,110 +1354,110 @@ void _showRoaCoverage(SRXConsole* self, SRxUpdateID updateID,
 
 /**
  * Get update information for the given AS and display it.
- * 
+ *
  * @param self The console instance
  * @param id The id of the update to be displayed.
- * @param noLines 
+ * @param noLines
  */
-void doShowUpdateID(SRXConsole* self, SRxUpdateID* updateID, uint16_t noLines)
+static void doShowUpdateID(SRXConsole* self, SRxUpdateID* updateID,
+                           uint16_t noLines)
 {
   if (*updateID == 0)
   {
-    sendToConsoleClient(self, "Error: Update ID other than 0 required!\r\n", 
+    sendToConsoleClient(self, "Error: Update ID other than 0 required!\r\n",
                         true);
   }
   else
   {
     UC_UpdateStatistics stat;
     SRxUpdateID uID = *updateID;
-    PC_Update* pcUpdate = NULL;
     stat.updateID = updateID;
     uint32_t maxNumPrexix = 10;
-     
+
     uint32_t msgLen = 2048;
     char  msg[msgLen];
     memset(msg, '\0', msgLen);
-    
+
     if (getUpdateData(self->commandHandler->updCache, &stat))
     {
-      
+
       char* msgPtr = msg;
       char prefixStr[MAX_PREFIX_STR_LEN_V6];
       uint8_t clients[self->commandHandler->updCache->minNumberOfClients];
       memset(clients, 0, self->commandHandler->updCache->minNumberOfClients);
-      int numClients = getClientIDsOfUpdate(self->commandHandler->updCache, 
-                            updateID, clients, 
+      int numClients = getClientIDsOfUpdate(self->commandHandler->updCache,
+                            updateID, clients,
                             self->commandHandler->updCache->minNumberOfClients);
       int idx = 0;
-              
+
       ipPrefixToStr (&(stat.prefix), prefixStr, MAX_PREFIX_STR_LEN_V6);
-      
-      sendToConsoleClient(self, "---------------------------------\r\n", false);      
-      
+
+      sendToConsoleClient(self, "---------------------------------\r\n", false);
+
       msgPtr += sprintf(msgPtr, "UpdateID.........: 0x%08X (%u)\r\n", uID, uID);
-      
-      // Also add the list of clients:            
-      msgPtr += sprintf(msgPtr, " -Clients........: %s", 
+
+      // Also add the list of clients:
+      msgPtr += sprintf(msgPtr, " -Clients........: %s",
                                 (numClients > 0 ? "" : "none\r\n"));
       for (idx = 0; idx < numClients; idx++)
       {
-        msgPtr += sprintf(msgPtr, "0x%02X%s", clients[idx], 
+        msgPtr += sprintf(msgPtr, "0x%02X%s", clients[idx],
                                  (idx < (numClients-1) ? ", " : "\r\n"));
       }
-      
+
       msgPtr += sprintf(msgPtr, " -AS.............: %u\r\n", stat.asn);
       msgPtr += sprintf(msgPtr, " -Prefix.........: %s\r\n", prefixStr);
       msgPtr += sprintf(msgPtr, " -ROA Count......: %u\r\n", stat.roa_count);
       msgPtr += sprintf(msgPtr, " -Prefix Origin..: ");
       if (stat.result.roaResult == SRx_RESULT_UNDEFINED)
       {
-        msgPtr += sprintf(msgPtr, "%s (default)\r\n", 
+        msgPtr += sprintf(msgPtr, "%s (default)\r\n",
                           getSRxResultStr(stat.defResult.result.roaResult));
       }
       else
       {
-        msgPtr += sprintf(msgPtr, "%s\r\n", 
-                          getSRxResultStr(stat.result.roaResult));        
+        msgPtr += sprintf(msgPtr, "%s\r\n",
+                          getSRxResultStr(stat.result.roaResult));
       }
-      msgPtr += sprintf(msgPtr, "  * Default......: %s\r\n", 
+      msgPtr += sprintf(msgPtr, "  * Default......: %s\r\n",
                       getSRxResultStr(stat.defResult.result.roaResult));
-      msgPtr += sprintf(msgPtr, "  * Source.......: %s\r\n", 
+      msgPtr += sprintf(msgPtr, "  * Source.......: %s\r\n",
                       getSRxResultSrcStr(stat.defResult.resSourceROA));
       msgPtr += sprintf(msgPtr, " -Path...........: ");
       if (stat.result.bgpsecResult == SRx_RESULT_UNDEFINED)
       {
-        msgPtr += sprintf(msgPtr, "%s (default)\r\n", 
+        msgPtr += sprintf(msgPtr, "%s (default)\r\n",
                           getSRxResultStr(stat.defResult.result.bgpsecResult));
       }
       else
       {
-        msgPtr += sprintf(msgPtr, "%s\r\n", 
-                        getSRxResultStr(stat.result.bgpsecResult));        
+        msgPtr += sprintf(msgPtr, "%s\r\n",
+                        getSRxResultStr(stat.result.bgpsecResult));
       }
-      msgPtr += sprintf(msgPtr, "  * Default......: %s\r\n", 
+      msgPtr += sprintf(msgPtr, "  * Default......: %s\r\n",
                       getSRxResultStr(stat.defResult.result.bgpsecResult));
-      msgPtr += sprintf(msgPtr, "  * Source.......: %s\r\n", 
+      msgPtr += sprintf(msgPtr, "  * Source.......: %s\r\n",
                       getSRxResultSrcStr(stat.defResult.resSourceBGPSEC));
-      
+
       sendToConsoleClient(self, msg, false);
       _showRoaCoverage(self, uID, stat.result.roaResult, maxNumPrexix);
     }
     else
     {
-      sprintf(msg, "Update [0x%08X] (%u) not found!\r\n", uID, uID);      
-      sendToConsoleClient(self, msg, true);      
+      sprintf(msg, "Update [0x%08X] (%u) not found!\r\n", uID, uID);
+      sendToConsoleClient(self, msg, true);
     }
-  }    
+  }
 }
 
 /**
  * Get update information for the given AS and display it.
- * 
+ *
  * @param self The console instance
  * @param param The parameter indicating what as to be counted.
  * @param type Determines which cache to examine, update cache or prefix cache.
  */
-void doShowCount(SRXConsole* self, char* param, ConsoleShowType type)
+static void doShowCount(SRXConsole* self, char* param, ConsoleShowType type)
 {
     if (strlen(param) == 0)
     {
@@ -1450,34 +1467,34 @@ void doShowCount(SRXConsole* self, char* param, ConsoleShowType type)
     else
     {
       cmdNotSupportedYet(self);
-    }    
-  
+    }
+
 }
 
 /**
  * Process the show-update .... command
- * 
+ *
  * @param self The console instance
  * @param cmd The command "show-update"
  * @param param The parameter used.
  */
-void doShowUpdate(SRXConsole* self, char* cmd, char* param)
-{  
+static void doShowUpdate(SRXConsole* self, char* cmd, char* param)
+{
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
-  
+
   char* strPtr = param;
   char* strStart = NULL;
   int   strLength = 0;
   int   strPos = 0;
-  
+
   if (strlen(param) == 0)
   {
-    sendToConsoleClient(self, "Error: sub command missing! See Help!\r\n", 
+    sendToConsoleClient(self, "Error: sub command missing! See Help!\r\n",
                         true);
-    
+
     return;
   }
-  
+
   // move chPtr to first character
   while ((*strPtr == ' ') || (*strPtr == '\t'))
   {
@@ -1486,11 +1503,11 @@ void doShowUpdate(SRXConsole* self, char* cmd, char* param)
   }
   strStart  = strPtr;
   strLength = 0;
-  
+
   while ((strLength < strlen(param)) && (*strPtr != ' ') && (*strPtr != '\t'))
   {
     strPtr++;
-    strLength++; 
+    strLength++;
   }
   char showCmd[strLength+1];
   memset (showCmd, 0, strLength+1);
@@ -1502,13 +1519,13 @@ void doShowUpdate(SRXConsole* self, char* cmd, char* param)
     strPtr++;
     strPos++;
   }
-  strStart  = strPtr; 
+  strStart  = strPtr;
   strLength = strlen(param)-strPos;
-  
+
   char showParam[strLength+1];
   memset (showParam, 0, strLength+1);
   memcpy(showParam, strStart, strLength);
-  
+
   if (strncmp(showCmd, "as", strlen(showCmd)) == 0)
   {
     doShowUpdateAS(self, (uint32_t)atoll(showParam));
@@ -1516,7 +1533,7 @@ void doShowUpdate(SRXConsole* self, char* cmd, char* param)
   else if (strncmp(showCmd, "prefix", strlen(showCmd)) == 0)
   {
     doShowUpdatePrefix(self, showParam);
-    
+
   }
   else if (strncmp(showCmd, "id", strlen(showCmd)) == 0)
   {
@@ -1532,23 +1549,32 @@ void doShowUpdate(SRXConsole* self, char* cmd, char* param)
   }
   else
   {
-    sendToConsoleClient(self, "Error: Show what ? (as, prefix, id, count)\r\n", 
+    sendToConsoleClient(self, "Error: Show what ? (as, prefix, id, count)\r\n",
                         true);
   }
 }
 
-void doShowRPKI(SRXConsole* self, char* cmd, char* param)
-{  
+/** Process the show-rpki command
+ *
+ * @param self The console itself
+ * @param cmd The command given
+ * @param param The commands parameters
+ *
+ */
+static void doShowRPKI(SRXConsole* self, char* cmd, char* param)
+{
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
-  if (cmd == "as")
+  int as = strcmp(param, "as");
+  printf("%i\n", as);
+  if (strcmp(param, "as") == 0)
   {
-    cmdNotSupportedYet(self);    
+    cmdNotSupportedYet(self);
   }
-  else if (cmd == "prefix")
+  else if (strcmp(param, "prefix") == 0)
   {
-    cmdNotSupportedYet(self);    
+    cmdNotSupportedYet(self);
   }
-  else if (cmd == "id")
+  else if (strcmp(param, "id") == 0)
   {
     if (strlen(param) == 0)
     {
@@ -1557,9 +1583,9 @@ void doShowRPKI(SRXConsole* self, char* cmd, char* param)
     else
     {
       cmdNotSupportedYet(self);
-    }    
+    }
   }
-  else if (cmd == "count")
+  else if (strcmp(param, "count") == 0)
   {
     if (strlen(param) == 0)
     {
@@ -1568,21 +1594,21 @@ void doShowRPKI(SRXConsole* self, char* cmd, char* param)
     else
     {
       cmdNotSupportedYet(self);
-    }    
-  }  
+    }
+  }
   else
   {
-    sendToConsoleClient(self, "Error: Show what ? (as, prefix, id, count)\r\n", 
+    sendToConsoleClient(self, "Error: Show what ? (as, prefix, id, count)\r\n",
                         true);
   }
 }
 
-void doShowSRX(SRXConsole* self, char* cmd, char* param)
+static void doShowSRX(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
-  
+
   Configuration* cfg = self->commandHandler->sysConfig;
-  
+
   char  str[1024];
   char* strPtr = str;
   // produce a \0 terminated string
@@ -1591,47 +1617,51 @@ void doShowSRX(SRXConsole* self, char* cmd, char* param)
   strPtr += sprintf(strPtr, "\r\nConfiguration:\r\n==============\r\n");
   strPtr += sprintf(strPtr, "port..................: %u\r\n", cfg->server_port);
   strPtr += sprintf(strPtr, "loglevel..............: %u\r\n", cfg->loglevel);
-  strPtr += sprintf(strPtr, "sync..................: %s\r\n", 
-                            cfg->syncAfterConnEstablished ? "true" : "false");  
+  strPtr += sprintf(strPtr, "sync..................: %s\r\n",
+                            cfg->syncAfterConnEstablished ? "true" : "false");
   strPtr += sprintf(strPtr, "rpki.host.............: %s\r\n", cfg->rpki_host);
   strPtr += sprintf(strPtr, "rpki.port.............: %u\r\n", cfg->rpki_port);
   strPtr += sprintf(strPtr, "bgpsec.host...........: %s\r\n", cfg->bgpsec_host);
   strPtr += sprintf(strPtr, "bgpsec.port...........: %u\r\n", cfg->bgpsec_port);
   strPtr += sprintf(strPtr, "console.port..........: %u\r\n",cfg->console_port);
   strPtr += sprintf(strPtr, "mode.no-sendque.......: %s\r\n",
-                       cfg->mode_no_sendqueue ? "true  (send queue turned off)" 
+                       cfg->mode_no_sendqueue ? "true  (send queue turned off)"
                                               : "false (send queue turned on)");
   strPtr += sprintf(strPtr, "mode.no-receivequeue..: %s\r\n",
-                 cfg->mode_no_receivequeue ? "true  (receive queue turned off)" 
+                 cfg->mode_no_receivequeue ? "true  (receive queue turned off)"
                                            : "false (receive queue turned on)");
   strPtr += sprintf(strPtr, "\r\n");
-  sendToConsoleClient(self, str, true);  
+  sendToConsoleClient(self, str, true);
 }
 
-void doShowProxies(SRXConsole* self, char* cmd, char* param)
+/**
+ * Process the show-proxies command.
+ *
+ * @param self The console itself
+ * @param cmd The command
+ * @param param The command parameters.
+ */
+static void doShowProxies(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
-  
-  int elements = 0;
+
   char str[256];
   // produce a \0 terminated string
   memset(str,'\0',256);
-  
-  // Number of inactive proxies
-  int inactive = 0;  
+
   int idx = 0;
   int mappings = self->commandHandler->svrConnHandler->noMappings;
   bool active  = false;
   bool precnf  = false;
   __time_t crashed = 0;
   uint32_t updates = 0;
-  int noClientsFound = 0;    
+  int noClientsFound = 0;
   sendToConsoleClient(self, "Display proxy mappings:\r\n", false);
   sendToConsoleClient(self, "=======================\r\n", false);
   uint32_t proxyID = 0;
-  
+
   while (idx < MAX_PROXY_CLIENT_ELEMENTS)
-  {    
+  {
     if (self->commandHandler->svrConnHandler->proxyMap[idx].proxyID != 0)
     {
       noClientsFound++;
@@ -1641,15 +1671,15 @@ void doShowProxies(SRXConsole* self, char* cmd, char* param)
       crashed = self->commandHandler->svrConnHandler->proxyMap[idx].crashed;
       updates = self->commandHandler->svrConnHandler->proxyMap[idx].updateCount;
       sprintf(str, "* %sClient[0x%02X](%3u): Proxy ID %03u.%03u.%03u.%03u "
-                   "[0x%08X](%010u) (%s/%s) - #updates=%u\r\n", 
+                   "[0x%08X](%010u) (%s/%s) - #updates=%u\r\n",
                    (mappings-- > 0 ? "" : "INVALID "), idx, idx,
-                   (proxyID >> 24) & 0xFF,  (proxyID >> 16) & 0xFF,  
-                   (proxyID >> 8) & 0xFF, proxyID & 0xFF, proxyID, proxyID, 
+                   (proxyID >> 24) & 0xFF,  (proxyID >> 16) & 0xFF,
+                   (proxyID >> 8) & 0xFF, proxyID & 0xFF, proxyID, proxyID,
                    (active ? " active" : crashed == 0 ? "-------"
-                                                     : "crashed"), 
+                                                     : "crashed"),
                    (precnf ? "pre-conf" : "dynamic "),
                    updates);
-      sendToConsoleClient(self, str, false);  
+      sendToConsoleClient(self, str, false);
       memset(str,'\0',256);
     }
     idx++;
@@ -1657,19 +1687,19 @@ void doShowProxies(SRXConsole* self, char* cmd, char* param)
   if (noClientsFound == 0)
   {
     sendToConsoleClient(self, "No proxy mappings registered!\r\n", false);
-  } 
-  sendToConsoleClient(self, "", true);  
+  }
+  sendToConsoleClient(self, "", true);
 }
 
 /**
  * Process the show-update .... command
- * 
+ *
  * @param self The console instance
  * @param cmd The command "show-update"
  * @param param The parameter used.
  * @param type The console show type (UPDATE or RPKI)
  */
-void doShow(SRXConsole* self, char* cmd, char* param, 
+static void doShow(SRXConsole* self, char* cmd, char* param,
                    ConsoleShowType type)
 {
   switch (type)
@@ -1687,7 +1717,7 @@ void doShow(SRXConsole* self, char* cmd, char* param,
       doShowProxies(self, cmd, param);
       break;
     case CST_VERSION:
-      doShowVersion(self, cmd, param);      
+      doShowVersion(self, cmd, param);
       break;
     default:
       break;
@@ -1695,14 +1725,14 @@ void doShow(SRXConsole* self, char* cmd, char* param,
 }
 
 /**
- * Show the number of updates stored in the update cache and how many updates 
+ * Show the number of updates stored in the update cache and how many updates
  * are referenced in the prefix cache.
- * 
+ *
  * @param self the console itself
  * @param cmd the console command
  * @param param the command parameter
  */
-void doNumUpdates(SRXConsole* self, char* cmd, char* param)
+static void doNumUpdates(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   int elements = 0;
@@ -1712,20 +1742,20 @@ void doNumUpdates(SRXConsole* self, char* cmd, char* param)
 
   elements = self->commandHandler->updCache->allItems.size;
   sprintf(str, "Update Cache: %u updates stored.\r\n", elements);
-  sendToConsoleClient(self, str, false);  
+  sendToConsoleClient(self, str, false);
   elements = self->commandHandler->rpkiHandler->prefixCache->updates.size;
   sprintf(str, "Prefix Cache: %u update shadows stored.\r\n", elements);
-  sendToConsoleClient(self, str, true);  
+  sendToConsoleClient(self, str, true);
 }
 
 /**
  * Display the number of prefixes stored in the prefix tree.
- * 
+ *
  * @param self the console itself/
  * @param cmd The console command
  * @param param the console command parameter
  */
-void doNumPrefixes(SRXConsole* self, char* cmd, char* param)
+static void doNumPrefixes(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   int elements = 0;
@@ -1733,19 +1763,19 @@ void doNumPrefixes(SRXConsole* self, char* cmd, char* param)
   // produce a \0 terminated string
   memset(str,'\0',256);
 
-  elements = self->rpkiHandler->prefixCache->prefixTree->num_active_node;  
+  elements = self->rpkiHandler->prefixCache->prefixTree->num_active_node;
   sprintf(str, "Prefix Cache: %u entries.\r\n", elements);
-  sendToConsoleClient(self, str, true);  
+  sendToConsoleClient(self, str, true);
 }
 
 /**
  * Return the number of proxies attached to the server
- * 
+ *
  * @param self the console application
- * @param cmd the console command 
+ * @param cmd the console command
  * @param param the command parameter
  */
-void doNumProxies(SRXConsole* self, char* cmd, char* param)
+static void doNumProxies(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   int elements = 0;
@@ -1754,19 +1784,19 @@ void doNumProxies(SRXConsole* self, char* cmd, char* param)
   memset(str,'\0',256);
 
   elements = self->commandHandler->svrConnHandler->clients.size;
-  
+
   sprintf(str, "Currently active: %u Proxies\r\n", elements);
-  sendToConsoleClient(self, str, true);    
+  sendToConsoleClient(self, str, true);
 }
 
 /**
  * This method gathers the number of elements stored in the command queue.
- * 
+ *
  * @param self Pointer to the console
  * @param cmd The command
  * @param param the parameters (empty)
  */
-void doCommandQueue(SRXConsole* self, char* cmd, char* param)
+static void doCommandQueue(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   char str[256];
@@ -1774,83 +1804,83 @@ void doCommandQueue(SRXConsole* self, char* cmd, char* param)
   int unprocessed = getUnprocessedQueueSize(self->commandHandler->queue);
   // produce a \0 terminated string
   memset(str,'\0',256);
-  
+
   // Get the number of elements from the command queue. Here is is for display
-  // only, synchronizing is not necessary  
+  // only, synchronizing is not necessary
   sprintf(str, "Command handler:\r\n"
                "====================================\r\n"
                "Total commands........: %06u\r\n"
                "Unprocessed commands..: %06u\r\n"
                "====================================\r\n", total, unprocessed);
-  sendToConsoleClient(self, str, true);  
+  sendToConsoleClient(self, str, true);
 }
 
 /**
- * Dump the prefix cache into a file/console on the server side. 
- * Use parameter '-' to dump it on the console of the server. 
- * 
+ * Dump the prefix cache into a file/console on the server side.
+ * Use parameter '-' to dump it on the console of the server.
+ *
  * @param self The console itself
  * @param cmd The dump command
  * @param param parameters
  */
-void doDumpPCache(SRXConsole* self, char* cmd, char* param)
+static void doDumpPCache(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   int elements = 0;
   char str[256];
   // produce a \0 terminated string
   memset(str,'\0',256);
-  
+
   char ch = (strlen(param) == 0) ? CON_STDOUT : param[0];
   char* fileName = (ch == CON_STDOUT) ? "standard out" : param;
   // Get the number of elements from the command queue. Here is is for display
   // only, synchronizing is not necessary
   elements = self->rpkiHandler->prefixCache->prefixTree->num_active_node;
-  sprintf(str, "Prefix Cache has %u items. Start export into %s!\r\n", 
+  sprintf(str, "Prefix Cache has %u items. Start export into %s!\r\n",
           elements, fileName);
-  sendToConsoleClient(self, str, true);    
+  sendToConsoleClient(self, str, true);
 
   FILE* out = (ch == CON_STDOUT) ? stdout : NULL;
   if (out != NULL)
-  {      
+  {
     outputPrefixCacheAsXML(self->rpkiHandler->prefixCache, stdout);
   }
   sprintf(str, "Export of prefix cache into %s done.!\r\n", param);
-  sendToConsoleClient(self, str, true);    
+  sendToConsoleClient(self, str, true);
 }
 
 /**
- * Dump the update cache into a file/console on the server side. 
- * Use parameter '-' to dump it on the console of the server. 
- * 
+ * Dump the update cache into a file/console on the server side.
+ * Use parameter '-' to dump it on the console of the server.
+ *
  * @param self The console itself
  * @param cmd The dump command
  * @param param parameters
  */
-void doDumpUCache(SRXConsole* self, char* cmd, char* param)
+static void doDumpUCache(SRXConsole* self, char* cmd, char* param)
 {
   LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
   int elements = 0;
   char str[256];
   // produce a \0 terminated string
   memset(str,'\0',256);
-  
+
   char ch = (strlen(param) == 0) ? CON_STDOUT : param[0];
   char* fileName = (ch == CON_STDOUT) ? "standard out" : param;
   // Get the number of elements from the command queue. Here is is for display
   // only, synchronizing is not necessary
   elements = self->commandHandler->updCache->allItems.size;
-  sprintf(str, "Update Cache has %u items. Start export into %s!\r\n", 
+  sprintf(str, "Update Cache has %u items. Start export into %s!\r\n",
           elements, fileName);
-  sendToConsoleClient(self, str, true);    
+  sendToConsoleClient(self, str, true);
 
   FILE* out = (ch == CON_STDOUT) ? stdout : NULL;
   if (out != NULL)
-  {      
+  {
     outputUpdateCacheAsXML(self->commandHandler->updCache, stdout, -1);
   }
   sprintf(str, "Export of prefix cache into %s done.!\r\n", param);
-  sendToConsoleClient(self, str, true);    
+  sendToConsoleClient(self, str, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1859,11 +1889,11 @@ void doDumpUCache(SRXConsole* self, char* cmd, char* param)
 /**
  * This function converts an hex string 0x00000000 of 00000000 into an unsigned
  * integer.
- * 
+ *
  * @param hex The hex string. Leading 0x is optional
  * @return the unsigned integer. in case of an error 0 will be returned.
  */
-uint32_t hexToInt(char* hex)
+static uint32_t hexToInt(char* hex)
 {
   // Determine start position in case the hex number was passed using 0x
   int idx = (hex[0] == '0' && (hex[1]=='x' || hex[1]=='X')) ? 2 : 0;
@@ -1871,7 +1901,7 @@ uint32_t hexToInt(char* hex)
   uint32_t retVal = 0;
   // the number of processed characters
   int character = 1;
-  // Go until the end of the string is reached or the maximum number of 
+  // Go until the end of the string is reached or the maximum number of
   // characters (8)
   while (hex[idx] != '\0')
   {
@@ -1890,18 +1920,17 @@ uint32_t hexToInt(char* hex)
       retVal = retVal * 16 + ((hex[idx] - 'A') + 10);
     }
     else if (hex[idx]>='a' && hex[idx] <= 'f')
-    {  
+    {
       retVal = retVal * 16 + ((hex[idx] - 'a') + 10);
     }
     else
     {
-      RAISE_SYS_ERROR("Given hex number [%s] contains invalid characters!!", 
+      RAISE_SYS_ERROR("Given hex number [%s] contains invalid characters!!",
                       hex);
       retVal = 0;
       break;
-    }      
+    }
     idx++;
   }
   return retVal;
 }
-

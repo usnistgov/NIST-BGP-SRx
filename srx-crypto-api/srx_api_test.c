@@ -1,17 +1,62 @@
+/**
+ * This software was developed at the National Institute of Standards and
+ * Technology by employees of the Federal Government in the course of
+ * their official duties. Pursuant to title 17 Section 105 of the United
+ * States Code this software is not subject to copyright protection and
+ * is in the public domain.
+ *
+ * NIST assumes no responsibility whatsoever for its use by other parties,
+ * and makes no guarantees, expressed or implied, about its quality,
+ * reliability, or any other characteristic.
+ *
+ * We would appreciate acknowledgment if the software is used.
+ *
+ * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
+ * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM THE USE OF THIS SOFTWARE.
+ *
+ *
+ * This software might use libraries that are under GNU public license or
+ * other licenses. Please refer to the licenses of all libraries required
+ * by this software.
+ *
+ * File contains methods to test API.
+ * 
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ *   0.1.2.0 - 2015/12/01 - oborchert
+ *             * Removed unused header bgpsec_openssl/bgpsec_openssh.h
+ *           - 2015/11/03 - oborchert
+ *             * Removed ski and algoID from struct BGPSecSignData, both data 
+ *               fields are part of the BGPSecKey structure. (BZ795)
+ *             * modified function signature of sign_with_id (BZ788)
+ *   0.1.0   - October 7, 2015 - oborchert
+ *             * Moved file back into project.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include <openssl/bio.h>
-#include "srxcryptoapi.h"
+#include "srx/srxcryptoapi.h"
 
-#define LOG_ERR     3   /* informational */
-#define LOG_INFO    6   /* informational */
-#define LOG_DEBUG   7   /* debug-level messages */
+/* informational */
+#define LOG_ERR     3
+/* informational */
+#define LOG_INFO    6
+/* debug-level messages */
+#define LOG_DEBUG   7 
+ /* The maximum number of keys */
+#define MAX_NO_KEYS   10
+/* The number of as paths */
+#define MAX_NO_ASPATH 3
 
-#define MAX_NO_KEYS   10  /* The maximum number of keys */
-#define MAX_NO_ASPATH 3   /* The number of as paths */
+#ifndef SYSCONFDIR
+#define SYSCONFDIR "."
+#endif
+
+#define CONF_FILE SYSCONFDIR "/srxcryptoapi.conf.sample"
 
 char** asPaths = NULL;
 
@@ -217,9 +262,7 @@ void testFailAll(SRxCryptoAPI* crypto, TestData* tData)
     report(tData->keyID==0);    
 
     printf ("\nTest sign with KeyID...\n\t");
-    testRetVal = crypto->sign_with_id(tData->dataLength, tData->data, 
-                                      tData->keyID, tData->sigLen, 
-                                      tData->signature);
+    testRetVal = crypto->sign_with_id(tData->bgpsecData, tData->keyID);
     report(testRetVal==0);    
     
     printf ("\nTest unregister private key...\n\t");
@@ -244,10 +287,6 @@ void testValidValidation(SRxCryptoAPI* crypto)
   u_int16_t       localAS    = 0;
   u_int8_t        extCode    = 0;
   BGPSecSignData* bgpsecData = NULL;
-  u_int16_t       dataLength = 0;
-  u_int8_t*       data       = NULL;
-  u_int16_t       sigLen     = 0;
-  u_int8_t*       signature  = NULL;
   //TODO fill values above and make calls.
 
   int testRetVal = 0;
@@ -298,8 +337,7 @@ void testValidValidation(SRxCryptoAPI* crypto)
     report(keyID > 0);    
 
     printf ("\nTest sign with KeyID...\n\t");
-    testRetVal = crypto->sign_with_id(dataLength, data, keyID, 
-                                      sigLen, signature);
+    testRetVal = crypto->sign_with_id(bgpsecData, keyID);
     report(testRetVal==1);    
     
     printf ("\nTest unregister private key...\n\t");
@@ -324,10 +362,6 @@ void testInValidValidation(SRxCryptoAPI* crypto)
   u_int16_t       localAS    = 0;
   u_int8_t        extCode    = 0;
   BGPSecSignData* bgpsecData = NULL;
-  u_int16_t       dataLength = 0;
-  u_int8_t*       data       = NULL;
-  u_int16_t       sigLen     = 0;
-  u_int8_t*       signature  = NULL;
   //TODO fill values above and make calls.
 
   int testRetVal = 0;
@@ -378,8 +412,7 @@ void testInValidValidation(SRxCryptoAPI* crypto)
     report(keyID > 0);    
 
     printf ("\nTest sign with KeyID...\n\t");
-    testRetVal = crypto->sign_with_id(dataLength, data, keyID, 
-                                      sigLen, signature);
+    testRetVal = crypto->sign_with_id(bgpsecData, keyID);
     report(testRetVal==1);    
     
     printf ("\nTest unregister private key...\n\t");
@@ -390,13 +423,49 @@ void testInValidValidation(SRxCryptoAPI* crypto)
 
 #define NO_KEYS 5
 
-int main()
-{   
-  BIO *out;
-  out = BIO_new_fp(stdout, BIO_NOCLOSE);
+static void _checkParams(int argc, char** argv, SRxCryptoAPI* crypto)
+{
+  int idx = 0;
+  char* param = NULL;
   
+  if (crypto != NULL)
+  {
+    for (; idx < argc -1; idx++)
+    {
+      param = NULL;
+      if (argv[idx][0] == '-' )
+      {
+        if (strlen(argv[idx]) > 1)
+        {
+          switch (argv[idx][1])
+          {
+            case 'c' : 
+              idx++;
+              if (argc < idx )
+              {
+                crypto->configFile = argv[idx];
+              }
+              break;
+            default:
+              break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (crypto->configFile == NULL)
+  {
+    crypto->configFile = CONF_FILE;        
+  }
+}
+
+int main(int argc, char** argv)
+{     
   SRxCryptoAPI* crypto = malloc(sizeof(SRxCryptoAPI));
-  crypto->configFile = "./srxcryptoapi.conf.sample";
+  memset (crypto, 0, sizeof(SRxCryptoAPI));
+  
+  _checkParams(argc, argv, crypto);
   int initVal = 0;
   initVal = srxCryptoInit(crypto);
 
@@ -405,9 +474,9 @@ int main()
   if (initVal)
   {
     printf ("API initialized!\n");
-    TestData* tData = createEmptyTestData();
-    testFailAll(crypto, tData);
-    freeTestData(tData);
+//    TestData* tData = createEmptyTestData();
+//    testFailAll(crypto, tData);
+//    freeTestData(tData);
     //testValidValidation(crypto)
     //testInValidValidation(crypto)
   }
@@ -420,8 +489,4 @@ int main()
   free(crypto);
   printf ("done\n");
   return 0;
-  
-  BIO_free(out);
-  
-  return 0;    
 }

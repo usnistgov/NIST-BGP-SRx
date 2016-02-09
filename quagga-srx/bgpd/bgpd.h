@@ -446,6 +446,11 @@ struct bgp
   /* bgpsec ski value */
   char* bgpsec_ski;
 
+  /* bgpsec signing method */
+  u_char bgpsec_sign_method_flag;
+#define BGPSEC_SIGN_WITH_KEY        (1 << 0)
+#define BGPSEC_SIGN_WITH_ID         (1 << 1)
+
   /** Contains the information if extended community is used and the subcode*/
 #define SRX_BGP_FLAG_ECOMMUNITY      (1 << 0)
 #define SRX_BGP_FLAG_ECOMMUNITY_EBGP (1 << 1)

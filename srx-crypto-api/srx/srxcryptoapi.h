@@ -1,4 +1,52 @@
-
+/**
+ * This software was developed at the National Institute of Standards and
+ * Technology by employees of the Federal Government in the course of
+ * their official duties. Pursuant to title 17 Section 105 of the United
+ * States Code this software is not subject to copyright protection and
+ * is in the public domain.
+ *
+ * NIST assumes no responsibility whatsoever for its use by other parties,
+ * and makes no guarantees, expressed or implied, about its quality,
+ * reliability, or any other characteristic.
+ *
+ * We would appreciate acknowledgment if the software is used.
+ *
+ * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
+ * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM THE USE OF THIS SOFTWARE.
+ *
+ * This is the SRxCryptoAPI library. It provides the crypto operations for 
+ * BGPSEC implementations. This library allows to switch the crypto 
+ * implementation dynamically.
+ *
+ * @version 0.1.2.1
+ * 
+ * ChangeLog:
+ * -----------------------------------------------------------------------------
+ *   0.1.2.1 - 2016/02/03 - oborchert
+ *             * Fixed incorrect date in Changelog
+ *             * Added version number
+ *           - 2016/02/01 - oborchert
+ *             * Added init(...) method
+ *   0.1.2.0 - 2015/11/03 - oborchert
+ *             * Removed ski and algoID from struct BGPSecSignData, both data 
+ *               fields are part of the BGPSecKey structure. (BZ795)
+ *             * modified function signature of sign_with_id (BZ788)
+ *           - 2015/10/13 - oborchert
+ *             * Fixed invalid method srxCryptoUnbind - previous interface did 
+ *               not ask for api object.
+ *             * Modified srxCrytpoInit to only return failure if binding of
+ *               the library failed.
+ *           - 2015/09/22 - oborchert
+ *             * added functions:
+ *               > sca_getCurrentLogLevel
+ *               > sca_SetDER_Ext - For private key
+ *               > sca_SetX90_ext - For public key
+ *             * Removed term_debug
+ *           - 2015/09/22 - oborchert
+ *             * Added ChangeLog to file.
+ *             * Return 0 for srxCryptoInit method when API is NULL.
+ */
 #ifndef _SRXCRYPTOAPI_H
 #define _SRXCRYPTOAPI_H
 
@@ -11,10 +59,22 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+/** SCA Method return value */
+#define API_SUCCESS          1
+/** SCA Method return value */
+#define API_FAILURE          0
+
 /** The SKI length is defined in the protocol specification. */
 #define SKI_LENGTH     20
 /** Twice the length of the SKI_LENGTH in binary form */
 #define SKI_HEX_LENGTH 40
+
+/** Update validation returns VALID */
+#define API_VALRESULT_VALID    1
+/** Update validation returns INVALID */
+#define API_VALRESULT_INVALID  0
+/** Update validation returns ERROR */
+#define API_VALRESULT_ERROR   -1
 
 ////////////////////////////////////////////////////////////////////////////////
 // BGPSEC Path Structures
@@ -99,14 +159,9 @@ typedef struct
 {
   u_int16_t dataLength;
   u_int8_t* data;       // the data buffer (message) to sign over.
-  u_int8_t* ski;
-  u_int8_t  algoID;
   u_int16_t sigLen;
   u_int8_t* signature;
 } BGPSecSignData;
-
-
-extern unsigned long term_debug;
 
 #define MAX_CFGFILE_NAME 255
 
@@ -118,6 +173,18 @@ typedef struct
   /** The configuration file name. */
   char* configFile;
 
+  /**
+   * Perform a Library initialization by passing a \0 terminated string. This 
+   * value can also be NULL.
+   * This function returns 0 in case of an error. In this case the library 
+   * cannot be used.
+   * 
+   * @param value A \0 terminated string or NULL.
+   * 
+   * @return 0: failure, 1: success
+   */
+  int (*init)(const char* value);
+  
   /**
    * Perform BGPSEC path validation. This function uses the list of keys
    * provided by the caller. Internally stored keys are NOT used. This function
@@ -171,16 +238,13 @@ typedef struct
    * the into the signature. The sigLen will contain the length of the
    * used signature space.
    *
-   * @param dataLength Size of the buffer containing the data to be signed.
-   * @param data The data buffer to be signed
+   * @param bgpsec_data The data object to be signed. This also includes the
+   *                    generated signature.
    * @param keyID The pre-registered private key to be used
-   * @param sigLen The length in bytes of the signature buffer
-   * @param signature The signature buffer itself
    *
    * @return 0: failure, > 0: length of the signature
    */
-  int (*sign_with_id)(u_int16_t dataLength, u_int8_t* data, u_int8_t keyID,
-                      u_int16_t sigLen, u_int8_t* signature);
+  int (*sign_with_id)(BGPSecSignData* bgpsec_data, u_int8_t keyID);
 
   /**
    * Register the private key (Optional). This method allows to register the
@@ -243,10 +307,11 @@ typedef struct
   /**
    * Return 1 if this API allows the storage of private keys, otherwise 0.
    *
-   * @return 0: Does not provide private key storage, 1: Does provide key
-   *         private storage
+   * @return 0: Does not provide private key storage, 1: Does provide private 
+   *         key storage
    */
   int (*isPrivateKeyStorage)();
+  
 } SRxCryptoAPI;
 
 /* Function Declaration */
@@ -261,12 +326,14 @@ typedef struct
 int srxCryptoInit(SRxCryptoAPI* api);
 
 /**
- * This function unloads the library that is loaded and attached to the
- * srcCryuptoAPI.
+ * This function unloads the library that is loaded and NULLs all attached 
+ * methods.
+ * 
+ * @param api Unbind the SRxCryptoAPI
  *
  * @return 0
  */
-int srxCryptoUnbind();
+int srxCryptoUnbind(SRxCryptoAPI* api);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Helper Functions
@@ -309,6 +376,29 @@ char* sca_FindDirInSKI (char* filenamebuf, size_t filenamebufLen, u_int8_t* ski)
 int sca_loadKey(BGPSecKey* key, bool fPrivate);
 
 /**
+ * Set the file extension for DER encoded private key.
+ * 
+ * @param key_ext The file extension
+ * 
+ * @return 0 error, 1 success
+ * 
+ * @since 0.1.2.0
+ */
+int sca_setDER_ext (char* key_ext);
+
+/**
+ * Set the file extension for the DER encoded x509 certificate containing the 
+ * public key.
+ * 
+ * @param x509_ext The file extension
+ * 
+ * @return 0 error, 1 success
+ * 
+ * @since 0.1.2.0
+ */
+int sca_setX509_ext (char* x509_ext);
+
+/**
  * Writes the loging information.
  *
  * @param level The logging level
@@ -317,4 +407,60 @@ int sca_loadKey(BGPSecKey* key, bool fPrivate);
  */
 void sca_debugLog( int level, const char *format, ...);
 
+/**
+ * Return the configured log level.
+ * 
+ * @return the logLevel configured.
+ * 
+ * @since 0.1.2.0
+ */
+long sca_getCurrentLogLevel();
+
+/** 
+ * Generate the message for the hash generation for the initial segment
+ * 
+ * @param buff The buffer to be used of NULL - In the later case a new buffer 
+ *             will be allocated using malloc
+ * @param blen IN/OUT for IN the size of buff, for OUT, the number of bytes used
+ *             in buff which might be the total length of buff or less.s
+ * @param targetAS The next AS to send the update to
+ * @param originAS The origin AS
+ * @param pCount the pCount of this hop (OriginAS)
+ * @param flags The flags
+ * @param algoID The Algorithm ID
+ * @param afi The AFI (AFI_V4 | AFI_V6)
+ * @param safi The SAFI
+ * @param pLen The prefix length in bits. Used to calculate the bytes needed to 
+ *        store the prefix (padded) 
+ * @param nlri The prefix.
+ * 
+ * @return The hash stored in either the given buff or a new allocated memory.
+ *         The length of the new hash is stores in 'blen'
+ */
+u_int8_t* sca_generateMSG1(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS, 
+                        u_int32_t originAS, u_int8_t  pCount,
+                        u_int8_t  flags, u_int8_t  algoID, u_int16_t afi, 
+                        u_int8_t  safi, u_int8_t  pLen, u_int8_t* nlri);
+
+/** 
+ * Generate the message for the hash generation for the intermediate segment.
+ * 
+ * @param buff The buffer to be used of NULL - In the later case a new buffer 
+ *             will be allocated using malloc.
+ * @param buffLen The length of the input buffer (only used if buff != NULL)
+ * @param targetAS The next AS to send the update to.
+ * @param originAS The origin AS.
+ * @param pCount the pCount of this hop (OriginAS).
+ * @param flags The flags.
+ * @param sigLen The length of the given signature.
+ * @param signature The previous signature.
+ * 
+ * @return The hash stored in either the given buff or a new allocated memory.
+ *         The length of the new hash is stores in 'blen'
+ */
+u_int8_t* sca_generateMSG2(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS, 
+                        u_int32_t signerAS, u_int8_t  pCount, u_int8_t  flags, 
+                        u_int8_t sigLen, u_int8_t* signature);
+                        
 #endif /* _SRXCRYPTOAPI_H*/
+

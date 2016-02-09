@@ -3,7 +3,7 @@
 # srx_serverd Starts/stop the "srx_server" daemon
 #
 # chkconfig:   345 95 5
-# description: Start the SRx Server deamon.
+# description: Start the SRx Server daemon.
 
 ### BEGIN INIT INFO
 # Provides: srx_serverd
@@ -12,16 +12,21 @@
 # Default-Start: 345
 # Default-Stop: 95
 # Short-Description: Starts/stop the "srx_serverd" daemon
-# Description:      Start the SRx Server deamon.
+# Description:      Start the SRx Server daemon.
 ### END INIT INFO
 
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-exec=/usr/bin/srx_server
+exec=@CFG_PREFIX@/bin/srx_server
 prog="srx_server"
-config="-f /etc/srx_server.conf"
+config="-f @CFG_SYSCONFIG@/srx_server.conf"
 pid=0
+
+status() {
+  pid=0$(ps -e | grep "$prog$" | sed -e "s/^[ \t]*\([0-9]\+ \).*/echo \1/g" | sh)
+  return $pid
+}
 
 start() {
     echo -n Starting $prog"d:"
@@ -67,11 +72,6 @@ restart() {
     stop
     start
     return $?
-}
-
-status() {
-  pid=0$(ps -e | grep "$prog$" | sed -e "s/\(^[0-9]\+ \).*/echo \1/g" | sh)
-  return $pid
 }
 
 case "$1" in

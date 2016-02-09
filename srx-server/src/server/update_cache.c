@@ -25,19 +25,22 @@
  * value. The other is a list, that allows to scan through all updates. Both 
  * MUST be maintained the same.
  * 
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2012/12/31 - oborchert
- *   * Added XML print function
- *         - 2012/12/17 - oborchert
- *   * Changed the logic of function getUpdateResult's signature. Both, result 
- *     and default value are out parameters now. 
- *   0.2.0 - 2011/11/01 - oborchert
- *   * mostly rewritten
- *   0.1.0 - 2010/04/15 - pgleichm
- *   * Code created.
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Removed unused variables.
+ * 0.3.0    - 2012/12/31 - oborchert
+ *            * Added XML print function
+ *          - 2012/12/17 - oborchert
+ *            * Changed the logic of function getUpdateResult's signature. Both,
+ *              result and default value are out parameters now. 
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * mostly rewritten
+ * 0.1.0    - 2010/04/15 - pgleichm
+ *            * Code created.
  */
 
 #include <uthash.h>
@@ -45,15 +48,15 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <time.h>
-#include "update_cache.h"
+#include "server/update_cache.h"
+#include "server/server_connection_handler.h"
+#include "server/prefix_cache.h"
+#include "shared/srx_defs.h"
+#include "shared/srx_packets.h"
 #include "util/log.h"
 #include "util/prefix.h"
 #include "util/xml_out.h"
-#include "shared/srx_defs.h"
-#include "shared/srx_packets.h"
-#include "server_connection_handler.h"
-#include "client/srx/srx_defs.h"
-#include "prefix_cache.h"
+#include "util/mutex.h"
 
 /* Number of preallocated result slots */
 //#define NUM_PREALLOC  20
@@ -758,8 +761,6 @@ int _deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
   
   // Check if the entry is associated with the client that requests the 
   // deletion.
-  uint8_t* cID = cEntry->clients;
-
   switch (_deleteUpdateFromCache_clientMgmt(cEntry, clientID))
   {
     case -1 : // Not found
@@ -1210,8 +1211,6 @@ void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
   char*       strPtr = NULL;
   initXMLOut(&out, stream);
   openTag(&out, "update-cache");
-  uint32_t    blobIdx;
-  uint8_t*    blob;
 
   // Add the current gc time
   addU32Attrib(&out, "current-gc-time", getGCTime(0));          

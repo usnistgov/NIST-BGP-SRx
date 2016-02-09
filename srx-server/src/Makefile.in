@@ -14,10 +14,13 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
+
+
+
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
-pkglibdir = $(libdir)/@PACKAGE@
 pkglibexecdir = $(libexecdir)/@PACKAGE@
 am__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
 install_sh_DATA = $(install_sh) -c -m 644
@@ -33,17 +36,23 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+srx_PROGRAMS = srx_server$(EXEEXT)
+tools_PROGRAMS = rpkirtr_client$(EXEEXT) rpkirtr_svr$(EXEEXT) \
+	srxsvr_client$(EXEEXT)
 subdir = .
-DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
+DIST_COMMON = README $(am__configure_deps) \
+	$(dist_libSRxProxy_libconfig_DATA) $(dist_srx_config_DATA) \
+	$(dist_srx_initd_DATA) $(noinst_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(srcdir)/srx.spec.in $(top_srcdir)/configure AUTHORS COPYING \
-	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
+	$(srcdir)/srx-proxy.spec.in $(srcdir)/srx.spec.in \
+	$(top_srcdir)/client/srxproxy.conf.in $(top_srcdir)/configure \
+	$(top_srcdir)/server/srx_serverd.in AUTHORS COPYING ChangeLog \
+	INSTALL NEWS compile config.guess config.sub depcomp \
 	install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/m4/srx_m4_check_interanl_lib_patricia_lib_config.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -51,25 +60,102 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = server/srx_serverd
 CONFIG_CLEAN_VPATH_FILES =
-SOURCES =
-DIST_SOURCES =
-RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
-	html-recursive info-recursive install-data-recursive \
-	install-dvi-recursive install-exec-recursive \
-	install-html-recursive install-info-recursive \
-	install-pdf-recursive install-ps-recursive install-recursive \
-	installcheck-recursive installdirs-recursive pdf-recursive \
-	ps-recursive uninstall-recursive
-RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
-  distclean-recursive maintainer-clean-recursive
-AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
-	$(RECURSIVE_CLEAN_TARGETS:-recursive=) tags TAGS ctags CTAGS \
-	distdir dist dist-all distcheck
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(srxdir)" \
+	"$(DESTDIR)$(toolsdir)" \
+	"$(DESTDIR)$(libSRxProxy_libconfigdir)" \
+	"$(DESTDIR)$(srx_configdir)" "$(DESTDIR)$(srx_initddir)"
+LTLIBRARIES = $(noinst_LTLIBRARIES) $(pkglib_LTLIBRARIES)
+libSRxProxy_la_DEPENDENCIES = libsrx_shared.la libsrx_util.la
+am_libSRxProxy_la_OBJECTS = client_connection_handler.lo srx_api.lo
+libSRxProxy_la_OBJECTS = $(am_libSRxProxy_la_OBJECTS)
+libSRxProxy_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libSRxProxy_la_LDFLAGS) $(LDFLAGS) -o $@
+libsrx_shared_la_LIBADD =
+am_libsrx_shared_la_OBJECTS = srx_packets.lo srx_identifier.lo \
+	crc32.lo
+libsrx_shared_la_OBJECTS = $(am_libsrx_shared_la_OBJECTS)
+libsrx_util_la_LIBADD =
+am_libsrx_util_la_OBJECTS = client_socket.lo debug.lo directory.lo \
+	log.lo multi_client_socket.lo mutex.lo packet.lo plugin.lo \
+	prefix.lo rwlock.lo server_socket.lo slist.lo socket.lo str.lo \
+	timer.lo xml_out.lo
+libsrx_util_la_OBJECTS = $(am_libsrx_util_la_OBJECTS)
+PROGRAMS = $(srx_PROGRAMS) $(tools_PROGRAMS)
+am_rpkirtr_client_OBJECTS = rpkirtr_client.$(OBJEXT) \
+	rpki_router_client.$(OBJEXT)
+rpkirtr_client_OBJECTS = $(am_rpkirtr_client_OBJECTS)
+rpkirtr_client_DEPENDENCIES = libsrx_util.la
+am_rpkirtr_svr_OBJECTS = rpkirtr_svr.$(OBJEXT)
+rpkirtr_svr_OBJECTS = $(am_rpkirtr_svr_OBJECTS)
+rpkirtr_svr_DEPENDENCIES = libsrx_util.la
+am_srx_server_OBJECTS = bgpsec_handler.$(OBJEXT) \
+	command_handler.$(OBJEXT) command_queue.$(OBJEXT) \
+	configuration.$(OBJEXT) console.$(OBJEXT) key_cache.$(OBJEXT) \
+	main.$(OBJEXT) prefix_cache.$(OBJEXT) rpki_handler.$(OBJEXT) \
+	rpki_router_client.$(OBJEXT) \
+	server_connection_handler.$(OBJEXT) \
+	srx_packet_sender.$(OBJEXT) update_cache.$(OBJEXT)
+srx_server_OBJECTS = $(am_srx_server_OBJECTS)
+am__DEPENDENCIES_1 =
+srx_server_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	libsrx_shared.la libsrx_util.la
+srx_server_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(srx_server_LDFLAGS) $(LDFLAGS) -o $@
+am_srxsvr_client_OBJECTS = srxsvr_client.$(OBJEXT)
+srxsvr_client_OBJECTS = $(am_srxsvr_client_OBJECTS)
+srxsvr_client_DEPENDENCIES = libsrx_util.la libsrx_shared.la \
+	libSRxProxy.la
+DEFAULT_INCLUDES = -I.@am__isrc@
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+am__depfiles_maybe = depfiles
+am__mv = mv -f
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
+LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+SOURCES = $(libSRxProxy_la_SOURCES) $(libsrx_shared_la_SOURCES) \
+	$(libsrx_util_la_SOURCES) $(rpkirtr_client_SOURCES) \
+	$(rpkirtr_svr_SOURCES) $(srx_server_SOURCES) \
+	$(srxsvr_client_SOURCES)
+DIST_SOURCES = $(libSRxProxy_la_SOURCES) $(libsrx_shared_la_SOURCES) \
+	$(libsrx_util_la_SOURCES) $(rpkirtr_client_SOURCES) \
+	$(rpkirtr_svr_SOURCES) $(srx_server_SOURCES) \
+	$(srxsvr_client_SOURCES)
+DATA = $(dist_libSRxProxy_libconfig_DATA) $(dist_srx_config_DATA) \
+	$(dist_srx_initd_DATA)
+HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = $(SUBDIRS)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -77,35 +163,11 @@ am__remove_distdir = \
   { test ! -d "$(distdir)" \
     || { find "$(distdir)" -type d ! -perm -200 -exec chmod u+w {} ';' \
          && rm -fr "$(distdir)"; }; }
-am__relativize = \
-  dir0=`pwd`; \
-  sed_first='s,^\([^/]*\)/.*$$,\1,'; \
-  sed_rest='s,^[^/]*/*,,'; \
-  sed_last='s,^.*/\([^/]*\)$$,\1,'; \
-  sed_butlast='s,/*[^/]*$$,,'; \
-  while test -n "$$dir1"; do \
-    first=`echo "$$dir1" | sed -e "$$sed_first"`; \
-    if test "$$first" != "."; then \
-      if test "$$first" = ".."; then \
-        dir2=`echo "$$dir0" | sed -e "$$sed_last"`/"$$dir2"; \
-        dir0=`echo "$$dir0" | sed -e "$$sed_butlast"`; \
-      else \
-        first2=`echo "$$dir2" | sed -e "$$sed_first"`; \
-        if test "$$first2" = "$$first"; then \
-          dir2=`echo "$$dir2" | sed -e "$$sed_rest"`; \
-        else \
-          dir2="../$$dir2"; \
-        fi; \
-        dir0="$$dir0"/"$$first"; \
-      fi; \
-    fi; \
-    dir1=`echo "$$dir1" | sed -e "$$sed_rest"`; \
-  done; \
-  reldir="$$dir2"
 DIST_ARCHIVES = $(distdir).tar.gz
 GZIP_ENV = --best
 distuninstallcheck_listfiles = find . -type f -print
 distcleancheck_listfiles = find . -type f -print
+pkglibdir = $(libdir)/$(SRX_DIR)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AR = @AR@
@@ -115,6 +177,8 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
+CFG_PREFIX = @CFG_PREFIX@
+CFG_SYSCONFIG = @CFG_SYSCONFIG@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -124,7 +188,7 @@ CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
 CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
-DEFS = @DEFS@
+DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 DEPDIR = @DEPDIR@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
@@ -142,13 +206,20 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LD_ARCH_LOC = @LD_ARCH_LOC@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
-LIBTOOL = libtool --tag=CC
+LIBTOOL = @LIBTOOL@
+LIB_PATRICIA = @LIB_PATRICIA@
+LIB_SCA = @LIB_SCA@
+LIB_SCA_LDFLAGS = @LIB_SCA_LDFLAGS@
+LIB_VER_INFO = @LIB_VER_INFO@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+MAJOR_VER = @MAJOR_VER@
 MAKEINFO = @MAKEINFO@
+MINOR_VER = @MINOR_VER@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 NMEDIT = @NMEDIT@
@@ -163,13 +234,19 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PATRICIA_DIR = @PATRICIA_DIR@
+PKG_VER = @PKG_VER@
 RANLIB = @RANLIB@
+SCA_DIR = @SCA_DIR@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SRX_DIR = @SRX_DIR@
 SRX_REVISION_FILE = @SRX_REVISION_FILE@
 STRIP = @STRIP@
+UPD_VER = @UPD_VER@
 VERSION = @VERSION@
+VER_INFO = @VER_INFO@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -200,6 +277,7 @@ host_cpu = @host_cpu@
 host_os = @host_os@
 host_vendor = @host_vendor@
 htmldir = @htmldir@
+incl_la_lib = @incl_la_lib@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
@@ -211,11 +289,13 @@ lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
+patricia_dir = @patricia_dir@
 pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
+sca_dir = @sca_dir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -224,23 +304,183 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST = $(SRX_REVISION_FILE) $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
-SUBDIRS = shared util client server tools
 
-# Extract the directory of this file out of the MAKEFILE_LIST
-SRC_DIR = `pwd`
+# Directories containing source files.
+CLIENT_DIR = client
+SERVER_DIR = server
+SHARED_DIR = shared
+TOOLS_DIR = tools
+UTIL_DIR = util
 
-# Exuberant Ctags
-READLINE_COPTS = -lreadline -lncurses
-CLEAN_SUBDIRS = .libs
+# Read the revision number of the revision file
+# This needs GNU-Make. if this is a problem, replace the 
+# assignment of SRX_REVISION=... with either an empty
+# string or the content of the revision file.
+SRX_REVISION = $(shell cat $(SRX_REVISION_FILE))
+AM_CFLAGS = -DSRX_REVISION=$(SRX_REVISION) \
+            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
+
+
+# Used to generate the srx folder for installation - DESTDIR for RPM generation
+INC_OUT = $(DESTDIR)$(includedir)/$(SRX_DIR)
+#INC_OUT = srx
+EXTRA_DIST = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec \
+             $(PACKAGE_TARNAME)-proxy-$(PACKAGE_VERSION).spec \
+             $(CLIENT_DIR)/srxproxy$(CPU_ARCH).conf
+
+
+# Temporary Libraries
+noinst_LTLIBRARIES = libsrx_shared.la libsrx_util.la
+libsrx_shared_la_SOURCES = \
+	             $(SHARED_DIR)/srx_packets.c \
+	             $(SHARED_DIR)/srx_identifier.c \
+	             $(SHARED_DIR)/crc32.c
+
+libsrx_util_la_SOURCES = \
+	             $(UTIL_DIR)/client_socket.c \
+		     $(UTIL_DIR)/debug.c \
+		     $(UTIL_DIR)/directory.c \
+		     $(UTIL_DIR)/log.c \
+		     $(UTIL_DIR)/multi_client_socket.c \
+		     $(UTIL_DIR)/mutex.c \
+		     $(UTIL_DIR)/packet.c \
+		     $(UTIL_DIR)/plugin.c \
+		     $(UTIL_DIR)/prefix.c \
+		     $(UTIL_DIR)/rwlock.c \
+		     $(UTIL_DIR)/server_socket.c \
+		     $(UTIL_DIR)/slist.c \
+		     $(UTIL_DIR)/socket.c \
+		     $(UTIL_DIR)/str.c \
+		     $(UTIL_DIR)/timer.c \
+		     $(UTIL_DIR)/xml_out.c
+
+@LIB_VER_INFO_COND_FALSE@LIB_VER = 0:0:0
+
+################################################################################
+################################################################################
+@LIB_VER_INFO_COND_TRUE@LIB_VER = $(LIB_VER_INFO)
+pkglib_LTLIBRARIES = libSRxProxy.la
+libSRxProxy_la_SOURCES = $(CLIENT_DIR)/client_connection_handler.c \
+		    $(CLIENT_DIR)/srx_api.c
+
+
+# General linker flags
+libSRxProxy_la_LIBADD = libsrx_shared.la libsrx_util.la
+libSRxProxy_la_LDFLAGS = -version-info $(LIB_VER)
+libSRxProxy_libconfigdir = $(sysconfdir)/ld.so.conf.d
+dist_libSRxProxy_libconfig_DATA = $(CLIENT_DIR)/srxproxy$(CPU_ARCH).conf
+
+################################################################################
+################################################################################
+
+################################################################################
+################################################################################
+srxdir = $(bindir)
+srx_configdir = $(sysconfdir)
+srx_initddir = $(sysconfdir)/rc.d/init.d
+dist_srx_config_DATA = $(SERVER_DIR)/srx_server.conf
+dist_srx_initd_DATA = $(SERVER_DIR)/srx_serverd
+
+#bin_PROGRAMS = srx_server
+srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
+	     	     $(SERVER_DIR)/command_handler.c \
+		     $(SERVER_DIR)/command_queue.c \
+		     $(SERVER_DIR)/configuration.c \
+		     $(SERVER_DIR)/console.c \
+		     $(SERVER_DIR)/key_cache.c \
+		     $(SERVER_DIR)/main.c \
+		     $(SERVER_DIR)/prefix_cache.c \
+		     $(SERVER_DIR)/rpki_handler.c \
+		     $(SERVER_DIR)/rpki_router_client.c \
+		     $(SERVER_DIR)/server_connection_handler.c \
+		     $(SERVER_DIR)/srx_packet_sender.c \
+		     $(SERVER_DIR)/update_cache.c 
+
+srx_server_LDADD = $(LIB_PATRICIA) $(LIB_SCA) \
+		   libsrx_shared.la \
+		   libsrx_util.la
+
+srx_server_LDFLAGS = $(LIB_SCA_LDFLAGS)
 
 # For the revision
 SRX_VENDOR = antd.nist.gov
 SVN_DIR = .svn
 SVN_CMD = /usr/bin/svn
 
+################################################################################
+################################################################################
+
+################################################################################
+################################################################################
+toolsdir = $(bindir)
+
+# Will be bundled with srx
+rpkirtr_client_SOURCES = $(TOOLS_DIR)/rpkirtr_client.c \
+		         $(SERVER_DIR)/rpki_router_client.c
+
+rpkirtr_client_LDADD = libsrx_util.la
+
+# Will be bundled with srx
+rpkirtr_svr_SOURCES = $(TOOLS_DIR)/rpkirtr_svr.c 
+rpkirtr_svr_LDADD = libsrx_util.la
+
+# Will be bundled with srx-proxy
+srxsvr_client_SOURCES = $(TOOLS_DIR)/srxsvr_client.c 
+srxsvr_client_LDADD = libsrx_util.la libsrx_shared.la libSRxProxy.la
+
+################################################################################
+################################################################################
+
+# Don't install
+noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
+		 $(CLIENT_DIR)/srx_api.h \
+		 \
+		 $(SERVER_DIR)/bgpsec_handler.h \
+		 $(SERVER_DIR)/command_handler.h \
+		 $(SERVER_DIR)/command_queue.h \
+		 $(SERVER_DIR)/configuration.h \
+		 $(SERVER_DIR)/console.h \
+		 $(SERVER_DIR)/key_cache.h \
+		 $(SERVER_DIR)/prefix_cache.h \
+		 $(SERVER_DIR)/rpki_handler.h \
+		 $(SERVER_DIR)/rpki_router_client.h \
+		 $(SERVER_DIR)/server_connection_handler.h \
+		 $(SERVER_DIR)/srx_packet_sender.h \
+		 $(SERVER_DIR)/srx_server.h \
+		 $(SERVER_DIR)/update_cache.h \
+		 \
+		 $(SHARED_DIR)/srx_packets.h \
+		 $(SHARED_DIR)/srx_defs.h \
+		 $(SHARED_DIR)/srx_identifier.h \
+		 $(SHARED_DIR)/rpki_router.h \
+		 $(SHARED_DIR)/crc32.h \
+		 \
+		 $(UTIL_DIR)/client_socket.h \
+		 $(UTIL_DIR)/debug.h \
+		 $(UTIL_DIR)/directory.h \
+		 $(UTIL_DIR)/log.h \
+		 $(UTIL_DIR)/math.h \
+		 $(UTIL_DIR)/multi_client_socket.h \
+		 $(UTIL_DIR)/mutex.h \
+		 $(UTIL_DIR)/packet.h \
+		 $(UTIL_DIR)/plugin.h \
+		 $(UTIL_DIR)/prefix.h \
+		 $(UTIL_DIR)/rwlock.h \
+		 $(UTIL_DIR)/server_socket.h \
+		 $(UTIL_DIR)/slist.h \
+		 $(UTIL_DIR)/socket.h \
+		 $(UTIL_DIR)/str.h \
+		 $(UTIL_DIR)/test.h \
+		 $(UTIL_DIR)/timer.h \
+		 $(UTIL_DIR)/xml_out.h
+
+
+################################################################################
+################################################################################
+
 # RPM script and macros for SRx
-rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+rpm_spec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+rpm_proxy_spec = $(PACKAGE_TARNAME)-proxy-$(PACKAGE_VERSION).spec
 rpmmacros = \
  --define="_rpmdir $${PWD}"\
  --define="_srcrpmdir $${PWD}"\
@@ -251,9 +491,10 @@ rpmmacros = \
 RPMBUILD = rpmbuild
 RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
 all: config.h
-	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
+.SUFFIXES: .c .lo .o .obj
 am--refresh:
 	@:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
@@ -305,6 +546,588 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+server/srx_serverd: $(top_builddir)/config.status $(top_srcdir)/server/srx_serverd.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+install-pkglibLTLIBRARIES: $(pkglib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkglibdir)" || $(MKDIR_P) "$(DESTDIR)$(pkglibdir)"
+	@list='$(pkglib_LTLIBRARIES)'; test -n "$(pkglibdir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 '$(DESTDIR)$(pkglibdir)'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 "$(DESTDIR)$(pkglibdir)"; \
+	}
+
+uninstall-pkglibLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkglib_LTLIBRARIES)'; test -n "$(pkglibdir)" || list=; \
+	for p in $$list; do \
+	  $(am__strip_dir) \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f '$(DESTDIR)$(pkglibdir)/$$f'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f "$(DESTDIR)$(pkglibdir)/$$f"; \
+	done
+
+clean-pkglibLTLIBRARIES:
+	-test -z "$(pkglib_LTLIBRARIES)" || rm -f $(pkglib_LTLIBRARIES)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+libSRxProxy.la: $(libSRxProxy_la_OBJECTS) $(libSRxProxy_la_DEPENDENCIES) 
+	$(libSRxProxy_la_LINK) -rpath $(pkglibdir) $(libSRxProxy_la_OBJECTS) $(libSRxProxy_la_LIBADD) $(LIBS)
+libsrx_shared.la: $(libsrx_shared_la_OBJECTS) $(libsrx_shared_la_DEPENDENCIES) 
+	$(LINK)  $(libsrx_shared_la_OBJECTS) $(libsrx_shared_la_LIBADD) $(LIBS)
+libsrx_util.la: $(libsrx_util_la_OBJECTS) $(libsrx_util_la_DEPENDENCIES) 
+	$(LINK)  $(libsrx_util_la_OBJECTS) $(libsrx_util_la_LIBADD) $(LIBS)
+install-srxPROGRAMS: $(srx_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	test -z "$(srxdir)" || $(MKDIR_P) "$(DESTDIR)$(srxdir)"
+	@list='$(srx_PROGRAMS)'; test -n "$(srxdir)" || list=; \
+	for p in $$list; do echo "$$p $$p"; done | \
+	sed 's/$(EXEEXT)$$//' | \
+	while read p p1; do if test -f $$p || test -f $$p1; \
+	  then echo "$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n;h' -e 's|.*|.|' \
+	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
+	sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
+	    else { print "f", $$3 "/" $$4, $$1; } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	    test -z "$$files" || { \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(srxdir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(srxdir)$$dir" || exit $$?; \
+	    } \
+	; done
+
+uninstall-srxPROGRAMS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(srx_PROGRAMS)'; test -n "$(srxdir)" || list=; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
+	      -e 's/$$/$(EXEEXT)/' `; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(srxdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(srxdir)" && rm -f $$files
+
+clean-srxPROGRAMS:
+	@list='$(srx_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+install-toolsPROGRAMS: $(tools_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	test -z "$(toolsdir)" || $(MKDIR_P) "$(DESTDIR)$(toolsdir)"
+	@list='$(tools_PROGRAMS)'; test -n "$(toolsdir)" || list=; \
+	for p in $$list; do echo "$$p $$p"; done | \
+	sed 's/$(EXEEXT)$$//' | \
+	while read p p1; do if test -f $$p || test -f $$p1; \
+	  then echo "$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n;h' -e 's|.*|.|' \
+	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
+	sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
+	    else { print "f", $$3 "/" $$4, $$1; } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	    test -z "$$files" || { \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(toolsdir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(toolsdir)$$dir" || exit $$?; \
+	    } \
+	; done
+
+uninstall-toolsPROGRAMS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(tools_PROGRAMS)'; test -n "$(toolsdir)" || list=; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
+	      -e 's/$$/$(EXEEXT)/' `; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(toolsdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(toolsdir)" && rm -f $$files
+
+clean-toolsPROGRAMS:
+	@list='$(tools_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+rpkirtr_client$(EXEEXT): $(rpkirtr_client_OBJECTS) $(rpkirtr_client_DEPENDENCIES) 
+	@rm -f rpkirtr_client$(EXEEXT)
+	$(LINK) $(rpkirtr_client_OBJECTS) $(rpkirtr_client_LDADD) $(LIBS)
+rpkirtr_svr$(EXEEXT): $(rpkirtr_svr_OBJECTS) $(rpkirtr_svr_DEPENDENCIES) 
+	@rm -f rpkirtr_svr$(EXEEXT)
+	$(LINK) $(rpkirtr_svr_OBJECTS) $(rpkirtr_svr_LDADD) $(LIBS)
+srx_server$(EXEEXT): $(srx_server_OBJECTS) $(srx_server_DEPENDENCIES) 
+	@rm -f srx_server$(EXEEXT)
+	$(srx_server_LINK) $(srx_server_OBJECTS) $(srx_server_LDADD) $(LIBS)
+srxsvr_client$(EXEEXT): $(srxsvr_client_OBJECTS) $(srxsvr_client_DEPENDENCIES) 
+	@rm -f srxsvr_client$(EXEEXT)
+	$(LINK) $(srxsvr_client_OBJECTS) $(srxsvr_client_LDADD) $(LIBS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT)
+
+distclean-compile:
+	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsec_handler.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_connection_handler.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_socket.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/command_handler.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/command_queue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configuration.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/console.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc32.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/directory.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/key_cache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multi_client_socket.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mutex.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/packet.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/plugin.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/prefix.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/prefix_cache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_handler.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_router_client.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpkirtr_client.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpkirtr_svr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwlock.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/server_connection_handler.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/server_socket.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/slist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/socket.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srx_api.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srx_identifier.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srx_packet_sender.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srx_packets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srxsvr_client.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/str.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/timer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/update_cache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xml_out.Plo@am__quote@
+
+.c.o:
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+
+.c.lo:
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
+
+client_connection_handler.lo: $(CLIENT_DIR)/client_connection_handler.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT client_connection_handler.lo -MD -MP -MF $(DEPDIR)/client_connection_handler.Tpo -c -o client_connection_handler.lo `test -f '$(CLIENT_DIR)/client_connection_handler.c' || echo '$(srcdir)/'`$(CLIENT_DIR)/client_connection_handler.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/client_connection_handler.Tpo $(DEPDIR)/client_connection_handler.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(CLIENT_DIR)/client_connection_handler.c' object='client_connection_handler.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o client_connection_handler.lo `test -f '$(CLIENT_DIR)/client_connection_handler.c' || echo '$(srcdir)/'`$(CLIENT_DIR)/client_connection_handler.c
+
+srx_api.lo: $(CLIENT_DIR)/srx_api.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srx_api.lo -MD -MP -MF $(DEPDIR)/srx_api.Tpo -c -o srx_api.lo `test -f '$(CLIENT_DIR)/srx_api.c' || echo '$(srcdir)/'`$(CLIENT_DIR)/srx_api.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srx_api.Tpo $(DEPDIR)/srx_api.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(CLIENT_DIR)/srx_api.c' object='srx_api.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srx_api.lo `test -f '$(CLIENT_DIR)/srx_api.c' || echo '$(srcdir)/'`$(CLIENT_DIR)/srx_api.c
+
+srx_packets.lo: $(SHARED_DIR)/srx_packets.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srx_packets.lo -MD -MP -MF $(DEPDIR)/srx_packets.Tpo -c -o srx_packets.lo `test -f '$(SHARED_DIR)/srx_packets.c' || echo '$(srcdir)/'`$(SHARED_DIR)/srx_packets.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srx_packets.Tpo $(DEPDIR)/srx_packets.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SHARED_DIR)/srx_packets.c' object='srx_packets.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srx_packets.lo `test -f '$(SHARED_DIR)/srx_packets.c' || echo '$(srcdir)/'`$(SHARED_DIR)/srx_packets.c
+
+srx_identifier.lo: $(SHARED_DIR)/srx_identifier.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srx_identifier.lo -MD -MP -MF $(DEPDIR)/srx_identifier.Tpo -c -o srx_identifier.lo `test -f '$(SHARED_DIR)/srx_identifier.c' || echo '$(srcdir)/'`$(SHARED_DIR)/srx_identifier.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srx_identifier.Tpo $(DEPDIR)/srx_identifier.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SHARED_DIR)/srx_identifier.c' object='srx_identifier.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srx_identifier.lo `test -f '$(SHARED_DIR)/srx_identifier.c' || echo '$(srcdir)/'`$(SHARED_DIR)/srx_identifier.c
+
+crc32.lo: $(SHARED_DIR)/crc32.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT crc32.lo -MD -MP -MF $(DEPDIR)/crc32.Tpo -c -o crc32.lo `test -f '$(SHARED_DIR)/crc32.c' || echo '$(srcdir)/'`$(SHARED_DIR)/crc32.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/crc32.Tpo $(DEPDIR)/crc32.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SHARED_DIR)/crc32.c' object='crc32.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o crc32.lo `test -f '$(SHARED_DIR)/crc32.c' || echo '$(srcdir)/'`$(SHARED_DIR)/crc32.c
+
+client_socket.lo: $(UTIL_DIR)/client_socket.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT client_socket.lo -MD -MP -MF $(DEPDIR)/client_socket.Tpo -c -o client_socket.lo `test -f '$(UTIL_DIR)/client_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/client_socket.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/client_socket.Tpo $(DEPDIR)/client_socket.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/client_socket.c' object='client_socket.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o client_socket.lo `test -f '$(UTIL_DIR)/client_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/client_socket.c
+
+debug.lo: $(UTIL_DIR)/debug.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT debug.lo -MD -MP -MF $(DEPDIR)/debug.Tpo -c -o debug.lo `test -f '$(UTIL_DIR)/debug.c' || echo '$(srcdir)/'`$(UTIL_DIR)/debug.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/debug.Tpo $(DEPDIR)/debug.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/debug.c' object='debug.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o debug.lo `test -f '$(UTIL_DIR)/debug.c' || echo '$(srcdir)/'`$(UTIL_DIR)/debug.c
+
+directory.lo: $(UTIL_DIR)/directory.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT directory.lo -MD -MP -MF $(DEPDIR)/directory.Tpo -c -o directory.lo `test -f '$(UTIL_DIR)/directory.c' || echo '$(srcdir)/'`$(UTIL_DIR)/directory.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/directory.Tpo $(DEPDIR)/directory.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/directory.c' object='directory.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o directory.lo `test -f '$(UTIL_DIR)/directory.c' || echo '$(srcdir)/'`$(UTIL_DIR)/directory.c
+
+log.lo: $(UTIL_DIR)/log.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT log.lo -MD -MP -MF $(DEPDIR)/log.Tpo -c -o log.lo `test -f '$(UTIL_DIR)/log.c' || echo '$(srcdir)/'`$(UTIL_DIR)/log.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/log.Tpo $(DEPDIR)/log.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/log.c' object='log.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o log.lo `test -f '$(UTIL_DIR)/log.c' || echo '$(srcdir)/'`$(UTIL_DIR)/log.c
+
+multi_client_socket.lo: $(UTIL_DIR)/multi_client_socket.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT multi_client_socket.lo -MD -MP -MF $(DEPDIR)/multi_client_socket.Tpo -c -o multi_client_socket.lo `test -f '$(UTIL_DIR)/multi_client_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/multi_client_socket.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/multi_client_socket.Tpo $(DEPDIR)/multi_client_socket.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/multi_client_socket.c' object='multi_client_socket.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o multi_client_socket.lo `test -f '$(UTIL_DIR)/multi_client_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/multi_client_socket.c
+
+mutex.lo: $(UTIL_DIR)/mutex.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mutex.lo -MD -MP -MF $(DEPDIR)/mutex.Tpo -c -o mutex.lo `test -f '$(UTIL_DIR)/mutex.c' || echo '$(srcdir)/'`$(UTIL_DIR)/mutex.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/mutex.Tpo $(DEPDIR)/mutex.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/mutex.c' object='mutex.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mutex.lo `test -f '$(UTIL_DIR)/mutex.c' || echo '$(srcdir)/'`$(UTIL_DIR)/mutex.c
+
+packet.lo: $(UTIL_DIR)/packet.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT packet.lo -MD -MP -MF $(DEPDIR)/packet.Tpo -c -o packet.lo `test -f '$(UTIL_DIR)/packet.c' || echo '$(srcdir)/'`$(UTIL_DIR)/packet.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/packet.Tpo $(DEPDIR)/packet.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/packet.c' object='packet.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o packet.lo `test -f '$(UTIL_DIR)/packet.c' || echo '$(srcdir)/'`$(UTIL_DIR)/packet.c
+
+plugin.lo: $(UTIL_DIR)/plugin.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT plugin.lo -MD -MP -MF $(DEPDIR)/plugin.Tpo -c -o plugin.lo `test -f '$(UTIL_DIR)/plugin.c' || echo '$(srcdir)/'`$(UTIL_DIR)/plugin.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/plugin.Tpo $(DEPDIR)/plugin.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/plugin.c' object='plugin.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o plugin.lo `test -f '$(UTIL_DIR)/plugin.c' || echo '$(srcdir)/'`$(UTIL_DIR)/plugin.c
+
+prefix.lo: $(UTIL_DIR)/prefix.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT prefix.lo -MD -MP -MF $(DEPDIR)/prefix.Tpo -c -o prefix.lo `test -f '$(UTIL_DIR)/prefix.c' || echo '$(srcdir)/'`$(UTIL_DIR)/prefix.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/prefix.Tpo $(DEPDIR)/prefix.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/prefix.c' object='prefix.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o prefix.lo `test -f '$(UTIL_DIR)/prefix.c' || echo '$(srcdir)/'`$(UTIL_DIR)/prefix.c
+
+rwlock.lo: $(UTIL_DIR)/rwlock.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rwlock.lo -MD -MP -MF $(DEPDIR)/rwlock.Tpo -c -o rwlock.lo `test -f '$(UTIL_DIR)/rwlock.c' || echo '$(srcdir)/'`$(UTIL_DIR)/rwlock.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rwlock.Tpo $(DEPDIR)/rwlock.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/rwlock.c' object='rwlock.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rwlock.lo `test -f '$(UTIL_DIR)/rwlock.c' || echo '$(srcdir)/'`$(UTIL_DIR)/rwlock.c
+
+server_socket.lo: $(UTIL_DIR)/server_socket.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT server_socket.lo -MD -MP -MF $(DEPDIR)/server_socket.Tpo -c -o server_socket.lo `test -f '$(UTIL_DIR)/server_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/server_socket.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/server_socket.Tpo $(DEPDIR)/server_socket.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/server_socket.c' object='server_socket.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o server_socket.lo `test -f '$(UTIL_DIR)/server_socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/server_socket.c
+
+slist.lo: $(UTIL_DIR)/slist.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT slist.lo -MD -MP -MF $(DEPDIR)/slist.Tpo -c -o slist.lo `test -f '$(UTIL_DIR)/slist.c' || echo '$(srcdir)/'`$(UTIL_DIR)/slist.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/slist.Tpo $(DEPDIR)/slist.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/slist.c' object='slist.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o slist.lo `test -f '$(UTIL_DIR)/slist.c' || echo '$(srcdir)/'`$(UTIL_DIR)/slist.c
+
+socket.lo: $(UTIL_DIR)/socket.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT socket.lo -MD -MP -MF $(DEPDIR)/socket.Tpo -c -o socket.lo `test -f '$(UTIL_DIR)/socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/socket.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/socket.Tpo $(DEPDIR)/socket.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/socket.c' object='socket.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o socket.lo `test -f '$(UTIL_DIR)/socket.c' || echo '$(srcdir)/'`$(UTIL_DIR)/socket.c
+
+str.lo: $(UTIL_DIR)/str.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT str.lo -MD -MP -MF $(DEPDIR)/str.Tpo -c -o str.lo `test -f '$(UTIL_DIR)/str.c' || echo '$(srcdir)/'`$(UTIL_DIR)/str.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/str.Tpo $(DEPDIR)/str.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/str.c' object='str.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o str.lo `test -f '$(UTIL_DIR)/str.c' || echo '$(srcdir)/'`$(UTIL_DIR)/str.c
+
+timer.lo: $(UTIL_DIR)/timer.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT timer.lo -MD -MP -MF $(DEPDIR)/timer.Tpo -c -o timer.lo `test -f '$(UTIL_DIR)/timer.c' || echo '$(srcdir)/'`$(UTIL_DIR)/timer.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/timer.Tpo $(DEPDIR)/timer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/timer.c' object='timer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o timer.lo `test -f '$(UTIL_DIR)/timer.c' || echo '$(srcdir)/'`$(UTIL_DIR)/timer.c
+
+xml_out.lo: $(UTIL_DIR)/xml_out.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xml_out.lo -MD -MP -MF $(DEPDIR)/xml_out.Tpo -c -o xml_out.lo `test -f '$(UTIL_DIR)/xml_out.c' || echo '$(srcdir)/'`$(UTIL_DIR)/xml_out.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/xml_out.Tpo $(DEPDIR)/xml_out.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(UTIL_DIR)/xml_out.c' object='xml_out.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xml_out.lo `test -f '$(UTIL_DIR)/xml_out.c' || echo '$(srcdir)/'`$(UTIL_DIR)/xml_out.c
+
+rpkirtr_client.o: $(TOOLS_DIR)/rpkirtr_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpkirtr_client.o -MD -MP -MF $(DEPDIR)/rpkirtr_client.Tpo -c -o rpkirtr_client.o `test -f '$(TOOLS_DIR)/rpkirtr_client.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/rpkirtr_client.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpkirtr_client.Tpo $(DEPDIR)/rpkirtr_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/rpkirtr_client.c' object='rpkirtr_client.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpkirtr_client.o `test -f '$(TOOLS_DIR)/rpkirtr_client.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/rpkirtr_client.c
+
+rpkirtr_client.obj: $(TOOLS_DIR)/rpkirtr_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpkirtr_client.obj -MD -MP -MF $(DEPDIR)/rpkirtr_client.Tpo -c -o rpkirtr_client.obj `if test -f '$(TOOLS_DIR)/rpkirtr_client.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/rpkirtr_client.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/rpkirtr_client.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpkirtr_client.Tpo $(DEPDIR)/rpkirtr_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/rpkirtr_client.c' object='rpkirtr_client.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpkirtr_client.obj `if test -f '$(TOOLS_DIR)/rpkirtr_client.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/rpkirtr_client.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/rpkirtr_client.c'; fi`
+
+rpki_router_client.o: $(SERVER_DIR)/rpki_router_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_router_client.o -MD -MP -MF $(DEPDIR)/rpki_router_client.Tpo -c -o rpki_router_client.o `test -f '$(SERVER_DIR)/rpki_router_client.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_router_client.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_router_client.Tpo $(DEPDIR)/rpki_router_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_router_client.c' object='rpki_router_client.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_router_client.o `test -f '$(SERVER_DIR)/rpki_router_client.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_router_client.c
+
+rpki_router_client.obj: $(SERVER_DIR)/rpki_router_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_router_client.obj -MD -MP -MF $(DEPDIR)/rpki_router_client.Tpo -c -o rpki_router_client.obj `if test -f '$(SERVER_DIR)/rpki_router_client.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_router_client.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_router_client.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_router_client.Tpo $(DEPDIR)/rpki_router_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_router_client.c' object='rpki_router_client.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_router_client.obj `if test -f '$(SERVER_DIR)/rpki_router_client.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_router_client.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_router_client.c'; fi`
+
+rpkirtr_svr.o: $(TOOLS_DIR)/rpkirtr_svr.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpkirtr_svr.o -MD -MP -MF $(DEPDIR)/rpkirtr_svr.Tpo -c -o rpkirtr_svr.o `test -f '$(TOOLS_DIR)/rpkirtr_svr.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/rpkirtr_svr.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpkirtr_svr.Tpo $(DEPDIR)/rpkirtr_svr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/rpkirtr_svr.c' object='rpkirtr_svr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpkirtr_svr.o `test -f '$(TOOLS_DIR)/rpkirtr_svr.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/rpkirtr_svr.c
+
+rpkirtr_svr.obj: $(TOOLS_DIR)/rpkirtr_svr.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpkirtr_svr.obj -MD -MP -MF $(DEPDIR)/rpkirtr_svr.Tpo -c -o rpkirtr_svr.obj `if test -f '$(TOOLS_DIR)/rpkirtr_svr.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/rpkirtr_svr.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/rpkirtr_svr.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpkirtr_svr.Tpo $(DEPDIR)/rpkirtr_svr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/rpkirtr_svr.c' object='rpkirtr_svr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpkirtr_svr.obj `if test -f '$(TOOLS_DIR)/rpkirtr_svr.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/rpkirtr_svr.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/rpkirtr_svr.c'; fi`
+
+bgpsec_handler.o: $(SERVER_DIR)/bgpsec_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT bgpsec_handler.o -MD -MP -MF $(DEPDIR)/bgpsec_handler.Tpo -c -o bgpsec_handler.o `test -f '$(SERVER_DIR)/bgpsec_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/bgpsec_handler.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/bgpsec_handler.Tpo $(DEPDIR)/bgpsec_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/bgpsec_handler.c' object='bgpsec_handler.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o bgpsec_handler.o `test -f '$(SERVER_DIR)/bgpsec_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/bgpsec_handler.c
+
+bgpsec_handler.obj: $(SERVER_DIR)/bgpsec_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT bgpsec_handler.obj -MD -MP -MF $(DEPDIR)/bgpsec_handler.Tpo -c -o bgpsec_handler.obj `if test -f '$(SERVER_DIR)/bgpsec_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/bgpsec_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/bgpsec_handler.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/bgpsec_handler.Tpo $(DEPDIR)/bgpsec_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/bgpsec_handler.c' object='bgpsec_handler.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o bgpsec_handler.obj `if test -f '$(SERVER_DIR)/bgpsec_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/bgpsec_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/bgpsec_handler.c'; fi`
+
+command_handler.o: $(SERVER_DIR)/command_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT command_handler.o -MD -MP -MF $(DEPDIR)/command_handler.Tpo -c -o command_handler.o `test -f '$(SERVER_DIR)/command_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/command_handler.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/command_handler.Tpo $(DEPDIR)/command_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/command_handler.c' object='command_handler.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o command_handler.o `test -f '$(SERVER_DIR)/command_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/command_handler.c
+
+command_handler.obj: $(SERVER_DIR)/command_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT command_handler.obj -MD -MP -MF $(DEPDIR)/command_handler.Tpo -c -o command_handler.obj `if test -f '$(SERVER_DIR)/command_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/command_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/command_handler.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/command_handler.Tpo $(DEPDIR)/command_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/command_handler.c' object='command_handler.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o command_handler.obj `if test -f '$(SERVER_DIR)/command_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/command_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/command_handler.c'; fi`
+
+command_queue.o: $(SERVER_DIR)/command_queue.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT command_queue.o -MD -MP -MF $(DEPDIR)/command_queue.Tpo -c -o command_queue.o `test -f '$(SERVER_DIR)/command_queue.c' || echo '$(srcdir)/'`$(SERVER_DIR)/command_queue.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/command_queue.Tpo $(DEPDIR)/command_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/command_queue.c' object='command_queue.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o command_queue.o `test -f '$(SERVER_DIR)/command_queue.c' || echo '$(srcdir)/'`$(SERVER_DIR)/command_queue.c
+
+command_queue.obj: $(SERVER_DIR)/command_queue.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT command_queue.obj -MD -MP -MF $(DEPDIR)/command_queue.Tpo -c -o command_queue.obj `if test -f '$(SERVER_DIR)/command_queue.c'; then $(CYGPATH_W) '$(SERVER_DIR)/command_queue.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/command_queue.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/command_queue.Tpo $(DEPDIR)/command_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/command_queue.c' object='command_queue.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o command_queue.obj `if test -f '$(SERVER_DIR)/command_queue.c'; then $(CYGPATH_W) '$(SERVER_DIR)/command_queue.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/command_queue.c'; fi`
+
+configuration.o: $(SERVER_DIR)/configuration.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT configuration.o -MD -MP -MF $(DEPDIR)/configuration.Tpo -c -o configuration.o `test -f '$(SERVER_DIR)/configuration.c' || echo '$(srcdir)/'`$(SERVER_DIR)/configuration.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/configuration.Tpo $(DEPDIR)/configuration.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/configuration.c' object='configuration.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o configuration.o `test -f '$(SERVER_DIR)/configuration.c' || echo '$(srcdir)/'`$(SERVER_DIR)/configuration.c
+
+configuration.obj: $(SERVER_DIR)/configuration.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT configuration.obj -MD -MP -MF $(DEPDIR)/configuration.Tpo -c -o configuration.obj `if test -f '$(SERVER_DIR)/configuration.c'; then $(CYGPATH_W) '$(SERVER_DIR)/configuration.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/configuration.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/configuration.Tpo $(DEPDIR)/configuration.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/configuration.c' object='configuration.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o configuration.obj `if test -f '$(SERVER_DIR)/configuration.c'; then $(CYGPATH_W) '$(SERVER_DIR)/configuration.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/configuration.c'; fi`
+
+console.o: $(SERVER_DIR)/console.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT console.o -MD -MP -MF $(DEPDIR)/console.Tpo -c -o console.o `test -f '$(SERVER_DIR)/console.c' || echo '$(srcdir)/'`$(SERVER_DIR)/console.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/console.Tpo $(DEPDIR)/console.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/console.c' object='console.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o console.o `test -f '$(SERVER_DIR)/console.c' || echo '$(srcdir)/'`$(SERVER_DIR)/console.c
+
+console.obj: $(SERVER_DIR)/console.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT console.obj -MD -MP -MF $(DEPDIR)/console.Tpo -c -o console.obj `if test -f '$(SERVER_DIR)/console.c'; then $(CYGPATH_W) '$(SERVER_DIR)/console.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/console.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/console.Tpo $(DEPDIR)/console.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/console.c' object='console.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o console.obj `if test -f '$(SERVER_DIR)/console.c'; then $(CYGPATH_W) '$(SERVER_DIR)/console.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/console.c'; fi`
+
+key_cache.o: $(SERVER_DIR)/key_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT key_cache.o -MD -MP -MF $(DEPDIR)/key_cache.Tpo -c -o key_cache.o `test -f '$(SERVER_DIR)/key_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/key_cache.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/key_cache.Tpo $(DEPDIR)/key_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/key_cache.c' object='key_cache.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o key_cache.o `test -f '$(SERVER_DIR)/key_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/key_cache.c
+
+key_cache.obj: $(SERVER_DIR)/key_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT key_cache.obj -MD -MP -MF $(DEPDIR)/key_cache.Tpo -c -o key_cache.obj `if test -f '$(SERVER_DIR)/key_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/key_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/key_cache.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/key_cache.Tpo $(DEPDIR)/key_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/key_cache.c' object='key_cache.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o key_cache.obj `if test -f '$(SERVER_DIR)/key_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/key_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/key_cache.c'; fi`
+
+main.o: $(SERVER_DIR)/main.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT main.o -MD -MP -MF $(DEPDIR)/main.Tpo -c -o main.o `test -f '$(SERVER_DIR)/main.c' || echo '$(srcdir)/'`$(SERVER_DIR)/main.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/main.Tpo $(DEPDIR)/main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/main.c' object='main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o main.o `test -f '$(SERVER_DIR)/main.c' || echo '$(srcdir)/'`$(SERVER_DIR)/main.c
+
+main.obj: $(SERVER_DIR)/main.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT main.obj -MD -MP -MF $(DEPDIR)/main.Tpo -c -o main.obj `if test -f '$(SERVER_DIR)/main.c'; then $(CYGPATH_W) '$(SERVER_DIR)/main.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/main.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/main.Tpo $(DEPDIR)/main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/main.c' object='main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o main.obj `if test -f '$(SERVER_DIR)/main.c'; then $(CYGPATH_W) '$(SERVER_DIR)/main.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/main.c'; fi`
+
+prefix_cache.o: $(SERVER_DIR)/prefix_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT prefix_cache.o -MD -MP -MF $(DEPDIR)/prefix_cache.Tpo -c -o prefix_cache.o `test -f '$(SERVER_DIR)/prefix_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/prefix_cache.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/prefix_cache.Tpo $(DEPDIR)/prefix_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/prefix_cache.c' object='prefix_cache.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o prefix_cache.o `test -f '$(SERVER_DIR)/prefix_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/prefix_cache.c
+
+prefix_cache.obj: $(SERVER_DIR)/prefix_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT prefix_cache.obj -MD -MP -MF $(DEPDIR)/prefix_cache.Tpo -c -o prefix_cache.obj `if test -f '$(SERVER_DIR)/prefix_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/prefix_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/prefix_cache.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/prefix_cache.Tpo $(DEPDIR)/prefix_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/prefix_cache.c' object='prefix_cache.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o prefix_cache.obj `if test -f '$(SERVER_DIR)/prefix_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/prefix_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/prefix_cache.c'; fi`
+
+rpki_handler.o: $(SERVER_DIR)/rpki_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_handler.o -MD -MP -MF $(DEPDIR)/rpki_handler.Tpo -c -o rpki_handler.o `test -f '$(SERVER_DIR)/rpki_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_handler.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_handler.Tpo $(DEPDIR)/rpki_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_handler.c' object='rpki_handler.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_handler.o `test -f '$(SERVER_DIR)/rpki_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_handler.c
+
+rpki_handler.obj: $(SERVER_DIR)/rpki_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_handler.obj -MD -MP -MF $(DEPDIR)/rpki_handler.Tpo -c -o rpki_handler.obj `if test -f '$(SERVER_DIR)/rpki_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_handler.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_handler.Tpo $(DEPDIR)/rpki_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_handler.c' object='rpki_handler.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_handler.obj `if test -f '$(SERVER_DIR)/rpki_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_handler.c'; fi`
+
+server_connection_handler.o: $(SERVER_DIR)/server_connection_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT server_connection_handler.o -MD -MP -MF $(DEPDIR)/server_connection_handler.Tpo -c -o server_connection_handler.o `test -f '$(SERVER_DIR)/server_connection_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/server_connection_handler.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/server_connection_handler.Tpo $(DEPDIR)/server_connection_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/server_connection_handler.c' object='server_connection_handler.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o server_connection_handler.o `test -f '$(SERVER_DIR)/server_connection_handler.c' || echo '$(srcdir)/'`$(SERVER_DIR)/server_connection_handler.c
+
+server_connection_handler.obj: $(SERVER_DIR)/server_connection_handler.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT server_connection_handler.obj -MD -MP -MF $(DEPDIR)/server_connection_handler.Tpo -c -o server_connection_handler.obj `if test -f '$(SERVER_DIR)/server_connection_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/server_connection_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/server_connection_handler.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/server_connection_handler.Tpo $(DEPDIR)/server_connection_handler.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/server_connection_handler.c' object='server_connection_handler.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o server_connection_handler.obj `if test -f '$(SERVER_DIR)/server_connection_handler.c'; then $(CYGPATH_W) '$(SERVER_DIR)/server_connection_handler.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/server_connection_handler.c'; fi`
+
+srx_packet_sender.o: $(SERVER_DIR)/srx_packet_sender.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srx_packet_sender.o -MD -MP -MF $(DEPDIR)/srx_packet_sender.Tpo -c -o srx_packet_sender.o `test -f '$(SERVER_DIR)/srx_packet_sender.c' || echo '$(srcdir)/'`$(SERVER_DIR)/srx_packet_sender.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srx_packet_sender.Tpo $(DEPDIR)/srx_packet_sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/srx_packet_sender.c' object='srx_packet_sender.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srx_packet_sender.o `test -f '$(SERVER_DIR)/srx_packet_sender.c' || echo '$(srcdir)/'`$(SERVER_DIR)/srx_packet_sender.c
+
+srx_packet_sender.obj: $(SERVER_DIR)/srx_packet_sender.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srx_packet_sender.obj -MD -MP -MF $(DEPDIR)/srx_packet_sender.Tpo -c -o srx_packet_sender.obj `if test -f '$(SERVER_DIR)/srx_packet_sender.c'; then $(CYGPATH_W) '$(SERVER_DIR)/srx_packet_sender.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/srx_packet_sender.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srx_packet_sender.Tpo $(DEPDIR)/srx_packet_sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/srx_packet_sender.c' object='srx_packet_sender.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srx_packet_sender.obj `if test -f '$(SERVER_DIR)/srx_packet_sender.c'; then $(CYGPATH_W) '$(SERVER_DIR)/srx_packet_sender.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/srx_packet_sender.c'; fi`
+
+update_cache.o: $(SERVER_DIR)/update_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT update_cache.o -MD -MP -MF $(DEPDIR)/update_cache.Tpo -c -o update_cache.o `test -f '$(SERVER_DIR)/update_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/update_cache.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/update_cache.Tpo $(DEPDIR)/update_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/update_cache.c' object='update_cache.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o update_cache.o `test -f '$(SERVER_DIR)/update_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/update_cache.c
+
+update_cache.obj: $(SERVER_DIR)/update_cache.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT update_cache.obj -MD -MP -MF $(DEPDIR)/update_cache.Tpo -c -o update_cache.obj `if test -f '$(SERVER_DIR)/update_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/update_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/update_cache.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/update_cache.Tpo $(DEPDIR)/update_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/update_cache.c' object='update_cache.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o update_cache.obj `if test -f '$(SERVER_DIR)/update_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/update_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/update_cache.c'; fi`
+
+srxsvr_client.o: $(TOOLS_DIR)/srxsvr_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srxsvr_client.o -MD -MP -MF $(DEPDIR)/srxsvr_client.Tpo -c -o srxsvr_client.o `test -f '$(TOOLS_DIR)/srxsvr_client.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/srxsvr_client.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srxsvr_client.Tpo $(DEPDIR)/srxsvr_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/srxsvr_client.c' object='srxsvr_client.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srxsvr_client.o `test -f '$(TOOLS_DIR)/srxsvr_client.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/srxsvr_client.c
+
+srxsvr_client.obj: $(TOOLS_DIR)/srxsvr_client.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srxsvr_client.obj -MD -MP -MF $(DEPDIR)/srxsvr_client.Tpo -c -o srxsvr_client.obj `if test -f '$(TOOLS_DIR)/srxsvr_client.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/srxsvr_client.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/srxsvr_client.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/srxsvr_client.Tpo $(DEPDIR)/srxsvr_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/srxsvr_client.c' object='srxsvr_client.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o srxsvr_client.obj `if test -f '$(TOOLS_DIR)/srxsvr_client.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/srxsvr_client.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/srxsvr_client.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -314,76 +1137,66 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool config.lt
-
-# This directory's subdirectories are mostly independent; you can cd
-# into them and run `make' without going through this Makefile.
-# To change the values of `make' variables: instead of editing Makefiles,
-# (1) if the variable is set in `config.status', edit `config.status'
-#     (which will cause the Makefiles to be regenerated when you run `make');
-# (2) otherwise, pass the desired values on the `make' command line.
-$(RECURSIVE_TARGETS):
-	@fail= failcom='exit 1'; \
-	for f in x $$MAKEFLAGS; do \
-	  case $$f in \
-	    *=* | --[!k]*);; \
-	    *k*) failcom='fail=yes';; \
-	  esac; \
-	done; \
-	dot_seen=no; \
-	target=`echo $@ | sed s/-recursive//`; \
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  echo "Making $$target in $$subdir"; \
-	  if test "$$subdir" = "."; then \
-	    dot_seen=yes; \
-	    local_target="$$target-am"; \
-	  else \
-	    local_target="$$target"; \
-	  fi; \
-	  ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
-	  || eval $$failcom; \
-	done; \
-	if test "$$dot_seen" = "no"; then \
-	  $(MAKE) $(AM_MAKEFLAGS) "$$target-am" || exit 1; \
-	fi; test -z "$$fail"
-
-$(RECURSIVE_CLEAN_TARGETS):
-	@fail= failcom='exit 1'; \
-	for f in x $$MAKEFLAGS; do \
-	  case $$f in \
-	    *=* | --[!k]*);; \
-	    *k*) failcom='fail=yes';; \
-	  esac; \
-	done; \
-	dot_seen=no; \
-	case "$@" in \
-	  distclean-* | maintainer-clean-*) list='$(DIST_SUBDIRS)' ;; \
-	  *) list='$(SUBDIRS)' ;; \
-	esac; \
-	rev=''; for subdir in $$list; do \
-	  if test "$$subdir" = "."; then :; else \
-	    rev="$$subdir $$rev"; \
-	  fi; \
-	done; \
-	rev="$$rev ."; \
-	target=`echo $@ | sed s/-recursive//`; \
-	for subdir in $$rev; do \
-	  echo "Making $$target in $$subdir"; \
-	  if test "$$subdir" = "."; then \
-	    local_target="$$target-am"; \
-	  else \
-	    local_target="$$target"; \
-	  fi; \
-	  ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
-	  || eval $$failcom; \
-	done && test -z "$$fail"
-tags-recursive:
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  test "$$subdir" = . || ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) tags); \
+install-dist_libSRxProxy_libconfigDATA: $(dist_libSRxProxy_libconfig_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(libSRxProxy_libconfigdir)" || $(MKDIR_P) "$(DESTDIR)$(libSRxProxy_libconfigdir)"
+	@list='$(dist_libSRxProxy_libconfig_DATA)'; test -n "$(libSRxProxy_libconfigdir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(libSRxProxy_libconfigdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(libSRxProxy_libconfigdir)" || exit $$?; \
 	done
-ctags-recursive:
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  test "$$subdir" = . || ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) ctags); \
+
+uninstall-dist_libSRxProxy_libconfigDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_libSRxProxy_libconfig_DATA)'; test -n "$(libSRxProxy_libconfigdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(libSRxProxy_libconfigdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(libSRxProxy_libconfigdir)" && rm -f $$files
+install-dist_srx_configDATA: $(dist_srx_config_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(srx_configdir)" || $(MKDIR_P) "$(DESTDIR)$(srx_configdir)"
+	@list='$(dist_srx_config_DATA)'; test -n "$(srx_configdir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(srx_configdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(srx_configdir)" || exit $$?; \
 	done
+
+uninstall-dist_srx_configDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_srx_config_DATA)'; test -n "$(srx_configdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(srx_configdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(srx_configdir)" && rm -f $$files
+install-dist_srx_initdDATA: $(dist_srx_initd_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(srx_initddir)" || $(MKDIR_P) "$(DESTDIR)$(srx_initddir)"
+	@list='$(dist_srx_initd_DATA)'; test -n "$(srx_initddir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(srx_initddir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(srx_initddir)" || exit $$?; \
+	done
+
+uninstall-dist_srx_initdDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_srx_initd_DATA)'; test -n "$(srx_initddir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(srx_initddir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(srx_initddir)" && rm -f $$files
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -395,23 +1208,10 @@ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	mkid -fID $$unique
 tags: TAGS
 
-TAGS: tags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
+TAGS:  $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	set x; \
 	here=`pwd`; \
-	if ($(ETAGS) --etags-include --version) >/dev/null 2>&1; then \
-	  include_option=--etags-include; \
-	  empty_fix=.; \
-	else \
-	  include_option=--include; \
-	  empty_fix=; \
-	fi; \
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    test ! -f $$subdir/TAGS || \
-	      set "$$@" "$$include_option=$$here/$$subdir/TAGS"; \
-	  fi; \
-	done; \
 	list='$(SOURCES) $(HEADERS) config.h.in $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
 	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
@@ -430,7 +1230,7 @@ TAGS: tags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 	  fi; \
 	fi
 ctags: CTAGS
-CTAGS: ctags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
+CTAGS:  $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	list='$(SOURCES) $(HEADERS) config.h.in $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
@@ -480,34 +1280,6 @@ distdir: $(DISTFILES)
 	    test -f "$(distdir)/$$file" \
 	    || cp -p $$d/$$file "$(distdir)/$$file" \
 	    || exit 1; \
-	  fi; \
-	done
-	@list='$(DIST_SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    test -d "$(distdir)/$$subdir" \
-	    || $(MKDIR_P) "$(distdir)/$$subdir" \
-	    || exit 1; \
-	  fi; \
-	done
-	@list='$(DIST_SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    dir1=$$subdir; dir2="$(distdir)/$$subdir"; \
-	    $(am__relativize); \
-	    new_distdir=$$reldir; \
-	    dir1=$$subdir; dir2="$(top_distdir)"; \
-	    $(am__relativize); \
-	    new_top_distdir=$$reldir; \
-	    echo " (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) top_distdir="$$new_top_distdir" distdir="$$new_distdir" \\"; \
-	    echo "     am__remove_distdir=: am__skip_length_check=: am__skip_mode_fix=: distdir)"; \
-	    ($(am__cd) $$subdir && \
-	      $(MAKE) $(AM_MAKEFLAGS) \
-	        top_distdir="$$new_top_distdir" \
-	        distdir="$$new_distdir" \
-		am__remove_distdir=: \
-		am__skip_length_check=: \
-		am__skip_mode_fix=: \
-	        distdir) \
-	      || exit 1; \
 	  fi; \
 	done
 	-test -n "$(am__skip_mode_fix)" \
@@ -626,19 +1398,22 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 check-am: all-am
-check: check-recursive
-all-am: Makefile config.h all-local
-installdirs: installdirs-recursive
-installdirs-am:
-install: install-recursive
-install-exec: install-exec-recursive
-install-data: install-data-recursive
-uninstall: uninstall-recursive
+check: check-am
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(DATA) $(HEADERS) \
+		config.h all-local
+installdirs:
+	for dir in "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(srxdir)" "$(DESTDIR)$(toolsdir)" "$(DESTDIR)$(libSRxProxy_libconfigdir)" "$(DESTDIR)$(srx_configdir)" "$(DESTDIR)$(srx_initddir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
+install: install-am
+install-exec: install-exec-am
+install-data: install-data-am
+uninstall: uninstall-am
 
 install-am: all-am
 	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
 
-installcheck: installcheck-recursive
+installcheck: installcheck-am
 install-strip:
 	$(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
 	  install_sh_PROGRAM="$(INSTALL_STRIP_PROGRAM)" INSTALL_STRIP_FLAG=-s \
@@ -655,114 +1430,117 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean: clean-recursive
+clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-local mostlyclean-am
+clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
+	clean-pkglibLTLIBRARIES clean-srxPROGRAMS clean-toolsPROGRAMS \
+	mostlyclean-am
 
-distclean: distclean-recursive
+distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-distclean-am: clean-am distclean-generic distclean-hdr \
-	distclean-libtool distclean-tags
+distclean-am: clean-am distclean-compile distclean-generic \
+	distclean-hdr distclean-libtool distclean-local distclean-tags
 
-dvi: dvi-recursive
+dvi: dvi-am
 
 dvi-am:
 
-html: html-recursive
+html: html-am
 
 html-am:
 
-info: info-recursive
+info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-dist_libSRxProxy_libconfigDATA \
+	install-dist_srx_configDATA install-dist_srx_initdDATA \
+	install-srxPROGRAMS install-toolsPROGRAMS
 
-install-dvi: install-dvi-recursive
+install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am:
+install-exec-am: install-exec-local install-pkglibLTLIBRARIES
 
-install-html: install-html-recursive
+install-html: install-html-am
 
 install-html-am:
 
-install-info: install-info-recursive
+install-info: install-info-am
 
 install-info-am:
 
 install-man:
 
-install-pdf: install-pdf-recursive
+install-pdf: install-pdf-am
 
 install-pdf-am:
 
-install-ps: install-ps-recursive
+install-ps: install-ps-am
 
 install-ps-am:
 
 installcheck-am:
 
-maintainer-clean: maintainer-clean-recursive
+maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
-mostlyclean: mostlyclean-recursive
+mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-generic mostlyclean-libtool
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
-pdf: pdf-recursive
+pdf: pdf-am
 
 pdf-am:
 
-ps: ps-recursive
+ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-dist_libSRxProxy_libconfigDATA \
+	uninstall-dist_srx_configDATA uninstall-dist_srx_initdDATA \
+	uninstall-local uninstall-pkglibLTLIBRARIES \
+	uninstall-srxPROGRAMS uninstall-toolsPROGRAMS
 
-.MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all \
-	ctags-recursive install-am install-strip tags-recursive
+.MAKE: all install-am install-strip
 
-.PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
-	all all-am all-local am--refresh check check-am clean \
-	clean-generic clean-libtool clean-local ctags ctags-recursive \
-	dist dist-all dist-bzip2 dist-gzip dist-lzma dist-shar \
+.PHONY: CTAGS GTAGS all all-am all-local am--refresh check check-am \
+	clean clean-generic clean-libtool clean-noinstLTLIBRARIES \
+	clean-pkglibLTLIBRARIES clean-srxPROGRAMS clean-toolsPROGRAMS \
+	ctags dist dist-all dist-bzip2 dist-gzip dist-lzma dist-shar \
 	dist-tarZ dist-xz dist-zip distcheck distclean \
-	distclean-generic distclean-hdr distclean-libtool \
-	distclean-tags distcleancheck distdir distuninstallcheck dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
+	distclean-compile distclean-generic distclean-hdr \
+	distclean-libtool distclean-local distclean-tags \
+	distcleancheck distdir distuninstallcheck dvi dvi-am html \
+	html-am info info-am install install-am install-data \
+	install-data-am install-dist_libSRxProxy_libconfigDATA \
+	install-dist_srx_configDATA install-dist_srx_initdDATA \
+	install-dvi install-dvi-am install-exec install-exec-am \
+	install-exec-local install-html install-html-am install-info \
+	install-info-am install-man install-pdf install-pdf-am \
+	install-pkglibLTLIBRARIES install-ps install-ps-am \
+	install-srxPROGRAMS install-strip install-toolsPROGRAMS \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-recursive uninstall uninstall-am
+	tags uninstall uninstall-am \
+	uninstall-dist_libSRxProxy_libconfigDATA \
+	uninstall-dist_srx_configDATA uninstall-dist_srx_initdDATA \
+	uninstall-local uninstall-pkglibLTLIBRARIES \
+	uninstall-srxPROGRAMS uninstall-toolsPROGRAMS
 
-.PHONY: clean-local tags-local echo $(SUBDIRS) rpmcheck srcrpm rpms
 
-all-local: set-revision
-
-tags-local:
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir tags; \
-	done
-
-clean-local: 
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir clean; \
-	done
-
-echo:
-	for dir in $(SUBDIRS); do \
-	    (cd $$dir && $(MAKE) $(AM_MAKESET) $@ ); \
-	    done
+.PHONY: clean-local distclean-local install-exec-local uninstall-local \
+	all-local rpmcheck srcrpm rpms set-revision \
+	set-revision-1
 
 set-revision:
 	@echo "Check for revision framework"
@@ -788,17 +1566,44 @@ set-revision-1:
 	@echo
 	@echo
 
+distclean-local:
+	rm -f *.spec *.rpm $(CLIENT_DIR)/*.conf; \
+	rm -rf autom4te.cache; 
+
+install-exec-local:
+	@if [ ! -d $(INC_OUT) ]; then \
+	  mkdir -p $(INC_OUT); \
+	fi
+	@echo "Copying and modifing 'srx headers'";
+	cat $(CLIENT_DIR)/srx_api.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <$(SRX_DIR)\2>/g' > $(INC_OUT)/srx_api.h
+	cat $(SHARED_DIR)/srx_defs.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <$(SRX_DIR)\2>/g' > $(INC_OUT)/srx_defs.h
+	cat $(UTIL_DIR)/prefix.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <$(SRX_DIR)\2>/g' > $(INC_OUT)/prefix.h
+	cat $(UTIL_DIR)/slist.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <$(SRX_DIR)\2>/g' > $(INC_OUT)/slist.h
+
+uninstall-local:
+	rm -f $(INC_OUT)/srx_api.h \
+	      $(INC_OUT)/srx_defs.h \
+	      $(INC_OUT)/prefix.h \
+	      $(INC_OUT)/slist.h;
+	@if [ -e $(INC_OUT) && "$(ls -A $(INC_OUT))" == "" ] ; then \
+	  rmdir $(INC_OUT) > /dev/null 2>&1; \
+	fi
+
+all-local: set-revision 
+	chmod ugo+x $(SERVER_DIR)/srx_serverd > /dev/null 2>&1
+
 rpmcheck:
 	if [ which rpmbuild &> /dev/null ]; then \
 	 echo "*** This make target requires an rpm-based linux distribution."; \
 	(exit 1); exit 1; \
 	fi
 
-srcrpm: rpmcheck $(rpmspec)
-	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)
+srcrpm: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpm_spec)
 
-rpms: rpmcheck $(rpmspec)
-	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)
+rpms: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
+	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpm_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_proxy_spec)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

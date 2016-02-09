@@ -1,70 +1,67 @@
-%define version 0.3.0.8
+%define package_num  @PKG_VER@
+%define major_ver    @MAJOR_VER@
+%define minor_ver    @MINOR_VER@
+%define update_num   @UPD_VER@
+%define lib_ver_info @VER_INFO@
+
+%define lib_version_info %{lib_ver_info}
+%define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
+%define version %{package_version}
 %define name srx
-%define lpatr_name Net-Patricia
-%define lpatr_version 1.15
+%define _unpackaged_files_terminate_build 0
 
 Name:%{name}
 Version:%{version}
-Release:	1%{?dist}
-Summary:srx Summary
-
+Release:1%{?dist}
+Summary:Package provides the SRx server and tools for RPKI and BGPSEC processing
 Group:Networking/Daemons
-License:LGPL	
+License:LGPL
 URL:www.antd.nist.gov
+Vendor:National Institute of Standards and Technology (NIST)
+Distribution:SRx Software Suite
+Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+
 Source0:%{name}-%{version}.tar.gz
-Patch: Net-Patricia-1.15-fixes-20100513.patch
 BuildRoot:/tmp/rpm/%{name}-%{version}	
-#%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-Prefix:/usr/local/srx
+Prefix: %{_prefix}
+Prefix: %{_sysconfdir}
 
 BuildRequires:automake	
-Requires:glibc libconfig >= 1.3 srxcryptoapi >= 0.1.1
+#Requires:glibc libconfig >= 1.3 srxcryptoapi >= 0.1.1
+Requires:glibc libconfig >= 1.3 srx-proxy = %{version}
 
 %description
-srx rpm packaging file
+The SRx-server allows to out-source the validation of BGP updates using RPKI 
+processing and BGPSEC path validation. The SRx-server allows to provide RPKI and
+BGPSEC processing to more than one router. The srx-server can be accessed 
+remotely using a telnet client.
+
+In addition to the srx-server this package procives an RPKI test harness that 
+allows to feed ROA's and PKI keys to the srx server usint the rtr-to-cache 
+protocol.
 
 
 %prep
 %setup -q
-#%setup -q -D -T -a 1 
-cd extras
-/usr/bin/gzip -dc $RPM_SOURCE_DIR/%{lpatr_name}-%{lpatr_version}.tar.gz | tar -xvvf - > /dev/null
-STATUS=0
-
-echo "Patch #0"
-cd %{lpatr_name}-%{lpatr_version}/libpatricia
-%patch -p0
-#patch -p0 -i $RPM_SOURCE_DIR/%{lpatr_name}-%{lpatr_version}-fixes-20100513.patch
-
 
 %build
-%configure --prefix=/usr/local --sysconfdir=/etc --with-libpatr
+%configure --prefix=/usr --sysconfdir=/etc sca_dir=@SCA_DIR@ patricia_dir=@PATRICIA_DIR@ 
 make %{?_smp_mflags}
-pwd
-
-cd extras/%{lpatr_name}-%{lpatr_version}/libpatricia
-perl Makefile.PL
-make
-pwd
-cp -f libpatricia.a ../../
-
 
 %install
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
-pwd
-
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
-ldconfig
 chmod go+rx %{_initddir}/srx_serverd
 chkconfig --add srx_serverd
 chkconfig srx_serverd off
 
 %preun
+service srx_serverd stop
 chkconfig --del srx_serverd
 if [ -e %{_sysconfdir}/srx_server.conf ] ; then
  echo "  - save server configuration as %{_sysconfdir}/srx_server.conf.rpmsafe"
@@ -72,43 +69,13 @@ if [ -e %{_sysconfdir}/srx_server.conf ] ; then
 fi
 
 %postun
-ldconfig
 
 %files
 #%defattr(644,root,root,755)
 %defattr(-,root,root,-)
 %doc
-%{_libdir}/srx/libsrx_packets.so.0.0.0
-%{_libdir}/srx/libsrx_packets.so.0
-%{_libdir}/srx/libsrx_packets.so
-%{_libdir}/srx/libsrx_packets.la
-%{_libdir}/srx/libsrx_packets.a
-%{_libdir}/srx/libsrxutil.so.0.0.0
-%{_libdir}/srx/libsrxutil.so.0
-%{_libdir}/srx/libsrxutil.so
-%{_libdir}/srx/libsrxutil.la
-%{_libdir}/srx/libsrxutil.a
-%{_libdir}/srx/libsrx.so.0.0.0
-%{_libdir}/srx/libsrx.so.0
-%{_libdir}/srx/libsrx.so
-%{_libdir}/srx/libsrx.la
-%{_libdir}/srx/libsrx.a
 %{_sysconfdir}/srx_server.conf
 %{_initddir}/srx_serverd
-%ifarch x86_64
-%{_sysconfdir}/ld.so.conf.d/srx_lib-x86_64.conf
-%else
-%{_sysconfdir}/ld.so.conf.d/srx_lib.conf
-%endif
 %{_bindir}/srx_server
 %{_bindir}/rpkirtr_client
 %{_bindir}/rpkirtr_svr
-%{_bindir}/srxsvr_client
-%{_includedir}/patricia.h
-%{_includedir}/uthash.h
-%{_includedir}/srx/uthash.h
-%{_includedir}/srx/types.h
-%{_includedir}/srx/srx_defs.h
-%{_includedir}/srx/srx_api.h
-%{_includedir}/srx/slist.h
-%{_includedir}/srx/prefix.h

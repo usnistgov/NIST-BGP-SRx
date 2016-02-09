@@ -9,39 +9,43 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * \file multi_client_socket.h
- * \date Created: 01/12/2010
- *
+ * by this software.
+ * *
  * Exchange of multiple data packets over a single connection.
  *
  * \note The server (server_socket.h) must run in MODE_MULTIPLE_CLIENTS mode 
  *
  * log.h is used for the handling of error messages.
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2010/01/12
+ *            * File Created.
+ * 
  */
-
-// TODO: This can be deleted
+// @TODO: Check if this can be deleted
 
 #ifndef __MULTI_CLIENT_SOCKET_H__
 #define __MULTI_CLIENT_SOCKET_H__
 
 #include <pthread.h>
+#include <stdint.h>
 #include "util/client_socket.h"
 #include "util/mutex.h"
 #include "util/slist.h"
-#include "util/types.h"
 
 /** 
  * A single Multi Client Socket

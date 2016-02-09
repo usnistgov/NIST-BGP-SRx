@@ -2,3 +2,14 @@ ChangeLog information for Quagga is now recorded in our source-code
 management system. Please see:
 
 	http://www.quagga.net/devel.php
+
+
+QuaggaSRx:
+  0.4.1.4 - October 2015
+    * Modified RPM build tool to require SRxCryptoAPI >= 1.2.0
+    * Removed methods used from SRxCryptoAPI 1.1.x
+    * Fixed configuration issues in configure.ac
+
+  0.4.1.3b - October 2015
+    * Started Adding information to ChangeLog
+    * Modified RPM build tool to require SRxCryptoAPI >= 1.1.0 < 1.2.0

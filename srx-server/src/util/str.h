@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,35 +18,28 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * @file str.h
- * @date Created: 07/28/2010
+ * by this software.
  *
  * String (0-terminated) helper functions.
  *
- * @version 0.2.0
- *
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.1.0 - 2010/07/28 - pgleichm
- *           * Code Created
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *           * Added trim, trim_right, trim_left
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.2.0    - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *            * Added trim, trim_right, trim_left
+ * 0.1.0    - 2010/07/28 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
-*
+ *
  */
-
 #ifndef __STR_H__
 #define __STR_H__
-
-#include "util/types.h"
-
+// @TODO: Check if it cam be replaced by stock string functions.
 /**
  * Removes the line-break and other white-space characters from the end of
  * a given string.

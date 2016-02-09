@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.1.3a, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.1.4, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -19,8 +19,25 @@ AC_CANONICAL_BUILD()
 AC_CANONICAL_HOST()
 AC_CANONICAL_TARGET()
 
-AM_INIT_AUTOMAKE(1.6)
+#AM_INIT_AUTOMAKE(1.6)
+AM_INIT_AUTOMAKE()
 AC_CONFIG_HEADERS(config.h)
+
+# library information versioning
+# Extract Version numbers from AC_INIT above
+PKG_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 1`
+MAJOR_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 2`
+MINOR_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 3`
+UPD_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 4`
+PACKAGE_VERSION=AC_PACKAGE_VERSION
+
+LDFLAGS=-L/usr/lib64/srx $LDFLAGS
+
+AC_SUBST(PKG_VER)
+AC_SUBST(MAJOR_VER)
+AC_SUBST(MINOR_VER)
+AC_SUBST(UPD_VER)
+AC_SUBST(PACKAGE_VERSION)
 
 AC_PATH_PROG(PERL, perl)
 AC_CHECK_PROG([GAWK],[gawk],[gawk],[not-in-PATH])
@@ -163,6 +180,38 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_CHECK_TOOL(AR, ar)
 
+dnl - Check for programs depending on switches set
+AS_BOX([Check more tools needed depending on enable/disable settings.])
+if test "${enable_snmp}" != "no" ; then
+  MORE_TOOLS=""
+  AC_CHECK_TOOL(MORE_TOOLS, net-snmp-config, [err])
+  if test "$MORE_TOOLS" = "err" ; then
+    AC_MSG_ERROR([
+	--------------------------------------------------------
+	tool 'net-snmp-config' needed - install 'net-snmp-devel'
+	--------------------------------------------------------])
+  fi
+fi
+
+if test "${enable_doc}" != "no" ; then
+  MORE_TOOLS=""
+  AC_CHECK_TOOL([MORE_TOOLS], [makeinfo], [err])
+  if test "$MORE_TOOLS" = "err" ; then
+    AC_MSG_ERROR([
+	--------------------------------------------------
+	tool 'makeinfo' needed - install 'texinfo'
+	--------------------------------------------------])
+  fi
+  MORE_TOOLS=""
+  AC_CHECK_TOOL([MORE_TOOLS], [texi2html], [err])
+  if test "$MORE_TOOLS" = "err" ; then
+    AC_MSG_ERROR([
+	--------------------------------------------------
+	tool 'texi2html' needed - install 'texi2html'
+	--------------------------------------------------])
+  fi
+fi
+
 dnl ---------------------------
 dnl We, perhaps unfortunately,
 dnl depend on GNU Make specific
@@ -233,7 +282,7 @@ AC_ARG_ENABLE(netlink,
 AC_ARG_ENABLE(broken-aliases,
 [  --enable-broken-aliases enable aliases as distinct interfaces for Linux 2.2.X])
 AC_ARG_ENABLE(snmp,
-[  --enable-snmp=ARG       enable SNMP support (smux or agentx)])
+[  --enable-snmp=ARG       enable SNMP support (smux or agentx)], [], [enable_snmp=no])
 AC_ARG_WITH(libpam,
 [  --with-libpam           use libpam for PAM support in vtysh])
 AC_ARG_ENABLE(tcp-zebra,
@@ -273,19 +322,28 @@ AC_ARG_ENABLE(rusage,
 AC_ARG_ENABLE(gcc_ultra_verbose,
 [  --enable-gcc-ultra-verbose    enable ultra verbose GCC warnings])
 AC_ARG_ENABLE(linux24_tcp_md5,
-[  --enable-linux24-tcp-md5  enable support for old, Linux-2.4 RFC2385 patch])
+[  --enable-linux24-tcp-md5      enable support for old, Linux-2.4 RFC2385 patch])
 AC_ARG_ENABLE(gcc-rdynamic,
-[  --enable-gcc-rdynamic   enable gcc linking with -rdynamic for better backtraces])
+[  --enable-gcc-rdynamic         enable gcc linking with -rdynamic for better backtraces])
 AC_ARG_ENABLE(time-check,
 [  --disable-time-check          disable slow thread warning messages])
 AC_ARG_ENABLE(pcreposix,
-[  --enable-pcreposix          enable using PCRE Posix libs for regex functions])
+[  --enable-pcreposix            enable using PCRE Posix libs for regex functions])
 AC_ARG_ENABLE(fpm,
-[  --enable-fpm            enable Forwarding Plane Manager support])
+[  --enable-fpm                  enable Forwarding Plane Manager support])
+
 AC_ARG_ENABLE(srx,
-[  --enable-srx           enable SRx])
+              [  --disable-srx                disable all SRx functionality], 
+              [], [enable_srx="yes"])
 AC_ARG_ENABLE(srxcryptoapi,
-[  --enable-srxcryptoapi           enable srxcryptoapi])
+              [  --disable-srxcryptoapi        disable srxcryptoapi integration], 
+              [] [enable_srxcryptoapi="yes"])
+
+if test x"${enable_srx}" != x"yes" ; then
+  if test x"${enable_srxcryptoapi}" = x"yes" ; then
+    AC_MSG_ERROR([--enable-srxcryptoapi not possible with --disable-srx !!])
+  fi
+fi 
 
 if test x"${enable_gcc_ultra_verbose}" = x"yes" ; then
   CFLAGS="${CFLAGS} -W -Wcast-qual -Wstrict-prototypes"
@@ -1340,223 +1398,165 @@ fi
 AM_CONDITIONAL(OSPFCLIENT, test "x$OSPFCLIENT" = "xospfclient")
 
 dnl ----------------------
-dnl  SRX check & pthread
+dnl  Check SRX integration
 dnl ----------------------
-have_pthreads=no
-if test "x${enable_srx}" == "xyes"; then
-  AC_DEFINE(USE_SRX,,SRX)
-  SRX_LIB=libsrx.a
-  SRX_LIB_SO=-lsrx
-  SRX_DIR=srx
-
-  AC_SEARCH_LIBS([pthread_create], [pthread], [have_pthreads=yes])
-  if test "x${have_pthreads}" = xyes; then
-      AC_CHECK_HEADERS([pthread.h], [], [have_pthreads=no])
-    if test "x${have_pthreads}" = xyes; then
-        AC_DEFINE([_REENTRANT],, pthread reentrant nature)
-    fi
-  fi
-
-  if test "x${have_pthreads}" = xno; then
-      AC_MSG_ERROR([
-      --------------------------------------------------
-      The pthread library and header file required to
-      build srx.  Stopping...
-      Check 'config.log' for more information.
-      --------------------------------------------------])
-  fi
-
-  AC_MSG_CHECKING([srx client module])
-  if test -f srx/libsrx.a ; then
-    SRX_CLI_LIB=../srx/libsrx.a
-    #AC_MSG_RESULT([yes - srx directory exists])
-  else
-    if test -f ${SRX_USER_INC}/srx/libsrx.la; then
-      SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.la
-      INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
-    else
-      if test -f ${SRX_USER_INC}/srx/libsrx.a; then
-        SRX_CLI_LIB=${SRX_USER_INC}/srx/libsrx.a
-        INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
-      else
-          if test -f /usr/lib64/srx/libsrx.la ; then
-            SRX_CLI_LIB="/usr/lib64/srx/libsrx.la /usr/lib64/srx/libsrxutil.la"
-            #INCLUDES="${INCLUDES} -I/usr/include/srx/" --> If already srx rpm installed, don't need to use.
-          else
-            if test -f /usr/lib/srx/libsrx.a ; then
-              SRX_CLI_LIB="/usr/lib/srx/libsrx.a /usr/lib/srx/libsrxutil.a"
-            else
-              have_libsrx=no
-              AC_SEARCH_LIBS([createSRxProxy], [srx], [have_libsrx=yes])
-              if test "x${have_libsrx}" = xyes; then
-                AC_MSG_RESULT([have_libsrx:${have_libsrx}])
-              else
-                if test -f /usr/local/lib/srx/libsrx.a; then
-                  SRX_CLI_LIB="/usr/local/lib/srx/libsrx.a /usr/local/lib/srx/libsrxutil.a"
-                  BGPD_INCLUDES="-I/usr/local/include/srx/"
-                  AC_SUBST(BGPD_INCLUDES)
-                else
-                  AC_MSG_ERROR([
-                            --------------------------------------------------
-                            The srx library and header file required to be
-                            installed first.  Stopping...
-                            Check 'config.log' for more information.
-                            --------------------------------------------------])
-                fi
-              fi
-            fi
-          fi
-      fi
-    fi
-      #AC_MSG_RESULT([no - srx directory  NOT exists])
-  fi
-
-  #CPPFLAGS= -I${SRX_USER_INC}
-  #INCLUDES="${INCLUDES} -I${SRX_USER_INC}"
-
-  AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
-  AC_MSG_RESULT([INCLUDES:${INCLUDES}])
-  AC_MSG_RESULT([USER:${SRX_CLI_LIB}  srx dir:${SRX_DIR}])
-  #AC_MSG_FAILURE([test])
-
-  AC_CANONICAL_HOST
+AS_BOX(Processing SRxProxy configuration)
+AC_MSG_CHECKING(Checking wether to embed srx)
+SRX_LDFLAGS=""
+SRX_CFLAGS=""
+SCA_LDFLAGS=""
+SCA_CFLAGS=""
+CACHED_LDFLAGS=""
+if test "x${enable_srx}" == "xyes"; then  
   AS_CASE([$host_cpu],
-          [i?86], [ARCHDIR=arch/i386],
-          [x86_64], [ARCHDIR=arch/x86_64],
-          [AC_MSG_WARN("No assembler code for CPU $host_cpu")]
-          )
-  AC_SUBST([ARCHDIR])
-  AC_MSG_RESULT([ cpu architecture: $host_cpu hosttype: $HOSTTYPE])
+            [x86_64], [LIBEXT="64"],
+            [LIBEXT=""]
+         )
 
-  dnl ---------------------------------
-  dnl  OpenSSL library and ECDSA check
-  dnl ---------------------------------
-  if test -f ${OPENSSL_ECDSA_INC}/openssl/ecdsa.h; then
-    OPENSSL_ECDSA_INC_DIR="${OPENSSL_ECDSA_INC}/"
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(USE_SRX,,SRX)
+
+  # ..._include_dir is only used for AC_CHECK_HEADER, not for CFLAGS
+  srx_include_dir=""
+  sca_include_dir=""
+
+  AC_ARG_VAR([srx_dir], [Provide local install location of SRxProxy])  
+  if test "x${srx_dir}" = "x" ; then
+    if test -d /usr/lib$LIBEXT/srx ; then
+      CACHED_LDFLAGS="-L/usr/lib$LIBEXT/srx"
+      LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
+      srx_include_dir="/usr/include/srx/"
+    fi
+    # Check for installed library, no custom location provided
+    AC_SEARCH_LIBS([createSRxProxy], [SRxProxy srx], 
+                   [], [
+       AC_MSG_ERROR([
+	--------------------------------------------------
+	The library 'libSRxProxy' or 'libsrx' could not be 
+  found, reinstall using: 
+	  'yum install srx-proxy'
+	or specify: 
+	  'srx_dir=<location>'
+	--------------------------------------------------])])
   else
-    AS_CASE([$host_cpu],
-            [i?86], [OPENSSL_ECDSA_INC_DIR="/usr/include/"],
-            [x86_64], [OPENSSL_ECDSA_INC_DIR="/usr/include/"],
-            [AC_MSG_WARN("No assembler code for CPU $host_cpu")]
-            )
-    if test -f ${OPENSSL_ECDSA_INC_DIR}/openssl/ecdsa.h; then
-      :
+    # Custom location provided.    
+    srx_include_dir="${srx_dir}/include/srx/"
+
+    # Search local install
+    AC_MSG_CHECKING(for local installed SRx Proxy)
+    if test -e ${srx_dir}/lib$LIBEXT/srx/libSRxProxy.so ; then
+      CFLAGS="-I${srx_dir}/include $CFLAGS"
+      LDFLAGS="-L${srx_dir}/lib$LIBEXT/srx $LDFLAGS"
+      LIBS="-lSRxProxy $LIBS"
+      AC_MSG_RESULT([found])
     else
-      if test -f /usr/local/ssl/include/openssl/ecdsa.h; then
-        OPENSSL_ECDSA_INC_DIR=/usr/local/ssl/include/
+      AC_MSG_RESULT([not found])
+      if test -e ${srx_dir} ; then
+        AC_MSG_ERROR([
+	--------------------------------------------------
+	The library 'libSRxProxy.so' could not be 
+	found at location:
+	  '${srx_dir}/lib$LIBEXT/srx/libSRxProxy.so'
+	--------------------------------------------------])
+      else
+        AC_MSG_ERROR([
+	--------------------------------------------------
+	Location srx_dir=${srx_dir} not found.
+	--------------------------------------------------])
       fi
     fi
   fi
 
-  if test -n "$OPENSSL_ECDSA_INC_DIR"; then
-    OPENSSL_FLAGS="-I${OPENSSL_ECDSA_INC_DIR}"
-  fi
+  # uthash.h is used for bgp_info_hash.h, not really an SRx header but still
+  # needed to compile and therefore added here.
+  AC_CHECK_HEADERS([ \
+			${srx_include_dir}srx_api.h \
+  		${srx_include_dir}srx_defs.h \
+			${srx_include_dir}prefix.h \
+			${srx_include_dir}slist.h \
+      uthash.h ], 
+      [], [AC_MSG_ERROR([
+	--------------------------------------------------
+	The required headers for 'SRxProxy' not Found.
+	--------------------------------------------------])])
+  
+  #
+  # Now Look for the dl or dld library
+  #
+  AC_SEARCH_LIBS([dlopen], [dl dld], [], [AC_MSG_ERROR([
+    ---------------------------------------------------
+    The System requires the capability to dynamically 
+    load libraries. No library (libdl or libdld) was 
+    found on the system.
+    ---------------------------------------------------])])
 
-  CPPFLAGS="${CPPFLAGS} ${OPENSSL_FLAGS}"
-  AC_MSG_RESULT([ openssl ecdsa dir: ${OPENSSL_ECDSA_INC_DIR}])
-
-  AC_CHECK_LIB([crypto],[CRYPTO_new_ex_data], [], [AC_MSG_ERROR([OpenSSL libraries required])])
-  AC_CHECK_LIB([ssl],[SSL_library_init], [], [AC_MSG_ERROR([OpenSSL libraries required])])
-  AC_CHECK_HEADERS([openssl/crypto.h openssl/x509.h openssl/pem.h openssl/ssl.h openssl/err.h],
-                                          [],[AC_MSG_ERROR([OpenSSL headers required])])
-  #AC_CHECK_FILE([${OPENSSL_ECDSA_INC_DIR}openssl/ecdsa.h],
-  #                 [],[AC_MSG_ERROR([OpenSSL ECDSA headers required])])
-  AC_CHECK_HEADER([openssl/ecdsa.h],
-                   [],[AC_MSG_ERROR([OpenSSL ECDSA headers required])])
-
-  if test -n "$OPENSSL_ECDSA_INC_DIR"; then
-    ldflags_temp=${OPENSSL_ECDSA_INC_DIR%include*}
-    if test "$HOSTTYPE" = x86_64; then
-      LDFLAGS="$LDFLAGS -L${ldflags_temp}lib64"
-    else
-      LDFLAGS="$LDFLAGS -L${ldflags_temp}lib"
+  #
+  # Now Check for SRxCryptoAPI
+  #
+  AC_ARG_VAR([sca_dir], [Provide local install location of SRxCryptoAPI])
+  if test "x${sca_dir}" = "x" ; then
+    # Check for regular installed library
+    if test -d /usr/lib$LIBEXT/srx ; then
+      if test "x$CACHED_LDFLAGS" = "x"; then
+        CACHED_LDFLAGS="/usr/lib$LIBEXT/srx"
+        LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
+      fi
+      sca_include_dir="/usr/include/srx/"
     fi
-  fi
-  AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
-  AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
-else
-  AC_MSG_WARN( [
-               --------------------------------------------------
-               The SRx extension is not enabled !!!!
-               To enable SRx extension use --enable-srx
-               --------------------------------------------------])
-fi
+    AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], 
+                   [], [AC_MSG_ERROR([
+	--------------------------------------------------
+	The library 'SRxCryptoAPI' is required to build 
+	quagga-srx. Install it using:
+	  'yum install srxcryptoapi'
+	or specify: 
+	  'sca_dir=<location>'
+	--------------------------------------------------])])
 
-  dnl ---------------------------------
-  dnl   Dynamic Loader for using later.
-  dnl ---------------------------------
-
-  dnl The dlopen() function is in the C library for *BSD and in
-  dnl libdl on GLIBC-based systems
-  dnl #AC_SEARCH_LIBS([dlopen], [dl dld], [], [
-  dnl #  AC_MSG_ERROR([unable to find the dlopen() function])
-  dnl #])
-
-  dnl #AC_SEARCH_LIBS([createSRxProxy], [srx], [], [
-  dnl #  AC_MSG_ERROR([unable to find the createSRxProxy() function])
-  dnl #])
-
-  dnl ---------------------------------
-  dnl  SRxCrypto library  check
-  dnl ---------------------------------
-
-if test "x${enable_srxcryptoapi}" == "xyes"; then
-  have_srxcryptolib=no
-  AC_DEFINE(USE_SRX_CRYPTO_API,,using SRX CRYPTOAPI )
-  AC_MSG_CHECKING([for SRxCryptoLib])
-  AC_MSG_RESULT([])
-
-  AC_SEARCH_LIBS([dlopen], [dl dld], [], [
-                AC_MSG_ERROR([unable to find the dlopen() function])
-  ])
-  AC_SEARCH_LIBS([config_init], [config],[],[
-                AC_MSG_ERROR([unable to find the config_init() function])
-  ])
-
-  if test -f ${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la; then
-    if test -f ${CRYPTOAPI_DIR}/lib/libCryptoImple.la; then
-      SRX_API_LIB="${CRYPTOAPI_DIR}/lib/libSRxCryptoAPI.la ${CRYPTOAPI_DIR}/lib/libCryptoImple.la"
-      INCLUDES="${INCLUDES} -I${CRYPTOAPI_DIR}/include"
-      AC_SUBST(SRX_API_LIB)
-      have_srxcryptolib=yes
-    fi
   else
-    if test -f /usr/local/lib/libSRxCryptoAPI.a; then
-      if test -f /usr/local/lib/libCryptoImple.a; then
-        AC_MSG_RESULT([manually found libSRxCryptoAPI])
-        SRX_CRYPTO_API_LIBS="-lSRxCryptoAPI -lCryptoImple"
-        LDFLAGS="$LDFLAGS -L/usr/local/lib/ "
-        CPPFLAGS="${CPPFLAGS} -I/usr/local/include/"
-        AC_SUBST(SRX_CRYPTO_API_LIBS)
-        have_srxcryptolib=yes
+    # Search local install
+    sca_include_dir="${sca_dir}/include/srx/"
+    AC_MSG_CHECKING(for local installed SRxCryptoAPI)
+
+    if test -e ${sca_dir}/lib$LIBEXT/srx/libSRxCryptoAPI.so ; then
+      AC_MSG_RESULT([found])
+      LDFLAGS="-L${sca_dir}/lib$LIBEXT/srx $LDFLAGS"
+      LIBS="-lSRxCryptoAPI $LIBS"
+
+      if test "$sca_dir" != "$srx_dir" ; then
+        # This check only for the include section, the lib section for SRx Proxy
+        # is different even if sca_dir and srx_dir is same.
+        CFLAGS="-I${sca_dir}/include $CFLAGS"
       fi
     else
-        AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], [have_srxcryptolib=yes])
-        if test "x${have_srxcryptolib}" = xyes; then
-          AC_CHECK_HEADERS([srxcryptoapi.h], [], [have_srxcryptolib=no])
-        else
-            AC_MSG_ERROR([
-                  --------------------------------------------------
-                  The SRxCrypto library and header file required to
-                  build srx.  Stopping...
-                  Check 'config.log' for more information.
-                  --------------------------------------------------])
-        fi
+      AC_MSG_RESULT([not found])
+      if test -e ${sca_dir} ; then
+        AC_MSG_ERROR([
+	--------------------------------------------------
+	The library 'libSRxCryptoAPI.so' could not be 
+	found at location:
+	  '${sca_dir}/lib$LIBEXT/srx/libSRxCryptoAPI.so'
+	--------------------------------------------------])
+      else
+        AC_MSG_ERROR([
+	--------------------------------------------------
+	Location sca_dir=${sca_dir} not found.
+	--------------------------------------------------])
+      fi
     fi
   fi
 
-  AC_MSG_RESULT([have_srxcryptolib:${have_srxcryptolib}])
-  AC_MSG_RESULT([USER srxcryptoapi dir:${SRX_API_LIB}])
-  AC_MSG_RESULT([INCLUDES:${INCLUDES}])
-  AC_MSG_RESULT([CPPFLAGS:${CPPFLAGS}])
-  AC_MSG_RESULT([LDFLAGS:${LDFLAGS}])
-  AC_MSG_RESULT([LIBS="$LIBS"])
-else
-  AC_MSG_WARN( [
-               --------------------------------------------------
-               The SRxCryptoAPI is not enabled !!!!
-               To enable SRxCryptoAPI use --enable-srxcryptoapi
-               --------------------------------------------------])
+  AC_CHECK_HEADERS([${sca_include_dir}srxcryptoapi.h], 
+                   [], [AC_MSG_ERROR([
+	--------------------------------------------------
+	The required header for 'SRxCryptoAPI' not Found.
+	--------------------------------------------------])])
+  
+else 
+  # Don't Embedd SRx
+  AC_MSG_RESULT([no])
+  AC_MSG_WARN([Quagga will be installed without the SRx addition. The router
+               might not function as expected!!])
 fi
 
 case "${enable_ripngd}" in
@@ -1610,11 +1610,6 @@ AC_SUBST(INCLUDES)
 AC_SUBST(CURSES)
 AC_SUBST(OSPFCLIENT)
 AC_SUBST(OSPFAPI)
-AC_SUBST(SRX_CLI_LIB)
-AC_SUBST(SRX_DIR)
-AC_SUBST(SRX_LIB)
-AC_SUBST(SRX_LIB_SO)
-AC_SUBST(OPENSSL_ECDSA_INC_DIR)
 AC_CHECK_LIB(c, inet_ntop, [AC_DEFINE(HAVE_INET_NTOP,,inet_ntop)])
 AC_CHECK_LIB(c, inet_pton, [AC_DEFINE(HAVE_INET_PTON,,inet_pton)])
 AC_CHECK_LIB(crypt, crypt)
@@ -1651,7 +1646,7 @@ AC_SUBST(LIB_REGEX)
 dnl ------------------
 dnl check Net-SNMP library
 dnl ------------------
-if test "${enable_snmp}" != ""; then
+if test "${enable_snmp}" != "no"; then
    AC_PATH_TOOL([NETSNMP_CONFIG], [net-snmp-config], [no])
    if test x"$NETSNMP_CONFIG" = x"no"; then
       AC_MSG_ERROR([--enable-snmp given but unable to find net-snmp-config])
@@ -1920,12 +1915,11 @@ AC_CACHE_VAL(ac_cv_htonl_works,
 AC_MSG_RESULT($ac_cv_htonl_works)
 
 AC_CONFIG_FILES([Makefile
-    quaggasrx-$PACKAGE_VERSION.spec:quaggasrx.spec.in     
     lib/Makefile zebra/Makefile ripd/Makefile 
 	  ripngd/Makefile bgpd/Makefile ospfd/Makefile watchquagga/Makefile
 	  ospf6d/Makefile isisd/Makefile babeld/Makefile vtysh/Makefile
-          doc/Makefile ospfclient/Makefile tests/Makefile m4/Makefile
-          redhat/Makefile
+    doc/Makefile ospfclient/Makefile tests/Makefile m4/Makefile
+    redhat/Makefile
 	  pkgsrc/Makefile
 	  redhat/quagga.spec 
 	  lib/version.h
@@ -1941,9 +1935,9 @@ AC_CONFIG_FILES([vtysh/extract.pl],[chmod +x vtysh/extract.pl])
 AC_OUTPUT
 
 echo "
-Quagga configuration
---------------------
-quagga version          : ${PACKAGE_VERSION}
+Quagga SRx Configuration
+-------------------------
+quaggasrx version       : ${PACKAGE_VERSION}
 host operating system   : ${host_os}
 source code location    : ${srcdir}
 compiler                : ${CC}
@@ -1964,8 +1958,8 @@ The above user and group must have read/write access to the state file
 directory and to the config files in the config file directory."
 
 if test x"$quagga_cv_gnu_make" = x"no"; then echo "
-Warning: The ${MAKE-make} programme detected, either in your path or
+Warning: The ${MAKE-make} program detected, either in your path or
 via the MAKE variable, is not GNU Make. GNU make may be installed as
-gmake on some systems. and is required to complete a build of Quagga
+gmake on some systems. and is required to complete a build of QuaggaSRx
 " > /dev/stderr 
 fi

@@ -23,24 +23,26 @@
  * IPv4 and IPv6 address and prefix structures and functions.
  * log.h is used for error message handling.
  * 
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Added method IPtoInt that allows to convert an IP string or 
- *             integer string into an unsigned integer.
- *           * Added version control.
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Extended.
- *   0.1.0 - 2010/02/03 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed unused variables in cpyPrefix  
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Added method IPtoInt that allows to convert an IP string or 
+ *              integer string into an unsigned integer.
+ *            * Added version control.
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * Extended.
+ * 0.1.0    - 2010/02/03 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-#include "prefix.h"
+#include "util/prefix.h"
 #include "util/log.h"
 
 bool strToIPv4Address(const char* str, IPv4Address* ipOut) {
@@ -175,7 +177,6 @@ extern bool cpyPrefix(IPPrefix* dst, IPPrefix* src)
   
   if (retVal)
   {
-    short i;
     dst->length     = src->length;
     dst->ip.version = src->ip.version;
     memcpy(dst->ip.addr.v6.u8, src->ip.addr.v6.u8, 16);

@@ -3,35 +3,58 @@
 %define minor_ver    @MINOR_VER@
 %define update_num   @UPD_VER@
 %define lib_ver_info @VER_INFO@
+%define srxdir       @SRX_DIR@
 
 %define lib_version_info %{lib_ver_info}
 %define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
 %define version %{package_version}
 %define name srxcryptoapi
+%if "@incl_la_lib@" == "no"
+  %define _unpackaged_files_terminate_build 0
+  %define la_lib_switch --without-la-lib
+%else
+  %define la_lib_switch --with-la-lib
+%endif
+%if "@BGPSEC_OPENSSL@" == ""
+  %define bgpsec_openssl_switch --without-bgpsec-openssl
+%else
+  %define bgpsec_openssl_switch --with-bgpsec-openssl
+%endif
+%if "@CRYPTO_TESTLIB@" == ""
+  %define testlib_switch --without-testlib
+%else
+  %define testlib_switch --with-testlib
+%endif
+
 
 Name:%{name}
 Version:%{version}
 Release:	1%{?dist}
 Summary:srxcryptoapi Summary
 
+
 Group:Networking/Daemons
 License:LGPL	
 URL:www.antd.nist.gov
 Source0:%{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-#Prefix:/usr/local
+Prefix: %{_prefix}
+Prefix: %{_sysconfdir}
 
 BuildRequires:automake	
 Requires:glibc libconfig >= 1.3 openssl >= 1.0.1e
 
+
 %description
 srxcryptoapi rpm packaging file
+
 
 %prep
 %setup -q
 
+
 %build
-%configure --prefix=/usr --sysconfdir=/etc --enable-testlib --enable-bgpsec-openssl
+%configure --prefix=/usr --sysconfdir=/etc %{bgpsec_openssl_switch} %{testlib_switch} %{la_lib_switch}
 make %{?_smp_mflags}
 
 
@@ -43,44 +66,86 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+
 %post
 mkdir -p /var/lib/bgpsec-keys
+
 if [ ! -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
-  cp %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf
-fi
-if [ ! -e %{_sysconfdir}/srxcryptoapi.conf.sample ]; then
-  cp %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf
+  mv -f %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf
+else
+  mv -f %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf.rpmnew
 fi
 
+if [ ! -e %{_sysconfdir}/srxcryptoapi.conf ]; then
+  mv -f %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf
+else
+  mv -f %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf.rpmnew
+fi
+ldconfig
+
 %postun
-rmdir /var/lib/bgpsec-keys >> /dev/null
+if [ -e /var/lib/bgpsec-keys ] ; then
+  if [ ! "$(ls -A /var/lib/bgpsec-keys)" ]; then
+    rmdir /var/lib/bgpsec-keys >> /dev/null
+  fi
+fi
+# in case a .rpmnew exists remove it. In this case don't move .cnf or .conf into
+# .rpmsafe because the .cnf or .conf was generated elsewhere. in case no .rpmnew 
+# exists the .cnf or .conf was installed by this package and will be moved into
+# .rpmsafe 
+if [ -e %{_sysconfdir}/qsrx-router-key.cnf.rpmnew ]; then
+  rm -f %{_sysconfdir}/qsrx-router-key.cnf.rpmnew
+else 
+  if [ -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
+    mv -f %{_sysconfdir}/qsrx-router-key.cnf %{_sysconfdir}/qsrx-router-key.cnf.rpmsafe
+  fi
+fi
+
+if [ -e %{_sysconfdir}/srxcryptoapi.conf.rpmnew ]; then
+  rm -f %{_sysconfdir}/srxcryptoapi.conf.rpmnew
+else
+  if [ -e %{_sysconfdir}/srxcryptoapi.conf ]; then
+    mv -f %{_sysconfdir}/srxcryptoapi.conf %{_sysconfdir}/srxcryptoapi.conf.rpmsafe
+  fi
+fi
+ldconfig
 
 %files
 %defattr(-,root,root,-)
 %doc
-%{_libdir}/libSRxCryptoAPI.so.%{lib_version_info}
-%{_libdir}/libSRxCryptoAPI.so.%{major_ver}
-%{_libdir}/libSRxCryptoAPI.so
-%{_libdir}/libSRxCryptoAPI.la
-%{_libdir}/libSRxCryptoAPI.a
-%{_libdir}/libSRxBGPSecOpenSSL.so.%{lib_version_info}
-%{_libdir}/libSRxBGPSecOpenSSL.so.%{major_ver}
-%{_libdir}/libSRxBGPSecOpenSSL.so
-%{_libdir}/libSRxBGPSecOpenSSL.la
-%{_libdir}/libSRxBGPSecOpenSSL.a
-%{_libdir}/libSRxCryptoTestlib.so.%{lib_version_info}
-%{_libdir}/libSRxCryptoTestlib.so.%{major_ver}
-%{_libdir}/libSRxCryptoTestlib.so
-%{_libdir}/libSRxCryptoTestlib.la
-%{_libdir}/libSRxCryptoTestlib.a
-%{_bindir}/srx_crypto_tester
+%{_sysconfdir}/ld.so.conf.d/srxcryptoapi_lib@CPU_ARCH@.conf
+%{_sysconfdir}/srxcryptoapi.conf.sample
+%{_sysconfdir}/qsrx-router-key.cnf.sample
+%{_includedir}/%{srxdir}/srxcryptoapi.h
+%{_libdir}/%{srxdir}/libSRxCryptoAPI.so.%{lib_version_info}
+%{_libdir}/%{srxdir}/libSRxCryptoAPI.so.%{major_ver}
+%{_libdir}/%{srxdir}/libSRxCryptoAPI.so
+%if "no" == "yes"
+  %{_libdir}/%{srxdir}/libSRxCryptoAPI.la
+  %{_libdir}/%{srxdir}/libSRxCryptoAPI.a
+%endif
+%if "bgpsec_openssl" != ""
+  %{_libdir}/%{srxdir}/libSRxBGPSecOpenSSL.so.%{lib_version_info}
+  %{_libdir}/%{srxdir}/libSRxBGPSecOpenSSL.so.%{major_ver}
+  %{_libdir}/%{srxdir}/libSRxBGPSecOpenSSL.so
+%endif
+%if "no" == "yes" && "bgpsec_openssl" != ""
+  %{_libdir}/%{srxdir}/libSRxBGPSecOpenSSL.la
+  %{_libdir}/%{srxdir}/libSRxBGPSecOpenSSL.a
+%endif
+%if "crypto_testlib" != ""
+  %{_libdir}/%{srxdir}/libSRxCryptoTestlib.so.%{lib_version_info}
+  %{_libdir}/%{srxdir}/libSRxCryptoTestlib.so.%{major_ver}
+  %{_libdir}/%{srxdir}/libSRxCryptoTestlib.so
+%endif
+%if "no" == "yes" && "crypto_testlib" != ""
+  %{_libdir}/%{srxdir}/libSRxCryptoTestlib.la
+  %{_libdir}/%{srxdir}/libSRxCryptoTestlib.a
+%endif
+%{_sbindir}/srx_crypto_tester
 %{_sbindir}/qsrx-make-cert
 %{_sbindir}/qsrx-make-key
 %{_sbindir}/qsrx-publish
 %{_sbindir}/qsrx-view-cert
 %{_sbindir}/qsrx-view-csr
 %{_sbindir}/qsrx-view-subject
-%{_includedir}/srxcryptoapi.h
-%{_includedir}/bgpsec_openssl.h
-%{_sysconfdir}/srxcryptoapi.conf.sample
-%{_sysconfdir}/qsrx-router-key.cnf.sample

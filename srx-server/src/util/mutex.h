@@ -19,17 +19,21 @@
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
- *
- */
-/**
- * @file mutex.h
- * @date Created: 01/11/2010
  * 
  * Functions for Mutex (Mutual Exclusion) handling.
- *
  * @note Currently based on PThread
- *
  * log.h is used for error reporting.
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ *            * Added inline int destroyCond(...) from c to header 
+ * 0.1.0.0  - 2010/01/11 - pgleichm
+ *            * Code created.
  */
 
 #ifndef __MUTEX_H__
@@ -37,7 +41,8 @@
 
 #include <pthread.h>
 #include <semaphore.h>
-#include "util/types.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 /** A mutex. */
 typedef pthread_mutex_t Mutex;
@@ -99,5 +104,7 @@ extern int waitCond(Cond *cond, Mutex *self, uint32_t millis);
  */
 extern int sem_wait_wrapper(sem_t *sem_var, uint32_t millis);
 
+
+inline int destroyCond(Cond *cond);
 #endif // !__MUTEX_H__
 

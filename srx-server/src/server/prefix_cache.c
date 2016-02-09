@@ -29,25 +29,27 @@
  *  - getOriginStatus: Triggered by the SRx - Router - proxy for each
  *                     validation request.
  * 
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/03/20 - oborchert
- *           * Added filter to not accept white-list entries for AS numbers
- *             specified in rfc5398.
- *         - 2013/01/28 - oborchert
- *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *             update does not include the secure protocol section. The protocol
- *             will still use un-encrypted plain TCP
- *         - 2013/01/01 - oborchert
- *           * Removed dead code
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Completely rewritten
- *   0.1.0 - 2010/05/24 - pgleichm
- *           * Code complete rewritten
- *   0.0.0 - 2010/04/08 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Moved outputPrefixCacheAsXML from c file to header.
+ * 0.3.0    - 2013/03/20 - oborchert
+ *            * Added filter to not accept white-list entries for AS numbers
+ *              specified in rfc5398.
+ *          - 2013/01/28 - oborchert
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *              update does not include the secure protocol section. The 
+ *              protocol will still use un-encrypted plain TCP
+ *          - 2013/01/01 - oborchert
+ *            * Removed dead code
+ * 0.2.0    - 2011/01/07 - oborchert
+ *            * Completely rewritten
+ * 0.1.0    - 2010/05/24 - pgleichm
+ *            * Code complete rewritten
+ * 0.0.0    - 2010/04/08 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 
@@ -55,11 +57,11 @@
 #include <string.h>
 
 #include <uthash.h>
-#include "prefix_cache.h"
+#include "server/prefix_cache.h"
+#include "shared/srx_defs.h"
 #include "util/log.h"
 #include "util/math.h"
 #include "util/xml_out.h"
-#include "shared/srx_defs.h"
 
 #define  HDR "[PrefixCache [0x%08X]]: "
 
@@ -261,8 +263,6 @@ void releasePrefixCache(PrefixCache* self)
     patricia_node_t*  treeNode;
     SListNode*        listNode;
     PC_Prefix*        prefix;
-    PC_AS*            pc_as;
-    PC_ROA*           pc_roa;
     PC_Update*        pc_update;
     
     // Free all prefixes and node-data
@@ -391,7 +391,6 @@ static void notifyUpdateCacheForROAChange(UpdateCache* updCache,
 static void _ROAwl_changeStateOfOther(UpdateCache* updateCache, 
                                       PC_Prefix* pcPrefix, 
                                       SRxValidationResultVal newState);
-void outputPrefixCacheAsXML(PrefixCache* self, FILE* stream);
 static void printXML(PrefixCache* self, char* methodName);
 
 /**
@@ -1134,8 +1133,6 @@ static void _addROAwl_verifyUpdates(PrefixCache* self, PC_Prefix* pcPrefix,
 {
   // nodes in valid list
   SListNode* validListNode = NULL;
-  // nodes in other list
-  SListNode* otherListNode = NULL;
   // The pc Update
   PC_Update* pcUpdate = NULL;
   // Indicates if children have to be checked as well.
@@ -1513,8 +1510,6 @@ bool delROAwl(PrefixCache* self, uint32_t originAS, IPPrefix* prefix,
 static void _delROAwl_validateUpdates(PrefixCache* self, PC_Prefix* pcPrefix, 
                      PC_ROA* pcROA, SRxValidationResultVal parentStateOfOther)
 {
-  // Valid list nodes
-  SListNode* validListNode = NULL;
   bool checkForChildren = false;
   
   if (pcPrefix->treeNode->prefix->bitlen <= pcROA->max_len)
@@ -1778,7 +1773,7 @@ static void printXML(PrefixCache* self, char* methodName)
 {
   printf ("%s---------------------------------\n", methodName);
   outputPrefixCacheAsXML(self, stdout);
-  printf ("end--------------------------------\n", methodName);
+  printf ("end--------------------------------\n");
 }
 
 //TODO: Documentation

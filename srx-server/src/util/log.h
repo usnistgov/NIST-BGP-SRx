@@ -19,19 +19,21 @@
  * to set the log method at the beginning of the application - otherwise 
  * eventual message will be discarded.
  *  
- * @version 0.3.0.7
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.7 - 2015/04/21 - oborchert
- *           * Added ChangeLog.
- * 0.1.1.0 - 2010/06/25 - borchert
- *           * Added level WARNING
- *             A wonderful description on how and when to use each level can be 
- *             found at: 
- *             http://www.kiwisyslog.com/kb/info:-syslog-message-levels/
- * 0.1.0.0 - 2009/12/28 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0.7  - 2015/04/21 - oborchert
+ *            * Added ChangeLog.
+ * 0.1.1.0  - 2010/06/25 - borchert
+ *            * Added level WARNING
+ *              A wonderful description on how and when to use each level can be 
+ *              found at: 
+ *              http://www.kiwisyslog.com/kb/info:-syslog-message-levels/
+ * 0.1.0.0  - 2009/12/28 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __LOG_H__
@@ -41,7 +43,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
-#include "util/types.h"
 
 /** 
  * Log levels.

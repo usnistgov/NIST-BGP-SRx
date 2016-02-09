@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,18 +18,21 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2009/12/08 - pgleichm
+ *            * Code creaded.
  */
-/**
- * \file packet.h
- * \date Created: 12/28/2009
- */
-
 #ifndef __PACKET_H__
 #define __PACKET_H__
 
-#include "util/types.h"
 #include "shared/srx_packets.h"
 
 /** Specifies the length of a packet. */

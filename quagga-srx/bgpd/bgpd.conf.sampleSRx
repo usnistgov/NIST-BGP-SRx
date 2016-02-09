@@ -294,6 +294,14 @@ router bgp 7675
 ! Specify BGPSEC private key
 ! bgpsec ski <key>
 
+! Specify Signing method
+! ======================
+!   If the following option specified, sign_with_id method will be used as the
+!     BGPSec signing operation. Otherwise, default action, sign_with_key, will
+!     be used.
+! bgpsec sign id
+
+
 ! Specify Neighbors
 ! =================
  neighbor 10.0.1.1 remote-as 7676

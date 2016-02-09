@@ -36,16 +36,16 @@
  *           * Added change log.
  *           * Changed mode of sending data
  *   0.2.0 - SKIPPED
- *   0.1.0 - 2009/12/29 - pgleichman
+ *   0.1.0 - 2009/12/29 - pgleichm
  *           * Code Created
  */
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#include "socket.h"
-#include "util/log.h"
 #include "shared/srx_packets.h"
+#include "util/socket.h"
+#include "util/log.h"
 
 #include <fcntl.h>
 #include <pthread.h>

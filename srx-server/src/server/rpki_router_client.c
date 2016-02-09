@@ -4,51 +4,55 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.3.0.7
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.7 - 2015/04/17 - oborchert
- *           * BZ599 - Changed typecase from (int) to (uintptr_t) to prevent 
- *             compiler warnings and other nasty side affects while compiling
- *             on 32 and 64 bit OS.
- * 0.3.0.0 - 2013/01/28 - oborchert
- *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ * 0.3.0.10 - 2016/01/21 - kyehwanl
+ *            * added pthread cancel state for enabling keyboard interrupt
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Removed un-used attributes.
+ * 0.3.0.7  - 2015/04/17 - oborchert
+ *            * BZ599 - Changed typecase from (int) to (uintptr_t) to prevent
+ *              compiler warnings and other nasty side affects while compiling
+ *              on 32 and 64 bit OS.
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This
  *             update does not include the secure protocol section. The protocol
  *             will still use un-encrypted plain TCP
- *         - 2012/12/17 - oborchert
- *           * Adapted to the changes in the underlying client socket structure.
- *           * Fixed some spellers in documentation
- *           * Added documentation TODO
- * 0.2.0.0 - 2011/03/27 - oborchert
- *           * Changed implementation to follow draft-ietf-rpki-rtr-10
- * 0.1.0.0 - 2010/03/11 - pgleichm
- *           * Code Created
+ *          - 2012/12/17 - oborchert
+ *            * Adapted to the changes in the underlying client socket structure.
+ *            * Fixed some spellers in documentation
+ *            * Added documentation TODO
+ * 0.2.0    - 2011/03/27 - oborchert
+ *            * Changed implementation to follow draft-ietf-rpki-rtr-10
+ * 0.1.0    - 2010/03/11 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <signal.h>
-#include "rpki_router_client.h"
+#include "server/rpki_router_client.h"
 #include "util/client_socket.h"
 #include "util/log.h"
 #include "util/socket.h"
@@ -63,7 +67,7 @@
  * @param hdr the IPv4 prefix header.
  * @return
  */
-static bool handleIPv4Prefix(RPKIRouterClient* client, 
+static bool handleIPv4Prefix(RPKIRouterClient* client,
                              RPKIIPv4PrefixHeader* hdr)
 {
   IPPrefix  prefix;
@@ -82,7 +86,7 @@ static bool handleIPv4Prefix(RPKIRouterClient* client,
   sessionID = client->sessionID;
 
   /* Pass the information to the callback */
-  client->params->prefixCallback(clientID, sessionID, isAnn, &prefix, 
+  client->params->prefixCallback(clientID, sessionID, isAnn, &prefix,
                                  hdr->maxLen, ntohl(hdr->as), client->user);
   return true;
 }
@@ -94,14 +98,14 @@ static bool handleIPv4Prefix(RPKIRouterClient* client,
  * @param client Client the client connection
  * @param hdr The IPv4 prefix header.
  */
-static bool handleIPv6Prefix(RPKIRouterClient* client, 
+static bool handleIPv6Prefix(RPKIRouterClient* client,
                              RPKIIPv6PrefixHeader* hdr)
 {
   IPPrefix  prefix;
   bool      isAnn;
   uint32_t  clientID;
   uint16_t  sessionID;
-                                                                           
+
   /* Create the version independent prefix */
   prefix.ip.version = 6;
   memcpy(&prefix.ip.addr, &hdr->addr, sizeof(IPv6Address));
@@ -113,7 +117,7 @@ static bool handleIPv6Prefix(RPKIRouterClient* client,
   sessionID = client->sessionID;
 
   /* Pass the information to the callback */
-  client->params->prefixCallback(clientID, sessionID, 
+  client->params->prefixCallback(clientID, sessionID,
                                  isAnn, &prefix, hdr->maxLen, ntohl(hdr->as),
                                  client->user);
   return true;
@@ -127,10 +131,9 @@ static bool handleIPv6Prefix(RPKIRouterClient* client,
  * @param hdr PDU header
  * @return \c 0 = stay connected, \c 1 = disconnect, \c -1 = socket error
  */
-static int handleErrorReport(RPKIRouterClient* client, 
+static int handleErrorReport(RPKIRouterClient* client,
                              RPKIErrorReportHeader* hdr)
 {
-  uint32_t totalLen = ntohl(hdr->length);
   uint32_t epduLen = ntohl(hdr->len_enc_pdu);
   // Go to the message portion
   uint8_t* messagePtr = (uint8_t*)hdr+12+epduLen;
@@ -236,7 +239,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
 
   // Allocate the message buffer
   byteBuffer = malloc(bytesAllocated);
-  // Set the bufferPtr to the position where the remaining data has be loaded 
+  // Set the bufferPtr to the position where the remaining data has be loaded
   // into.
   bufferPtr = (byteBuffer + sizeof(RPKICommonHeader));
   if (!byteBuffer)
@@ -256,7 +259,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
     {
       LOG(LEVEL_DEBUG, HDR "Connection lost!", pthread_self());
       break;
-    } 
+    }
 
     hdr = (RPKICommonHeader*)byteBuffer;
     // retrieve the actual size of the message. In case more needs to be loaded
@@ -267,7 +270,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
       LOG(LEVEL_DEBUG, HDR "Received an invalid RPKI-RTR PDU!", pthread_self());
       break;
     }
-    LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%d]", pthread_self(), 
+    LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%d]", pthread_self(),
                      hdr->type);
 
 /////////////////////////////////////////
@@ -312,7 +315,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
 /////////////////////////////////////////
     client->lastRecv = hdr->type;
 
-    LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%u] length=%u\n", 
+    LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%u] length=%u\n",
                      pthread_self(), hdr->type, ntohl(hdr->length));
 
     // Is needed in PDU_TYPE_ERROR_REPORT
@@ -367,7 +370,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
         {
           if (ret == 1)
           {
-            // BZ599 - Changed typecase from (int) to (uintptr_t) to prevent 
+            // BZ599 - Changed typecase from (int) to (uintptr_t) to prevent
             // compiler warnings and other nasty side affects while compiling
             // on 32 and 64 bit OS.
             close((uintptr_t)getClientFDPtr(&client->clSock));
@@ -416,23 +419,25 @@ static void* manageConnection (void* clientPtr)
   act.sa_handler = sigusr_rpki_pipe_handler;
   sigaction(SIGPIPE, &act, NULL);
   pthread_sigmask(SIG_UNBLOCK, &errmask, NULL);
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
   g_rpki_single_thread_client_fd = client->clSock.clientFD;
-  
-  LOG (LEVEL_DEBUG, "([0x%08X]) > RPKI Router Client Thread started!", 
-                    pthread_self());    
+
+
+  LOG (LEVEL_DEBUG, "([0x%08X]) > RPKI Router Client Thread started!",
+                    pthread_self());
 
   while (!client->stop)
   {
     // Start off every new connection with a reset
     if (sendResetQuery(client))
     {
-      // Receive and process all PDUs - This is a loop until the connection 
+      // Receive and process all PDUs - This is a loop until the connection
       // is either lost or closed.
       receivePDUs(client, false);
     }
 
     // The connection is lost or did not even exist yet.
-    
+
     // Test if the connection stopped!
     if (client->stop)
     {
@@ -444,8 +449,8 @@ static void* manageConnection (void* clientPtr)
     sec = (client->params->connectionCallback == NULL)
               ? -1
               : client->params->connectionCallback(client->user);
- 
-    
+
+
     if (sec == -1)
     { // Stop trying to re-establish the connection
       pthread_exit((void*)1);
@@ -456,10 +461,10 @@ static void* manageConnection (void* clientPtr)
       // prepare some settings to allow a fresh start
       client->startup = true;
     }
-    
+
     // Now try to reconnect.
     reconnectToServer(&client->clSock, sec, MAX_RECONNECTION_ATTEMPTS);
-    
+
     // See if the session_id changed!
     if (client->sessionIDChanged)
     {
@@ -478,7 +483,7 @@ static void* manageConnection (void* clientPtr)
         client->params->sessionIDChangedCallback(client->routerClientID,
                                                  client->sessionID);
       }
-      LOG (LEVEL_DEBUG, HDR "CACHE SESSION ID CHANGE: SEND RESET QUERY", 
+      LOG (LEVEL_DEBUG, HDR "CACHE SESSION ID CHANGE: SEND RESET QUERY",
                         pthread_self());
       if (sendResetQuery(client))
       {
@@ -497,9 +502,9 @@ static void* manageConnection (void* clientPtr)
     }
   }
 
-  LOG (LEVEL_DEBUG, "([0x%08X]) < RPKI Router Client Thread stopped!", 
-                    pthread_self());    
-  
+  LOG (LEVEL_DEBUG, "([0x%08X]) < RPKI Router Client Thread stopped!",
+                    pthread_self());
+
   pthread_exit(0);
 }
 
@@ -528,7 +533,7 @@ uint32_t createRouterClientID(RPKIRouterClient* self)
  * @return true if a Client could be created, otherwise false.
  */
 bool createRPKIRouterClient (RPKIRouterClient* self,
-                             RPKIRouterClientParams* params, 
+                             RPKIRouterClientParams* params,
                              void* user)
 {
   int ret;
@@ -539,7 +544,7 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
     RAISE_ERROR("Not all mandatory callback methods are set");
     return false;
   }
- 
+
   // Try to connect to the server
   if (!createClientSocket (&self->clSock,
                            params->serverHost, params->serverPort,
@@ -565,13 +570,13 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
   self->params = params;
   self->stop   = false;
 
-  // Configure necessary data for cache session id. The configuration 
-  // startup=true allows the sessionID attribute to be set without further 
+  // Configure necessary data for cache session id. The configuration
+  // startup=true allows the sessionID attribute to be set without further
   // action.
   self->sessionID        = 0xffff;
   self->sessionIDChanged = false;
   self->startup          = true;
-  
+
   self->routerClientID = createRouterClientID(self);
 
   ret = pthread_create (&self->thread, NULL, manageConnection, self);
@@ -586,6 +591,9 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
   return true;
 }
 
+#include <errno.h>
+#define handle_error_en(en, msg) \
+                 do { errno = en; perror(msg);  pthread_exit(0); } while (0)
 //TODO: Documentation missing
 void releaseRPKIRouterClient (RPKIRouterClient* self)
 {
@@ -594,10 +602,11 @@ void releaseRPKIRouterClient (RPKIRouterClient* self)
   releaseMutex(&self->writeMutex);
   closeClientSocket(&self->clSock);
 
-  // Interrupt any reconnect attempt sleep
-  pthread_kill(self->thread, SIGINT);  
+  int s;
   // Wait until the thread terminates
-  pthread_join(self->thread, NULL);
+  s = pthread_cancel(self->thread);
+  if (s != 0)
+    handle_error_en(s, "pthread_join");
 }
 
 /**
@@ -640,8 +649,8 @@ bool sendResetQuery (RPKIRouterClient* self)
       self->clSock.clientFD = self->clSock.oldFD;
     }
     unlockMutex(&self->writeMutex);
-    
-    LOG (LEVEL_DEBUG, HDR "...%s\n", pthread_self(), (succ ? "done(srq)." 
+
+    LOG (LEVEL_DEBUG, HDR "...%s\n", pthread_self(), (succ ? "done(srq)."
                                                            : "failed!(srq)"));
   }
 
@@ -665,7 +674,7 @@ bool sendSerialQuery (RPKIRouterClient* self)
   hdr.sessionID = self->sessionID;
   hdr.length    = htonl(sizeof(RPKISerialQueryHeader));
   hdr.serial    = self->serial;
-  
+
   bool succ  = false;
 
   lockMutex(&self->writeMutex);
@@ -696,7 +705,7 @@ inline RPKIRouterPDUType getLastReceivedPDUType(RPKIRouterClient* self)
 //TODO: Documentation missing
 void sigusr_general_pipe_handler(int signo)
 {
-  LOG(LEVEL_DEBUG, "([0x%08X]) received signal %d from broken socket  ", 
+  LOG(LEVEL_DEBUG, "([0x%08X]) received signal %d from broken socket  ",
                    pthread_self(), signo);
   shutdown(g_rpki_single_thread_client_fd, SHUT_RDWR);
   //pthread_kill(pthread_self(), SIGPIPE);

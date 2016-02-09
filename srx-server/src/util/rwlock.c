@@ -25,7 +25,7 @@
  * 06/04/2010
  */
 
-#include "rwlock.h"
+#include "util/rwlock.h"
 #include "util/log.h"
 
 bool createRWLock(RWLock* self)

@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,17 +18,24 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Added Initialization for function variables in monitorThread
+ *          - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0    - 2010/12/01 -pgleichm
+ *            * Code created. 
  */
-/**
- * \file multi_client_socket.c
- * \date Created: 01/12/2010
- */
+// @TODO: This can be deleted
 
-// TODO: This can be deleted
-
-#include "multi_client_socket.h"
+#include "util/multi_client_socket.h"
 #include "util/client_socket.h"
 #include "util/log.h"
 #include "util/socket.h"
@@ -56,9 +63,9 @@ static void* monitorThread(void* data) {
   RAISE_ERROR("NOT CHECKED YET!!!");
   
   MultiClientSocket*  cs = (MultiClientSocket*)data;
-  uint32_t            id;
-  SListNode*          cnode;
-  QueueData*          qdata;
+  uint32_t            id = 0;
+  SListNode*          cnode = NULL;
+  QueueData*          qdata = NULL;
 
   LOG (LEVEL_DEBUG, "([0x%08X]) > Multi Client Socket Thread started!", pthread_self());    
   

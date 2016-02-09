@@ -112,3 +112,6 @@ EXTRA_DIST = BGP-TypeCode draft-zebra-00.ms draft-zebra-00.txt \
 
 draft-zebra-00.txt: draft-zebra-00.ms
 	groff -T ascii -ms $< > $@
+
+clean-local:
+	rm -f quagga.info quagga.info-1 quagga.info-2 stamp-vti version.texi

@@ -7,7 +7,8 @@
 # They are not intended to be used elsewhere than the test bed.
 # 
 
-EXT_KEY="key"
+EXT_DER="der"
+EXT_PEM="key"
 EXT_CERT="cert"
 SKI_LIST="ski-list.txt"
 
@@ -15,9 +16,18 @@ QSRX_VIEW=qsrx-view-subject
 QSRX_MAKE_KEY=qsrx-make-key
 QSRX_MAKE_CERT=qsrx-make-cert
 
+WITH_PEM=0
+
 if [ "$1" == "" ] ; then
-  echo "$0 <cert-name> [<repository path>]"
+  echo "$0 [--with-pem] <cert-name> [<repository path>]"
   exit 1
+fi
+
+if [ "$1" != "" ] ; then
+  if [ "$1" == "--with-pem" ] ; then
+    WITH_PEM=1
+    shift;
+  fi
 fi
 
 REPO_ROOT="/var/lib/bgpsec-keys"
@@ -25,27 +35,70 @@ if [ "$2" != "" ] ; then
   REPO_ROOT=$2
 fi
 
+ALL_GOOD=0
+
 if [ -e "$1.$EXT_CERT" ] ; then
-  if [ -e "$1.$EXT_KEY" ] ; then
-    SUBJECT=$($QSRX_VIEW $1)
-    DIR1=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\).*/\1/g")
-    DIR2=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\)\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\).*/\2/g")
-    FILE=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\)\(.*\)/\2/g")
+  if [ -e "$1.$EXT_DER" ] ; then
+    if [ $WITH_PEM -eq 1 ] ; then
+      if [ -e "$1.$EXT_PEM" ] ; then
+        ALL_GOOD=1
+      fi
+    else
+      ALL_GOOD=1
+    fi
 
-    REPOSITORY=$REPO_ROOT/$DIR1/$DIR2
-    KEYVOLT=$REPO_ROOT/$DIR1/$DIR2
-    #KEYVOLT=$REPO_ROOT/keys
+    if [ $ALL_GOOD -eq 1 ] ; then
+      SUBJECT=$($QSRX_VIEW $1)
+      DIR1=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\).*/\1/g")
+      DIR2=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\)\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\).*/\2/g")
+      FILE=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\)\(.*\)/\2/g")
 
-    echo "Publish cert and key into $REPOSITORY"
-    mkdir -p $REPOSITORY
-    mkdir -p $KEYVOLT
+      REPOSITORY=$REPO_ROOT/$DIR1/$DIR2
+      KEYVOLT=$REPO_ROOT/$DIR1/$DIR2
+      #KEYVOLT=$REPO_ROOT/keys
 
-    cp $1.$EXT_CERT $REPOSITORY/$FILE.$EXT_CERT
-    cp $1.$EXT_KEY  $KEYVOLT/$FILE.$EXT_KEY
-    echo "$1-SKI=$SUBJECT"
-    echo "$1-SKI: $SUBJECT" >> $REPO_ROOT/$SKI_LIST
+      DO_REGISTER=0
+
+      echo "Publish cert and key into $REPOSITORY"
+      # Check if public key exists already!!
+      if [ -e $REPOSITORY/$FILE.$EXT_CERT ] ; then
+        echo " * public key $REPOSITORY/$FILE.$EXT_CERT already installed!!"
+      else
+        mkdir -p $REPOSITORY
+        cp $1.$EXT_CERT $REPOSITORY/$FILE.$EXT_CERT
+        DO_REGISTER=1
+      fi
+
+      if [ -e $KEYVOLT/$FILE.$EXT_DER ] ; then
+        echo " * private key $REPOSITORY/$FILE.$EXT_DER already installed!!"
+      else
+        mkdir -p $KEYVOLT
+        cp $1.$EXT_DER  $KEYVOLT/$FILE.$EXT_DER
+        DO_REGISTER=1
+      fi
+
+      if [ $WITH_PEM -eq 1 ] ; then
+        if [ -e $KEYVOLT/$FILE.$EXT_PEM ] ; then
+          echo " * private key $REPOSITORY/$FILE.$EXT_PEM already installed!!"
+        else
+          cp $1.$EXT_PEM  $KEYVOLT/$FILE.$EXT_PEM
+          DO_REGISTER=1
+        fi
+      fi
+
+      if [ $DO_REGISTER -eq 1 ] ; then
+        echo "Register $1-SKI=$SUBJECT"
+        echo "$1-SKI: $SUBJECT" >> $REPO_ROOT/$SKI_LIST
+      else
+        echo "$1-SKI=$SUBJECT already registered"
+      fi
+    else
+      echo "Key $1.$EXT_PEM not found! Please generate a key and certificate first using:"
+      echo "- Generate a key using '$QSRX_MAKE_KEY $1'"
+      echo "- Generate a certificate '$QSRX_MAKE_CERT $1'"
+    fi
   else
-    echo "Key $1.$EXT_KEY not found! Please generate a key and certificate first using:"
+    echo "Key $1.$EXT_DER not found! Please generate a key and certificate first using:"
     echo "- Generate a key using '$QSRX_MAKE_KEY $1'"
     echo "- Generate a certificate '$QSRX_MAKE_CERT $1'"
   fi

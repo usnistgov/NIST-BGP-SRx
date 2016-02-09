@@ -47,16 +47,19 @@
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/27 - oborchert
- *           * Added Change log
- *           * Changed volatile attribute _handshakeSocket from int to pointer 
- *             of int. This allows a correct maintenance of the sockets file
- *             descriptor.
- *           * Removed setting of established. Is already maintained in srx_api.
- *   0.2.0 - 2011/11/01 - oborchert
- *           * rewritten
- *   0.1.0 - 2010/04/07 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Removed un-used static function _suppressSIGINT. It was already
+ *              replaced with SIG_IGN. 
+ * 0.3.0    - 2013/02/27 - oborchert
+ *            * Added Change log
+ *            * Changed volatile attribute _handshakeSocket from int to pointer 
+ *              of int. This allows a correct maintenance of the sockets file
+ *              descriptor.
+ *            * Removed setting of established. Is already maintained in srx_api.
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * rewritten
+ * 0.1.0    - 2010/04/07 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #include <stdio.h>
@@ -64,11 +67,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <netinet/tcp.h>
+#include "client/client_connection_handler.h"
+#include "shared/srx_packets.h"
 #include "util/client_socket.h"
 #include "util/log.h"
-#include "shared/srx_packets.h"
 #include "util/mutex.h"
-#include "client_connection_handler.h"
 #include "util/socket.h"
 
 /** Seconds between reconnect attempts */
@@ -247,18 +250,6 @@ bool initializeClientConnectionHandler(ClientConnectionHandler* self,
 }
 
 /**
- * Empty signal handler to prevent SIGINT from closing the program. This method
- * does absolutely nothing.
- *
- * @param _unused Not used here. (Just for Debug printout
- */
-static void _suppressSIGINT(int _unused)
-{
-  // Do nothing - just suppress the signal
-  LOG(LEVEL_DEBUG, HDR "SIGNAL RECEIVED [%u]\n", pthread_self(), _unused);
-}
-
-/**
  * Closes the connection to the server.
  *
  * @param self Instance that should be used
@@ -276,7 +267,6 @@ void releaseClientConnectionHandler(ClientConnectionHandler* self)
       self->stop = true;
       
       // Make sure the SIGINT does not terminate the program
-//      signal(SIGINT, _suppressSIGINT);
       signal(SIGINT, SIG_IGN); // Ignore the signals
 
       if (self->established)
@@ -484,12 +474,7 @@ void _catch_handshakeTimeout(int sig)
  * @return true if the handshake was successful.
  */
 bool handshakeWithServer(ClientConnectionHandler* self, SRXPROXY_HELLO* pdu)
-{
-  uint8_t                  responsePdu[sizeof(SRXPROXY_HELLO_RESPONSE)];
-  SRXPROXY_HELLO_RESPONSE* responseHdr;
-  uint32_t                 bytesReceived;
-  int                      timeout = 0;
-  
+{  
   // Send 'HELLO' to the server
   if (!sendData(&self->clSock, (void*)pdu, ntohl(pdu->length)))
   {
@@ -501,7 +486,7 @@ bool handshakeWithServer(ClientConnectionHandler* self, SRXPROXY_HELLO* pdu)
   // prepare handshake
   _handshakeAlarm  = 0;
   _handshakeSocket = &self->clSock.clientFD;
-  __sighandler_t oldHandler;
+  __sighandler_t oldHandler = NULL;
   int oldAlarmTimer = 0;
   
   if (self->handshake_timeout)
@@ -694,8 +679,7 @@ bool reconnectSRX(ClientConnectionHandler* self)
         RAISE_ERROR("Handshake with server failed but connection handler is "
                     "not stopped!");
         //releaseClientConnectionHandler(self);
-        //--> need to be something different, because it is really bad idea to \
-        // pthread_cancel inside same thread.
+        //--> need to be something different, because it is really bad idea to pthread_cancel inside same thread.
       }
       LOG(LEVEL_WARNING, "Handshake with server failed!");
       return false;

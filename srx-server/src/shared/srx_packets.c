@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,19 +18,27 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * @file srx_packets.c
- * @date Created: 04/28/2010
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Removed unused static function sappendf
+ *          - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0    - 2010/04/28 -pgleichm
+ *            * Code created. 
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <arpa/inet.h>
-#include "srx_packets.h"
+#include "shared/srx_packets.h"
 #include "util/debug.h"
 #include "util/prefix.h"
 
@@ -64,33 +72,5 @@ const char* packetTypeToStr(SRxProxyPDUType type)
   else
   {
     return NULL;
-  }
-}
-
-/*--------------------------
- * Packet to string (= dump)
- */
-
-/**
- * Appends a printf-format string to a buffer and adjusts the buffer 
- * pointer and size.
- *
- * @param dest Pointer to the char* buffer
- * @param n Pointer to the size of the buffer
- * @param fmt \c printf like format string
- * @param ... Arguments
- */
-static void sappendf(char** dest, size_t* n, const char* fmt, ...)
-{
-  va_list ap;
-  int num;
-
-  if (*n > 0)
-  {
-    va_start(ap, fmt);
-    num = vsnprintf(*dest, *n, fmt, ap);
-    va_end(ap);
-    *dest += num;
-    *n -= num;
   }
 }

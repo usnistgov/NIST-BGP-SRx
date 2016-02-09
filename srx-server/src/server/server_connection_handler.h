@@ -21,34 +21,36 @@
  * by this software.
  *
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/15 - oborchert
- *           * Added the number of updates linked to the ProxyClientMapping
- *         - 2013/02/12 - oborchert
- *           * Removed delMapping from header file. The code will still be 
- *             executed with the call of deaktivateMapping.
- *         - 2013/01/28 - oborchert
- *           * Finished mapping configuration.
- *         - 2013/01/22 - oborchert
- *           * Added internal receiver queue. (can be configured!)
- *         - 2013/01/05 - oborchert
- *           * Renamed ProxyClientMap into ProxyClientMaping
- *           * Added documentation to C file
- *         - 2013/01/04 - oborchert
- *           * Added isShutdown parameter to structure
- *           * Added system configuration to structure
- *         - 2012/12/31 - oborchert
- *           * Added Version control
- *           * Bug fix in prefix preparation for storing in update cache
- *         - 2012/12/17 - oborchert
- *           * Partially rewritten message flow.
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Rewritten.
- *   0.0.0 - 2010/04/15 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/02/15 - oborchert
+ *            * Added the number of updates linked to the ProxyClientMapping
+ *          - 2013/02/12 - oborchert
+ *            * Removed delMapping from header file. The code will still be 
+ *              executed with the call of deaktivateMapping.
+ *          - 2013/01/28 - oborchert
+ *            * Finished mapping configuration.
+ *          - 2013/01/22 - oborchert
+ *            * Added internal receiver queue. (can be configured!)
+ *          - 2013/01/05 - oborchert
+ *            * Renamed ProxyClientMap into ProxyClientMaping
+ *            * Added documentation to C file
+ *          - 2013/01/04 - oborchert
+ *            * Added isShutdown parameter to structure
+ *            * Added system configuration to structure
+ *          - 2012/12/31 - oborchert
+ *            * Added Version control
+ *            * Bug fix in prefix preparation for storing in update cache
+ *          - 2012/12/17 - oborchert
+ *            * Partially rewritten message flow.
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * Rewritten.
+ * 0.1.0    - 2010/04/15 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  */
@@ -60,7 +62,6 @@
 #include "server/update_cache.h"
 #include "util/server_socket.h"
 #include "util/slist.h"
-#include "util/types.h"
 
 /** This Structure is used to identify proxies. IMPORTANT though to mention is 
  * that this map is ONLY used for initial mapping. Once the mapping is done the

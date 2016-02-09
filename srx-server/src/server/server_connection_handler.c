@@ -20,28 +20,31 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Finished mapping configuration.
- *         - 2013/01/22 - oborchert
- *           * Added internal receiver queue. (can be configured!)
- *         - 2013/01/05 - oborchert
- *           * Renamed ProxyClientMap into ProxyClientMaping
- *           * Added documentation to C file
- *         - 2013/01/04 - oborchert
- *           * Added isShutdown parameter to structure
- *         - 2012/12/31 - oborchert
- *           * Added Version control
- *           * Bug fix in prefix preparation for storing in update cache
- *         - 2012/12/17 - oborchert
- *           * Message flow partially rewritten.
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Rewritten.
- *   0.0.0 - 2010/04/15 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Fixed assignment bug in stopSCHReceiverQueue
+ *            * Added return value (NULL) to schReceiverQueueThreadLoop
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Finished mapping configuration.
+ *          - 2013/01/22 - oborchert
+ *            * Added internal receiver queue. (can be configured!)
+ *          - 2013/01/05 - oborchert
+ *            * Renamed ProxyClientMap into ProxyClientMaping
+ *            * Added documentation to C file
+ *          - 2013/01/04 - oborchert
+ *            * Added isShutdown parameter to structure
+ *          - 2012/12/31 - oborchert
+ *            * Added Version control
+ *            * Bug fix in prefix preparation for storing in update cache
+ *          - 2012/12/17 - oborchert
+ *            * Message flow partially rewritten.
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * Rewritten.
+ * 0.0.0    - 2010/04/15 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  */
@@ -50,11 +53,11 @@
 #include <stdint.h>
 
 #include "util/log.h"
+#include "server/server_connection_handler.h"
+#include "server/srx_packet_sender.h"
 #include "shared/srx_identifier.h"
 #include "shared/srx_packets.h"
 #include "shared/srx_defs.h"
-#include "server_connection_handler.h"
-#include "srx_packet_sender.h"
 
 #define HDR  "([0x%08X] SrvConnHdlr): "
 
@@ -183,6 +186,8 @@ void releaseSCHReceiverQueue(SCH_ReceiverQueue* queue)
  * 
  * @param The queue itself
  * 
+ * @return NULL
+ * 
  * @since 0.3.0
  */
 void* schReceiverQueueThreadLoop(void* thisQueue)
@@ -210,6 +215,8 @@ void* schReceiverQueueThreadLoop(void* thisQueue)
     }
     LOG(LEVEL_DEBUG, "Exit loop of Server Connection Handler REceiver Queue!");
   }
+  
+  return NULL;
 }
 
 /**
@@ -295,7 +302,7 @@ void stopSCHReceiverQueue(SCH_ReceiverQueue* queue)
       free(packet);
       queue->size--;
     }
-    queue->tail == NULL;
+    queue->tail = NULL;
     unlockMutex(&queue->mutex);
   }
 }
@@ -1428,7 +1435,6 @@ void deactivateConnectionMapping(ServerConnectionHandler* self,
                                  uint8_t clientID, bool crashed, 
                                  uint16_t keepWindow)
 {
-  //TODO set the time of the crash.  
   struct timespec time;
   clock_gettime(CLOCK_REALTIME, &time);
   if (keepWindow < (uint16_t)self->sysConfig->defaultKeepWindow)

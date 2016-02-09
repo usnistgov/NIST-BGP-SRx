@@ -22,30 +22,28 @@
  *
  * RPKI/Router definitions.
  *
- * @version 0.3.0
- *
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *             update does not include the secure protocol section. The protocol
- *             will still use un-encrypted plain TCP
- *           * Removed invalid PDU type: PDU_TYPE_UNKNOWN.
- *   0.2.0 - 2011/03/03 - oborchert
- *           * Updated to comply with version draft-ietf-sidr-rpki-rtr.10
- *           * For better understanding created a struct for each
- *   0.1.0 - 01/05/2010 - pgleichm
- *           * Code Created according to  draft-ymbk-rtr-protocol-05
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *              update does not include the secure protocol section. The protocol
+ *              will still use un-encrypted plain TCP
+ *            * Removed invalid PDU type: PDU_TYPE_UNKNOWN.
+ * 0.2.0    - 2011/03/03 - oborchert
+ *            * Updated to comply with version draft-ietf-sidr-rpki-rtr.10
+ *            * For better understanding created a struct for each
+ * 0.1.0    - 01/05/2010 - pgleichm
+ *            * Code Created according to  draft-ymbk-rtr-protocol-05
  * -----------------------------------------------------------------------------
  */
-
-
 #ifndef __RPKI_ROUTER_H__
 #define __RPKI_ROUTER_H__
 
 #include "util/prefix.h"
-#include "util/types.h"
 
 /** 
  * PDU Types 

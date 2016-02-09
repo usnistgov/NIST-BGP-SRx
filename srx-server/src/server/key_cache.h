@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,14 +18,18 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * @file key_cache.h
- * @date Created: 4/8/2010
  *
- * Key Cache.
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0    - 2010/04/08
+ *            * File created
  */
 
 #ifndef __KEY_CACHE_H__
@@ -33,7 +37,6 @@
 
 #include "server/update_cache.h"
 #include "shared/srx_defs.h"
-#include "util/types.h"
 
 /**
  * Function that is called when a key was removed or replaced.

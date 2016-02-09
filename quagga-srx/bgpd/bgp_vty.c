@@ -1620,7 +1620,6 @@ DEFUN (bgpsec_ski,
 
   if (strlen(argv[0]) == 0)
   {
-    // TODO: SKI length sould be checked here as 20-letter long hex-string
     vty_out (vty, "%% Empty SKI %s", VTY_NEWLINE);
     return CMD_ERR_INCOMPLETE;
   }
@@ -1644,6 +1643,31 @@ DEFUN (bgpsec_ski,
 
   return CMD_SUCCESS;
 }
+
+DEFUN (bgpsec_sign,
+       bgpsec_sign_cmd,
+       "bgpsec sign (key|id)",
+       "bgpsec signing using key or id")
+{
+
+  u_char flag = 0;
+  struct bgp *bgp;
+  bgp = vty->index;
+
+  if (strncmp (argv[0], "i", 1) == 0)
+    flag = BGPSEC_SIGN_WITH_ID;
+  else if(strncmp(argv[0], "k", 1) == 0)
+    flag = BGPSEC_SIGN_WITH_KEY;
+  else
+    return CMD_WARNING;
+
+  bgp->bgpsec_sign_method_flag = flag;
+
+  //vty_out (vty, "%% bgpsec_sign_method:%08x %s", bgp->bgpsec_sign_method_flag,  VTY_NEWLINE);
+  return CMD_SUCCESS;
+}
+
+
 
 DEFUN (srx_connect,
        srx_connect_cmd,
@@ -10006,6 +10030,7 @@ bgp_vty_init (void)
   install_element (BGP_NODE, &srx_policy_prefer_valid_cmd);
   install_element (BGP_NODE, &no_srx_policy_prefer_valid_cmd);
   install_element (BGP_NODE, &bgpsec_ski_cmd);
+  install_element (BGP_NODE, &bgpsec_sign_cmd);
   install_element (BGP_NODE, &srx_send_extcommunity_cmd);
   install_element (BGP_NODE, &srx_send_extcommunity_ebgp_cmd);
   install_element (BGP_NODE, &no_srx_send_extcommunity_cmd);

@@ -34,11 +34,11 @@
  * -----------------------------------------------------------------------------
  */
 
-#include "command_queue.h"
-#include "util/log.h"
-#include "util/math.h"
+#include "server/command_queue.h"
 #include "shared/srx_defs.h"
 #include "shared/srx_packets.h"
+#include "util/log.h"
+#include "util/math.h"
 
 #define HDR "([0x%08X] Command Queue): "
 

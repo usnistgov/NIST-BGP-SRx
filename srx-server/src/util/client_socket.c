@@ -30,7 +30,7 @@
  *     where this structure is used (proxy / srx-server)
  *   0.2.0 - 2011/11/xx - oborchert
  *   * bug fixes and other changes.
- *   0.1.0 - 2009/12/28 - pgleichman
+ *   0.1.0 - 2009/12/28 - pgleichm
  *   * Code Created
  */
 
@@ -40,7 +40,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include "client_socket.h"
+#include "util/client_socket.h"
 #include "util/log.h"
 #include "util/packet.h"
 #include "util/socket.h"

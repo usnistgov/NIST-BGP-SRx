@@ -23,25 +23,28 @@
  * IPv4 and IPv6 address and prefix structures and functions.
  * log.h is used for error message handling.
  * 
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Added method IPtoInt that allows to convert an IP string or 
- *             integer string into an unsigned integer.
- *           * Added version control.
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Extended.
- *   0.1.0 - 2010/02/03 - pgleichm
- *           * Code Created
+ *   0.3.0.10 - 2015/11/06 - oborchert
+ *              * removed types.h
+ *   0.3.0    - 2013/01/28 - oborchert
+ *              * Added method IPtoInt that allows to convert an IP string or 
+ *                integer string into an unsigned integer.
+ *              * Added version control.
+ *   0.2.0    - 2011/11/01 - oborchert
+ *              * Extended.
+ *   0.1.0    - 2010/02/03 - pgleichm
+ *              * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __PREFIX_H__
 #define __PREFIX_H__
 
+#include <stddef.h>
+#include <stdbool.h>
 #include <netinet/in.h>
-#include "util/types.h"
 
 /** An IPv4 address */
 typedef union {

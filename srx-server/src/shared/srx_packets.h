@@ -9,36 +9,39 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
+ * Some data definitions are moved into shared/srx_defs.h This makes it easier
+ * for integrating into quagga. 
+ *   
+ * Packet types and constants.
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
+ * 
+ * @version 0.3.0.10
  *
- */
-/**
- * @file srx_packets.h
- * @date Created: 04/09/2010
- *
- * Some data definitions are moved into shared/srx_defs.h This makes it easier
- * for integrating into quagga. 
- *  
- * Packet types and constants.
- *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/06 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2010/04/09 - pgleichm
+ *            * Created code.
+ * 
  * @note All structures are packed
  */
-
 #ifndef __SRX_PACKETS_H__
 #define __SRX_PACKETS_H__
 
 #include <unistd.h>
-#include "util/prefix.h"
 #include "shared/srx_defs.h"
+#include "util/prefix.h"
 
 /** Version of the protocol listed in this document. */
 #define SRX_PROTOCOL_VER  1

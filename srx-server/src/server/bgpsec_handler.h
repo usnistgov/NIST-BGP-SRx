@@ -9,23 +9,28 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * @file bgpsec_handler.h
- * @date Created: 4/8/2010
+ * @version 0.3.0.10
  *
- * BGPSec Handler.
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0.0  - 2010/08/04 - pgleichm
+ *            * File created.
  */
 
 #ifndef __BGPSEC_HANDLER_H__
@@ -33,7 +38,6 @@
 
 #include "server/key_cache.h"
 #include "shared/srx_defs.h"
-#include "util/types.h"
 
 /** 
  * A single BGPSec Handler.

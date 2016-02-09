@@ -806,7 +806,7 @@ aspath_parse (struct stream *s, size_t length, int use32bit)
   {
     size_t i = stream_get_getp (s);
     zlog_debug ("[AS4SEG] aspath_parse: dump stream length:%d - getp:%d ",\
-               length, stream_getc_from(s, i) );
+               (int)length, stream_getc_from(s, i) );
     size_t tot = length + i, inc=0;
     for (i; i < tot; i++)
     {

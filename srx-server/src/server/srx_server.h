@@ -21,10 +21,12 @@
  *
  * This file does provide CONSTANT declarations ONLY
  *
- * Version 0.3.0.7
+ * Version 0.3.1.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.3.1.0 - 2015/11/11 - oborchert
+ *         * Fixed speller in program name from SRX to SRx
  * 0.3.0.7 - 2015/04/21 - oborchert
  *         * Modified Version numbering by referring specification to Makefile.
  * 0.3.0.0 - 2013/02/04 - oborchert
@@ -46,7 +48,7 @@
 #define SRX_CHECKVAL(VAL)    SRX_DO_CHECKVAL(VAL)
 
 
-#define SRX_SERVER_NAME     "SRX Server"
+#define SRX_SERVER_NAME     "SRx Server"
 
 #ifndef SRX_SERVER_PACKAGE
 // Is provided by Makefile as CFLAGS -I

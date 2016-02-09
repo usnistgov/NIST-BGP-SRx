@@ -73,6 +73,7 @@
 #ifndef __SERVER_SOCKET_H__
 #define __SERVER_SOCKET_H__
 
+#include "util/mutex.h"
 #include "util/packet.h"
 #include "util/slist.h"
 
@@ -284,7 +285,8 @@ bool sendPacketToClient(ServerSocket* self, ServerClient* client,
  */
 int closeClientConnection(ServerSocket* self, ServerClient* client);
 
-// TODO: Check if it is still needed
+// TODO: Check if it is still needed - Still used in server_socket.c/h 
+// Maybe it can be moved into server_socket.c
 int g_single_thread_client_fd;
 
 #endif // !__SERVER_SOCKET_H__

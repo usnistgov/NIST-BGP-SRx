@@ -83,6 +83,13 @@ certificates only contain the public key.
 The last step generates a file containing the skis of all private keys for easy
 copy past into the bgpd.conf
 
+Known Issues:
+=============
+The load key function can only private files in PEM format. Therefore the .pem
+files are required. The PEM formated keys will be converted internally into 
+DER formated keys as required by the specification. 
+
+
 Questions:
 ==========
 Email to bgpsrx-dev@nist.gov

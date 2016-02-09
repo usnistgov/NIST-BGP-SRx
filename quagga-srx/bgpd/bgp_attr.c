@@ -38,9 +38,9 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_packet.h"
 #include "bgpd/bgp_ecommunity.h"
-#ifdef USE_SRX
+//#ifdef USE_SRX
 #include "bgpd/bgp_validate.h"
-#endif
+//#endif
 
 /* Attribute strings for logging. */
 static const struct message attr_str [] =
@@ -2387,7 +2387,7 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
     fSetAspath = 1;
     if (BGP_DEBUG (as4, AS4_SEGMENT))
       zlog_debug("[AS4SEG] ASPATH TRANSFERRED");
-#endif
+#endif // USE_SRX
     stream_putc (s, BGP_ATTR_FLAG_TRANS|BGP_ATTR_FLAG_EXTLEN);
     stream_putc (s, BGP_ATTR_AS_PATH);
     aspath_sizep = stream_get_endp (s);
@@ -2397,8 +2397,7 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
   }
 #endif
 
-//#undef DEBUG_TEST
-#ifdef DEBUG_TEST
+#if defined(DEBUG_TEST) && defined(USE_SRX)
   if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
   {
     struct aspath *attaspath = aspath;
@@ -2431,12 +2430,12 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
       print_signature(attr->bgpsecPathAttr);
     }
 
-#endif
+#endif // DEBUG_TEST
 
 #ifdef USE_SRX
   struct aspath *aspath_bgpsec = NULL;
   aspath_bgpsec = aspath_dup (aspath);
-#endif
+#endif // USE_SRX
 
   /* OLD session may need NEW_AS_PATH sent, if there are 4-byte ASNs
    * in the path
@@ -2843,21 +2842,6 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
 
   /* if and only if, the peer's recv capability set and this node's send capability set,
    * BGPSec Update message can be sent to the peer */
-
-  /* this is different condition compared to what the following if-confditions */
-#if 0
-  if (from
-      && CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) // this node has the send capability
-      && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV) // peer node has the recv capability
-      && (from->as == 0  // in case, this is Origin node
-          || (from->as && from->as != peer->as  // if the prev node exist and different from the next peer
-              && CHECK_FLAG (from->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV) // this, recv-cap
-              && CHECK_FLAG (from->cap, PEER_CAP_BGPSEC_ADV_SEND) // prev, send-cap
-             )
-         )
-     )
-#endif
-
   if ( from && (from->as == 0) && // in case, this is Origin node
       (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND) // this node has the send capability
        && CHECK_FLAG (peer->cap, PEER_CAP_BGPSEC_ADV))               // peer node has the recv capability

@@ -22,71 +22,75 @@
  *
  * This program allows to test the SRX server implementation.
  *
- * @version 0.3.0.6
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.6 - 2014/04/03 - oborchert
- *           * Fixed formating error in printout ($i -> %i)
- * 0.3.0   - 2013/03/05 - oborchert
- *           * Fixed logLevel management
- *           * Fixed initial creation of proxy by passing the communication 
- *             management handler.
- *         - 2013/02/27 - oborchert
- *           * Removed debug printf statements
- *           * Updated to reflect changes in error management made in srx_api.
- *           * fixed doDisconnect.
- *         - 2013/02/21 - oborchert
- *           * Relabeled bgpsec to path and rpki to origin.
- *         - 2013/02/20 - oborchert
- *           * Fixed bug in doConnect() where host name was overwritten by 
- *             port number.
- *           * Fixed bug in runScript where the script mode was not turned off 
- *             at the end.
- *         - 2013/02/15 - oborchert
- *           * Added prompt after printout of receiving validation result.
- *           * Changed delete command. 0 as updateID cancels the request!
- *         - 2013/02/12 - oborchert
- *           * Fixed bug (BZ278) in non blocking socket mode. 
- *           * Do not add commands from a script to history.
- *         - 2013/02/06 - oborchert
- *           * Removed polling sleep time. Not needed anymore using select() for
- *             non-blocking socket.
- *         - 2013/01/28 - oborchert
- *           * Moved method IPtoINT into prefix.h
- *         - 2013/01/23 - oborchert
- *           * Added command to exit automatically when stat-mark is reached!
- *           * added function promptBool.
- *           * Added command "code completion" to console.
- *           * Fixed runtime error when attempting to open non existing script.
- *         - 2013/01/15 - oborchert
- *           * Allow the usage of non blocking sockets.
- *         - 2013/01/04 - oborchert
- *           * Removed calculation of average processing time from statistics
- *             framework.
- *         - 2013/01/04 - oborchert
- *           * Fixed some bugs in statistics framework
- *           * Added Error Management.
- *         - 2013/01/03 - oborchert
- *           * Fixed help output in verify command
- *           * Changed default proxyID from 1234 to 10.0.0.1
- *           * Added statistics framework for validation requests
- *           * Moved all commands into defines for easier handling
- *         - 2012/12/31 - oborchert
- *           * BZ256 Added capability to enter both, integer or IPv4 as proxy id
- *           * Fixed a minor display issue.
- *         - 2012/12/11 - oborchert
- *           * Added proxy id to connect command
- *           * Internally changed verify update to new API
- *           * Added reconnect command "doReConnect"
- *           * Changed parameter input for connect "doConnect"
- * 0.2.0   - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *           * Fixed some output to be less confusing.
- *           * Trimmed all input.
- * 0.0.0   - 2010/05/11 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Added initialization of variables in runScript
+ *            * Removed unused variables from doVerify
+ * 0.3.0.6  - 2014/04/03 - oborchert
+ *            * Fixed formating error in printout ($i -> %i)
+ * 0.3.0    - 2013/03/05 - oborchert
+ *            * Fixed logLevel management
+ *            * Fixed initial creation of proxy by passing the communication 
+ *              management handler.
+ *          - 2013/02/27 - oborchert
+ *            * Removed debug printf statements
+ *            * Updated to reflect changes in error management made in srx_api.
+ *            * fixed doDisconnect.
+ *          - 2013/02/21 - oborchert
+ *            * Relabeled bgpsec to path and rpki to origin.
+ *          - 2013/02/20 - oborchert
+ *            * Fixed bug in doConnect() where host name was overwritten by 
+ *              port number.
+ *            * Fixed bug in runScript where the script mode was not turned off 
+ *              at the end.
+ *          - 2013/02/15 - oborchert
+ *            * Added prompt after printout of receiving validation result.
+ *            * Changed delete command. 0 as updateID cancels the request!
+ *          - 2013/02/12 - oborchert
+ *            * Fixed bug (BZ278) in non blocking socket mode. 
+ *            * Do not add commands from a script to history.
+ *          - 2013/02/06 - oborchert
+ *            * Removed polling sleep time. Not needed anymore using select() for
+ *              non-blocking socket.
+ *          - 2013/01/28 - oborchert
+ *            * Moved method IPtoINT into prefix.h
+ *          - 2013/01/23 - oborchert
+ *            * Added command to exit automatically when stat-mark is reached!
+ *            * added function promptBool.
+ *            * Added command "code completion" to console.
+ *            * Fixed runtime error when attempting to open non existing script.
+ *          - 2013/01/15 - oborchert
+ *            * Allow the usage of non blocking sockets.
+ *          - 2013/01/04 - oborchert
+ *            * Removed calculation of average processing time from statistics
+ *              framework.
+ *          - 2013/01/04 - oborchert
+ *            * Fixed some bugs in statistics framework
+ *            * Added Error Management.
+ *          - 2013/01/03 - oborchert
+ *            * Fixed help output in verify command
+ *            * Changed default proxyID from 1234 to 10.0.0.1
+ *            * Added statistics framework for validation requests
+ *            * Moved all commands into defines for easier handling
+ *          - 2012/12/31 - oborchert
+ *            * BZ256 Added capability to enter both, integer or IPv4 as proxy 
+ *              id
+ *            * Fixed a minor display issue.
+ *          - 2012/12/11 - oborchert
+ *            * Added proxy id to connect command
+ *            * Internally changed verify update to new API
+ *            * Added reconnect command "doReConnect"
+ *            * Changed parameter input for connect "doConnect"
+ * 0.2.0    - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *            * Fixed some output to be less confusing.
+ *            * Trimmed all input.
+ * 0.0.0    - 2010/05/11 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  */
@@ -98,19 +102,19 @@
 #include <errno.h>
 #include <time.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <sys/select.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include <unistd.h>
 #include "client/srx_api.h"
+// This include is only needed for some program version defines. Not needed 
+// otherwise.
+#include "server/srx_server.h"
 #include "shared/srx_packets.h"
 #include "util/log.h"
 #include "util/prefix.h"
 #include "util/str.h"
 #include "util/socket.h"
-// This include is only needed for some program version defines. Not needed 
-// otherwise.
-#include "server/srx_server.h"
 
 #define DEFAULT_SERVER    "localhost"
 #define DEFAULT_PORT      17900
@@ -604,7 +608,6 @@ void* pollProxy(void* threadid)
   int fd = -1;  
   bool useSelect = false;
   bool goodToGo  = false;
-  bool retval = false;
   
   while (keepGoing)
   {    
@@ -856,7 +859,6 @@ void addToHistory(const char* fmt, ...)
     va_list ap;
     va_start(ap, fmt);
     vasprintf(&line, fmt, ap);
-    //sprintf(&line, fmt, ap);
     va_end(ap);
 
     add_history(line);
@@ -1275,10 +1277,8 @@ void doMaintainPeer(bool log, char** argPtr, bool add)
  */
 void doVerify(bool log, char** argPtr)
 {
-  SRxUpdateID      updId;
   uint32_t         localID;
   uint32_t         as32;
-  bool             doPrompt;
   const char*      prefixInput;
   const char*      bgpsecInput;
   IPPrefix         prefix;
@@ -1744,10 +1744,10 @@ void runScript(bool log, char** argPtr)
 {
   #define SCRIPT_BUF_SIZE 1024
 
-  char* fname;
-  FILE* fh;
+  char* fname = NULL;
+  FILE* fh = NULL;
   char  buf[SCRIPT_BUF_SIZE];
-  int   pos;
+  int   pos = 0;
 
   fname = prompt(argPtr, "Script filename ? ");
   fh = fopen(fname, "rt");

@@ -27,31 +27,32 @@
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/15 - oborchert
- *           * Added outputUpdateCacheAsXML to the header.
- *         - 2013/01/01 - oborchert
- *           * Added declaration of modifyUpdateResult into header file.
- *         - 2012/12/17 - oborchert
- *           * Changed the logic of function getUpdateResult's signature. Both, 
- *             result and default value are out parameters now. 
- *           * Changed signature of function storeUpdate.   
- *   0.2.0 - 2011/11/01 - oborchert
- *           * mostly rewritten
- *   0.1.0 - 2010/04/15 - pgleichm
- *         * Code created.
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/02/15 - oborchert
+ *            * Added outputUpdateCacheAsXML to the header.
+ *          - 2013/01/01 - oborchert
+ *            * Added declaration of modifyUpdateResult into header file.
+ *          - 2012/12/17 - oborchert
+ *            * Changed the logic of function getUpdateResult's signature. Both, 
+ *              result and default value are out parameters now. 
+ *            * Changed signature of function storeUpdate.   
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * mostly rewritten
+ * 0.1.0    - 2010/04/15 - pgleichm
+ *          * Code created.
  */
 
 #ifndef __UPDATE_CACHE_H__
 #define __UPDATE_CACHE_H__
 
 #include <stdio.h>
+#include "server/configuration.h"
 #include "shared/srx_defs.h"
 #include "shared/srx_packets.h"
 #include "util/mutex.h"
 #include "util/rwlock.h"
 #include "util/slist.h"
-#include "util/types.h"
-#include "configuration.h"
 
 /**
  * Function that is called in case a result changed.

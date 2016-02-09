@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,15 +18,20 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0    - 2009/12/23 -pgleichm
+ *            * Code created. 
  */
-/**
- * \file slist.c
- * \date Created: 12/23/2009 by Patrick Gleichmann
- */
-
-#include "slist.h"
+#include "util/slist.h"
 #include "util/log.h"
 
 void initSList(SList* self)

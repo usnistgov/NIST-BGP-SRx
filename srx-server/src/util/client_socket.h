@@ -15,20 +15,24 @@
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
+ * Functions to create a client-socket, to receive from and to send data
+ * to a server.
+ *
+ * log.h is used for the handling of error messages.
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- */
-/**
- * @file client_socket.h
- * @date Created: 12/28/2009
+ * @version 0.3.0.10
  *
- * Functions to create a client-socket, to receive from and to send data
- * to a server.
- *
- * log.h is used for the handling of error messages.
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2009/12/28
+ *            * Created code.
  */
 
 #ifndef __CLIENT_SOCKET_H__
@@ -36,7 +40,6 @@
 
 #include <netinet/in.h>
 #include "util/packet.h"
-#include "util/types.h"
 
 typedef enum {
   /** This is an undefined socket. == NULL*/

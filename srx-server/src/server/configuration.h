@@ -20,30 +20,33 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 3014/11/17 - oborchert
- *           * Modified the function signature of initConfiguration
- *         - 2013/02/12 - oborchert
- *           * Added keepWindow to the configuration.
- *         - 2013/01/28 - oborchert
- *           * Added experimental mode parameters
- *           * Added mapping configuration
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Extended.
- *   0.1.0 - 2009/12/23 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2014/11/17 - oborchert
+ *            * Modified the function signature of initConfiguration
+ *          - 2013/02/12 - oborchert
+ *            * Added keepWindow to the configuration.
+ *          - 2013/01/28 - oborchert
+ *            * Added experimental mode parameters
+ *            * Added mapping configuration
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * Extended.
+ * 0.1.0    - 2009/12/23 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __CONFIGURATION_H__
 #define __CONFIGURATION_H__
 
-#include "util/types.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-static char* DEFAULT_CONSOLE_PASSWORD = "SRxSERVER";
+//@TODO: Remove line below
+//static char* DEFAULT_CONSOLE_PASSWORD = "SRxSERVER";
 
 #define MAX_PROXY_MAPPINGS 256 
 

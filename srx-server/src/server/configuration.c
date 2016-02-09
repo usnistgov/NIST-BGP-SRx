@@ -20,25 +20,33 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0.7
+ * @version 0.3.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.7 - 2015/04/20 - borchert
+ * 0.3.0.10 - 2016-01-08 - oborchert
+ *           * Fixed type cast problems in during configuration.
+ *          - 2015/11/10 - oborchert
+ *           * Re-organized includes and added <pthread.h>
+ *           * Fixes bug in configuration assignment for mode_no_receivequeue.
+ *          - 2015/11/05 - oborchert
+ *           * Switch to stock libconfig.h resulted in loss of macro
+ *             config_error_file. Updated code to use filename instead.
+ * 0.3.0.7 - 2015/04/20 - oborchert
  *           * Fixed seg fault when -f [config file] was provided (BZ661)
  *           * Removed _copyString and added _dublicateString. New method works
- *             fundamentially different.
+ *             fundamentally different.
  *           * Modified reading and applying configuration settings.
- *           * Added documentation to undocumented code. 
+ *           * Added documentation to undocumented code.
  *           * Modified the version output.
  *         - 2015/04/17 - oborchert
  *           * Fixed formating in help output (BZ341)
  * 0.3.0.6 - 2015/04/03 - oborchert
  *           * Modified CFG_FILE_NAME to be \0 terminated
  *           * Added documentation to readConfigFile
- *           * Added pointer initialization to readConfigFile 
+ *           * Added pointer initialization to readConfigFile
  *         - 2015/04/03 - kyehwanl
- *           * Fixes Memory Error in readConfigFile 
+ *           * Fixes Memory Error in readConfigFile
  * 0.3.0   - 2014/11/17 - oborchert
  *           * Modified the function signature of initConfiguration
  *           * Added mechanism to detect the location of the configuration file
@@ -61,12 +69,13 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <libconfig.h>
-#include "configuration.h"
-#include "srx_server.h"  // For server name and version number
+#include <pthread.h>
+#include "server/configuration.h"
+#include "server/srx_server.h"  // For server name and version number
+#include "shared/srx_defs.h"
 #include "shared/srx_packets.h" // For Protocol Version number
 #include "util/log.h"
 #include "util/prefix.h"
-#include "shared/srx_defs.h"
 #include "util/directory.h"
 
 #define CFG_PARAM_CREDITS 1
@@ -186,9 +195,9 @@ void initConfiguration(Configuration* self)
   // Determine and set default configFileName.
   char* fName = fileIsReadable(LOC_CFG_FILE) ? LOC_CFG_FILE
                          : fileIsReadable(SYS_CFG_FILE) ? SYS_CFG_FILE : NULL;
-  self->configFileName = _duplicateString(fName, &self->configFileName, 
+  self->configFileName = _duplicateString(fName, &self->configFileName,
                                           "Configuration filename");
-  
+
   self->verbose  = false;
   self->loglevel = LEVEL_ERROR;
   self->syncAfterConnEstablished = false;
@@ -215,7 +224,7 @@ void initConfiguration(Configuration* self)
 
 /**
  * Release all memory allocated for the configuration instance.
- * 
+ *
  * @param self The configuration instance.
  */
 void releaseConfiguration(Configuration* self)
@@ -247,13 +256,13 @@ void releaseConfiguration(Configuration* self)
  * Create a duplicate of the given string. The duplicate is stored in memory
  * allocated for the string and MUST be freed later on.
  * This method replaces the former _copyString method.
- * 
+ *
  * @param src  the source string - must be \0 terminated
  * @param dest pointer to the destination string (can be NULL)
  * @param err  the error text in case an error occurs.
- * 
- * @return newly allocated memory containing the string or NULL. 
- * 
+ *
+ * @return newly allocated memory containing the string or NULL.
+ *
  * @since 0.3.0.7
  */
 static char* _duplicateString(char* src, char** dest, const char* err)
@@ -267,7 +276,7 @@ static char* _duplicateString(char* src, char** dest, const char* err)
       free(*dest);
     }
   }
-  
+
   if (strLen > 0)
   {
     resultStr = malloc(strLen+1);
@@ -281,10 +290,10 @@ static char* _duplicateString(char* src, char** dest, const char* err)
       if (err != NULL)
       {
         RAISE_SYS_ERROR("Not enough memory for %s", err);
-      }      
+      }
     }
   }
-  
+
   if (dest)
   {
     *dest = resultStr;
@@ -350,12 +359,12 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           RAISE_ERROR("Name for configuration file is missing!");
           return 0;
         }
-        self->configFileName = _duplicateString(optarg, &self->configFileName, 
+        self->configFileName = _duplicateString(optarg, &self->configFileName,
                                                 "Configuration filename");
         if (self->configFileName == NULL)
         {
           RAISE_ERROR("Configuration file '%s' could not be set!", optarg);
-          return 0;          
+          return 0;
         }
         break;
       case 'v':
@@ -436,7 +445,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         }
         if (self->console_password != NULL)
         {
-          self->console_password = _duplicateString(optarg, 
+          self->console_password = _duplicateString(optarg,
                    &self->console_password, "Console remote shutdown password");
           if (self->console_password == NULL)
           {
@@ -451,7 +460,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           RAISE_ERROR("Validation cache host name missing !");
           return 0;
         }
-        self->rpki_host = _duplicateString(optarg, &self->rpki_host, 
+        self->rpki_host = _duplicateString(optarg, &self->rpki_host,
                                            "Validation cache host name");
         if (self->rpki_host == NULL)
         {
@@ -479,7 +488,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           RAISE_ERROR("BGPSEC certificate cache host name missing!");
           return 0;
         }
-        self->bgpsec_host = _duplicateString(optarg, &self->bgpsec_host, 
+        self->bgpsec_host = _duplicateString(optarg, &self->bgpsec_host,
                                           "BGPSec certificate cache host name");
         if (self->bgpsec_host == NULL)
         {
@@ -546,30 +555,30 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
 }
 
 /**
- * Configure the provided configuration object by reading the configurartion 
+ * Configure the provided configuration object by reading the configurartion
  * file. The configuration object MUST be pre-allocated and the filename
  * MUST be \0 terminated.
- * 
- * @param self Pointer to the Configuration object. 
+ *
+ * @param self Pointer to the Configuration object.
  * @param filename Null terminated string.
- * 
- * @return false in case an error occured, otherwise true. 
+ *
+ * @return false in case an error occured, otherwise true.
  */
 bool readConfigFile(Configuration* self, const char* filename)
 {
-  bool ret = false; // By default something went wrong
-  static config_t cfg; // BZ647 changed to static.
-  config_setting_t* sett = NULL;
-  const char* strtmp = NULL;
-  bool useSyslog;
-  int boolVal;
-  int intVal;
+  bool ret = false;      // By default something went wrong
+  static config_t   cfg; // BZ647 changed to static.
+  config_setting_t* sett   = NULL;
+  const char*       strtmp = NULL;
+  bool useSyslog = 0;
+  int  boolVal   = 0;
+  long intVal    = 0;
 
   // Added intVal to not have the libconfig library modify the configuration
-  // structure. This caused all kinds of memory mess-up. The new procedure is 
+  // structure. This caused all kinds of memory mess-up. The new procedure is
   // to read all configuration data into local variables and then transferring
   // the values to the configuration structure. (BZ661/665)
-  
+
   // Initialize libconfig
   config_init(&cfg);
 
@@ -577,27 +586,37 @@ bool readConfigFile(Configuration* self, const char* filename)
   if (!config_read_file(&cfg, filename))
   {
     RAISE_ERROR("Unknown or invalid configuration file: %s (line %d) - %s",
-                config_error_file(&cfg), config_error_line(&cfg),
+                filename, config_error_line(&cfg),
                 config_error_text(&cfg));
     goto free_config;
   }
 
   // Global & server settings
-  (void)config_lookup_bool(&cfg, "verbose", (int*)&boolVal);
-        self->verbose = (bool)boolVal;
-  (void)config_lookup_int(&cfg, "port", (int*)&intVal);
-        self->server_port = intVal;
-  (void)config_lookup_bool(&cfg, "sync", (int*)&boolVal);
-        self->syncAfterConnEstablished = (bool)boolVal;
+  config_lookup_bool(&cfg, "verbose", (int*)&boolVal) == CONFIG_TRUE ?
+    (self->verbose = (bool)boolVal):
+    (boolVal = 0);
 
-  (void)config_lookup_int(&cfg, "keep-window", (int*)&intVal);
-        self->defaultKeepWindow = intVal;
+  config_lookup_int(&cfg, "port", &intVal) == CONFIG_TRUE ?
+    (self->server_port = (int)intVal):
+    (intVal = 0);
+
+  config_lookup_bool(&cfg, "sync", (int*)&boolVal) == CONFIG_TRUE ?
+    (self->syncAfterConnEstablished = (bool)boolVal):
+    (boolVal = 0);
+
+  config_lookup_int(&cfg, "keep-window", &intVal) == CONFIG_TRUE ?
+    (self->defaultKeepWindow = (int)intVal):
+    (intVal = 0);
 
   // Global - message destination
-  (void)config_lookup_bool(&cfg, "syslog", (int*)&boolVal);
-        useSyslog = (bool)boolVal;
-  (void)config_lookup_int(&cfg, "loglevel", (int*)&intVal);
-        self->loglevel = intVal;
+  config_lookup_bool(&cfg, "syslog", (int*)&boolVal) == CONFIG_TRUE ?
+    (useSyslog = (bool)boolVal):
+    (boolVal = 0);
+
+  config_lookup_int(&cfg, "loglevel", &intVal) == CONFIG_TRUE ?
+    (self->loglevel = (int)intVal):
+    (intVal = 0);
+
   if (config_lookup_string(&cfg, "log", &strtmp) == CONFIG_TRUE)
   {
     if (useSyslog)
@@ -608,14 +627,14 @@ bool readConfigFile(Configuration* self, const char* filename)
     if (self->msgDestFilename == NULL)
     {
       self->msgDest = MSG_DEST_FILENAME;
-      self->msgDestFilename = _duplicateString((char*)strtmp, 
+      self->msgDestFilename = _duplicateString((char*)strtmp,
                                        &self->msgDestFilename, "Log filename");
     }
     if (self->msgDestFilename == NULL)
     {
       RAISE_ERROR ("Could not set log file.");
       goto free_config;
-    }    
+    }
   }
   else if (useSyslog)
   {
@@ -630,7 +649,7 @@ bool readConfigFile(Configuration* self, const char* filename)
     {
       if (self->console_password == NULL) // Not set by command line parameter
       {
-        self->console_password = _duplicateString((char*)strtmp, 
+        self->console_password = _duplicateString((char*)strtmp,
                                    &self->console_password, "Console password");
       }
       if (self->console_password == NULL)
@@ -638,8 +657,9 @@ bool readConfigFile(Configuration* self, const char* filename)
         goto free_config;
       }
     }
-    (void)config_setting_lookup_int(sett, "port", (int*)&intVal);
-       self->console_port = intVal;
+    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
+      (self->console_port = (int)intVal):
+      (intVal = 0);
   }
 
 
@@ -651,7 +671,7 @@ bool readConfigFile(Configuration* self, const char* filename)
     {
       if (self->rpki_host == NULL)
       {
-        self->rpki_host = _duplicateString((char*)strtmp, &self->rpki_host, 
+        self->rpki_host = _duplicateString((char*)strtmp, &self->rpki_host,
                                            "RPKI/Router host name");
       }
       if (self->rpki_host == NULL)
@@ -659,8 +679,9 @@ bool readConfigFile(Configuration* self, const char* filename)
         goto free_config;
       }
     }
-    (void)config_setting_lookup_int(sett, "port", (int*)&intVal);
-      self->rpki_port = intVal;
+    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
+      (self->rpki_port = (int)intVal):
+      (intVal = 0);
   }
 
   // BGPSec
@@ -671,7 +692,7 @@ bool readConfigFile(Configuration* self, const char* filename)
     {
       if (self->bgpsec_host == NULL)
       {
-        self->bgpsec_host = _duplicateString((char*)strtmp, &self->bgpsec_host, 
+        self->bgpsec_host = _duplicateString((char*)strtmp, &self->bgpsec_host,
                                              "BGPSec/Router host name");
       }
       if (self->bgpsec_host == NULL)
@@ -679,18 +700,22 @@ bool readConfigFile(Configuration* self, const char* filename)
         goto free_config;
       }
     }
-    (void)config_setting_lookup_int(sett, "port", (int*)&intVal);
-       self->bgpsec_port = intVal;
+    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
+      (self->bgpsec_port = (int)intVal):
+      (intVal = 0);
   }
 
   // Experimental
   sett = config_lookup(&cfg, "mode");
   if (sett != NULL)
   {
-    (void)config_setting_lookup_bool(sett, "no-sendqueue", (int*)&boolVal);
-          self->mode_no_sendqueue = (bool)boolVal;
-    (void)config_setting_lookup_bool(sett, "no-receivequeue", (int*)&boolVal);
-          self->mode_no_receivequeue - (bool)boolVal;
+    config_setting_lookup_bool(sett, "no-sendqueue", (int*)&boolVal) == CONFIG_TRUE ?
+      (self->mode_no_sendqueue = (bool)boolVal):
+      (boolVal = 0);
+
+    config_setting_lookup_bool(sett, "no-receivequeue", (int*)&boolVal) == CONFIG_TRUE ?
+      (self->mode_no_receivequeue = (bool)boolVal):
+      (boolVal = 0);
   }
 
   // mapping configuration

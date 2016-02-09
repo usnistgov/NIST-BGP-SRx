@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,14 +18,17 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * @file rpki_handler.h
- * @date Created: 04/12/2010
+ * @version 0.3.0.10
  *
- * RPKI Handler.
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Removed warning for comments within a comment
+ * 0.1.0    - 2010/04/12 - pgleichm
+ *            * Code Created
  */
 
 #ifndef __RPKI_HANDLER_H__
@@ -35,7 +38,6 @@
 #include "server/prefix_cache.h"
 #include "server/rpki_router_client.h"
 #include "util/prefix.h"
-#include "util/types.h"
 
 /**
  * A single RPKI/Router Handler.

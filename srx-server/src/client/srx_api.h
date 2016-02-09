@@ -23,36 +23,38 @@
  * Secure Routing extension (SRx) client API - This API provides a fully 
  * functional proxy client to the SRx server.
  *
- * Version 0.3.0
+ * Version 0.3.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/27 - oborchert
- *           * Changed the error management to a more broader communication 
- *             management. This resulted also in renaming some defines as well 
- *             as parameters in the proxy structure to be more meaningful.
- *         - 2013/02/04 - oborchert
- *           * Added stdarg.h into include to be able to compile under Centos 5
- *         - 2013/01/08 - oborchert
- *           * Added error control when server encounters buffer overflow.
- *           * Added experimental structure ProxySocketConfig;
- *         - 2012/12/17 - oborchert
- *           * Removed enumeration SRxOpMode
- *           * Added enumeration SRxProxyError
- *           * Changed signature of callback function (*ValidationReady), 
- *           * Modified parameter type of callback function (*SignaturesReady)
- *           * Added  callback function (*ErrorManagement)
- *           * Modified structure of SRxProxy
- *           * Changed signature of the following functions:
- *             createProxy; deleteUpdate; connectToSRx; vreifyUpdate; 
- *           * Added function:
- *             reconnectWithSRx; processPackets; getInternalSocketFD
+ * 0.3.0.10 - 2015/11/09 - oborchert 
+ *            * Removed types.h
+ * 0.3.0    - 2013/02/27 - oborchert
+ *            * Changed the error management to a more broader communication 
+ *              management. This resulted also in renaming some defines as well 
+ *              as parameters in the proxy structure to be more meaningful.
+ *          - 2013/02/04 - oborchert
+ *            * Added stdarg.h into include to be able to compile under Centos 5
+ *          - 2013/01/08 - oborchert
+ *            * Added error control when server encounters buffer overflow.
+ *            * Added experimental structure ProxySocketConfig;
+ *          - 2012/12/17 - oborchert
+ *            * Removed enumeration SRxOpMode
+ *            * Added enumeration SRxProxyError
+ *            * Changed signature of callback function (*ValidationReady), 
+ *            * Modified parameter type of callback function (*SignaturesReady)
+ *            * Added  callback function (*ErrorManagement)
+ *            * Modified structure of SRxProxy
+ *            * Changed signature of the following functions:
+ *              createProxy; deleteUpdate; connectToSRx; vreifyUpdate; 
+ *            * Added function:
+ *              reconnectWithSRx; processPackets; getInternalSocketFD
  * 
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *   0.1.0 - 2010/03/10 - pgleichm
- *           * Code Created
+ * 0.2.0    - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ * 0.1.0    - 2010/03/10 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __SRX_API_H__
@@ -67,7 +69,6 @@ extern "C" {
 #include <sys/un.h>
 #include "shared/srx_defs.h"
 #include "util/prefix.h"
-#include "util/types.h"
 #include "util/slist.h"
   
 

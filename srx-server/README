@@ -21,9 +21,9 @@ To be informed for new releases or minor bug fixes, register with
 bgpsrx-users@nist.gov.
 
 
-SRx server installation
-==========================
+`srx server and proxy' installation
+===================================
 1. tar xvfz srx-<VER>.tar.gz
-2. ./configure --prefix=<desired dir> --with-libconf --with-libpatr
-3. make all install  (You might need root permission when you install)
+2. ./configure --prefix=<desired dir> [sca_dir=<alternative SRxCryptoAPI location>]
+3. make; make install  (You might need root permission when you install)
 

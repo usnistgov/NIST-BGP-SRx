@@ -1,24 +1,48 @@
-# Contains the name of the library that will be loaded.
-#library_conf="bgpsec_openssl";
-library_conf="testlib";
+# Contains the name of the library that will be loaded. By default SRxCryptoAPI
+# comes with two implementations:
+# testlib        - For testing purpose only
+# bgpsec_openssl - provides a crypto implementation based on OpenSSL (DEFAULT)
+library_conf="bgpsec_openssl";
 
 # Allows to specify the default key volt. Can be overwritten programatically.
 key_volt = "/var/lib/bgpsec-keys/";
 
-#debug type
-debug-type = 3;
+# Specify the key file extensions fir private keys DER encoded and public keys 
+# embedded in X509
+key_ext_private="der";
+key_ext_public="cert";
+
+# Specify the debugging type which indicates only information that matches 
+# the debugging type or are less in its numerical value are displayed. 
+# The following debugging types are available:
+#     0: LOG_EMERG   - system is unusable
+#     1: LOG_ALERT   - action must be taken immediately 
+#     2: LOG_CRIT    - critical conditions
+#     3: LOG_ERR     - error conditions
+#     4: LOG_WARNING - warning conditions
+#     5: LOG_NOTICE  - normal but significant condition
+#     6: LOG_INFO    - informational (DEFAULT)
+#     7: LOG_DEBUG   - debug-level messages
+#debug-type = 6;
 
 # this is the mapping information of the library to be loaded
 bgpsec_openssl: {
   library_name = "libSRxBGPSecOpenSSL.so";
 
 #
-# The following method mappings allow to customize the mapping. in case the 
-# mapping is disables using the hash tag, misspelled, or missing at all the 
+# The following method mappings allow to customize the mapping. In case the 
+# mapping is disabled using the hash tag, misspelled, or missing at all the 
 # default mapping of method names as specified in the header file will be used.
-# in case the default specified method names are not implemented, the 
+# In case the default specified method names are not implemented, the 
 # SRxCryptoAPI wrapper functions are mapped.
 #
+
+# Library initialization method parameters - init is only performed if use_init
+# is set to 1. To disable initialization (including mapping) set value to 0.
+  use_init                    = "0";
+# A String or "NULL" as initialization parameter.
+  init_value                  = "NULL";
+  method_init                 = "init";
 
 # Minimum required functions to operate
   method_validate             = "validate";
@@ -40,6 +64,13 @@ bgpsec_openssl: {
 # Some other example configuration 
 testlib: {
   library_name="libSRxCryptoTestlib.so";
+
+# Library initialization method parameters - init is only performed if use_init
+# is set to 1. To disable initialization (including mapping) set value to 0.
+  use_init                    = "1";
+# A String or NULL as initialization parameter.
+  init_value                  = "some random text";
+  method_init                 = "init";
 
 # Minimum required functions to operate
   method_validate             = "validate";

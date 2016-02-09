@@ -21,23 +21,25 @@
  * by this software.
  * 
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Changed a log entry from INFO to WARNING
- *           * Added Version Control
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Rewritten
- *   0.1.0 - 2012/05/15 - pgleichman
- *           * Code Created.
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Changed a log entry from INFO to WARNING
+ *            * Added Version Control
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * Rewritten
+ * 0.1.0    - 2012/05/15 - pgleichm
+ *            * Code Created.
  */
 #ifndef __COMMAND_HANDLER_H__
 #define __COMMAND_HANDLER_H__
 
-#include "server/configuration.h"
 #include "server/bgpsec_handler.h"
+#include "server/configuration.h"
 #include "server/command_queue.h"
 #include "server/rpki_handler.h"
 #include "server/server_connection_handler.h"
@@ -45,7 +47,6 @@
 #include "shared/srx_packets.h"
 #include "util/packet.h"
 #include "util/server_socket.h"
-#include "util/types.h"
 
 /**
  * Number of parallel threads.

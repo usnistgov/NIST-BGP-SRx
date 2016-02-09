@@ -9,30 +9,35 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * \file timer.h
- * \date Created: 12/31/2009
  *
  * Managed timers.
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2009/12/31 - pgleichm
+ *            * Code created. 
  */
 
 #ifndef __TIMER_H__
 #define __TIMER_H__
 
-#include "util/types.h"
 #include <time.h>
+#include <stdbool.h>
 
 /**
  * Definition of the function that should be called upon the firing of a

@@ -1,5 +1,25 @@
+Changelog for Version 0.3.1
+- Added switch --with-la-lib to add static SRx Proxy libraries to distribution 
+  rpm.
+- Added library versioning
+- Libraries are now installed in lib or lib64 depending on the system 
+  architecture.
+- Renamed library libsrx into libSRxProxy to better reflect its function
+- Separated SRx Proxy from SRx server in the main RPM install
+- Rewrote Configuration- and Makefile scripts.
+- Fixed library dependency to use stock libraries
+- Removed auto generated client/srx folder. Include files will be generated 
+  directly into the install directory.
+- interface header files use include <...> rather than "..."
+- Rewrote compilation and integration of Patricia Lib extra source.
+- All extra source removed other than patricia library
 Changelog for Version 0.3.0
-- Removed un-used configuraiton switches.
+- Fixed bugs in server console for the command show-rpki
+- Fixed assignment error for configuration attribute mode_no_receivequeue
+- Cleaned code from unused variables / functions.
+- Rewrote generation for libpatricia
+- Fixed init.d server daemon script
+- Removed un-used configuration switches.
 - Removed the libconfig library distribution from source package. 
 - Fixed minor output formating at the remote console.
 - modified the RPM installer in such that the configuration file is not deleted 
@@ -21,7 +41,7 @@ Changelog for Version 0.3.0
 - Fixed bugs during connect call and timeout.
 - Fixed the connect and run commands in srx server test harness.
 - Introduced LocalID to allow update management on proxy side.
-- Fixed problem with srx-serevr parameter --version or --full-version
+- Fixed problem with srx-server parameter --version or --full-version
 - Fixed problem with missing network to host translation for keepWindow values.
 - Removed misleading error output.
 - Fixed problem of duplicate updates in prefix cache. Each validation request 

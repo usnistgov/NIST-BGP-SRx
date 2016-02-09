@@ -1,0 +1,83 @@
+%define package_num  @PKG_VER@
+%define major_ver    @MAJOR_VER@
+%define minor_ver    @MINOR_VER@
+%define update_num   @UPD_VER@
+%define lib_ver_info @VER_INFO@
+%define srxdir       @SRX_DIR@
+
+%define lib_version_info %{lib_ver_info}
+%define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
+%define version %{package_version}
+%define name srx-proxy
+%define core_name srx
+%define _unpackaged_files_terminate_build 0
+
+Name:%{name}
+Version:%{version}
+Release:1%{?dist}
+Summary:Package provides the SRx Proxy
+Group:Networking/Daemons
+License:LGPL
+URL:www.antd.nist.gov
+Vendor:National Institute of Standards and Technology (NIST)
+Distribution:SRx Software Suite
+Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+
+Source0:%{core_name}-%{version}.tar.gz
+BuildRoot:/tmp/rpm/%{core_name}-%{version}	
+Prefix: %{_prefix}
+Prefix: %{_sysconfdir}
+
+BuildRequires:automake	
+Requires:glibc
+
+%description
+The SRx-Proxy allows routers to connect to the srx-server using API calls.
+Additionaly this package provides an srxsrv_client
+
+%prep
+pwd
+%setup -q -n %{core_name}-%{version}
+
+%build
+%configure --prefix=/usr --sysconfdir=/etc sca_dir=@SCA_DIR@ patricia_dir=@PATRICIA_DIR@ 
+make %{?_smp_mflags}
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+ldconfig
+
+%preun
+
+%postun
+if [ "$(ls -A %{_libdir}/srx)" == "" ] ; then
+  rmdir %{_libdir}/%{srxdir}
+fi 
+if [ "$(ls -A %{_includedir}/%{srxdir})" == "" ] ; then
+  rmdir %{_includedir}/%{srxdir}
+fi 
+ldconfig
+
+%files
+#%defattr(644,root,root,755)
+%defattr(-,root,root,-)
+%doc
+%{_sysconfdir}/ld.so.conf.d/srxproxy@CPU_ARCH@.conf
+%{_libdir}/%{srxdir}/libSRxProxy.so
+%{_libdir}/%{srxdir}/libSRxProxy.so.%{major_ver}
+%{_libdir}/%{srxdir}/libSRxProxy.so.%{lib_version_info}
+%if "@incl_la_lib@" == "yes" 
+  %{_libdir}/%{srxdir}/libSRxProxy.la
+  %{_libdir}/%{srxdir}/libSRxProxy.a
+%endif
+%{_includedir}/%{srxdir}/srx_defs.h
+%{_includedir}/%{srxdir}/srx_api.h
+%{_includedir}/%{srxdir}/slist.h
+%{_includedir}/%{srxdir}/prefix.h
+%{_bindir}/srxsvr_client

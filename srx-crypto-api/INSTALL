@@ -2,18 +2,28 @@ The SRxCryptoAPI requires the following software packages installed:
 
 openssl and openssl-devel
 libconfig
+uthash-devel (if bgpsec-openssl is requested.)
 
 To compile the api the following switches allow customization
 
---enable-bgpsec-openssl
-      This switch includes the BGPSEC open-ssl implementation to be added.
+--without-bgpsec-openssl
+      This switch prevents the BGPSEC open-ssl implementation to be added.
 
---enable-testlib
-      Enable the compilation of the test library. This library only provides 
-      the plug in skeleton.
+--without-testlib
+      This switch prevents the test library to be added. This library only 
+      provides the plug in skeleton.
+
+--enable-mcheck
+      enable memory check M_CHECK_ACTION 3.
+
+--enable-static-openssl
+      Link OpenSSL libraries statically.
+
+--with-la-lib
+      Add the static .a and .la libraries to the binary rpm distribution.
 
 For customized OpenSSL installations use:
 openssl_dir="<path to customized openssl installation>"
 
 
-./configure --prefix=<install-direcotry> CFLAGS="-g -O0" --enable-bgpsec-openssl --enable-testlib
+./configure --prefix=<install-direcotry> CFLAGS="-g -O0"

@@ -14,8 +14,11 @@ EXTRA_DIST = aclocal.m4 SERVICES TODO REPORTING-BUGS INSTALL.quagga.txt \
 	vtysh/Makefile.in vtysh/Makefile.am \
 	tools/mrlg.cgi tools/rrcheck.pl tools/rrlookup.pl tools/zc.pl \
 	tools/zebra.el tools/multiple-bgpd.sh \
-	fpm/fpm.h \
-	$(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+	fpm/fpm.h 
+
+ACLOCAL_AMFLAGS = -I m4
+
+.PHONY: distclean-local clean-local rpms srcrpm
 
 if HAVE_LATEX
 
@@ -27,7 +30,9 @@ clean-local:
 
 endif
 
-ACLOCAL_AMFLAGS = -I m4
+distclean-local:
+	rm -f quaggasrx-*.rpm quaggasrx-*.spec quaggasrx-*.tar.gz; \
+	rm -rf autom4te.cache
 
 # RPM script and macros for QuaggaSRx
 RPM = rpm
@@ -42,7 +47,8 @@ RPM = rpm
 
 
 # RPM script and macros for SRx
-rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+#rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+rpmspec = redhat/quagga.spec
 
 rpmmacros =\
  --define="_rpmdir $${PWD}"\
@@ -73,10 +79,5 @@ dist-hook:
 	rm -rf `find $(distdir) -name .svn`
 
 
-
 # for preparing rpm sources
 #extra_dist:
-
-
-.PHONY: rpms srcrpm
-

@@ -1,3 +1,34 @@
+More details on changes are scripted in the files itself.
+===========================================================
+
+Version 0.1.2.1 - January-March 2016
+  - Added init method (missing in 0.1.2.0)
+  - Fixed bugs
+Version 0.1.2.0 - September-December 2015
+  - Moved the installed libraries into lib/srx or lib64/srx. Same for the header
+    file srxcryptoapi.h - It is not located in srx/srxcryptoapi.h
+  - Changed --enable settings (testlib and bgpsec-openssl) to be --without 
+    settings. Components are installed by default.
+  - Added --without-la-lib which is used for RPM generation. This setting is 
+    used in spec file %configure statement to not include .a and .la libraries
+    in rpm file.
+  _ Restructured initialization code
+  - Removed term_debug and added sca_getCurrentLogLevel
+  - Added configuration for key file extension for backwards compatibility
+  - Modified the key generation to not only produce the PEM encoded key.
+    Newly der encoded keys are stores and xxxxx.der
+  - Use the DER encoded key rather than the PEM encoded one.
+  - Added key storage to BGPSecOpenSSL implementation.
+  - The verify and sign methods now take the DER encoded keys.
+  _ Added functionality to NOT load functions the plugin reports as not 
+    supported - regardless if they are configured or not.
+    Example: !isExtended -> extValidate and all public key functions are not 
+                            loaded
+  - Modified the qsrx-xxx tools to only install keys not already installed.
+    Kept backwards compatibility with key filenames. PEM=.key, DER=.der
+    The PEM keys are used for srxCryptoAPI 0.1.1.1, all others will use the
+    DER encoding.
+ 
 Version 0.1.1.1 - Arpil 2015
   - Fixed bug in configuration that could cause memory issues
   - Fixed linking problems on Ubuntu systems

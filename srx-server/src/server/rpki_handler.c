@@ -40,7 +40,7 @@
  * -----------------------------------------------------------------------------
  */
 
-#include "rpki_handler.h"
+#include "server/rpki_handler.h"
 #include "util/log.h"
 
 ///////////////////
@@ -169,7 +169,9 @@ static void handleReset (uint32_t valCacheID, void* rpkiHandler)
   LOG(LEVEL_DEBUG, HDR "Prefix: Reset", pthread_self());
   RPKIHandler* handler = (RPKIHandler*)rpkiHandler;
   RAISE_ERROR("Handle Reset not implemented yet! - doDo: remove or flag all "
-              "ROAS from th3e given validation Cache");
+              "ROAS from the given validation Cache");
+  handler = NULL; // just to supress the compiler warning. Must be removed later
+  // @TODO: Remove or flag all ROAS from the given validation Cache
 }
 
 /**

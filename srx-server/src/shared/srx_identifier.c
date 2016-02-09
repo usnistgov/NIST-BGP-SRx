@@ -20,12 +20,23 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ *            * Fixed typecast error
+ *            * REmoved unused variables
+ * 0.1.0    - 2011/05/03 -oborchert
+ *            * Code created. 
  */
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include "srx_identifier.h"
-#include "crc32.h"
+#include "shared/crc32.h"
+#include "shared/srx_identifier.h"
 #include "util/prefix.h"
 
 /**
@@ -43,7 +54,6 @@
 uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix,
                             uint32_t blobLength, void* blob)
 {  
-  uint8_t* data = (uint8_t*)blob;
   uint32_t crc  = 0;
   uint32_t prefixSize = prefix->ip.version == 4 ? 4
                                                 : sizeof(prefix->ip.addr.v6.u8);
@@ -82,7 +92,7 @@ uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix,
     dataPtr += 2;
     blob++;
   }  
-  crc = crc32(dataText, length);
+  crc = crc32((uint8_t*)dataText, length);
   return crc;
 }
 

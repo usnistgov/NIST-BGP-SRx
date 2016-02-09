@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,12 +18,7 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * @file slist.h
- * @date Created: 12/23/2009 by Patrick Gleichmann
+ * by this software.
  *
  * A single-linked list.
  *
@@ -45,13 +40,25 @@
  * @endcode
  *
  * Uses log.h to report error messages
+ * 
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2009/12/23 - pgleichm
+ *            * Code created
+ * 
  */
-
+// @TODO: See if it can be replaced with antd-util list implementation
 #ifndef __SLIST_H__
 #define __SLIST_H__
 
 #include <stdlib.h>
-#include "util/types.h"
+#include <stdbool.h>
 
 /**
  * A single node.

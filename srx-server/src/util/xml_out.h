@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,18 +18,9 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/**
- * 
- * Added last method (HEX)
- * 
- * 
- * 
- * @file xml_out.h
- * @date Created: 05/25/2010
- *
+ * Added last method (HEX) 
  * A primitive collection of functions to create XML output.
  *
  * Example:
@@ -46,14 +37,25 @@
  * closeTag();
  * releaseXMLOut(&out);
  * @endcode
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2010/05/25 - pgleichm
+ *            * Code created. 
  */
 
 #ifndef __XML_OUT_H__
 #define __XML_OUT_H__
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include "util/slist.h"
-#include "util/types.h"
 
 /**
  * A single XML Out(put) instance.

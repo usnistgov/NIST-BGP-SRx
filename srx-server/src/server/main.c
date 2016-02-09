@@ -4,20 +4,20 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * SRx Server - main program file.
@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.3.0.7
+ * @version 0.3.0.10
  *
  * EXIT Values:
  *
@@ -38,45 +38,46 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.7 - 2015/04/21 - oborchert
- *           * Modified version output.
- * 0.3.0.0 - 2014/11/17 - oborchert
- *           * Removed constant value for configuration file and replaced it 
- *             with a defined one in config.h. Also modified the determination
- *             process on how to figure out which configuration file to load. 
- *         - 2013/02/05 - oborchert
- *           * Fixed parameter processing when help is requested
- *         - 2012/11/23 - oborchert
- *           * Extended version handling. - F for full version
- *           * Added capability to pass configuration file as parameter (-f)
- * 0.2.0.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *           * Added handling of SIGKILL to allow a clean shutdown when killing
- *             the server. this helps saving time especially during debugging
- *           * Added documentation.
- * 0.1.0.0 - 2010/04/26 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Removed unused static colsoleLoop
+ * 0.3.0.7  - 2015/04/21 - oborchert
+ *            * Modified version output.
+ * 0.3.0.0  - 2014/11/17 - oborchert
+ *            * Removed constant value for configuration file and replaced it
+ *              with a defined one in config.h. Also modified the determination
+ *              process on how to figure out which configuration file to load.
+ *          - 2013/02/05 - oborchert
+ *            * Fixed parameter processing when help is requested
+ *          - 2012/11/23 - oborchert
+ *            * Extended version handling. - F for full version
+ *            * Added capability to pass configuration file as parameter (-f)
+ * 0.2.0.0  - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *            * Added handling of SIGKILL to allow a clean shutdown when killing
+ *              the server. this helps saving time especially during debugging
+ *            * Added documentation.
+ * 0.1.0.0  - 2010/04/26 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  */
 #include <stdio.h>
 #include <signal.h>
-#include "bgpsec_handler.h"
-#include "command_handler.h"
-#include "command_queue.h"
-#include "configuration.h"
-#include "key_cache.h"
-#include "prefix_cache.h"
-#include "rpki_handler.h"
-#include "server_connection_handler.h"
-#include "update_cache.h"
-#include "console.h"
+#include "server/bgpsec_handler.h"
+#include "server/command_handler.h"
+#include "server/command_queue.h"
+#include "server/configuration.h"
+#include "server/console.h"
+#include "server/key_cache.h"
+#include "server/prefix_cache.h"
+#include "server/rpki_handler.h"
+#include "server/server_connection_handler.h"
+#include "server/srx_server.h"
+#include "server/srx_packet_sender.h"
+#include "server/update_cache.h"
 #include "util/directory.h"
 #include "util/log.h"
-#include "srx_server.h"
-#include "srx_packet_sender.h"
-
 
 // Some defines needed for east
 #define SETUP_RPKI_HANDLER         1
@@ -155,16 +156,15 @@ static void handleUpdateResultChange (SRxValidationResult* valResult)
  * @param argc Contains the number of arguments passed
  * @param argv The array containing the parameters
  *
- * @return 1 if the configuration is created succesful, 0 if errors occured, 
+ * @return 1 if the configuration is created succesful, 0 if errors occured,
  *         -1 if the configuration was manually stopped (example: -h).
  *
  * @see initConfiguration, parseProgramArgs
  */
 static int setupConfiguration (int argc, const char* argv[])
 {
-  int idx;
   int params;
-  
+
   // Set to defaults
   //initConfiguration(&config, DEFAULT_CONFIG_FILE);
   initConfiguration(&config);
@@ -187,12 +187,12 @@ static int setupConfiguration (int argc, const char* argv[])
   else
   {
     // Check if configuration file is located in installed etc folder
-    
+
     printf("Cannot access \'%s\'\n", config.configFileName);
-    return 0;      
+    return 0;
   }
 
-  // Handle the command-line 
+  // Handle the command-line
   params = parseProgramArgs(&config, argc, argv, false);
   if (params != 1)
   {
@@ -215,7 +215,12 @@ static int setupConfiguration (int argc, const char* argv[])
   else
   {
     // Set log level for verbose output
-    setLogLevel(config.loglevel);    
+    setLogLevel(config.loglevel);
+  }
+
+  if (config.msgDest == MSG_DEST_SYSLOG)
+  {
+    setLogMethodToSyslog();
   }
 
   LOG(LEVEL_INFO, "- Configuration processed");
@@ -230,15 +235,15 @@ static int setupConfiguration (int argc, const char* argv[])
  */
 static bool setupCaches()
 {
-  if (   !createUpdateCache(&updCache, handleUpdateResultChange, 
+  if (   !createUpdateCache(&updCache, handleUpdateResultChange,
                             config.expectedProxies, &config)
-      || !initializePrefixCache(&prefixCache, &updCache) 
+      || !initializePrefixCache(&prefixCache, &updCache)
       || !createKeyCache(&keyCache, &updCache, NULL, NULL))
   { ///< TODO Set KeyInvalidated, KeyNotFound
     RAISE_ERROR("Failed to setup a cache - stopping");
     return false;
   }
-  
+
   LOG(LEVEL_INFO, "- Caches created");
   return true;
 }
@@ -276,7 +281,7 @@ static bool setupHandlers()
       else
       {
         handlers |= SETUP_CONNECTION_HANDLER;
-        if (!initializeCommandHandler (&cmdHandler, &config, &svrConnHandler, 
+        if (!initializeCommandHandler (&cmdHandler, &config, &svrConnHandler,
                                        &bgpsecHandler, &rpkiHandler, &updCache))
         {
           RAISE_ERROR("Failed to create Command Handler.");
@@ -286,7 +291,7 @@ static bool setupHandlers()
           handlers |= SETUP_COMMAND_HANDLER;
         }
       }
-    }    
+    }
   }
 
   if (handlers == SETUP_ALL_HANDLERS)
@@ -310,7 +315,7 @@ static bool setupHandlers()
 static bool setupQueues()
 {
   bool cont = true;
-  
+
   if (!config.mode_no_sendqueue)
   {
     cont = false;
@@ -328,7 +333,7 @@ static bool setupQueues()
       }
     }
   }
-  
+
   if (cont)
   {
     if (!initializeCommandQueue(&cmdQueue))
@@ -343,25 +348,8 @@ static bool setupQueues()
       LOG(LEVEL_INFO, "- Command Queue created!");
     }
   }
-  
-  return cont;
-}
 
-/** Contains the console server loop
- * 
- * @param ptr Some pointer that is not used!
- */
-static void* consoleLoop(void* ptr)
-{
-  bool keepGoing = true;
-  int loop = 20;
-  LOG(LEVEL_DEBUG, HDR "Start Server Console Loop!", pthread_self());
-  while (keepGoing)
-  {
-    sleep(1);
-    keepGoing = loop-- > 0;
-  }
-  LOG(LEVEL_DEBUG, HDR "STOP Server Console Loop!", pthread_self());
+  return cont;
 }
 
 /**
@@ -380,9 +368,9 @@ static void signalReceived(int _sig)
 
   // Disconnect all clients
   stopProcessingRequests(&svrConnHandler);
-  
+
   releaseConsole(&console);
-  
+
   // Stopps, clears and releases all memory used by the send queue
   releaseSendQueue();
 }
@@ -402,10 +390,10 @@ static void run()
   if (startProcessingCommands(&cmdHandler, &cmdQueue))
   {
     // Receive commands (block)
-    LOG(LEVEL_INFO, "SRX server running, control via telnet on port %u", 
+    LOG(LEVEL_INFO, "SRX server running, control via telnet on port %u",
         config.console_port);
     startProcessingRequests(&svrConnHandler, &cmdQueue);
-    LOG(LEVEL_INFO, "SRX server stopped"); 
+    LOG(LEVEL_INFO, "SRX server stopped");
   }
 }
 
@@ -463,14 +451,14 @@ static void doCleanup()
 {
   // First disconnects the server console.
   releaseConsole(&console);
-    
+
   // Queues
   releaseCommandQueue(&cmdQueue);
   releaseSendQueue();
 
   // Handlers
   doCleanupHandlers(SETUP_ALL_HANDLERS);
- 
+
   // Caches
   doCleanupCaches(SETUP_ALL_CACHES);
 
@@ -478,19 +466,19 @@ static void doCleanup()
   releaseConfiguration(&config);
 }
 
-/** 
- * Stop the server by cleaning up all handlers. This method calls raise(15) to 
+/**
+ * Stop the server by cleaning up all handlers. This method calls raise(15) to
  * stop the process.
  */
 void shutDown()
 {
   LOG(LEVEL_DEBUG, HDR "Received Shutdown request!", pthread_self());
-  
+
   // Set the shutdown flag
   markConnectionHandlerShutdown(&svrConnHandler);
-  
+
   SRXPROXY_GOODBYE pdu;
-  uint32_t length = sizeof(SRXPROXY_GOODBYE);    
+  uint32_t length = sizeof(SRXPROXY_GOODBYE);
   pdu.type = PDU_SRXPROXY_GOODBYE;
   pdu.keepWindow = 0;
   pdu.zero = 0;
@@ -503,10 +491,10 @@ void shutDown()
 
   // Disconnect all clients
   stopProcessingRequests(&svrConnHandler);
-    
+
   cleanupRequired = false;
-  
-  doCleanup();  
+
+  doCleanup();
   LOG(LEVEL_DEBUG, HDR "Shutdown performed!", pthread_self());
   raise(15);
 }
@@ -516,7 +504,7 @@ void shutDown()
  *
  * @param argc The number of arguments passed.
  * @param argv The array of arguments passed to the server
- * 
+ *
  * @return the exit code.
  */
 int main(int argc, const char* argv[])
@@ -525,16 +513,27 @@ int main(int argc, const char* argv[])
   int exitCode = 0;
   int passedConfig;
   bool printGoodbye = true;
-  
+  FILE* fp=NULL;
+
   // By default all messages go to standard error
   setLogMethodToFile(stderr);
   setLogLevel(LEVEL_ERROR);
-  
-  printf ("Start %s Version%s (%s)\n", SRX_SERVER_NAME, SRX_SERVER_VERSION, 
+
+  printf ("Start %s Version%s (%s)\n", SRX_SERVER_NAME, SRX_SERVER_VERSION,
           __TIME__);
   passedConfig = setupConfiguration(argc, argv);
+
+  if(config.msgDestFilename)
+  {
+    fp = fopen(config.msgDestFilename, "wt");
+    if(fp)
+      setLogMethodToFile(fp);
+    else
+      LOG(LEVEL_ERROR, "Could not set log file.");
+  }
+
   LOG(LEVEL_DEBUG, "([0x%08X]) > Start Main SRx server thread.", pthread_self());
-    
+
   if ( passedConfig != 1)
   {
     printGoodbye=false;
@@ -548,9 +547,9 @@ int main(int argc, const char* argv[])
       exitCode = 0;
     }
   }
-  // Setup all necessary instances  
+  // Setup all necessary instances
   else if ( !setupCaches() )
-  {    
+  {
     LOG(LEVEL_ERROR, "Failure setting up caches, exit program (2)");
     // So far only the Configuration is created .
     releaseConfiguration(&config);
@@ -573,7 +572,7 @@ int main(int argc, const char* argv[])
     releaseConfiguration(&config);
     exitCode = 4;
   }
-  else if (!createConsole(&console, config.console_port, shutDown, 
+  else if (!createConsole(&console, config.console_port, shutDown,
                           &config, &rpkiHandler, &cmdHandler))
   {
     LOG(LEVEL_ERROR, "Failure setting up the console, exit program (5)");
@@ -582,7 +581,7 @@ int main(int argc, const char* argv[])
     doCleanupHandlers(SETUP_ALL_HANDLERS);
     doCleanupCaches(SETUP_ALL_CACHES);
     releaseConfiguration(&config);
-    exitCode = 5;    
+    exitCode = 5;
   }
   else
   {
@@ -601,7 +600,9 @@ int main(int argc, const char* argv[])
   {
     printf ("Goodbye!\n");
   }
-  
+
   LOG(LEVEL_DEBUG, "([0x%08X]) < Stop Main SRx server thread.", pthread_self());
+  if(fp)
+    fclose(fp);
   return exitCode;
 }

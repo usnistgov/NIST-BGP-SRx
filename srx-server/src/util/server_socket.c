@@ -22,10 +22,12 @@
  *
  * Provides functionality to handle the SRx server socket.
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.3.10- 2013/01/25 - oborchert
+ *           * Removed un-used include glib.h 
  *   0.3.0 - 2013/01/25 - oborchert
  *           * Removed error output if an attempt of removing an already removed
  *             client thread from the client list.
@@ -57,8 +59,7 @@
 #include "util/packet.h"
 #include "util/slist.h"
 #include "util/socket.h"
-#include "server_socket.h"
-//#include <glib.h>
+#include "util/server_socket.h"
 
 #define HDR  "([0x%08X] Server Socket): "
 

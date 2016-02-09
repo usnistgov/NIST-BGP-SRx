@@ -5,7 +5,9 @@ Building and Installing Quagga SRx client:
 
 
 Configuration Option:
-    --enable-srx	    turn on SRx client to compile with Quagga bgp module
+    --disable-srx     	    Do not compile the SRx extension. In this mode 
+                            QuaggaSRx compiles as pure Quagga router without
+                            RPKI and BGPSEC integration.
     --enable-srxcryptoapi   to have the srxcryptoapi library to take care of
                             verifying/signing functions
 
@@ -33,10 +35,10 @@ Compile:
 
  (Configuration example)
 #1 Simple version (in case the SRxServer rpm version is already installed)
-./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx --enable-srxcryptoapi
+./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srxcryptoapi
 
 #2 With all switches (in case of installing the source tarball)
-./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srx --enable-srxcryptoapi CPPFLAGS=-I<srx-installed dir>/include/ SRX_USER_INC=<srx-installed dir>/include/ CRYPTOAPI_DIR=<srxcryptoapi dir>
+./configure --prefix=<desired dir> --disable-ospfapi --disable-ospfd --disable-ospf6d --disable-babeld --enable-user=root --enable-group=root --enable-configfile-mask=0644 --enable-logfile-mask=0644 --enable-srxcryptoapi srx_dir=<srx-installed dir> sca_dir=<srxcryptoapi-installed dir>
 
 
 Key Management and Installation for this Version

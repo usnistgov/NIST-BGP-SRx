@@ -36,13 +36,12 @@
 #ifndef __COMMAND_QUEUE_H__
 #define __COMMAND_QUEUE_H__
 
+#include "shared/srx_defs.h"
 #include "shared/srx_packets.h"
 #include "util/mutex.h"
 #include "util/packet.h"
 #include "util/server_socket.h"
 #include "util/slist.h"
-#include "shared/srx_defs.h"
-#include "shared/srx_packets.h"
 
 // Specifies the types of commands the queue can handle.
 typedef enum {

@@ -22,23 +22,26 @@
  *
  * Prefix Cache.
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/28 - oborchert
- *           * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *             update does not include the secure protocol section. The protocol
- *             will still use un-encrypted plain TCP
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *           * Changed return value of function getOriginStatus from bool to
- *             uint8 to reflect the validation result. This method provides more
- *             than valid/invalid.
- *           * Added unknownLock to PrefixCache
- *   0.1.0 - 2010/04/08 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Moved outputPrefixCacheAsXML from c file to header.
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *              update does not include the secure protocol section. The
+ *              protocol will still use un-encrypted plain TCP
+ * 0.2.0    - 2011/01/07 - oborchert 
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *            * Changed return value of function getOriginStatus from bool to
+ *              uint8 to reflect the validation result. This method provides
+ *              more than valid/invalid.
+ *            * Added unknownLock to PrefixCache  
+ * 0.1.0    - 2010/04/08 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  */
@@ -57,7 +60,6 @@
 #include "util/prefix.h"
 #include "util/rwlock.h"
 #include "util/slist.h"
-#include "util/types.h"
 
 
 
@@ -296,6 +298,13 @@ PC_Prefix* getParent(patricia_node_t* node);
  */
 const char* ipOfPrefix_tToStr(prefix_t* prefix);
 
+/**
+ * Convert the cache into an XML stream
+ * 
+ * @param self The prefix cache itself
+ * @param stream The stream to write it into.
+ */
+void outputPrefixCacheAsXML(PrefixCache* self, FILE* stream);
 
 
 
@@ -316,8 +325,7 @@ const char* ipOfPrefix_tToStr(prefix_t* prefix);
 
 
 
-
-
+// @TODO: Remove code below or activate it. 
 
 
 
@@ -338,12 +346,10 @@ const char* ipOfPrefix_tToStr(prefix_t* prefix);
  * @param flags Arbitrary flags
  * @return \c true = stored, \c false = an internal error occurred
  */
-
-/*
-bool maintainOriginStatus(PrefixCache* self, uint32_t valCacheID,
-                          uint16_t session_id, bool add,
-                          IPPrefix* prefix, uint8_t maxLen, uint32_t oas,
-                          uint8_t flags);
+//bool maintainOriginStatus(PrefixCache* self, uint32_t valCacheID,
+//                          uint16_t session_id, bool add,
+//                          IPPrefix* prefix, uint8_t maxLen, uint32_t oas,
+//                          uint8_t flags);
 
 /**
  * Retrieves the status of a (prefix, origin) pair and logs the passed update 
@@ -359,20 +365,16 @@ bool maintainOriginStatus(PrefixCache* self, uint32_t valCacheID,
  * @param details More detailed information regarding the status
  * @return SRx_RESULT_VALID, SRx_RESULT_UNKNOWN, SRx_RESULT_INVALID
  */
-
-/*
-SRxValidationResultVal getOriginStatus(PrefixCache* self, IPPrefix* prefix, 
-                                       uint32_t oas, SRxUpdateID* updateID, 
-                                       OriginStatusDetails* details);
+//SRxValidationResultVal getOriginStatus(PrefixCache* self, IPPrefix* prefix, 
+//                                       uint32_t oas, SRxUpdateID* updateID, 
+//                                       OriginStatusDetails* details);
 
 /**
  * Removes all statuses.
  *
  * @param self Instance
  */
-
-/*
-void resetAllOriginStatuses(PrefixCache* self);
+//void resetAllOriginStatuses(PrefixCache* self);
 
 /**
  * Outputs the cache as an XML tree.
@@ -380,9 +382,7 @@ void resetAllOriginStatuses(PrefixCache* self);
  * @param self Instance
  * @param stream Output stream
  */
-
-/*
-void outputPrefixCacheAsXML(PrefixCache* self, FILE* stream);
+//void outputPrefixCacheAsXML(PrefixCache* self, FILE* stream);
 
 /**
  * Returns the number an update is referenced internally.
@@ -395,10 +395,6 @@ void outputPrefixCacheAsXML(PrefixCache* self, FILE* stream);
  * 
  * @return Number of references, or \c -1 if an unknown update
  */
-
-/*
-int getUpdateRefCount(PrefixCache* self, SRxUpdateID* updateID);
-
-*/
+//int getUpdateRefCount(PrefixCache* self, SRxUpdateID* updateID);
 
 #endif // !__PREFIX_CACHE_H__

@@ -28,9 +28,9 @@
 #ifndef CONSOLE_H
 #define	CONSOLE_H
 
-#include "configuration.h"
-#include "rpki_handler.h"
-#include "command_handler.h"
+#include "server/configuration.h"
+#include "server/command_handler.h"
+#include "server/rpki_handler.h"
 
 /** This callback method is used to allow shutdowns */
 typedef void (*ShutDownMethod)();
@@ -49,7 +49,7 @@ typedef struct {
     /** An instance of the RPKI Handler*/
   CommandHandler* commandHandler;
 
-  // The server socket fie descriptor
+  // The server socket file descriptor
   int srvSockFd;
   // The client socket file descriptor;
   int clientSockFd;

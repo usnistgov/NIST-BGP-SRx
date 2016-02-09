@@ -20,16 +20,18 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * Version 0.3.0
+ * Version 0.3.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/27 - oborchert
- *           * Added Change log
- *   0.2.0 - 2011/11/01 - oborchert
- *           * rewritten
- *   0.1.0 - 2010/04/07 - pgleichm
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/02/27 - oborchert
+ *            * Added Change log
+ * 0.2.0    - 2011/11/01 - oborchert
+ *            * rewritten
+ * 0.1.0    - 2010/04/07 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __CLIENT_CONNECTION_HANDLER__
@@ -37,13 +39,12 @@
 
 #include <pthread.h>
 #include <semaphore.h>
-#include "shared/srx_packets.h"
+#include "client/srx_api.h"
 #include "util/client_socket.h"
 #include "util/packet.h"
 #include "util/rwlock.h"
 #include "util/slist.h"
-#include "util/types.h"
-#include "client/srx_api.h"
+#include "shared/srx_packets.h"
 
 /**
  * This method is called to handle the packet received. The size of the pdu is

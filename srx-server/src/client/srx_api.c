@@ -23,41 +23,45 @@
  * Secure Routing extension (SRx) client API - This API provides a fully
  * functional proxy client to the SRx server.
  *
+ * Version: 0.3.0.10
+ * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/27 - oborchert
- *           * Added #ifdef BZ263 for BZ263 / BZ280 handling.
- *           * Downgraded ERROR to WARNING while attempting to connect.
- *           * Changed the error management to a more broader communication 
- *             management. This resulted also in renaming some defines as well 
- *             as parameters in the proxy structure to be more meaningful.
- *           * Renamed _setProxyError into _setProxyCommCode
- *         - 2013/02/11 - oborchert
- *           * Pass local ID only if receipt flag is set in notification.
- *         - 2013/01/24 - oborchert
- *           * Added resetProxyError, _setProxyError
- *           * Fixed Segmentation fault in pLog
- *           * fixed handshake timeout
- *         - 2013/01/08 - oborchert
- *           * Added error control when server encounters buffer overflow.
- *           * Added experimental structure ProxySocketConfig;
- *         - 2012/12/17 - oborchert
- *           * Removed enumeration SRxOpMode
- *           * Added enumeration SRxProxyError
- *           * Changed signature of callback function (*ValidationReady),
- *           * Modified parameter type of callback function (*SignaturesReady)
- *           * Added  callback function (*ErrorManagement)
- *           * Modified structure of SRxProxy
- *           * Changed signature of the following functions:
- *             createProxy; deleteUpdate; connectToSRx; vreifyUpdate;
- *           * Added function:
- *             reconnectWithSRx; processPackets; getInternalSocketFD
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Removed unused variables.
+ * 0.3.0    - 2013/02/27 - oborchert
+ *             * Added #ifdef BZ263 for BZ263 / BZ280 handling.
+ *             * Downgraded ERROR to WARNING while attempting to connect.
+ *             * Changed the error management to a more broader communication 
+ *               management. This resulted also in renaming some defines as well 
+ *               as parameters in the proxy structure to be more meaningful.
+ *             * Renamed _setProxyError into _setProxyCommCode
+ *           - 2013/02/11 - oborchert
+ *             * Pass local ID only if receipt flag is set in notification.
+ *           - 2013/01/24 - oborchert
+ *             * Added resetProxyError, _setProxyError
+ *             * Fixed Segmentation fault in pLog
+ *             * fixed handshake timeout
+ *           - 2013/01/08 - oborchert
+ *             * Added error control when server encounters buffer overflow.
+ *             * Added experimental structure ProxySocketConfig;
+ *           - 2012/12/17 - oborchert
+ *             * Removed enumeration SRxOpMode
+ *             * Added enumeration SRxProxyError
+ *             * Changed signature of callback function (*ValidationReady),
+ *             * Modified parameter type of callback function (*SignaturesReady)
+ *             * Added  callback function (*ErrorManagement)
+ *             * Modified structure of SRxProxy
+ *             * Changed signature of the following functions:
+ *               createProxy; deleteUpdate; connectToSRx; vreifyUpdate;
+ *             * Added function:
+ *               reconnectWithSRx; processPackets; getInternalSocketFD
  *
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *   0.1.0 - 2010/03/10 - pgleichm
- *           * Code Created
+ * 0.2.0     - 2011/01/07 - oborchert
+ *             * Changelog added with version 0.2.0 and date 2011/01/07
+ *             * Version tag added
+ * 0.1.0     - 2010/03/10 - pgleichm
+ *             * Code Created
  * -----------------------------------------------------------------------------
  */
 #include <string.h>
@@ -67,9 +71,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <assert.h>
+#include "client/srx_api.h"
+#include "client/client_connection_handler.h"
 #include "shared/srx_packets.h"
-#include "srx_api.h"
-#include "client_connection_handler.h"
 #include "util/mutex.h"
 #include "util/log.h"
 #include "util/socket.h"
@@ -128,8 +132,6 @@ SRxProxy* createSRxProxy(ValidationReady   validationReadyCallback,
                          uint32_t proxyID, uint32_t proxyAS, void* userPtr)
 {
   SRxProxy* proxy;
-  // The client connection handler
-  ClientConnectionHandler* connHandler;
 
   // Install the logging framework;
   setLogMethodToCallback(pLog);
@@ -308,7 +310,6 @@ void removePeers(SRxProxy* proxy, uint32_t noPeers, uint32_t* peerAS)
  */
 void deleteUpdate(SRxProxy* proxy, uint16_t keep_window, SRxUpdateID updateID)
 {
-  uint32_t  i;
   // The client connection handler
   ClientConnectionHandler* connHandler =
                                    (ClientConnectionHandler*)proxy->connHandler;
@@ -1257,7 +1258,6 @@ static void dispatchPackets(SRXPROXY_BasicHeader* packet, void* proxyPtr)
 bool processPackets(SRxProxy* proxy)
 {
   bool bRetVal=true;
-  bool switchedToNonBlock = false;
 
   ClientConnectionHandler* connHandler =
                                    (ClientConnectionHandler*)proxy->connHandler;

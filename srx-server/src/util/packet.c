@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,33 +18,30 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- *
- * Oliver Borchert
+ * by this software.
  *
  *
+ * @version 0.3.0.10
  *
- *
- * @file packet.c
- * @date Created: 04/09/2010 by Patrick Gleichmann
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentations
+ * 0.1.0    - 2010/04/09 -pgleichm
+ *            * Code created. 
  */
 
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include "client/client_connection_handler.h"
-#include "packet.h"
-#include "util/log.h"
-#include "util/socket.h"
-#include "client/srx_api.h"
-
-#include "util/mutex.h"
-#include "server_socket.h"
 #include "server/server_connection_handler.h"
-//#include "../server/server_connection_handler.h"
+#include "util/packet.h"
+#include "util/server_socket.h"
+#include "util/log.h"
+#include "util/mutex.h"
+#include "util/socket.h"
 
 #define HDR "([0x%08X] Packet): "
 
@@ -53,7 +50,7 @@
  * receiver loop on both sides, SRx server as well as SRx client. IN case the 
  * SRx server uses. this method the parameter connHandler MUST be NULL.
  *
- * @note Blocking call, only if in server mode. Clients run trhough only once.
+ * @note Blocking call, only if in server mode. Clients run through only once.
  *
  * @param fdPtr        The file descriptor of the socket
  * @param dispatcher   The dispatcher method that receives all packets and

@@ -4,6 +4,17 @@
 # rpmbuild --define 'variable value'
 #
 
+%define package_num  @PKG_VER@
+%define major_ver    @MAJOR_VER@
+%define minor_ver    @MINOR_VER@
+%define update_num   @UPD_VER@
+%define lib_ver_info @VER_INFO@
+
+%define lib_version_info %{lib_ver_info}
+%define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
+%define version %{package_version}
+%define name quaggasrx
+
 ####################### Quagga configure options #########################
 # with-feature options
 %{!?with_snmp:		%define with_snmp	1 }
@@ -87,43 +98,56 @@
 #release sub-revision (the two digits after the CONFDATE)
 %{!?release_rev:	%define		release_rev	01 }
 
-Summary: Routing daemon
-Name:		quagga
-Version:	@VERSION@
-Release:	@CONFDATE@%{release_rev}
-License:	GPL
-Group: System Environment/Daemons
-Source0:	http://www.quagga.net/snapshots/cvs/%{name}-%{version}.tar.gz
-URL:		http://www.quagga.net
+Summary:  Routing daemon
+#Name:		quaggasrx
+#Version: @VERSION@
+Name:		  %{name}
+Version:	%{version}
+Release:  22%{?dist}
+#Release: @CONFDATE@%{release_rev}
+License:  GPL
+Group:    System Environment/Daemons
+Source0:  %{name}-%{version}.tar.gz
+#Source0:	http://www.quagga.net/snapshots/cvs/%{name}-%{version}.tar.gz
+#URL:		  http://www.quagga.net
+URL:	 	  http://bgpsec.antd.nist.gov
+
 %if %{with_snmp}
 BuildRequires:	net-snmp-devel
-Prereq:		net-snmp
+Requires:		net-snmp
 %endif
 %if %{with_vtysh}
 BuildRequires:	readline readline-devel ncurses ncurses-devel
-Prereq:		ncurses
+Requires:		ncurses
 %endif
 BuildRequires:	texinfo tetex autoconf pam-devel patch libcap-devel tetex
 # Initscripts > 5.60 is required for IPv6 support
-Prereq:		initscripts >= 5.60
-Prereq:		ncurses pam
-Prereq:		/sbin/install-info
+Requires:		initscripts >= 5.60
+Requires:		ncurses pam
+Requires:		/sbin/install-info
 Provides:	routingdaemon
 BuildRoot:	%{_tmppath}/%{name}-%{version}-root
 Obsoletes:	bird gated mrt zebra
+Prefix: %{_prefix}
+Prefix: %{_sysconfdir}
+
+# Needed for QuaggaSRx
+Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.3.1, srxcryptoapi >= 0.1.2
+
 
 %description
-Quagga is a free software that manages TCP/IP based routing
+QuaggaSRx is a free software based upon Quagga that manages TCP/IP based routing
 protocol. It takes multi-server and multi-thread approach to resolve
 the current complexity of the Internet.
 
-Quagga supports BGP4, BGP4+, OSPFv2, OSPFv3, RIPv1, RIPv2, and RIPng.
+QuaggaSRx supports BGP4, BGP4+, BGPSEC, RPKI OSPFv2, OSPFv3, RIPv1, RIPv2, 
+and RIPng.
 
-Quagga is intended to be used as a Route Server and a Route Reflector. It is
+QuaggaSRx is a reference implementation of The new BGPSEC protocol. It is
 not a toolkit, it provides full routing power under a new architecture.
-Quagga by design has a process for each protocol.
+QuaggaSRx by design has a process for each protocol.
 
-Quagga is a fork of GNU Zebra.
+QuaggaSRx is a fork of Quagga.
 
 %package contrib
 Summary: contrib tools for quagga
@@ -218,7 +242,10 @@ developing OSPF-API and quagga applications.
 %if %vty_group
 	--enable-vty-group=%vty_group \
 %endif
---enable-netlink --enable-gcc-rdynamic
+--enable-netlink --enable-gcc-rdynamic \
+--disable-babeld \
+sca_dir= srx_dir=
+#sca_dir=@sca_dir@ srx_dir=@srx_dir@
 
 make %{?_smp_mflags} MAKEINFO="makeinfo --no-split"
 
@@ -361,7 +388,9 @@ if [ "$1" -ge 1 ]; then
 	[ "$running_watchquagga" = yes ] && \
 		/etc/rc.d/init.d/watchquagga start >/dev/null 2>&1 || :
 fi
-/sbin/install-info --delete %{_infodir}/quagga.info.gz %{_infodir}/dir
+if [ -e %{_infodir}/quagga.info.gz ] ; then
+  /sbin/install-info --delete %{_infodir}/quagga.info.gz %{_infodir}/dir
+fi
 
 %preun
 if [ "$1" = "0" ]; then
@@ -446,6 +475,12 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Tue Oct 13 2015 Oliver Borchert <borchert@nist.gov>
+- renamed package to quaggasrx
+- disabled babeld
+- added install requirements for SRx related libraries
+- Changed package numbering format to fit previously used QuaggaSRx format.
+
 * Thu Sep 12 2005 Paul Jakma <paul@dishone.st>
 - Steal some changes from Fedora spec file:
 - Add with_rtadv variable
@@ -578,7 +613,7 @@ rm -rf $RPM_BUILD_ROOT
 * Thu Aug 09 2001 Elliot Lee <sopwith@redhat.com> 0.91a-6
 - Fix bug #51336
 
-* Wed Aug  1 2001 Trond Eivind Glomsrød <teg@redhat.com> 0.91a-5
+* Wed Aug  1 2001 Trond Eivind Glomsrï¿½d <teg@redhat.com> 0.91a-5
 - Use generic initscript strings instead of initscript specific
   ( "Starting foo: " -> "Starting $prog:" )
 

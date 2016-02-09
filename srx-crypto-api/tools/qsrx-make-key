@@ -5,9 +5,13 @@
 # generated here are for test purpose only and might not follow the BGPSEc 
 # certificate structure.
 # They are not intended to be used elsewhere than the test bed.
+#
+# This script generates both formats, the pure key format and the PEM 
+# encoded format. The pem encoded format is used to generate the certificate.
 # 
 
-EXT_KEY="key"
+EXT_PEM="key"
+EXT_DER="der"
 EXT_CERT="cert"
 
 if [ "$1" == "" ] ; then
@@ -19,5 +23,6 @@ if [ -e "$1.cert" ] ; then
   echo "A certificate $1.$EXTCERT exists for $1. First remove certificate then generate a key!"
   exit 2;
 else
-  openssl ecparam -name prime256v1 -genkey -out $1.$EXT_KEY
+  openssl ecparam -name prime256v1 -genkey -out $1.$EXT_PEM
+  openssl ec -in $1.$EXT_PEM -outform der -out $1.$EXT_DER
 fi

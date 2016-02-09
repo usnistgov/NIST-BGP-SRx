@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,25 +18,12 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * @file test.h
- * @date Created: 4/19/2010
- * @date Last update: 6/2/2010
+ * by this software.
  *
  * A small unit test suite for C
  *
  * @note Define TRACE_TEST before including this file to print every 
  *       checked condition.
- *
- * @par Changelog
- *
- * - 6/2/2010: 
- *   - Ability to trace
- * - 5/15/2010:
- *   - Initial release
  *
  * @par A typical skeleton
  *
@@ -73,8 +60,23 @@
  * -# Run the two tests "ONE" and "TWO"
  * -# Print the number of checks that were executed and how many of them failed
  * -# Return the number of failed checks as program exit code
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Added Changelog
+ *            * Fixed speller in documentation header
+ * 0.1.0    - 2010/06/02 -pgleichm
+ *            * Ability to trace
+ *          - 2010/05/15 - pgleichm
+ *            * Initial release
+ *          - 2010/04/19 -pgleichm
+ *            * Code created. 
+ * 
  */
-
+// @TODO: Check if it can be deleted
 #ifndef __TEST_H__
 #define __TEST_H__
 

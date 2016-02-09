@@ -9,32 +9,35 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * @file rwlock.h
- * @date Created: 06/04/2010
+ * by this software.
  *
  * Read/write lock - multiple readers or one writer at the same time
- *
  * @note Currently based on PThread
+ * 
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2010/06/04 - pgleichm
+ *            * Code created.
  */
 
 #ifndef __RWLOCK_H__
 #define __RWLOCK_H__
 
 #include <pthread.h>
-#include "util/types.h"
+#include <stdbool.h>
 
 /** An R/W lock. */
 typedef pthread_rwlock_t  RWLock;

@@ -9,32 +9,36 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  * 
- * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
  * by thsi software.
  *
- */
-/**
- * @file debug.h
- * @date Created: 12/28/2009
- *
  * Various function to make debugging easier.
+ *
+ * @version 0.3.0.10
+ *
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ *            * Added Changelog
+ * 0.1.0.0  - 2009/12/28 - pgleichm
+ *            * Created code.
  */
-
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
-#include "util/types.h"
+#include <stdio.h>
+#include <stdbool.h>
 
 /**
- * Writes a heximal representation of data to a stream (e.g. stdout).
+ * Writes a hexdecimal representation of data to a stream (e.g. stdout).
  *
  * @param stream File handle
  * @param data Data

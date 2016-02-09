@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in.
 
-INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)/lib -I$(top_srcdir)/$(SRX_DIR) $(BGPD_INCLUDES)
+INCLUDES = @INCLUDES@ -I.. -I$(top_srcdir) -I$(top_srcdir)/lib -I$(top_builddir)/lib $(BGPD_INCLUDES)
 DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 INSTALL_SDATA=@INSTALL@ -m 600
 
@@ -15,8 +15,8 @@ libbgp_a_SOURCES = \
 	bgp_debug.c bgp_route.c bgp_zebra.c bgp_open.c bgp_routemap.c \
 	bgp_packet.c bgp_network.c bgp_filter.c bgp_regex.c bgp_clist.c \
 	bgp_dump.c bgp_snmp.c bgp_ecommunity.c bgp_mplsvpn.c bgp_nexthop.c \
-	bgp_damp.c bgp_table.c bgp_advertise.c bgp_vty.c bgp_mpath.c bgp_info_hash.c \
-	bgp_validate.c
+	bgp_damp.c bgp_table.c bgp_advertise.c bgp_vty.c bgp_mpath.c \
+	bgp_info_hash.c bgp_validate.c
 
 noinst_HEADERS = \
 	bgp_aspath.h bgp_attr.h bgp_community.h bgp_debug.h bgp_fsm.h \
@@ -27,7 +27,8 @@ noinst_HEADERS = \
 	bgp_validate.h
 
 bgpd_SOURCES = bgp_main.c
-bgpd_LDADD = libbgp.a ../lib/libzebra.la $(SRX_CLI_LIB) $(SRX_CRYPTO_API_LIBS) $(SRX_API_LIB) @LIBCAP@ @LIBM@ -ldl
+
+bgpd_LDADD = libbgp.a ../lib/libzebra.la @LIBCAP@ @LIBM@
 
 examplesdir = $(exampledir)
 dist_examples_DATA = bgpd.conf.sample bgpd.conf.sample2 bgpd.conf.sampleSRx

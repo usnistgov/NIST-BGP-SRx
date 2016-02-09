@@ -28,41 +28,44 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.3.0.2
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0.2 - 2013/07/08 - oborchert
- *             * Added an ID for each command to allow acing on them after they
- *               are executed.
- *             * Allows the exit/quit/\q command to be executed from within a
- *               script
- *             * Allowed to end the program when a script is passed and the 
- *               last command is quit BZ# 351
- *             * Changed all command processing methods to return the proper
- *               command id CMD_ID_<command>
- *   0.3.0   - 2013/01/28 - oborchert
- *             * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *               update does not include the secure protocol section. The 
- *               protocol will still use un-encrypted plain TCP
- *   0.2.2   - 2012/12/28 - oborchert
- *             * Modified update 0.2.1. Fix BZ165 caused no ROA to be 
- *               installed into the cache. Applied new fix.
- *   0.2.1   - 2012/07/25 - kyehwan
- *             * Fixed segmentation fault while adding ROAs.
- *   0.2.0   - 2011/01/07 - oborchert
- *             * Changelog added with version 0.2.0 and date 2011/01/07
- *             * Version tag added
- *             * M0000713: Cleaned console input string with trim()
- *             * Added capability of adding single "white list" entries through
- *             * console (add ...).
- *             * Added version information.
- *             * Added addNow and removeNow to bypass the 60 seconds delay timer.
- *             * Rewritten code for prototype 2.
- *             * following draft-ietf-sidr-rpki-rtr.10
- *   0.1.0   - 2010/06/02 - pgleichm
- *             * Code Created Prototype 1
- *             * following draft-ymbk-rtr-protocol-05
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Added parentheses around comparison in operand & in sendPrefixes
+ *            * Removed unused sessionID from function readPrefixData
+ * 0.3.0.2  - 2013/07/08 - oborchert
+ *            * Added an ID for each command to allow acing on them after they
+ *              are executed.
+ *            * Allows the exit/quit/\q command to be executed from within a
+ *              script
+ *            * Allowed to end the program when a script is passed and the 
+ *              last command is quit BZ# 351
+ *            * Changed all command processing methods to return the proper
+ *              command id CMD_ID_<command>
+ * 0.3.0    - 2013/01/28 - oborchert
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *              update does not include the secure protocol section. The 
+ *              protocol will still use un-encrypted plain TCP
+ * 0.2.2    - 2012/12/28 - oborchert
+ *            * Modified update 0.2.1. Fix BZ165 caused no ROA to be 
+ *              installed into the cache. Applied new fix.
+ * 0.2.1    - 2012/07/25 - kyehwan
+ *            * Fixed segmentation fault while adding ROAs.
+ * 0.2.0    - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *            * M0000713: Cleaned console input string with trim()
+ *            * Added capability of adding single "white list" entries through
+ *            * console (add ...).
+ *            * Added version information.
+ *            * Added addNow and removeNow to bypass the 60 seconds delay timer.
+ *            * Rewritten code for prototype 2.
+ *            * following draft-ietf-sidr-rpki-rtr.10
+ * 0.1.0    - 2010/06/02 - pgleichm
+ *            * Code Created Prototype 1
+              * following draft-ymbk-rtr-protocol-05
  * -----------------------------------------------------------------------------
  */
 
@@ -77,6 +80,7 @@
 #include <readline/history.h>
 #include <uthash.h>
 #include <unistd.h>
+#include "server/srx_server.h"
 #include "shared/rpki_router.h"
 #include "util/debug.h"
 #include "util/log.h"
@@ -90,7 +94,6 @@
 #include "util/str.h"
 #include "util/timer.h"
 #include "util/prefix.h"
-#include "server/srx_server.h"
 
 typedef struct {
   uint32_t  serial;     // Current serial number of the entry
@@ -409,7 +412,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
           // Skip entries that are already expired.
           if (isReset)
           {
-            if (cEntry->flags & PREFIX_FLAG_ANNOUNCEMENT == 0)
+            if ((cEntry->flags & PREFIX_FLAG_ANNOUNCEMENT) == 0)
             {
               // This entry is NOT an announcement. Because we send a fresh set,
               // only announcements will be send, no withdrawals.
@@ -945,7 +948,6 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   IPPrefix       prefix;
   uint32_t       maxLen;
   uint32_t       oas;
-  uint16_t       sessionID;
   ValCacheEntry* cEntry;
   bool           goOn=true;
 

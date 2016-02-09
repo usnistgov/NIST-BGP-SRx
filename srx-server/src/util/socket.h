@@ -20,27 +20,28 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/09 - oborchert
- *           * Added getter for last error code produced. 0 for no error.
- *           * Removed the extern keyword - not needed.
- *         - 2012/12/17 - oborchert
- *           * Minor changes, mainly formating and spellers in documentation
- *           * Added change log.
- *           * Changed mode of sending data
- *   0.2.0 - SKIPPED
- *   0.1.0 - 2009/12/29 - pgleichman
- *           * Code Created
+ * 0.3.0.10 - 2015/11/09 - oborchert
+ *            * Removed types.h
+ * 0.3.0    - 2013/01/09 - oborchert
+ *            * Added getter for last error code produced. 0 for no error.
+ *            * Removed the extern keyword - not needed.
+ *          - 2012/12/17 - oborchert
+ *            * Minor changes, mainly formating and spellers in documentation
+ *            * Added change log.
+ *            * Changed mode of sending data
+ * 0.2.0    - SKIPPED
+ * 0.1.0    - 2009/12/29 - pgleichm
+ *            * Code Created
  */
 #ifndef __SOCKET_H__
 #define __SOCKET_H__
 
 #include <sys/socket.h>
 #include "util/prefix.h"
-#include "util/types.h"
 
 /** 
  * Max. length of the textual representation of a socket.

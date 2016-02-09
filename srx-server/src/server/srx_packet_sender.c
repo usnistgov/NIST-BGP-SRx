@@ -22,27 +22,30 @@
  *
  * This file contains the functions to send srx-proxy packets.
  * 
- * @version 0.3.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * 
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/06 - oborchert
- *           * Changed logging within release of sending queue.
- *         - 2013/01/02 - oborchert
- *           * Added changelog.
- *           * Added sending queue to prevent buffer overflows in the receiver 
- *             socket 
- *   0.1.0 - 2011/11/01 - oborchert
- *           * File Created.
+ * 0.3.0.10 - 2015/11/10 - oborchert
+ *            * Fixed assignment bug in stopSendQueue
+ *            * Added return value (NULL) to sendQueueThreadLoop
+ * 0.3.0    - 2013/02/06 - oborchert
+ *            * Changed logging within release of sending queue.
+ *          - 2013/01/02 - oborchert
+ *            * Added Changelog.
+ *            * Added sending queue to prevent buffer overflows in the receiver 
+ *              socket 
+ * 0.1.0    - 2011/11/01 - oborchert
+ *            * File Created.
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include "server/srx_packet_sender.h"
 #include "shared/srx_packets.h"
 #include "util/log.h"
 #include "util/mutex.h"
 #include "util/server_socket.h"
-#include "srx_packet_sender.h"
 
 typedef struct {
   // The pdu to be send
@@ -157,6 +160,10 @@ void releaseSendQueue()
 /** 
  * The thread loop of the queue. To stop the queue call stopSendQueue()
  * 
+ * @param notused - Not Used
+ * 
+ * @return NULL
+ * 
  * @since 0.3.0
  */
 void* sendQueueThreadLoop(void* notused)
@@ -187,6 +194,8 @@ void* sendQueueThreadLoop(void* notused)
     }
     LOG(LEVEL_DEBUG, "Exit send queue loop!");
   }
+  
+  return NULL;
 }
 
 /**
@@ -270,7 +279,7 @@ void stopSendQueue()
       free(packet);
       queue->size--;
     }
-    queue->tail == NULL;
+    queue->tail = NULL;
     unlockMutex(&queue->mutex);
   }
 }

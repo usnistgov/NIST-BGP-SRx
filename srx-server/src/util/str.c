@@ -9,7 +9,7 @@
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
  * 
- * We would appreciate acknowledgement if the software is used.
+ * We would appreciate acknowledgment if the software is used.
  * 
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
@@ -18,14 +18,11 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
+ * by this software.
  *
- */
-/*
  * This file contains string utilities.
  *
- *  * @version 0.2.0
- *
+ * @version 0.2.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
@@ -40,7 +37,7 @@
 
 #include <string.h>
 #include <ctype.h>
-#include "str.h"
+#include "util/str.h"
 
 char* chomp(char* str)
 {
