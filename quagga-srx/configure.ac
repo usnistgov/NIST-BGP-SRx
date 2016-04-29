@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.1.4, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.1.5, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -31,7 +31,12 @@ MINOR_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 3`
 UPD_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 4`
 PACKAGE_VERSION=AC_PACKAGE_VERSION
 
-LDFLAGS=-L/usr/lib64/srx $LDFLAGS
+AS_CASE([$host_cpu],
+        [i?86], [ARCH=""], 
+        [x86_64], [ARCH="64"],
+        []
+        )
+#LDFLAGS=-L/usr/lib$ARCH/srx $LDFLAGS
 
 AC_SUBST(PKG_VER)
 AC_SUBST(MAJOR_VER)
@@ -43,7 +48,7 @@ AC_PATH_PROG(PERL, perl)
 AC_CHECK_PROG([GAWK],[gawk],[gawk],[not-in-PATH])
 if test "x$GAWK" = "xnot-in-PATH" ; then
 	AC_MSG_ERROR([GNU awk is required for lib/memtype.h made by memtypes.awk.
-BSD awk complains: awk: gensub doesn't support backreferences (subst "\1") ])
+BSD awk complains: awk: gensub does not support backreferences (subst "\1") ])
 fi
 AC_ARG_VAR([GAWK],[GNU AWK])
 
@@ -1408,10 +1413,6 @@ SCA_LDFLAGS=""
 SCA_CFLAGS=""
 CACHED_LDFLAGS=""
 if test "x${enable_srx}" == "xyes"; then  
-  AS_CASE([$host_cpu],
-            [x86_64], [LIBEXT="64"],
-            [LIBEXT=""]
-         )
 
   AC_MSG_RESULT(yes)
   AC_DEFINE(USE_SRX,,SRX)
@@ -1422,9 +1423,11 @@ if test "x${enable_srx}" == "xyes"; then
 
   AC_ARG_VAR([srx_dir], [Provide local install location of SRxProxy])  
   if test "x${srx_dir}" = "x" ; then
-    if test -d /usr/lib$LIBEXT/srx ; then
-      CACHED_LDFLAGS="-L/usr/lib$LIBEXT/srx"
-      LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
+    if test -d /usr/lib${ARCH}/srx ; then
+      if test "x${CACHED_LDFLAGS}" = "x" ; then
+        CACHED_LDFLAGS="-L/usr/lib${ARCH}/srx"
+        LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
+      fi
       srx_include_dir="/usr/include/srx/"
     fi
     # Check for installed library, no custom location provided
@@ -1444,9 +1447,13 @@ if test "x${enable_srx}" == "xyes"; then
 
     # Search local install
     AC_MSG_CHECKING(for local installed SRx Proxy)
-    if test -e ${srx_dir}/lib$LIBEXT/srx/libSRxProxy.so ; then
+    if test -e ${srx_dir}/lib${ARCH}/srx/libSRxProxy.so ; then
       CFLAGS="-I${srx_dir}/include $CFLAGS"
-      LDFLAGS="-L${srx_dir}/lib$LIBEXT/srx $LDFLAGS"
+
+      # Check if the new library path is already added
+      if "x$CACHED_LDFLAGS" = "x" ; then
+        LDFLAGS="-L${srx_dir}/lib${ARCH}/srx $LDFLAGS"
+      fi
       LIBS="-lSRxProxy $LIBS"
       AC_MSG_RESULT([found])
     else
@@ -1456,7 +1463,7 @@ if test "x${enable_srx}" == "xyes"; then
 	--------------------------------------------------
 	The library 'libSRxProxy.so' could not be 
 	found at location:
-	  '${srx_dir}/lib$LIBEXT/srx/libSRxProxy.so'
+	  '${srx_dir}/lib${ARCH}/srx/libSRxProxy.so'
 	--------------------------------------------------])
       else
         AC_MSG_ERROR([
@@ -1496,9 +1503,9 @@ if test "x${enable_srx}" == "xyes"; then
   AC_ARG_VAR([sca_dir], [Provide local install location of SRxCryptoAPI])
   if test "x${sca_dir}" = "x" ; then
     # Check for regular installed library
-    if test -d /usr/lib$LIBEXT/srx ; then
+    if test -d /usr/lib${ARCH}/srx ; then
       if test "x$CACHED_LDFLAGS" = "x"; then
-        CACHED_LDFLAGS="/usr/lib$LIBEXT/srx"
+        CACHED_LDFLAGS="/usr/lib${ARCH}/srx"
         LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
       fi
       sca_include_dir="/usr/include/srx/"
@@ -1518,9 +1525,9 @@ if test "x${enable_srx}" == "xyes"; then
     sca_include_dir="${sca_dir}/include/srx/"
     AC_MSG_CHECKING(for local installed SRxCryptoAPI)
 
-    if test -e ${sca_dir}/lib$LIBEXT/srx/libSRxCryptoAPI.so ; then
+    if test -e ${sca_dir}/lib${ARCH}/srx/libSRxCryptoAPI.so ; then
       AC_MSG_RESULT([found])
-      LDFLAGS="-L${sca_dir}/lib$LIBEXT/srx $LDFLAGS"
+      LDFLAGS="-L${sca_dir}/lib${ARCH}/srx $LDFLAGS"
       LIBS="-lSRxCryptoAPI $LIBS"
 
       if test "$sca_dir" != "$srx_dir" ; then
@@ -1535,7 +1542,7 @@ if test "x${enable_srx}" == "xyes"; then
 	--------------------------------------------------
 	The library 'libSRxCryptoAPI.so' could not be 
 	found at location:
-	  '${sca_dir}/lib$LIBEXT/srx/libSRxCryptoAPI.so'
+	  '${sca_dir}/lib${ARCH}/srx/libSRxCryptoAPI.so'
 	--------------------------------------------------])
       else
         AC_MSG_ERROR([

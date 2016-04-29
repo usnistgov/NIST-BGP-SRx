@@ -17,13 +17,21 @@
  *
  * This plugin provides an OpenSSL ECDSA implementation for BGPSEC.
  *
- * @version 0.1.2.1
+ * @version 0.1.3.0
  *
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.2.1  - 2016/02/09 - oborchert
- *             * removed key loading functions, code is provided by srxcryptoapi
- *            - 2016/02/04 - kyehwanl
+ *   0.1.3.0 - 2016/04/29 - oborchert
+ *             * Additional modification in ERROR reporting as well as 
+ *               logging of results.
+ *           - 2016/04/28 - kyehwanl
+ *             * Modified reporting of ERROR, SUCCESS and FAILURE during 
+ *               validation
+ *   0.1.2.1 - 2016/03/11 - kyehwanl
+ *             * Complement ExtBgpsecVerify function with using pubkey ids
+ *           - 2016/02/09 - oborchert
+ *             * Removed key loading functions, code is provided by srxcryptoapi
+ *           - 2016/02/04 - kyehwanl
  *             * deprecated codes removed
  *           - 2016/02/02 - borchert
  *             * Added init method.
@@ -32,7 +40,7 @@
  *           - 2016/01/04 - oborchert
  *             * Changed return value if isExtended from 1 to 0
  *           - 2015/12/03 - oborchert
- *             * fixed location of bgpsec_openssl.h
+ *             * Fixed location of bgpsec_openssl.h
  *           - 2015/09/25 - oborchert
  *             * Resolved compiler warnings.
  *           - 2015/09/22 - oborchert
@@ -55,6 +63,7 @@
 #include "bgpsec_openssl.h"
 
 Record_t *g_records = NULL;
+Record_t *g_records_pub = NULL;
 struct Enbuf_Eckey_t
 {
   void  *en_buf;
@@ -69,6 +78,7 @@ static struct Enbuf_Eckey_t  stEnbuf_Eckey[ID_NUM_MAX];
 int cl_SignParamWithKeySanityCheck(BGPSecSignData *signData, BGPSecKey *key);
 int cl_SignParamWithIDSanityCheck(BGPSecSignData *signData, u_int8_t keyID);
 void PrintPrivPubKeyHex(EC_KEY* ec_key);
+Record_t* restoreKeyInfo(bool fPrivate, u_int8_t* ski, u_int32_t asn);
 static inline void put_u32(void *p, u_int32_t x) {
   x = htonl(x); memcpy(p, &x, 4); }
 
@@ -102,40 +112,38 @@ static bool cmpSKI(u_int8_t* arr1, u_int8_t* arr2)
  *
  * @param digest: char string in which message digest contained
  * @param digest_len: message digest length
- * @param eckey_nistp256 is ECDSA key used for veirification
+ * @param eckey_nistp256 is ECDSA key used for verification
  * @param signature: input resource for verification
  * @param signature_len: signature length
  *
- * @return status sucess(API_BGPSEC_VERIFY_SUCCESS), failure(API_BGPSEC_VERIFY_FAILURE)
+ * @return status sucess  (API_BGPSEC_VERIFY_SUCCESS == 1), 
+ *                failure (API_BGPSEC_VERIFY_FAILURE == 0)
+ *                error   (API_BGPSEC_VERIFY_ERROR   == -1)
  */
 
 int cl_BgpsecDoVerifySignature (u_int8_t *digest, int digest_len,
                                 EC_KEY    *eckey_nistp256,
                                 u_int8_t *signature, int signature_len)
 {
-    if (IS_DEBUG_ENABLED)
-    {
-      sca_debugLog(LOG_DEBUG, "Received signatgure: 0x:");
-      printHex(signature_len, (unsigned char*)signature);
-    }
+  if (IS_DEBUG_ENABLED)
+  {
+    sca_debugLog(LOG_DEBUG, "Received signature: 0x:");
+    printHex(signature_len, (unsigned char*)signature);
+  }
 
-    if(! ECDSA_verify(0, digest, digest_len, signature, signature_len, eckey_nistp256))
-    {
-    /* error return handling */
-      //SSL_load_error_strings();
-      sca_debugLog(LOG_ERR, "+ [libcrypto] ECDSA_verify error: %s\n", \
-          ERR_error_string(ERR_get_error(), NULL));
-      ERR_print_errors_fp(stderr);
-      goto verify_err;
-    }
-    else
-      return API_BGPSEC_VERIFY_SUCCESS;
-
-
-// openssl clean up needs to be done
-verify_err:
-  return API_BGPSEC_VERIFY_FAILURE ; /* error return */
-
+  // return  1 (== API_BGPSEC_VERIFY_SUCCESS) if the signature is valid, 
+  // return  0 (== API_BGPSEC_VERIFY_FAILURE) if the signature is invalid
+  // return -1 (== API_BGPSEC_VERIFY_ERROR)   on error 
+  int status = ECDSA_verify(0, digest, digest_len, signature, signature_len, 
+                            eckey_nistp256);
+  if (status == API_BGPSEC_VERIFY_ERROR)
+  {
+    sca_debugLog(LOG_ERR, " + [libcrypto] ECDSA_verify failure: %s\n", 
+                 ERR_error_string(ERR_get_error(), NULL));
+    ERR_print_errors_fp(stderr);
+  }
+  
+  return status;
 }
 
 
@@ -148,13 +156,14 @@ verify_err:
  * @param keys: used as a container which include key info
  * @param keyCnt: the number of keys
  *
- * @return status sucess(API_BGPSEC_VERIFY_SUCCESS), failure(API_BGPSEC_VERIFY_FAILURE)
+ * @return status sucess(API_BGPSEC_VERIFY_SUCCESS), failure(API_BGPSEC_VERIFY_FAILURE),
+ *          error(API_BGPSEC_VERIFY_ERROR)
  */
 int stcl_BgpsecVerifySignatureSSL_withKeyInfo (BGPSecSignData* sslVerifyData,
                 BGPSecKey** keys, u_int16_t keyCnt)
 {
     EC_KEY  *ecdsa_key=NULL;
-    int status = -1;
+    int status = API_BGPSEC_VERIFY_ERROR;
     int bDerPrivate=0;
     int retType=0;
     unsigned char *p = NULL;
@@ -234,7 +243,7 @@ int stcl_BgpsecVerifySignatureSSL_withKeyInfo (BGPSecSignData* sslVerifyData,
 
     /* check validity of ec key */
     if (!EC_KEY_check_key(ecdsa_key)) {
-      status = -1;
+      status = API_BGPSEC_VERIFY_ERROR;
       sca_debugLog(LOG_ERR, "+ [libcrypto] EC_KEY_check failed: EC key check error \
           [current num:%d, ski:%02x, ASN:%d] \n",\
           keyCnt, *keys[keyCnt]->ski, keys[keyCnt]->asn);
@@ -252,17 +261,11 @@ int stcl_BgpsecVerifySignatureSSL_withKeyInfo (BGPSecSignData* sslVerifyData,
                                        sslVerifyData->signature,
                                        sslVerifyData->sigLen);
 
-    if(status != API_BGPSEC_VERIFY_SUCCESS)
+    if (status == API_BGPSEC_VERIFY_ERROR)
     {
-      sca_debugLog(LOG_ERR, "+ [libcrypto] Error at verifying\n");
-      status = API_BGPSEC_VERIFY_FAILURE;
-      goto err_cleanup;
+      sca_debugLog(LOG_ERR, "+ [libcrypto] error at verifying\n");
     }
-    else
-    {
-      if (ecdsa_key) EC_KEY_free(ecdsa_key);
-      return status;
-    }
+    // Removed goto stuff because it happens anyhow.
 
 err_cleanup:
     // openssl cleanup
@@ -298,7 +301,7 @@ int cl_BgpsecECDSA_Sign (u_int8_t *digest, int digest_len,
 
   sca_debugLog(LOG_INFO, " + [libcrypto] sig length: %d \n", sig_len);
 
-  if(!ECDSA_sign(0, digest, digest_len, signature, &sig_len, ecdsa_key))
+  if(ECDSA_sign(0, digest, digest_len, signature, &sig_len, ecdsa_key) != 1)
   {
     /* error */
     sca_debugLog(LOG_ERR, "+ [libcrypto] ECDSA_sing error: %s\n", \
@@ -427,6 +430,13 @@ int stBgpsecReqSigningWithID(BGPSecSignData *sslSignData, u_int8_t inID)
 
   keyID = inID - RET_ID_OFFSET;
 
+  /* keyID need to have bound checking regarding to stEnbuf_Eckey */
+  if(keyID > ID_NUM_MAX-1 || keyID < 0 )
+  {
+    sca_debugLog(LOG_INFO, "+ [libcrypto] key ID(%x) bound error \n", keyID);
+    goto int_err;
+  }
+
   /* retrieve eckey from key id */
   sca_debugLog(LOG_INFO, "+ [libcrypto] key ID:%x \n", keyID);
   ecdsa_key = stEnbuf_Eckey[keyID].ec_key;
@@ -477,7 +487,8 @@ int_err:
  * @param prefix: additional information for NLRI
  * @param local_as:  additional information for NLRI
  *
- * @return on success with API_BGPSEC_VERIFY_SUCCESS or on failure with API_BGPSEC_VERIFY_ERROR
+ * @return on success with API_BGPSEC_VERIFY_SUCCESS or on failure(invalid) with API_BGPSEC_VERIFY_FAILURE
+ *          on error with API_BGPSEC_VERIFY_ERROR
  */
 int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** keys,
                     void *prefix, u_int32_t local_as)
@@ -488,12 +499,12 @@ int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** key
     return API_BGPSEC_VERIFY_ERROR;
   }
 
+  int status = API_BGPSEC_VERIFY_ERROR;
   PathSegment   *seg = bpa->pathSegments;
   SigBlock      *sb = bpa->sigBlocks;
   SigSegment    *ss = sb->sigSegments;
 
   struct prefix *p=(struct prefix *)prefix;
-  //struct KeyInfoData *keyInfo = NULL;
   int currNum =0;
 
   u_int8_t hashbuff[BGPSEC_MAX_SIG_LENGTH + 10 + BGPSEC_AFI_LENGTH];
@@ -570,25 +581,36 @@ int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** key
       // calculate current number in array
       currNum = number_keys - iter;
 
-      if(keys && keys[currNum])
+      if (keys && keys[currNum])
       {
-        if ( API_BGPSEC_VERIFY_SUCCESS!=
-            stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, keys, currNum))
+        status = stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, keys, 
+                                                           currNum);
+        switch (status)
         {
-          sca_debugLog(LOG_ERR,"Error: %s: bad signature, ignoring\n", __FUNCTION__);
-          goto verify_err;
-        }
-        else
-        {
-          sca_debugLog(LOG_INFO,"BGPSEC Update Verification SUCCESS !!! [Signer AS:%d] \n\n",
-              seg->as);
+          case API_BGPSEC_VERIFY_ERROR:
+            sca_debugLog(LOG_ERR, "%s: An Error occured during verification of signature. Stop validation!\n", 
+                                  __FUNCTION__);
+            goto verify_err;
+          case API_BGPSEC_VERIFY_FAILURE:
+            sca_debugLog(LOG_DEBUG, "%s: Signature %d if signer AS%d is invalid - abort further validation! \n", 
+                                    __FUNCTION__, currNum, seg->as);
+            goto verify_err;
+          case API_BGPSEC_VERIFY_SUCCESS:
+            sca_debugLog(LOG_INFO,"BGPSEC Update Verification SUCCESS !!! [Signer AS:%d] \n\n",
+                         seg->as);
+          default:
+            break;            
         }
       }
       else
       {
+        // Even though in OpenSSL a missing key is an error, for SRxCryptoAPI
+        // which follows BGPSEC it is a valid state to not have a particular
+        
         sca_debugLog(LOG_ERR,"Error: %s: keys Not Found\n", __FUNCTION__);
+        status = API_BGPSEC_VERIFY_ERROR;
         goto verify_err;
-        }
+      }
 
       /* next target as concatenation */
       targetAS = seg->as;
@@ -648,9 +670,9 @@ int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** key
       if(keys && *keys)
       {
         if ( API_BGPSEC_VERIFY_SUCCESS!=
-            stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, keys, (number_keys - iter)))
+            (status = stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, keys, (number_keys - iter))))
         {
-          sca_debugLog(LOG_ERR,"Error: %s: bad signature, ignoring\n", __FUNCTION__);
+          sca_debugLog(LOG_ERR,"%s: Failure(status:%d): bad signature, ignoring\n", __FUNCTION__,status);
           goto verify_err;
         }
         else
@@ -662,6 +684,7 @@ int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** key
       else
       {
         sca_debugLog(LOG_ERR,"Error: %s: keys Not Found\n", __FUNCTION__);
+        status = API_BGPSEC_VERIFY_ERROR;
         goto verify_err;
         }
 
@@ -675,7 +698,7 @@ int cl_BgpsecVerify (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** key
 
   } /* end of while */
 
-  return API_BGPSEC_VERIFY_SUCCESS;
+  return status;
 
 verify_err:
   /* release temporary allocated pointer if it was allocated by sca_generateMSG
@@ -684,7 +707,7 @@ verify_err:
   {
     free(sslVerifyData.data);
   }
-  return API_BGPSEC_VERIFY_ERROR;
+  return status;
 
 }
 
@@ -695,9 +718,11 @@ verify_err:
  * @param bpa : bgpsec path attribute info
  * @param prefix: additional information for NLRI
  * @param local_as:  additional information for NLRI
- * @param extCode: 1 - key not found,  0 - invalid
+ * @param extCode:  on input: used for public key id temporarily,
+ *                  on return: 1 - key not found,  0 - invalid
  *
- * @return on success with API_BGPSEC_VERIFY_SUCCESS or on failure with API_BGPSEC_VERIFY_ERROR
+ * @return on success with API_BGPSEC_VERIFY_SUCCESS or on failure(invalid) with API_BGPSEC_VERIFY_FAILURE
+ *          on error with API_BGPSEC_VERIFY_ERROR
  */
 int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u_int8_t* extCode)
 {
@@ -707,18 +732,19 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
     return API_BGPSEC_VERIFY_ERROR;
   }
 
+  int status = API_BGPSEC_VERIFY_ERROR;
+  EC_KEY *ecdsa_key = NULL;
+
   PathSegment   *seg = bpa->pathSegments;
   SigBlock      *sb = bpa->sigBlocks;
   SigSegment    *ss = sb->sigSegments;
 
   static u_int8_t keyID_pub=0;
   struct prefix *p=(struct prefix *)prefix;
-  //struct KeyInfoData *keyInfo = NULL;
-  int currNum =0;
 
-  int psize=0;
-  if(p)
-    psize = PSIZE (p->prefixlen);
+  // calculate current number in array
+  int currNum =0;// it has yet to make mutiple input of ids, so now one by one
+  bool fPrivate= false;
 
   u_int8_t hashbuff[BGPSEC_MAX_SIG_LENGTH + 10 + BGPSEC_AFI_LENGTH];
   size_t hashLen = 0;
@@ -732,6 +758,13 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
 
   /* Validation Routine */
   as_t targetAS = local_as;
+
+  BGPSecSignData sslVerifyData = {
+    .data           = hashbuff,
+    .dataLength     = hashLen,
+    .signature      = ss->signature,
+    .sigLen         = ss->sigLen,
+  };
 
   BGPSecKey *outKeyInfo=NULL;
   u_int16_t num_key = 1; /* single action for now */
@@ -755,23 +788,29 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
        * +-----------------------------------------+
        */
 
-      /* hashbuff */
-      put_u32(hashbuff, targetAS);          // Target AS: MUST be same as number in BGP_OPEN message
-      put_u32(hashbuff+4, seg->as);         // Signer's AS
 
-      *(hashbuff+8) = seg->pCount;      // pCount
-      *(hashbuff+9) = seg->flags;       // Flags
+      /* release temporary allocated pointer if it was allocated by sca_generateMSG
+       * in srxcryptoapi */
+      if(sslVerifyData.data != hashbuff && sslVerifyData.data)
+        free(sslVerifyData.data);
 
-      // most recent sigSegment elements
-      hashLen = 10;
+      sslVerifyData.data           = hashbuff;
+      sslVerifyData.dataLength     = sizeof(hashbuff);
+      sslVerifyData.signature      = ss->signature;
+      sslVerifyData.sigLen         = ss->sigLen;
+
       if(!ss->next)
       {
         sca_debugLog(LOG_ERR,"Error: bad segment arrangement, ignoring\n", __FUNCTION__);
         return API_BGPSEC_VERIFY_ERROR;
       }
-      memcpy(hashbuff + hashLen, ss->next->signature, ss->next->sigLen);
-      hashLen += ss->next->sigLen;
 
+      /* call srx-crypto-api function */
+      sca_generateMSG2(sslVerifyData.data , (u_int8_t*)&sslVerifyData.dataLength,
+          targetAS, seg->as, seg->pCount, seg->flags,
+          ss->next->sigLen, ss->next->signature);
+
+      hashLen = sslVerifyData.dataLength;
 
       if (IS_DEBUG_ENABLED)
       {
@@ -782,48 +821,85 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
         sca_debugLog(LOG_DEBUG,"[IN] ---- current SKI: 0x%s ----\n", skiBuffer);
       }
 
-      BGPSecSignData sslVerifyData = {
-        .data           = hashbuff,
-        .dataLength     = hashLen,
-        .signature      = ss->signature,
-        .sigLen         = ss->sigLen,
-      };
-
       /* find a key amongst the registered key previously */
-      outKeyInfo= (BGPSecKey*) malloc(sizeof(BGPSecKey));
+      // TODO: Later, should be replaced with a set of ids
+      Record_t *out = restoreKeyInfo(fPrivate, (u_int8_t*)ss->ski, seg->as);
 
+      if(out)
+      {
+        outKeyInfo = (BGPSecKey*) malloc(sizeof(BGPSecKey));
       if(!outKeyInfo)
       {
         sca_debugLog(LOG_ERR, "[%s:%d] pubkey info mem allocation failed", __FUNCTION__, __LINE__);
         *extCode = 1;
         goto err;
       }
-      else
-      {
+
         memset(outKeyInfo, 0x0, sizeof(BGPSecKey));
         outKeyInfo->algoID        = BGPSEC_ALGO_ID;
         outKeyInfo->asn           = seg->as;
         memcpy(outKeyInfo->ski, ss->ski, BGPSEC_SKI_LENGTH);
+
+        outKeyInfo->keyLength = (u_int16_t )(((BGPSecKey *)out->data)->keyLength);
+        outKeyInfo->keyData = (u_int8_t *)malloc(((BGPSecKey *)out->data)->keyLength); // this pointer will be freed by caller
+        memcpy(outKeyInfo->keyData, ((BGPSecKey *)out->data)->keyData, ((BGPSecKey *)out->data)->keyLength);
+
+        sca_debugLog (LOG_DEBUG, "[%s] obtain KEY data from pubkey ID: %p\n",
+            __FUNCTION__, (u_int8_t*)outKeyInfo->keyData);
+
+        /* retrieve ec key */
+        ecdsa_key = (EC_KEY *)out->data_eckey;
+        if (!ecdsa_key )
+        {
+          sca_debugLog(LOG_ERR, "fail to retrieve a registered eckey \n");
+        }
       }
 
-      keyID_pub = registerPublicKey(outKeyInfo);
-
-      if(!keyID_pub)
+      if(ecdsa_key)
       {
-        sca_debugLog(LOG_ERR, "[%s:%d] failed to load public key", __FUNCTION__, __LINE__);
-        *extCode = 1; // key not found
+        /* check public key */
+        if(EC_KEY_get0_public_key(ecdsa_key) == NULL)
+        {
+          ECerr(EC_F_ECKEY_PUB_DECODE, ERR_R_EC_LIB);
+          sca_debugLog(LOG_ERR, "EC_KEY_get0_public_key failed \n");
+          *extCode = 1;
+          goto err;
+        }
+        /* check validity of ec key */
+        if (!EC_KEY_check_key(ecdsa_key)) {
+          sca_debugLog(LOG_ERR, "[libcrypto] EC_KEY_check failed: EC key check error\n");
+          *extCode = 1;
+          goto err;
+      }
+
+        sca_debugLog(LOG_INFO, "Verify directly using eckey... \n");
+        unsigned char md[SHA256_DIGEST_LENGTH];
+        cl_BgpsecOctetDigest(sslVerifyData.data, sslVerifyData.dataLength, md);
+        status = cl_BgpsecDoVerifySignature (md, SHA256_DIGEST_LENGTH,
+            ecdsa_key,
+            sslVerifyData.signature,
+            sslVerifyData.sigLen);
+
+        if(status != API_BGPSEC_VERIFY_SUCCESS)
+      {
+          sca_debugLog(LOG_ERR, "+ [libcrypto] Failure at verifying\n");
+          *extCode = 0; // invalid
         goto err;
       }
+        else
+        {
+          sca_debugLog(LOG_INFO,"BGPSEC Update Verification SUCCESS !!! [Signer AS:%d] \n\n",
+              seg->as);
+        }
+      }
 
-      // calculate current number in array
-      currNum = 0;
-
-      if(outKeyInfo && outKeyInfo->keyData)
+      /* in case, the retrieved ec key fails */
+      else if(outKeyInfo && outKeyInfo->keyData)
       {
         if ( API_BGPSEC_VERIFY_SUCCESS!=
-            stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, &outKeyInfo, currNum))
+            (status = stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, &outKeyInfo, currNum)))
         {
-          sca_debugLog(LOG_ERR,"Error: %s: bad signature, ignoring\n", __FUNCTION__);
+          sca_debugLog(LOG_ERR,"%s: Failure(status:%d): bad signature, ignoring\n", __FUNCTION__,status);
           *extCode = 0; // invalid
           goto err;
         }
@@ -837,6 +913,7 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
       {
         sca_debugLog(LOG_ERR,"Error: %s: keys Not Found\n", __FUNCTION__);
         *extCode = 1;
+        status = API_BGPSEC_VERIFY_ERROR;
         goto err;
       }
 
@@ -881,80 +958,114 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
        * +-------------------------------------+
        */
 
-      hashLen = 0;
-      /* hashbuff */
-      put_u32(hashbuff, targetAS);          // Target AS: MUST be same as number in BGP_OPEN message
-      put_u32(hashbuff+4, seg->as);         // Origin AS
-      sca_debugLog(LOG_INFO,"[IN]:%d -- Target AS:%d Origin AS: %d \n", __LINE__, targetAS, seg->as);
-      sca_debugLog(LOG_INFO,"[IN] prefixlen:%d psize:%d  p.u.prefix:%08x prefix4:%08x\n",
-                                p->prefixlen, psize, p->u.prefix, p->u.prefix4);
-      *(hashbuff+8) = seg->pCount;                 // pCount
-      *(hashbuff+9) = seg->flags;                  // Flags
-      hashbuff[10] = sb->algoSuiteId;             // Algorithm Suite Id
-      hashbuff[11] = 0;
-      hashbuff[12] = 1; // AFI
-      hashbuff[13] = 1; // SAFI
-      hashbuff[14] = p->prefixlen;                 // NLRI length
-      memcpy(hashbuff+15, &p->u.prefix, psize);    // NLRI prefix
-      hashLen = 15 + psize;
-#ifdef HAVE_IPV6
-      //TODO: detect IPv6 capability
-      if(p->family == AF_INET6)
-      {
-        hashbuff[hashLen] = (p->family == AF_INET6) ? AFI_IP6 : AFI_IP;   // AFI
-        hashLen += BGPSEC_AFI_LENGTH;
-      }
-#endif /* HAVE_IPV6 */
 
+      /* release temporary allocated pointer if it was allocated by sca_generateMSG
+       * in srxcryptoapi */
+      if(sslVerifyData.data != hashbuff && sslVerifyData.data)
+        free(sslVerifyData.data);
+
+      sslVerifyData.data           = hashbuff;
+      sslVerifyData.dataLength     = sizeof(hashbuff);
+      sslVerifyData.signature      = ss->signature;
+      sslVerifyData.sigLen         = ss->sigLen;
+
+      /* call srx-crypto-api function */
+      sca_generateMSG1(sslVerifyData.data, (u_int8_t*)&sslVerifyData.dataLength,
+          targetAS, seg->as,
+          seg->pCount, seg->flags, sb->algoSuiteId, AFI_IP, SAFI_UNICAST,
+          p->prefixlen, &p->u.prefix);
+
+      hashLen = sslVerifyData.dataLength;
 
       if (IS_DEBUG_ENABLED)
       {
-        sca_debugLog(LOG_DEBUG,"[IN]:%d ---- HASH recv for Origin [total length: %d] ----\n", __LINE__, hashLen);
+        sca_debugLog(LOG_DEBUG,"[IN] %s:%d ---- HASH recv for Origin [total length: %d] ----\n",
+            __FUNCTION__,__LINE__, hashLen);
         printHex(hashLen, hashbuff);
         char skiBuffer[BGPSEC_SKI_LENGTH * 2 + 1];
         GEN_SKI_ASCII(skiBuffer, ss->ski, BGPSEC_SKI_LENGTH);
         sca_debugLog(LOG_DEBUG,"[IN] ---- current SKI: 0x%s ----\n", skiBuffer);
       }
 
-      BGPSecSignData sslVerifyData = {
-        .data           = hashbuff,
-        .dataLength     = hashLen,
-        .signature      = ss->signature,
-        .sigLen         = ss->sigLen,
-      };
-
       /* find a key amongst the registered key previously */
-      outKeyInfo= (BGPSecKey*) malloc(sizeof(BGPSecKey));
+      // TODO: Later, should be replaced with a set of ids
+      Record_t *out = restoreKeyInfo(fPrivate, (u_int8_t*)ss->ski, seg->as);
 
+      if(out)
+      {
+      outKeyInfo= (BGPSecKey*) malloc(sizeof(BGPSecKey));
       if(!outKeyInfo)
       {
         sca_debugLog(LOG_ERR, "[%s:%d] pubkey info mem allocation failed", __FUNCTION__, __LINE__);
         *extCode = 1;
         goto err;
       }
-      else
-      {
+
         memset(outKeyInfo, 0x0, sizeof(BGPSecKey));
         outKeyInfo->algoID        = BGPSEC_ALGO_ID;
         outKeyInfo->asn           = seg->as;
         memcpy(outKeyInfo->ski, ss->ski, BGPSEC_SKI_LENGTH);
+
+        outKeyInfo->keyLength = (u_int16_t )(((BGPSecKey *)out->data)->keyLength);
+        outKeyInfo->keyData = (u_int8_t *)malloc(((BGPSecKey *)out->data)->keyLength); // this pointer will be freed by caller
+        memcpy(outKeyInfo->keyData, ((BGPSecKey *)out->data)->keyData, ((BGPSecKey *)out->data)->keyLength);
+
+        sca_debugLog (LOG_DEBUG, "[%s] obtain KEY data from pubkey ID: %p\n",
+            __FUNCTION__, (u_int8_t*)outKeyInfo->keyData);
+
+        /* retrieve ec key */
+        ecdsa_key = (EC_KEY *)out->data_eckey;
+        if (!ecdsa_key )
+        {
+          sca_debugLog(LOG_ERR, "fail to retrieve a registered eckey \n");
+        }
       }
 
-      keyID_pub = registerPublicKey(outKeyInfo);
-
-      if(!keyID_pub)
+      if(ecdsa_key)
       {
-        sca_debugLog(LOG_ERR, "[%s:%d] failed to load public key", __FUNCTION__, __LINE__);
-        *extCode = 1; // key not found
+        /* check public key */
+        if(EC_KEY_get0_public_key(ecdsa_key) == NULL)
+        {
+          ECerr(EC_F_ECKEY_PUB_DECODE, ERR_R_EC_LIB);
+          sca_debugLog(LOG_ERR, "EC_KEY_get0_public_key failed \n");
+          *extCode = 1;
+          goto err;
+        }
+        /* check validity of ec key */
+        if (!EC_KEY_check_key(ecdsa_key)) {
+          sca_debugLog(LOG_ERR, "[libcrypto] EC_KEY_check failed: EC key check error\n");
+          *extCode = 1;
+          goto err;
+      }
+
+        sca_debugLog(LOG_INFO, "Verify directly using eckey... \n");
+        unsigned char md[SHA256_DIGEST_LENGTH];
+        cl_BgpsecOctetDigest(sslVerifyData.data, sslVerifyData.dataLength, md);
+        status = cl_BgpsecDoVerifySignature (md, SHA256_DIGEST_LENGTH,
+            ecdsa_key,
+            sslVerifyData.signature,
+            sslVerifyData.sigLen);
+
+        if(status != API_BGPSEC_VERIFY_SUCCESS)
+      {
+          sca_debugLog(LOG_ERR, "+ [libcrypto] Failure at verifying\n");
+          *extCode = 0; // invalid
         goto err;
       }
+        else
+        {
+          sca_debugLog(LOG_INFO,"BGPSEC Update Verification with key SUCCESS !!! [Origin AS:%d] \n\n",
+              seg->as);
+        }
+      }
 
-      if(outKeyInfo && outKeyInfo->keyData)
+      /* in case, the retrieved ec key fails */
+      else if(outKeyInfo && outKeyInfo->keyData)
       {
         if ( API_BGPSEC_VERIFY_SUCCESS!=
-            stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, &outKeyInfo, (num_key - iter)))
+            (status = stcl_BgpsecVerifySignatureSSL_withKeyInfo(&sslVerifyData, &outKeyInfo, currNum)))
         {
-          sca_debugLog(LOG_ERR,"Error: %s: bad signature, ignoring\n", __FUNCTION__);
+          sca_debugLog(LOG_ERR,"%s: Failure(status:%d): bad signature, ignoring\n", __FUNCTION__,status);
           *extCode = 0; // invalid
           goto err;
         }
@@ -968,6 +1079,7 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
       {
         sca_debugLog(LOG_ERR,"Error: %s: keys Not Found\n", __FUNCTION__);
         *extCode = 1;
+        status = API_BGPSEC_VERIFY_ERROR;
         goto err;
       }
 
@@ -994,7 +1106,7 @@ int cl_ExtBgpsecVerify (BgpsecPathAttr *bpa, void *prefix, u_int32_t local_as, u
   } /* end of while */
 
 
-  return API_BGPSEC_VERIFY_SUCCESS;
+  return status;
 
 err:
   /* release parameter resources */
@@ -1009,10 +1121,14 @@ err:
     outKeyInfo = NULL;
   }
 
-  if (*extCode == 1)
-    return API_BGPSEC_VERIFY_FAILURE;
-  else
-    return API_BGPSEC_VERIFY_ERROR;
+  /* TODO: this ec key should be removed at unregisterKey or somewhere else
+  if (ecdsa_key)
+  {
+    EC_KEY_free(ecdsa_key);
+    ecdsa_key = NULL;
+  }
+  */
+  return status;
 }
 
 
@@ -1027,6 +1143,7 @@ err:
  * @param local_as:  additional information for NLRI
  *
  * @return an int value from the function cl_BgpsecVerify
+ *  (API_BGPSEC_VERIFY_SUCCESS/API_BGPSEC_VERIFY_ERROR/API_BGPSEC_VERIFY_FAILURE)
  */
 int validate (BgpsecPathAttr *bpa, u_int16_t number_keys, BGPSecKey** keys, void *prefix,
                 u_int32_t local_as)
@@ -1220,17 +1337,18 @@ unsigned char* cl_BgpsecOctetDigest(const unsigned char* octet, unsigned int oct
 /**
  * caller for hash input function
  *
- * @param record    UTHASH record instance
+ * @param fPrivate  UTHASH for private key or public key
  * @param ec_key    ecdsa key used as data instance of record
  * @param ski
  * @param asn
  * @param inKey     input key parameter
  * @param outKeyData duplicated variable and maintained in the hash storage
+ * @param filter    id bound filter
  *
  * @return  id number or -1 on error
  */
-int inputKeyInfo(Record_t *record, EC_KEY* ec_key, u_int8_t* ski, u_int32_t asn,
-                 BGPSecKey* inKey, void** outKeyData)
+int inputKeyInfo(bool fPrivate, EC_KEY* ec_key, u_int8_t* ski, u_int32_t asn,
+                 BGPSecKey* inKey, void** outKeyData, unsigned int filter)
 {
 
   unsigned int id=0;
@@ -1269,24 +1387,38 @@ int inputKeyInfo(Record_t *record, EC_KEY* ec_key, u_int8_t* ski, u_int32_t asn,
 
   new->key.asn = asn;
   new->ski = malloc(SKI_LENGTH);
+  new->data_eckey = (void*)ec_key;
 
   if (new->ski != NULL)
   {
     memcpy(new->ski, ski, SKI_LENGTH);
-
     new->data = (void*)bsKeyInfo;
 
+    /* different hash storage according to a key */
+    Record_t *head;
+    if(fPrivate)
+    {
     HASH_ADD(hh, g_records, key, sizeof(DataKey_t), new);
+      head = g_records;
+    }
+    else
+    {
+      HASH_ADD(hh, g_records_pub, key, sizeof(DataKey_t), new);
+      head = g_records_pub;
+    }
 
     id = new->hh.hashv;
+    filter = filter > (((head)->hh.tbl->num_buckets) -1) ?
+      (((head)->hh.tbl->num_buckets) -1) : filter;
+
     sca_debugLog (LOG_DEBUG,"[%s:%d] ski: %p\n",
                   __FUNCTION__, __LINE__, new->ski);
     sca_debugLog (LOG_DEBUG, "[%s] new data (bgpsec key): %p Total num of data:%d\n",
-                  __FUNCTION__, bsKeyInfo, (g_records)->hh.tbl->num_items);
-    sca_debugLog (LOG_DEBUG," number of bucket:%d  hashv:%x\n", (g_records)->hh.tbl->num_buckets, new->hh.hashv);
-    sca_debugLog (LOG_DEBUG," ha_bkt(id): %x\n", (new->hh.hashv) & (((g_records)->hh.tbl->num_buckets) -1) );
+        __FUNCTION__, bsKeyInfo, (head)->hh.tbl->num_items);
+    sca_debugLog (LOG_DEBUG," number of bucket:%d  hashv:%x\n", (head)->hh.tbl->num_buckets, new->hh.hashv);
+    sca_debugLog (LOG_DEBUG," ha_bkt(id): %x\n", (new->hh.hashv) & (((head)->hh.tbl->num_buckets) -1) );
 
-    return (id & (ID_NUM_MAX-1)) ;
+    return (id & filter) ;
   }
 
 err:
@@ -1300,13 +1432,13 @@ err:
 /**
  * caller function for hash-find function
  *
- * @param record    UTHASH record instance
+ * @param fPrivate  UTHASH for private key or public key
  * @param ski
  * @param asn
  *
  * @return Record_t hash object or NULL on error
  */
-Record_t* restoreKeyInfo(u_int8_t* ski, u_int32_t asn)
+Record_t* restoreKeyInfo(bool fPrivate, u_int8_t* ski, u_int32_t asn)
 {
   BGPSecKey *outKeyInfo =NULL;
 
@@ -1316,7 +1448,14 @@ Record_t* restoreKeyInfo(u_int8_t* ski, u_int32_t asn)
   sca_debugLog (LOG_DEBUG, "[%s:%d] given ski:%02x asn:%ld\n",
       __FUNCTION__, __LINE__, *ski, asn);
 
+  if(fPrivate)
+  {
   HASH_FIND(hh, g_records, &temp.key, sizeof(DataKey_t), out);
+  }
+  else
+  {
+    HASH_FIND(hh, g_records_pub, &temp.key, sizeof(DataKey_t), out);
+  }
 
   if(out)
   {
@@ -1347,18 +1486,20 @@ Record_t* restoreKeyInfo(u_int8_t* ski, u_int32_t asn)
 /**
  * caller function for hash-find function with using id info
  *
+ * @param fPrivate  UTHASH for private key or public key
  * @param ski
  * @param asn
  * @param id    hash id
  *
  * @return Record_t hash object or NULL on error
  */
-Record_t* restoreKeyInfo_withID(u_int8_t* ski, u_int32_t asn, u_int32_t id)
+Record_t* restoreKeyInfo_withID(bool fPrivate, u_int8_t* ski, u_int32_t asn, u_int32_t id)
 {
 
   Record_t *s;
+  s = fPrivate ? g_records: g_records_pub;
 
-  for(s= g_records; s!=NULL; s=(Record_t*)(s->hh.next))
+  for(s; s!=NULL; s=(Record_t*)(s->hh.next))
   {
     if (s->key.asn == asn && cmpSKI(s->ski, ski))
     {
@@ -1398,7 +1539,7 @@ BGPSecKey * hashKey_get_BGPSecKey(u_int32_t asn, u_int8_t* ski)
     return NULL;
   }
 
-  rec = restoreKeyInfo(ski, asn);
+  rec = restoreKeyInfo(0, ski, asn);
   if (rec)
   {
     tmpBsKey = (BGPSecKey *)rec->data;
@@ -1427,6 +1568,7 @@ u_int8_t registerPrivateKey(BGPSecKey* outKey)
   EC_KEY    *ec_key=NULL;
   Record_t *rec=NULL;
   //BGPSecKey* bsKeyInfo = NULL;
+  bool      fPrivate=true;
 
   if(!outKey )
   {
@@ -1450,7 +1592,7 @@ u_int8_t registerPrivateKey(BGPSecKey* outKey)
    * first try to find if already existed or not.
    * otherwise, proceed to register
    */
-  rec = restoreKeyInfo(ski, asn);
+  rec = restoreKeyInfo(fPrivate, ski, asn);
   if(rec)
   {
     ret_hash_id = (rec->hh.hashv & (ID_NUM_MAX-1));
@@ -1499,7 +1641,7 @@ u_int8_t registerPrivateKey(BGPSecKey* outKey)
 
   /* register key info into hash */
   void *outKeyData = NULL;
-  int retVal= inputKeyInfo(g_records, ec_key, ski, asn, outKey, &outKeyData);
+  int retVal= inputKeyInfo(fPrivate, ec_key, ski, asn, outKey, &outKeyData, (ID_NUM_MAX-1));
   if(retVal == -1)
   {
     ret_hash_id = 0; //error
@@ -1542,6 +1684,7 @@ u_int8_t registerPublicKey(BGPSecKey* outKey)
   u_int8_t  ret_hash_id=0;
   EC_KEY    *ec_key=NULL;
   Record_t  *rec=NULL;
+  bool      fPrivate=false;
 
   sca_debugLog(LOG_DEBUG, "+ [libcrypto]  registerPublicKey called \n");
 
@@ -1567,7 +1710,7 @@ u_int8_t registerPublicKey(BGPSecKey* outKey)
    * first try to find if already existed or not.
    * otherwise, proceed to register
    */
-  rec = restoreKeyInfo(ski, asn);
+  rec = restoreKeyInfo(fPrivate, ski, asn);
   if(rec)
   {
     ret_hash_id = (rec->hh.hashv & (ID_NUM_MAX-1));
@@ -1636,7 +1779,7 @@ u_int8_t registerPublicKey(BGPSecKey* outKey)
 
   /* register key info into hash */
   void *outKeyData = NULL;
-  int retVal= inputKeyInfo(g_records, ec_key, ski, asn, outKey, &outKeyData);
+  int retVal= inputKeyInfo(fPrivate, ec_key, ski, asn, outKey, &outKeyData, UINT_MAX);
   if(retVal == -1)
   {
     ret_hash_id = 0; //error
@@ -1652,7 +1795,7 @@ u_int8_t registerPublicKey(BGPSecKey* outKey)
   }
 
 
-  /* store the key into key array */
+  /*  TODO: store the key into key array */
 #if 0 // ret_hash_id once duplicated, so that it need to have a better mechanism to store
   stEnbuf_Eckey[ret_hash_id].id     = ret_hash_id;
   stEnbuf_Eckey[ret_hash_id].ec_key = (void*)ec_key;
@@ -1668,8 +1811,33 @@ u_int8_t registerPublicKey(BGPSecKey* outKey)
 
 }
 
+/**
+ * @ remove public key data in uthash
+ *
+ * @param key  uthash key parameter to find
+ *
+ * @return 0: failure, 1: success
+ */
 int unregisterPublicKey(BGPSecKey* key)
 {
+  BGPSecKey *tmpBsKey   = NULL;
+
+  /* Remove from uthash */
+  Record_t *s;
+  for(s= g_records; s!=NULL; s=(Record_t *)(s->hh.next))
+  {
+    tmpBsKey = s->data;
+    if( memcmp(key->keyData, tmpBsKey->keyData, tmpBsKey->keyLength) == 0)
+    {
+      sca_debugLog(LOG_INFO, "+ [libcrypto][%s:%d] HASH record removing \n", __FUNCTION__, __LINE__);
+      sca_debugLog (LOG_DEBUG," === Item Found to be deleted === id:%x keyData:%p\n",
+          s->hh.hashv, tmpBsKey->keyData);
+      //deleteKeyInfo(s);
+      HASH_DEL(g_records_pub,  s);
+      free(s);
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -1715,7 +1883,7 @@ int deleteKeyInfo(Record_t *rec)
 }
 
 /**
- * API method function for unregisterKey
+ * API method function for unregisterKey  -- Now this one is DEPRECATED
  *
  * @param ski
  * @param asn
@@ -1737,7 +1905,7 @@ u_int32_t unregisterKey (u_int8_t* ski, u_int32_t asn, u_int32_t keyID)
   BGPSecKey *bsKey = NULL;
 
 
-  rec = restoreKeyInfo(ski, asn);
+  rec = restoreKeyInfo(0, ski, asn);
   if(rec)
   {
     bsKey = (BGPSecKey *)rec->data;
@@ -1970,7 +2138,7 @@ int isPrivateKeyStorage()
  * @param len the buffer length
  * @param buff the buffer to be printed out.
  */
-inline void printHex(int len, unsigned char* buff)
+__attribute__((always_inline)) inline void printHex(int len, unsigned char* buff)
 {
   int i;
   for(i=0; i < len; i++ )

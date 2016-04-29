@@ -19,10 +19,12 @@
  * BGPSEC implementations. This library allows to switch the crypto 
  * implementation dynamically.
  *
- * @version 0.1.2.1
+ * @version 0.1.3.0
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.1.3.0 - 2016/04/15 - oborchert
+ *             * Added prefix structure SCA_Prefix
  *   0.1.2.1 - 2016/02/03 - oborchert
  *             * Fixed incorrect date in Changelog
  *             * Added version number
@@ -58,6 +60,7 @@
 #include <sys/param.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <netinet/in.h>
 
 /** SCA Method return value */
 #define API_SUCCESS          1
@@ -148,7 +151,23 @@ typedef struct
   u_int16_t keyLength;
   /** The key in DER format */
   u_int8_t* keyData;
-} BGPSecKey;
+} __attribute__((packed)) BGPSecKey;
+
+/**
+ * Prefix Structure used within the functions.
+ */
+typedef struct
+{
+  u_int16_t afi;
+  u_int8_t  safi;
+  u_int8_t  length;
+  union
+  {
+    struct in_addr  ipV4;
+    struct in6_addr ipV6;
+    u_int8_t ip[16];
+  } addr;
+} __attribute__((packed)) SCA_Prefix;
 
 /* Parameter structure for using validation request and Signing request.
  * It will be used for structured data which includes the hash information
@@ -202,6 +221,7 @@ typedef struct
    */
   int (*validate)(BgpsecPathAttr* bgpsec_path, u_int16_t number_keys,
                   BGPSecKey** keys, void *prefix, u_int32_t localAS );
+  // @TODO: BZ 903: replace void* prefix with SCA_Prefix* prefix
 
   /**
    * Perform BGPSEC path validation. (Optional) This function uses the list of

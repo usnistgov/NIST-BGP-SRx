@@ -1,6 +1,14 @@
 More details on changes are scripted in the files itself.
 ===========================================================
 
+Version 0.1.3.0 - March-April 2016
+  - modified structure BGPSecKey to be packed
+  - added prefix structure SCA_Prefix
+Version 0.1.2.2 - March 2016
+  - Modified memory management in sca_generateMSG1 and sca_generateMSG2 to 
+    prevent a memory leak.
+  - Added NULL check to srxCryptoUnbind
+  - Modified configure.ac merging code to distinguish between 32 and 64 bit
 Version 0.1.2.1 - January-March 2016
   - Added init method (missing in 0.1.2.0)
   - Fixed bugs
@@ -28,7 +36,6 @@ Version 0.1.2.0 - September-December 2015
     Kept backwards compatibility with key filenames. PEM=.key, DER=.der
     The PEM keys are used for srxCryptoAPI 0.1.1.1, all others will use the
     DER encoding.
- 
 Version 0.1.1.1 - Arpil 2015
   - Fixed bug in configuration that could cause memory issues
   - Fixed linking problems on Ubuntu systems

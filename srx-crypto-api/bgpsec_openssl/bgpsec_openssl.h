@@ -21,7 +21,9 @@
  *
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.2.1 - 2016/02/09 - oborchert
+ *   0.1.2.1 - 2016/03/11 - kyehwanl
+ *             * complement ExtBgpsecVerify function with using pubkey ids
+ *           - 2016/02/09 - oborchert
  *             * removed key loading functions, code is provided by srxcryptoapi
  *           - 2016/02/04 - kyehwanl
  *             * deprecated codes removed
@@ -186,6 +188,7 @@ typedef struct {
   DataKey_t key;
   u_int8_t* ski;
   void *data;
+  void *data_eckey;
   UT_hash_handle hh;
 } Record_t;
 

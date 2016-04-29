@@ -22,8 +22,13 @@
  *
  * File contains methods to test API.
  * 
+ * @version 0.1.2.2
+ * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.1.2.2 - 2016/03/25 - oborchert
+ *             * Fixed BZ898 which caused the test tool not to read the provided
+ *               configuration file.
  *   0.1.2.0 - 2015/12/01 - oborchert
  *             * Removed unused header bgpsec_openssl/bgpsec_openssh.h
  *           - 2015/11/03 - oborchert
@@ -441,7 +446,7 @@ static void _checkParams(int argc, char** argv, SRxCryptoAPI* crypto)
           {
             case 'c' : 
               idx++;
-              if (argc < idx )
+              if (idx < argc) // flipped variables BZ898
               {
                 crypto->configFile = argv[idx];
               }

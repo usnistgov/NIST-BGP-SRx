@@ -25,41 +25,47 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @Version 0.1.2.1
+ * @Version 0.1.2.2
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.2.1 - 2016/02/03 - oborchert
- *             * Fixed BUG in mapping printout (BZ836)
- *             * Fixed bug in misinterpretation of init value.
- *           - 2016/02/01 - oborchert
- *             * added init method
- *   0.1.2.0 - 2016/01/13 - oborchert
- *             * added some more inline documentation 
- *           - 2015/12/03 - oborchert
- *             * moved srxcryptoapi.h into srx folder
- *           - 2015/11/03 - oborchert
- *             * Removed ski and algoID from struct BGPSecSignData, both data
- *               fields are part of the BGPSecKey structure. (BZ795)
- *             * modified function signature of sign_with_id (BZ788)
- *           - 2015/10/13 - oborchert
- *             * Fixed invalid method srxCryptoUnbind - previous interface did
- *               not ask for api object.
- *             * Modified srxCrytpoInit to only return failure if binding of
- *               the library failed.
- *           - 2015/09/22 - oborchert
- *             * added functions:
- *               > sca_getCurrentLogLevel
- *               > sca_SetDER_Ext - For private key
- *               > sca_SetX90_ext - For public key
- *             * Removed term_debug
- *             * Restructured initialization code and moved configuration and
- *               mapping into their respective methods.
- *             * Added configuration for key file extensions.
- *           - 2015/09/22 - oborchert
- *             * Added ChangeLog to file.
- *             * Return 0 for srxCryptoInit method when API is NULL.
- *             * Removed BIO_snprintf
+ *  0.1.2.2 - 2016/03/22 - oborchert
+ *            * modified memory management in functions sca_generateMSG1 and
+ *              sca_generateMSG2 by using realloc in lieu of malloc when 
+ *              modifying the provided buffer (buff) to prevent a memory leak.
+ *          - 2016/03/09 - oborchert
+ *            * added NULL check to srxCryptoUnbind
+ *  0.1.2.1 - 2016/02/03 - oborchert
+ *            * Fixed BUG in mapping printout (BZ836)
+ *            * Fixed bug in misinterpretation of init value.
+ *          - 2016/02/01 - oborchert
+ *            * added init method
+ *  0.1.2.0 - 2016/01/13 - oborchert
+ *            * added some more inline documentation 
+ *          - 2015/12/03 - oborchert
+ *            * moved srxcryptoapi.h into srx folder
+ *          - 2015/11/03 - oborchert
+ *            * Removed ski and algoID from struct BGPSecSignData, both data
+ *              fields are part of the BGPSecKey structure. (BZ795)
+ *            * modified function signature of sign_with_id (BZ788)
+ *          - 2015/10/13 - oborchert
+ *            * Fixed invalid method srxCryptoUnbind - previous interface did
+ *              not ask for api object.
+ *            * Modified srxCrytpoInit to only return failure if binding of
+ *              the library failed.
+ *          - 2015/09/22 - oborchert
+ *            * added functions:
+ *              > sca_getCurrentLogLevel
+ *              > sca_SetDER_Ext - For private key
+ *              > sca_SetX90_ext - For public key
+ *            * Removed term_debug
+ *            * Restructured initialization code and moved configuration and
+ *              mapping into their respective methods.
+ *            * Added configuration for key file extensions.
+ *          - 2015/09/22 - oborchert
+ *            * Added ChangeLog to file.
+ *            * Return 0 for srxCryptoInit method when API is NULL.
+ *            * Removed BIO_snprintf
  */
 #include <syslog.h>
 #include <libconfig.h>
@@ -901,33 +907,36 @@ int srxCryptoInit(SRxCryptoAPI* api)
  */
 int srxCryptoUnbind(SRxCryptoAPI* api)
 {
-  if (api->libHandle != NULL)
+  if (api != NULL)
   {
-    // free errors from library
+    if (api->libHandle != NULL)
+    {
+      // free errors from library
 #if HAVE_LTDL_H
-    lt_dlerror();
+      lt_dlerror();
 
-    if (ltdl == 0)
-    {
-      if (api->libHandle != 0)
+      if (ltdl == 0)
       {
-        lt_dlclose(api->libHandle);
+        if (api->libHandle != 0)
+        {
+          lt_dlclose(api->libHandle);
+        }
+        lt_dlexit();
       }
-      lt_dlexit();
-    }
-    module = 0;
+      module = 0;
 #else
-    dlerror();
-    if (dlclose(api->libHandle) != 0)
-    {
-      sca_debugLog(LOG_WARNING, "Unbinding of SRxCryptoAPI plugin seems to have"
-                                " caused some issues!");
-    }
+      dlerror();
+      if (dlclose(api->libHandle) != 0)
+      {
+        sca_debugLog(LOG_WARNING, "Unbinding of SRxCryptoAPI plugin seems to have"
+                                  " caused some issues!");
+      }
 #endif
-  }
+    }
 
-  // NULL the complete API
-  memset (api, 0, sizeof(SRxCryptoAPI));
+    // NULL the complete API
+    memset (api, 0, sizeof(SRxCryptoAPI));
+  }
 
   return 0;
 }
@@ -1101,8 +1110,10 @@ long sca_getCurrentLogLevel()
  * Generate the message for the hash generation for the initial segment for
  * protocol draft 13
  *
- * @param buff The buffer to be used or NULL - In the later case a new buffer
- *             will be allocated using malloc
+ * @param buff The buffer to be used or NULL - In the later case or if the given 
+ *             buffer is of insufficient size, either a new buffer will be 
+ *             allocated or the existing buffer will be extended, both using 
+ *             realloc.
  * @param blen IN/OUT for IN the size of buff, for OUT, the number of bytes used
  *             in buff which might be the total length of buff or less.s
  * @param targetAS The next AS to send the update to
@@ -1132,7 +1143,7 @@ u_int8_t* sca_generateMSG1(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS,
 
     if (buff == NULL || *blen < neededLen)
     {
-      buff = malloc(neededLen);
+      buff = (u_int8_t*)realloc(buff, neededLen);
     }
     memset(buff, 0, neededLen);
     TplHash1* hash1 = (TplHash1*)buff;
@@ -1164,8 +1175,10 @@ u_int8_t* sca_generateMSG1(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS,
  * Generate the message for the hash generation for the intermediate segment for
  * protocol draft 13
  *
- * @param buff The buffer to be used or NULL - In the later case a new buffer
- *             will be allocated using malloc.
+ * @param buff The buffer to be used or NULL - In the later case or if the given 
+ *             buffer is of insufficient size, either a new buffer will be 
+ *             allocated or the existing buffer will be extended, both using 
+ *             realloc.
  * @param buffLen The length of the input buffer (only used if buff != NULL)
  * @param targetAS The next AS to send the update to.
  * @param originAS The origin AS.
@@ -1187,7 +1200,7 @@ u_int8_t* sca_generateMSG2(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS,
   {
     if (buff == NULL || *blen < neededLen)
     {
-      buff = malloc(neededLen);
+      buff = (u_int8_t*)realloc(buff, neededLen);
     }
     memset(buff, 0, neededLen);
 

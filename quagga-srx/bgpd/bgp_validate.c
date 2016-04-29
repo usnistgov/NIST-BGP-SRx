@@ -143,6 +143,7 @@ void bgpsec_path_attr_init (void)
   g_capi->sign_with_id = NULL;
   g_capi->sign_with_key = NULL;
   g_capi->validate = NULL;
+  g_capi->isExtended = NULL;
   if(srxCryptoInit(g_capi) == 0)
   {
     zlog_err("[BGPSEC] SRxCryptoAPI not initialized!\n");
@@ -521,7 +522,7 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
     /* Fetch prefix length. */
     p.prefixlen = *pnt++;
     psize = PSIZE (p.prefixlen);
-//    bgp_size_t nlri_len = mp_update->length;
+//  bgp_size_t nlri_len = mp_update->length;
 
     /* Fetch prefix from NLRI packet. */
     memcpy (&p.u.prefix, pnt, psize);
@@ -571,8 +572,9 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
   struct PathSegment *seg;
   struct SigBlock *sb;
   struct SigSegment *ss;
-  static u_int8_t keyID_pub=0;
 
+  u_int8_t keyID_pub=0;
+  u_int8_t fEnablePubKeyValidate=0;
   /*
    * If this is the originating AS
    */
@@ -625,16 +627,14 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
       goto ValidateFail;
     }
 
-#define VERIFY_WITH_KEY_ENABLED
-#ifdef VERIFY_WITH_KEY_ENABLED
     /*
      * Register Public Key information
      */
     outKeyInfo= (BGPSecKey*) malloc(sizeof(BGPSecKey));
     if(!outKeyInfo)
     {
-      if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-        zlog_err("[%s:%d] pubkey info mem allocation failed", __FUNCTION__, __LINE__);
+      if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+        zlog_err("[IN] [%s:%d] pubkey info mem allocation failed", __FUNCTION__, __LINE__);
     }
     else
     {
@@ -652,8 +652,8 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
         /* load key info for pubkey in forms of DER */
         if(sca_loadKey(outKeyInfo, 0 /* pubkey */) == 0)
         {
-          if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-            zlog_err("[%s:%d] failed to load pubkey", __FUNCTION__, __LINE__);
+          if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+            zlog_err("[IN] [%s:%d] failed to load pubkey", __FUNCTION__, __LINE__);
           outKeyInfo->keyData = NULL;
           outKeyInfo->keyLength = 0;
         }
@@ -661,24 +661,40 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
         /* once again to register */
         keyID_pub = g_capi->registerPublicKey(outKeyInfo);
       }
+      else
+      {
+        fEnablePubKeyValidate = 1;
+      }
 
-      if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       {
         if(outKeyInfo && outKeyInfo->keyData)
-          zlog_debug("[OUT] out key: %p, pkey pub key:%p(len:%d) key_id:%x", \
+          zlog_debug("[IN] out key: %p, pkey pub key:%p(len:%d) key_id:%x", \
               outKeyInfo, outKeyInfo->keyData, outKeyInfo->keyLength, keyID_pub - RET_ID_OFFSET);
       }
     }
-#endif /* end VERIFY_WITH_KEY_ENABLED */
 
 
     /* perform validation */
-    if(outKeyInfo && outKeyInfo->keyData)
+    if(!fEnablePubKeyValidate && outKeyInfo && outKeyInfo->keyData)
     {
       if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
         zlog_debug("[%s:%d] calling validation function with keys ", __FUNCTION__, __LINE__);
 
       if( g_capi->validate((BgpsecPathAttr*)bpa, num_key, &outKeyInfo, &p, peer->local_as) != BGPSEC_VERIFY_SUCCESS)
+      {
+        *errCode = BGPSEC_VERIFY_ERROR;
+        goto ValidateFail;
+      }
+    }
+    else if(fEnablePubKeyValidate && g_capi->isExtended && g_capi->isExtended())
+    {
+      if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+        zlog_debug("[%s:%d] calling Extended validation function WITH id ", __FUNCTION__, __LINE__);
+
+      u_int8_t extCode;
+      /* call the library function --> cl_ExtBgpsecVerify */
+      if( g_capi->extValidate((BgpsecPathAttr*)bpa, &p, peer->local_as, &extCode) != BGPSEC_VERIFY_SUCCESS)
       {
         *errCode = BGPSEC_VERIFY_ERROR;
         goto ValidateFail;
@@ -780,6 +796,12 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
 
       stream_get(ss->ski, s, BGPSEC_SKI_LENGTH);    // SKI
       ss->sigLen           = stream_getw(s);        // Signature Length
+
+      if (STREAM_READABLE(s) < ss->sigLen)          // bounds check
+      {
+        zlog_err("Bad bgpsec signautre length: bigger than remaining byte");
+        return NULL;                                // syntatic check failed
+      }
       ss->signature = signature_new(ss->sigLen);
       stream_get(ss->signature, s, ss->sigLen);     // signauture
 
@@ -799,7 +821,6 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
     memset(arrOutKeyInfo, 0, numSecurePathSegment * sizeof(BGPSecKey*));
     int idx=0; u_int32_t keyCnt=0;
 
-#ifdef VERIFY_WITH_KEY_ENABLED
     /* key retrieve and register */
     iter = numSecurePathSegment;                // reset iterration
     struct PathSegment *tmp_ps = head;          // head of path segment
@@ -827,20 +848,25 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
         /* load key info for pubkey in forms of DER */
         if(sca_loadKey(arrOutKeyInfo[idx], 0 /* pubkey */) == 0)
         {
-          if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+          if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
             zlog_err("[%s:%d] failed to load pubkey", __FUNCTION__, __LINE__);
           arrOutKeyInfo[idx]->keyData = NULL;
           arrOutKeyInfo[idx]->keyLength = 0;
         }
         /* once again to register */
+        // TODO: pub key ids also should be stored as a list
         keyID_pub = g_capi->registerPublicKey(arrOutKeyInfo[idx]);
+      }
+      else
+      {
+        fEnablePubKeyValidate = 1;
       }
 
       /* debugging */
-      if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       {
         if(arrOutKeyInfo[idx] && arrOutKeyInfo[idx]->keyData)
-          zlog_debug("[OUT] out key: %p, pkey pub key:%p(len:%d) key_id:%x", \
+          zlog_debug("[IN] out key: %p, pkey pub key:%p(len:%d) key_id:%x", \
               arrOutKeyInfo[idx], arrOutKeyInfo[idx]->keyData, arrOutKeyInfo[idx]->keyLength, \
               keyID_pub - RET_ID_OFFSET);
       }
@@ -856,7 +882,6 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
       keyCnt++;
 
     } /* end of while */
-#endif /* end VERIFY_WITH_KEY_ENABLED */
 
 
     /* call the library function --> bgpsecVerify */
@@ -883,14 +908,32 @@ struct BgpsecPathAttr * bgpsec_parse(struct peer *peer, struct stream *s,
     }
     else
     {
+      if(fEnablePubKeyValidate && g_capi->isExtended && g_capi->isExtended())
+      {
+        if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+          zlog_debug("[%s:%d] calling Extended validation function WITH id ", __FUNCTION__, __LINE__);
+
+        u_int8_t extCode;
+        /* call the library function --> cl_ExtBgpsecVerify */
+        if( g_capi->extValidate((BgpsecPathAttr*)bpa, &p, peer->local_as,
+              &extCode) != BGPSEC_VERIFY_SUCCESS)
+        {
+          *errCode = BGPSEC_VERIFY_ERROR;
+          goto ValidateFail;
+        }
+      }
+      else
+      {
       if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
         zlog_debug("[%s:%d] calling validation function with keys ", __FUNCTION__, __LINE__);
+
       if( g_capi->validate((BgpsecPathAttr*)bpa, numSecurePathSegment, \
             arrOutKeyInfo, &p, peer->local_as) != BGPSEC_VERIFY_SUCCESS)
       {
         *errCode = BGPSEC_VERIFY_ERROR;
         goto ValidateFail;
       }
+    }
     }
 
     /* release all resources - keyInfoData or others */
@@ -1281,10 +1324,13 @@ int bgpsecPathAttribute(struct bgp *bgp, struct peer *peer,
           outKeyInfo->keyData = NULL;
           outKeyInfo->keyLength = 0;
         }
+        else /* if found, register first time */
+        {
+          /* call register function in srx crypto api */
+          keyID_priv = g_capi->registerPrivateKey(outKeyInfo);
+        }
       }
 
-      /* call register function in srx crypto api */
-      keyID_priv = g_capi->registerPrivateKey(outKeyInfo);
 
       if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       {

@@ -5,6 +5,9 @@ management system. Please see:
 
 
 QuaggaSRx:
+  0.4.1.5 - March 2016
+    * Minor bug fixes
+
   0.4.1.4 - October 2015
     * Modified RPM build tool to require SRxCryptoAPI >= 1.2.0
     * Removed methods used from SRxCryptoAPI 1.1.x
