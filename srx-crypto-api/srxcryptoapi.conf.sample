@@ -3,6 +3,7 @@
 # testlib        - For testing purpose only
 # bgpsec_openssl - provides a crypto implementation based on OpenSSL (DEFAULT)
 library_conf="bgpsec_openssl";
+#library_conf="testlib";
 
 # Allows to specify the default key volt. Can be overwritten programatically.
 key_volt = "/var/lib/bgpsec-keys/";
@@ -37,26 +38,20 @@ bgpsec_openssl: {
 # SRxCryptoAPI wrapper functions are mapped.
 #
 
-# Library initialization method parameters - init is only performed if use_init
-# is set to 1. To disable initialization (including mapping) set value to 0.
-  use_init                    = "0";
 # A String or "NULL" as initialization parameter.
-  init_value                  = "NULL";
+  init_value                  = "PUB:/var/lib/bgpsec-keys/ski-list.txt;PRIV:/var/lib/bgpsec-keys/priv-ski-list.txt";
   method_init                 = "init";
+  method_release              = "release";
 
-# Minimum required functions to operate
+  method_freeHashMessage      = "freeHashMessage";
+  method_freeSignature        = "freeSignature";
+
+  method_sign                 = "sign";
   method_validate             = "validate";
-  method_sign_with_key        = "sign_with_key";
 
-# In case public key management is available
-  method_isExtended           = "isExtended";
-  method_extValidate          = "extValidate";
   method_registerPublicKey    = "registerPublicKey";
   method_unregisterPublicKey  = "unregisterPublicKey";
 
-# In case private key management is available
-  method_isPrivateKeyStorage  = "isPrivateKeyStorage";
-  method_sign_with_id         = "sign_with_id";
   method_registerPrivateKey   = "registerPrivateKey";
   method_unregisterPrivateKey = "unregisterPrivateKey";
 };
@@ -65,26 +60,20 @@ bgpsec_openssl: {
 testlib: {
   library_name="libSRxCryptoTestlib.so";
 
-# Library initialization method parameters - init is only performed if use_init
-# is set to 1. To disable initialization (including mapping) set value to 0.
-  use_init                    = "1";
 # A String or NULL as initialization parameter.
-  init_value                  = "some random text";
+  init_value                  = "NULL";
   method_init                 = "init";
+  method_release              = "release";
 
-# Minimum required functions to operate
+  method_freeHashMessage      = "freeHashMessage";
+  method_freeSignature        = "freeSignature";
+
+  method_sign                 = "sign";
   method_validate             = "validate";
-  method_sign_with_key        = "sign_with_key";
 
-# In case public key management is available
-  method_isExtended           = "isExtended";
-  method_extValidate          = "extValidate";
   method_registerPublicKey    = "registerPublicKey";
   method_unregisterPublicKey  = "unregisterPublicKey";
 
-# In case private key management is available
-  method_isPrivateKeyStorage  = "isPrivateKeyStorage";
-  method_sign_with_id         = "sign_with_id";
   method_registerPrivateKey   = "registerPrivateKey";
   method_unregisterPrivateKey = "unregisterPrivateKey";
 };

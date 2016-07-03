@@ -1043,14 +1043,15 @@ bool handleValidationResult(SRxUpdateID          updateID,
  * @param updateID The update id the signature is calculated for
  * @param userPtr data the data containing the signature (structure TBD)
  */
-void handleSignatures(SRxUpdateID updateID, BGPSecData* bgpsec, void* usrPtr)
+void handleSignatures(SRxUpdateID updateID, BGPSecCallbackData* bgpsecCallback, 
+                      void* usrPtr)
 {
   int i;
   PRINTF("Received a handle signature for update [0x%08X]\n", updateID);
-  PRINTF("Data (%u bytes): ", bgpsec->length);
-  for (i = 0; i < bgpsec->length; i++)
+  PRINTF("Data (%u bytes): ", bgpsecCallback->length);
+  for (i = 0; i < bgpsecCallback->length; i++)
   {
-    PRINTF("%c", (unsigned char)bgpsec->data[i]);
+    PRINTF("%c", (unsigned char)bgpsecCallback->data[i]);
   }
   PRINTF("\n");
 }
@@ -1353,22 +1354,27 @@ void doVerify(bool log, char** argPtr)
   defResult.resSourceROA = SRxRS_UNKNOWN;
   defResult.resSourceBGPSEC = SRxRS_UNKNOWN;
 
+  // @TODO: Generate some test data for input
   bgpsecInput = prompt(argPtr, "(Verify) BGPSEC some string ? ");
 
   if (bgpsecInput == '\0')
   {
-    bgpsec.length = 0;
-    bgpsec.data = NULL;
+    bgpsec.numberHops = 0;
+    bgpsec.asPath = NULL;
+    bgpsec.attr_length = 0;
+    bgpsec.bgpsec_path_attr = NULL;
   }
   else
   {
-    bgpsec.length = strlen(bgpsecInput)+1;
-    bgpsec.data = (uint8_t*)bgpsecInput;
+    bgpsec.numberHops = 0;
+    bgpsec.asPath = NULL;
+    bgpsec.attr_length = strlen(bgpsecInput)+1;
+    bgpsec.bgpsec_path_attr = (uint8_t*)bgpsecInput;
   }
   
   if (log)
   {
-    if (bgpsec.length == 0)
+    if (bgpsec.attr_length == 0)
     {
       addToHistory("verify %d %u %u %s %u %u %c" ,
                    localID, method, as32, ipStringPtr,

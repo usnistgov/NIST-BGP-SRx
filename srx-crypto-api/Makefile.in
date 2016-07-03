@@ -45,8 +45,8 @@ DIST_COMMON = README $(am__configure_deps) \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/srxcryptoapi.spec.in \
 	$(srcdir)/srxcryptoapi_lib.conf.in $(top_srcdir)/configure \
-	AUTHORS ChangeLog INSTALL config.guess config.sub depcomp \
-	install-sh ltmain.sh missing
+	AUTHORS ChangeLog INSTALL compile config.guess config.sub \
+	depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -194,6 +194,7 @@ CYGPATH_W = @CYGPATH_W@
 # location of the configuration file.
 DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\" @MCHECK@
 DEPDIR = @DEPDIR@
+DOLLAR_SIGN = @DOLLAR_SIGN@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -1096,7 +1097,7 @@ install-exec-local:
 
 uninstall-local:
 	rm -f $(INC_OUT)/srxcryptoapi.h;
-	@if [ -e $(INC_OUT) && "$(ls -A $(INC_OUT))" == "" ] ; then \
+	@if [ -e $(INC_OUT) && "@DOLLAR_SIGN@(ls -A $(INC_OUT))" == "" ] ; then \
 	  rmdir $(INC_OUT) > /dev/null 2>&1; \
 	fi
 

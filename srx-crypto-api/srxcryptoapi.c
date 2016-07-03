@@ -25,11 +25,25 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @Version 0.1.2.2
+ * @Version 0.2.0.1
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.1.2.2 - 2016/03/22 - oborchert
+ *  0.2.0.1 - 2016/07/02 - oborchert
+ *            * Added missing hash generation for origin announcements.
+ *  0.2.0.0 - 2016/06/27 - oborchert
+ *            * Fixed endless loop in sca_generateHashMessage
+ *            * modified sca_generateHashMessage to allow pre-generated hash 
+ *              message. in this case return SUCCESS and set status ti INFO_USER1 
+ *          - 2016/06/09 - oborchert
+ *            * Added debug level functionality.
+ *            * Removed use_init. Init is required from now on.
+ *          - 2016/05/27 - 2016/06/08 - oborchert
+ *            * Complete overhaul of the API
+ *            * Added status flag to most methods.
+ *  0.1.2.2 - 2016/04/23 - oborchert
+ *            * Added draft 15 hash generation.
+ *          - 2016/03/22 - oborchert
  *            * modified memory management in functions sca_generateMSG1 and
  *              sca_generateMSG2 by using realloc in lieu of malloc when 
  *              modifying the provided buffer (buff) to prevent a memory leak.
@@ -79,15 +93,13 @@
 #include "srx/srxcryptoapi.h"
 #include "crypto_imple.h"
 
-// Below might be removed again
-#ifdef CPU_64
-#define CT_INT long
-#else
-#define CT_INT int
+#ifndef LIBCFG_INT
+#define LIBCFG_INT int
 #endif
 
 #define MAX_CMD_LEN                1024
 #define MAX_EXT_SIZE               10
+#define MAX_FUNC_NAME              512
 
 #define CRYPTO_CFG_FILE            "srxcryptoapi.conf"
 
@@ -100,39 +112,42 @@
 #define DEF_KEY_EXT_PRIV           "der"
 #define DEF_KEY_EXT_PUB            "cert"
 
-#define SCA_USE_INIT               "use_init"
 #define SCA_INIT_VALUE             "init_value"
-
 #define SCA_INIT                   "method_init"
+#define SCA_RELEASE                "method_release"
 
-#define SCA_SIGN_WITH_KEY          "method_sign_with_key"
-#define SCA_SIGN_WITH_ID           "method_sign_with_id"
+#define SCA_FREE_HASH_MESSAGE      "method_freeHashMessage"
+#define SCA_FREE_SIGNATURE         "method_freeSignature"
+
+#define SCA_GET_DEBUGLEVEL         "method_getDebugLevel"
+#define SCA_SET_DEBUGLEVEL         "method_setDebugLevel"
+
+#define SCA_SIGN                   "method_sign"
 #define SCA_VALIDATE               "method_validate"
 
-#define SCA_IS_EXTENDED            "method_isExtended"
-#define SCA_EXT_VALIDATE           "method_extValidate"
-
-#define SCA_IS_PRIVATE_KEY_STORAGE "method_isPrivateKeyStorage"
 #define SCA_REGISTER_PRIVATE_KEY   "method_registerPrivateKey"
 #define SCA_UNREGISTER_PRIVATE_KEY "method_unregisterPrivateKey"
 
 #define SCA_REGISTER_PUBLIC_KEY    "method_registerPublicKey"
 #define SCA_UNREGISTER_PUBLIC_KEY  "method_unregisterPublicKey"
 
-#define SCA_DEF_INIT                  "init"
+#define SCA_DEF_INIT                   "init"
+#define SCA_DEF_RELEASE                "release"
 
+#define SCA_DEF_FREE_HASH_MESSAGE      "freeHashMessage"
+#define SCA_DEF_FREE_SIGNATURE         "freeSignature"
+
+#define SCA_DEF_GET_DEBUGLEVEL         "getDebugLevel"
+#define SCA_DEF_SET_DEBUGLEVEL         "setDebugLevel"
+
+#define SCA_DEF_SIGN                   "sign"
 #define SCA_DEF_VALIDATE               "validate"
-#define SCA_DEF_SIGN_WITH_KEY          "sign_with_key"
 
-#define SCA_DEF_IS_EXTENDED            "isExtended"
-#define SCA_DEF_EXT_VALIDATE           "extValidate"
-#define SCA_DEF_REGISTER_PUBLIC_KEY    "registerPublicKey"
-#define SCA_DEF_UNREGISTER_PUBLIC_KEY  "unregisterPublicKey"
-
-#define SCA_DEF_IS_PRIVATE_KEY_STORAGE "isPrivateKeyStorage"
-#define SCA_DEF_SIGN_WITH_ID           "sign_with_id"
 #define SCA_DEF_REGISTER_PRIVATE_KEY   "registerPrivateKey"
 #define SCA_DEF_UNREGISTER_PRIVATE_KEY "unregisterPrivateKey"
+
+#define SCA_DEF_REGISTER_PUBLIC_KEY    "registerPublicKey"
+#define SCA_DEF_UNREGISTER_PUBLIC_KEY  "unregisterPublicKey"
 
 #ifndef SYSCONFDIR
 #define SYSCONFDIR               "/etc"
@@ -141,28 +156,27 @@
 #define SYS_CFG_FILE SYSCONFDIR "/" CRYPTO_CFG_FILE
 #define LOC_CFG_FILE "./" CRYPTO_CFG_FILE
 
-#define MAX_FUNC_NAME 512
-
 typedef struct {
   const char* str_library_name;
 
-  const char* str_use_init;
-  const char* str_init_val;
-  
+  const char* str_init_val;  
   const char* str_method_init;
+  const char* str_method_release;
   
+  const char* str_method_freeHashMessage;
+  const char* str_method_freeSignature;
+
+  const char* str_method_getDebugLevel;
+  const char* str_method_setDebugLevel;
+  
+  const char* str_method_sign;
   const char* str_method_validate;
-  const char* str_method_sign_with_key;
 
-  const char* str_method_isExtended;
-  const char* str_method_extValidate;
-  const char* str_method_registerPublicKey;
-  const char* str_method_unregisterPublicKey;
-
-  const char* str_method_isPrivateKeyStorage;
-  const char* str_method_sign_with_id;
   const char* str_method_registerPrivateKey;
   const char* str_method_unregisterPrivateKey;
+  
+  const char* str_method_registerPublicKey;
+  const char* str_method_unregisterPublicKey;
 } SCA_Mappings;
 
 // Hash struct for first signature in path
@@ -217,14 +231,118 @@ static char _key_ext_pub[MAX_EXT_SIZE];
  * the error code nd provides a debug log.
  * 
  * @param value The initialization value.
+ * @param debugLevel the debugging level - Follows the system debug levels.
+ * @param status Will contain the status information of this call.
  * 
- * @return 0: error.
+ * @return API_FILURE (0)
  */
-int wrap_init(const char* value)
+int wrap_init(const char* value, int debugLevel, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'init'\n");
-  return 0;  
+  return API_FAILURE;  
+}
+
+/**
+ * This will be called prior un-binding the library. This allows the API 
+ * implementation to perform a clean shutdown / cleanup.
+ * 
+ * @return API_FAILURE (0)
+ */
+int wrap_release()
+{
+  // Return an error for missing implementation.
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'release'\n");
+  return API_FAILURE;    
+}
+
+/**
+  * In case the validation method does return the generated hashMessage, this
+  * function is used to free the allocated memory.
+  * 
+  * @param hashMessage The generated hash input data, must be generated by the 
+  *                    API mapped library and retrieved using the validate 
+  *                    call.
+ * 
+ *  @return false
+  */
+bool wrap_freeHashMessage(SCA_HashMessage* hashMessage)
+{
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'freeHashMessage'\n");
+  
+  return false;
+}
+
+  /**
+   * Signatures are generated by the API and also freed by the API module.
+   * 
+   * @param signature The signature element.
+   * 
+   * @return false
+   */
+  bool wrap_freeSignature(SCA_Signature* signature)
+  {
+    sca_debugLog (LOG_DEBUG, "Called local test wrapper 'freeSignature'\n");
+    
+    return false;
+  }
+  
+  /**
+   * Return the current debug level of -1 if not supported
+   * 
+   * @return -1 (not supported)
+   */
+  int wrap_getDebugLevel()
+  {
+    sca_debugLog (LOG_DEBUG, "Called local test wrapper 'getDebugLevel'\n");
+    return -1;
+  }
+
+  /**
+   * Set the new debug level going forward. This methid returns the previous set 
+   * debug level or -1 if not supported.
+   * 
+   * @param debugLevel The debug level to be set - Follows system debug values.
+   * 
+   * @return -1 (not supported)
+   */
+  int wrap_setDebugLevel(int debugLevel)
+  {
+    sca_debugLog (LOG_DEBUG, "Called local test wrapper 'setDebugLevel'\n");
+    return -1;    
+  }
+  
+  /**
+   * Perform BGPSEC path validation. This function required the keys to be 
+   * pre-registered to perform the validation. 
+   * The caller manages the memory and MUST assure the memory is intact until
+   * the function returns.
+   * This function only returns API_VALRESULT_VALID and API_VALRESULT_INVALID.
+   * In case of erorrs API_VALRESULT_INVALID will be returned with an error code
+   * passed in the status flag. This flag also contains more details about the 
+   * validation status (why invalid, etc.)
+   *
+   * @param data This structure contains all necessary information to perform
+   *             the path validation. The status flag will contain more 
+   *             information
+   *
+   * @return API_VALRESULT_INVALID (1) and the status 
+   *         flag contains further information - including errors.
+   *         
+   */
+int wrap_validate(SCA_BGPSecValidationData* data)
+{
+  // Return an error for missing implementation.
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'validate'\n");
+  if (data != NULL)
+  {
+    data->status = API_STATUS_INFO_KEY_NOTFOUND
+                   | API_STATUS_ERR_INVLID_KEY            
+                   | API_STATUS_ERR_KEY_IO
+                   | API_STATUS_ERR_INSUF_BUFFER
+                   | API_STATUS_ERR_NO_PREFIX;    
+  }  
+  return API_VALRESULT_INVALID;
 }
 
 /**
@@ -237,72 +355,18 @@ int wrap_init(const char* value)
  * @param prefix pointer to the prefix.
  * @param localAS the callers local AS number.
  *
- * @return -1: error -> implementation missing
+ * @return API_VALRESULT_INVALID -> status = API_STATUS_ERR_USER1
  */
-int wrap_validate(BgpsecPathAttr* bgpsec_path, u_int16_t number_keys,
-                  BGPSecKey** keys, void *prefix, u_int32_t localAS )
+int wrap_sign(SCA_BGPSecSignData* data)
 {
   // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'validate'\n");
-  return -1;
-}
-
-/**
- * Perform BGPSEC path validation. (Optional) This function uses the list of
- * registered public keys and returns the validation state or -1 for an error.
- * The caller manages the memory and MUST assure the memory is intact until
- * the function returns. The implementation itself DOES NOT modify the given
- * data.
- *
- * @param bgpsec_path pointer to the BGPSEC path attribute.
- * @param prefix pointer to the prefix.
- * @param localAS the callers local AS number.
- * @param extCode contains more information in case the validation value is
- *                invalid. 0: validation failed, 1: key not found.
- *
- * @return -1: error -> Missing implementation
- */
-int wrap_extValidate(BgpsecPathAttr* bgpsec_path, void *prefix,
-                     u_int32_t localAS, u_int8_t* extCode)
-{
-  // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'wrap_extValidate'\n");
-  return -1;
-}
-
-/**
- * Sign the given BGPSEC path data with the provided key. This implementation
- * does not sign the path.
- *
- * @param bgpsec_data The BGPSEc data to be signed.
- * @param key The key to be used for signing
- *
- * @return 1 for success, 0 for failure
- */
-int wrap_sign_with_key(BGPSecSignData* bgpsec_data, BGPSecKey* key)
-{
-  // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'sign_with_key'\n");
-
-  return API_FAILURE;
-}
-
-/**
- *
- * Wrapper for sign the given BGPSEC path data with the provided key. This
- * implementation does not sign the path.
- *
- * @param bgpsec_data The data object to be signed. This also includes the
- *                    generated signature.
- * @param keyID The pre-registered private key to be used
- *
- * @return 1 for success, 0 for failure
- */
-int wrap_sign_with_id(BGPSecSignData* bgpsec_data, u_int8_t keyID)
-{
-  // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'sign_with_id'\n");
-
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'sign'\n");
+  if (data != NULL)
+  {
+    data->status = API_STATUS_INFO_KEY_NOTFOUND
+                   | API_STATUS_ERR_INVLID_KEY            
+                   | API_STATUS_ERR_KEY_IO;
+  }
   return API_FAILURE;
 }
 
@@ -311,13 +375,20 @@ int wrap_sign_with_id(BGPSecSignData* bgpsec_data, u_int8_t keyID)
  * value is 0
  *
  * @param key The key to be stored
+ * @param status Will contain the status information of this call.
  *
- * @return 0
+ * @return API_FAILURE - check status
  */
-u_int8_t wrap_registerPrivateKey(BGPSecKey* key)
+u_int8_t wrap_registerPrivateKey(BGPSecKey* key, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'registerPrivateKey'\n");
+  if (status != NULL)
+  {
+    *status =   API_STATUS_ERR_INSUF_KEYSTORAGE 
+              | API_STATUS_ERR_INVLID_KEY 
+              | API_STATUS_ERR_KEY_IO;
+  }
 
   return API_FAILURE;
 }
@@ -326,15 +397,21 @@ u_int8_t wrap_registerPrivateKey(BGPSecKey* key)
  * Unregister the Private key. This method actually does not register unregister
  * the private key. It returns 0
  *
- * @param keyID The key id to unregister.
+ * @param key The key needs at least contain the ASN and SKI.
+ * @param status Will contain the status information of this call.
  *
- * @return 0
+ * @return API_FAILURE - check status
  */
-u_int8_t wrap_unregisterPrivateKey(u_int8_t keyID)
+u_int8_t wrap_unregisterPrivateKey(BGPSecKey* key, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper "
                            "'unregisterPrivateKey'\n");
+  if (status != NULL)
+  {
+    *status =  API_STATUS_ERR_KEY_IO
+              | API_STATUS_INFO_KEY_NOTFOUND;
+  }
 
   return API_FAILURE;
 }
@@ -344,13 +421,20 @@ u_int8_t wrap_unregisterPrivateKey(u_int8_t keyID)
  * value is 0
  *
  * @param key The key to be stored
+ * @param status Will contain the status information of this call.
  *
- * @return 0
+ * @return API_FAILURE - check status
  */
-u_int8_t wrap_registerPublicKey(BGPSecKey* key)
+u_int8_t wrap_registerPublicKey(BGPSecKey* key, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'registerPublicKey'\n");
+  if (status != NULL)
+  {
+    *status =   API_STATUS_ERR_INSUF_KEYSTORAGE 
+              | API_STATUS_ERR_INVLID_KEY 
+              | API_STATUS_ERR_KEY_IO;
+  }
 
   return API_FAILURE;
 }
@@ -360,43 +444,23 @@ u_int8_t wrap_registerPublicKey(BGPSecKey* key)
  * the private key. It returns 0
  *
  * @param keyID The key id to unregister.
+ * @param status Will contain the status information of this call.
  *
- * @return 0
+ * @return API_FAILURE - check status
  */
-int wrap_unregisterPublicKey(BGPSecKey* key)
+u_int8_t wrap_unregisterPublicKey(BGPSecKey* key, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'unregisterPublicKey'\n");
+  
+  if (status != NULL)
+  {
+    // Just set all errors
+    *status =   API_STATUS_INFO_KEY_NOTFOUND
+              | API_STATUS_ERR_KEY_IO;
+  }
 
   return API_FAILURE;
-}
-
-/**
- * This method determines if the API provides the extended public key
- * management. In this case the extended validation method extValidate can be
- * called.
- *
- * @return 0: Does NOT provide the extended method. 1: does provide extended
- *         functionality
- */
-int wrap_isExtended()
-{
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'isExtended'\n");
-
-  return 0;
-}
-
-/**
- * Return 1 if this API allows the storage of private keys, otherwise 0.
- *
- * @return 0: Does not provide private key storage, 1: Does provide key
- *         private storage
- */
-int wrap_isPrivateKeyStorage()
-{
-  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'isPrivateKeyStorage'\n");
-
-  return 0;
 }
 
 /**
@@ -456,14 +520,15 @@ static int _checkConfigFile(SRxCryptoAPI* api)
  * that will be mapped.
  *
  * @param cfg The configuration object
+ * @param status The status information if errors happened.
  *
- * @return true if all went well.
+ * @return true if all went well otherwise look into status.
  */
-static void _loadGeneralConfiguration(config_t* cfg)
+static void _loadGeneralConfiguration(config_t* cfg, sca_status_t* status)
 {
     /* debug level */
-  long int newLogLevel = g_loglevel;
-  if(config_lookup_int(cfg, "debug-type", &newLogLevel))
+  LIBCFG_INT newLogLevel = (LIBCFG_INT)g_loglevel;
+  if(config_lookup_int(cfg, "debug-type", (LIBCFG_INT*)&newLogLevel))
   {
     sca_debugLog(LOG_INFO, "- debug type: %d\n", newLogLevel);
     g_loglevel = newLogLevel;
@@ -542,25 +607,39 @@ static void _loadMapping(config_setting_t *set, SCA_Mappings* mappings)
   // LIBRARY NAME
   //////////////////////////////////////////////////////////////////////////////
   __readMapping(set, SCA_LIBRARY_NAME, &mappings->str_library_name);
-  //////////////////////////////////////////////////////////////////////////////
-  // LOAD INIT VALUES
-  //////////////////////////////////////////////////////////////////////////////  
-  __readMapping(set, SCA_USE_INIT, &mappings->str_use_init);
-  __readMapping(set, SCA_INIT_VALUE, &mappings->str_init_val); 
-  __readMapping(set, SCA_INIT, &mappings->str_method_init);
   
   //////////////////////////////////////////////////////////////////////////////
-  // REQUIRED FUNCTIONS
-  //////////////////////////////////////////////////////////////////////////////
-  __readMapping(set, SCA_SIGN_WITH_KEY, &mappings->str_method_sign_with_key);
-  __readMapping(set, SCA_VALIDATE, &mappings->str_method_validate);
+  // LOAD INIT VALUES and INIT / DESTROY FUNCTIONS
+  //////////////////////////////////////////////////////////////////////////////  
+  __readMapping(set, SCA_INIT_VALUE, &mappings->str_init_val);  
+  
+  __readMapping(set, SCA_INIT, &mappings->str_method_init);
+  __readMapping(set, SCA_RELEASE, &mappings->str_method_release);
+  
+  __readMapping(set, SCA_FREE_HASH_MESSAGE, 
+                     &mappings->str_method_freeHashMessage);
+  __readMapping(set, SCA_FREE_SIGNATURE, 
+                     &mappings->str_method_freeSignature);
 
+  //////////////////////////////////////////////////////////////////////////////
+  // LOAD DEBUG FUNCTIONS
+  //////////////////////////////////////////////////////////////////////////////  
+  __readMapping(set, SCA_GET_DEBUGLEVEL, 
+                     &mappings->str_method_getDebugLevel);
+  __readMapping(set, SCA_SET_DEBUGLEVEL, 
+                     &mappings->str_method_setDebugLevel);
+  
+  
+  //////////////////////////////////////////////////////////////////////////////
+  // SIGN / VALIDATE FUNCTIONS
+  //////////////////////////////////////////////////////////////////////////////
+  __readMapping(set, SCA_SIGN, &mappings->str_method_sign);
+  __readMapping(set, SCA_VALIDATE, &mappings->str_method_validate);
+  
+  
   //////////////////////////////////////////////////////////////////////////////
   // PRIVATE KEY STORAGE
   //////////////////////////////////////////////////////////////////////////////
-  __readMapping(set, SCA_IS_PRIVATE_KEY_STORAGE,
-                     &mappings->str_method_isPrivateKeyStorage);
-  __readMapping(set, SCA_SIGN_WITH_ID, &mappings->str_method_sign_with_id);
   __readMapping(set, SCA_REGISTER_PRIVATE_KEY,
                      &mappings->str_method_registerPrivateKey);
   __readMapping(set, SCA_UNREGISTER_PRIVATE_KEY,
@@ -569,8 +648,6 @@ static void _loadMapping(config_setting_t *set, SCA_Mappings* mappings)
   //////////////////////////////////////////////////////////////////////////////
   // EXTENDED - validation and public key storage
   //////////////////////////////////////////////////////////////////////////////
-  __readMapping(set, SCA_IS_EXTENDED, &mappings->str_method_isExtended);
-  __readMapping(set, SCA_EXT_VALIDATE, &mappings->str_method_extValidate);
   __readMapping(set, SCA_REGISTER_PUBLIC_KEY,
                      &mappings->str_method_registerPublicKey);
   __readMapping(set, SCA_UNREGISTER_PUBLIC_KEY,
@@ -679,40 +756,36 @@ static int _mapAPI(SCA_Mappings* mappings, SRxCryptoAPI* api)
   {
     __doMapFunction(api->libHandle, (void**)&api->init,
                     mappings->str_method_init, SCA_DEF_INIT);
+    __doMapFunction(api->libHandle, (void**)&api->release,
+                    mappings->str_method_release, SCA_DEF_RELEASE);
+
+    __doMapFunction(api->libHandle, (void**)&api->freeHashMessage,
+                    mappings->str_method_freeHashMessage, 
+                    SCA_DEF_FREE_HASH_MESSAGE);    
+
+    __doMapFunction(api->libHandle, (void**)&api->freeSignature,
+                    mappings->str_method_freeSignature, 
+                    SCA_DEF_FREE_SIGNATURE);    
+
     
+    __doMapFunction(api->libHandle, (void**)&api->sign,
+                    mappings->str_method_sign, SCA_DEF_SIGN);
     __doMapFunction(api->libHandle, (void**)&api->validate,
                     mappings->str_method_validate, SCA_DEF_VALIDATE);
-    __doMapFunction(api->libHandle, (void**)&api->sign_with_key,
-                    mappings->str_method_sign_with_key, SCA_DEF_SIGN_WITH_KEY);
-    __doMapFunction(api->libHandle, (void**)&api->isExtended,
-                    mappings->str_method_isExtended, SCA_DEF_IS_EXTENDED);
-    __doMapFunction(api->libHandle, (void**)&api->isPrivateKeyStorage,
-                    mappings->str_method_isPrivateKeyStorage,
-                    SCA_DEF_IS_PRIVATE_KEY_STORAGE);
+    
+    __doMapFunction(api->libHandle, (void**)&api->registerPublicKey,
+                    mappings->str_method_registerPublicKey,
+                    SCA_DEF_REGISTER_PUBLIC_KEY);
+    __doMapFunction(api->libHandle, (void**)&api->unregisterPublicKey,
+                    mappings->str_method_unregisterPublicKey,
+                    SCA_DEF_UNREGISTER_PUBLIC_KEY);
 
-    if (api->isExtended())
-    {
-      __doMapFunction(api->libHandle, (void**)&api->extValidate,
-                      mappings->str_method_extValidate, SCA_DEF_EXT_VALIDATE);
-      __doMapFunction(api->libHandle, (void**)&api->registerPublicKey,
-                      mappings->str_method_registerPublicKey,
-                      SCA_DEF_REGISTER_PUBLIC_KEY);
-      __doMapFunction(api->libHandle, (void**)&api->unregisterPublicKey,
-                      mappings->str_method_unregisterPublicKey,
-                      SCA_DEF_UNREGISTER_PUBLIC_KEY);
-    }
-
-    if (api->isPrivateKeyStorage())
-    {
-      __doMapFunction(api->libHandle, (void**)&api->sign_with_id,
-                      mappings->str_method_sign_with_id, SCA_DEF_SIGN_WITH_ID);
-      __doMapFunction(api->libHandle, (void**)&api->registerPrivateKey,
-                      mappings->str_method_registerPrivateKey,
-                      SCA_DEF_REGISTER_PRIVATE_KEY);
-      __doMapFunction(api->libHandle, (void**)&api->unregisterPrivateKey,
-                      mappings->str_method_unregisterPrivateKey,
-                      SCA_DEF_UNREGISTER_PRIVATE_KEY);
-    }
+    __doMapFunction(api->libHandle, (void**)&api->registerPrivateKey,
+                    mappings->str_method_registerPrivateKey,
+                    SCA_DEF_REGISTER_PRIVATE_KEY);
+    __doMapFunction(api->libHandle, (void**)&api->unregisterPrivateKey,
+                    mappings->str_method_unregisterPrivateKey,
+                    SCA_DEF_UNREGISTER_PRIVATE_KEY);
   }
 
   return retVal;
@@ -729,17 +802,18 @@ static int _mapAPI(SCA_Mappings* mappings, SRxCryptoAPI* api)
  * mapping will be performed.
  *
  * @param api the crypto api container - MUST NOT BE NULL
+ * @param the status variable containing information about failures etc.
  *
- * @return int API_FAILURE (0) for failure API_SUCCESS (1) for success.
+ * @return int API_SUCCESS(1) or API_FAILURE(0 - see status) 
  */
-int srxCryptoInit(SRxCryptoAPI* api)
+int srxCryptoInit(SRxCryptoAPI* api, sca_status_t* status)
 {
-  int retVal             = API_FAILURE;
-  SCA_Mappings* mappings = NULL;
-  config_setting_t *set  = NULL;
-  bool useLocal          = false;
-  const char* str_library_conf = NULL;
-  static config_t cfg;
+  int               retVal           = API_FAILURE;
+  SCA_Mappings*     mappings         = NULL;
+  config_setting_t* set              = NULL;
+  bool              useLocal         = false;
+  const char*       str_library_conf = NULL;
+  static config_t   cfg;
   memset (&cfg, 0, sizeof(config_t));
 
   if (api == NULL)
@@ -773,16 +847,17 @@ int srxCryptoInit(SRxCryptoAPI* api)
 
   // Just set default wrapper mappings
   api->init                 = wrap_init;
+  api->release              = wrap_release;
+  
+  api->freeHashMessage      = wrap_freeHashMessage;
+  api->freeSignature        = wrap_freeSignature;
+  
+  api->sign                 = wrap_sign;
   api->validate             = wrap_validate;
-  api->sign_with_key        = wrap_sign_with_key;
 
-  api->isExtended           = wrap_isExtended;
-  api->extValidate          = wrap_extValidate;
   api->registerPublicKey    = wrap_registerPublicKey;
   api->unregisterPublicKey  = wrap_unregisterPublicKey;
 
-  api->isPrivateKeyStorage  = wrap_isPrivateKeyStorage;
-  api->sign_with_id         = wrap_sign_with_id;
   api->registerPrivateKey   = wrap_registerPrivateKey;
   api->unregisterPrivateKey = wrap_unregisterPrivateKey;
 
@@ -812,7 +887,7 @@ int srxCryptoInit(SRxCryptoAPI* api)
 ////////////////////////////////////////////////////////////////////////////////
 // DEFAULT CONFIGURATION
 ////////////////////////////////////////////////////////////////////////////////
-      _loadGeneralConfiguration(&cfg);
+      _loadGeneralConfiguration(&cfg, status);
 
 ////////////////////////////////////////////////////////////////////////////////
 // LIBRAQRY MAPPING INFORAMTION
@@ -831,30 +906,34 @@ int srxCryptoInit(SRxCryptoAPI* api)
 
           // Do the final mapping of the API functions into the plugin.
           retVal = _mapAPI(mappings, api);
-          
-          // Do the library initialization if specified
-          const char* initVal = NULL;
-          if (mappings->str_init_val != NULL)
+          if (retVal != API_FAILURE)
           {
-            if (strcmp(mappings->str_init_val, "NULL") != 0)
+            // Do the library initialization if specified
+            const char* initVal = NULL;
+            if (mappings->str_init_val != NULL)
             {
-              initVal = mappings->str_init_val;
-            }
-          }
-          if (mappings->str_use_init != NULL)
-          {
-            int use_init = atoi(mappings->str_use_init);
-            if (use_init == 1)
-            {
-              // initialize API
-              sca_debugLog(LOG_INFO, 
-                           "Initiate library initialization using '%s'\n",
-                           initVal);
-              if (api->init(initVal) == 0)
+              if (strcmp(mappings->str_init_val, "NULL") != 0)
               {
-                sca_debugLog(LOG_ERR, "Initialization failed!\n");
+                initVal = mappings->str_init_val;
               }
             }
+            
+            // initialize API
+            sca_debugLog(LOG_INFO, 
+                         "Initiate library initialization using '%s'\n",
+                         initVal);
+            retVal = api->init(initVal, sca_getCurrentLogLevel(), status);
+            if (retVal == API_FAILURE)
+            {
+              sca_status_t releaseStatus = API_STATUS_OK;
+              api->release(&releaseStatus);
+              sca_debugLog(LOG_ERR, "Initialization failed (0x%X, 0x%X)!\n", 
+                           status, releaseStatus);
+            }
+          }
+          else
+          {
+            sca_debugLog(LOG_ERR, "API could not be linked!\n");
           }
         }
       }
@@ -881,7 +960,7 @@ int srxCryptoInit(SRxCryptoAPI* api)
     {
       sca_debugLog(LOG_ERR, "Library could not be loaded!\n");
       // Just in case the failure occurred not only during the beginning,
-      srxCryptoUnbind(api);
+      srxCryptoUnbind(api, status);
     }
     else
     {
@@ -902,15 +981,20 @@ int srxCryptoInit(SRxCryptoAPI* api)
  * close the linked library, sets all api settings to NULL / 0
  *
  * @param api Unbind the SRxCryptoAPI
+ * @param status the status in case an error occured.
  *
- * @return 0
+ * @return API_SUCCESS(1) or API_FAILURE(0 - see status)
  */
-int srxCryptoUnbind(SRxCryptoAPI* api)
+int srxCryptoUnbind(SRxCryptoAPI* api, sca_status_t* status)
 {
+  sca_status_t myStatus = API_STATUS_OK;
+  
   if (api != NULL)
   {
     if (api->libHandle != NULL)
     {
+      api->release(&myStatus);
+      
       // free errors from library
 #if HAVE_LTDL_H
       lt_dlerror();
@@ -937,8 +1021,17 @@ int srxCryptoUnbind(SRxCryptoAPI* api)
     // NULL the complete API
     memset (api, 0, sizeof(SRxCryptoAPI));
   }
+  else
+  {
+    myStatus |= API_STATUS_ERR_NO_DATA;
+  }
+  
+  if (status != NULL)
+  {
+    *status = myStatus;
+  }
 
-  return 0;
+  return ((myStatus & API_STATUS_ERROR_MASK) == 0) ? API_SUCCESS: API_FAILURE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -950,7 +1043,7 @@ int srxCryptoUnbind(SRxCryptoAPI* api)
  *
  * @param key_path the path to the keys (\0 terminated).
  *
- * @return 0 error, 1 success
+ * @return API_SUCCESS(1) or API_FAILURE(0)
  *
  */
 int sca_SetKeyPath (char* key_path)
@@ -1073,10 +1166,12 @@ void sca_debugLog( int level, const char *format, ...)
  *
  * @param key Pre-allocated memory where the ley will be loaded into.
  * @param fPrivate indicates if the key is private or public.
+ * @param status The status information - The status flag will NOT be 
+ *                                        initialized.
  *
- * @return 1 if key was loaded successfully, 0 otherwise
+ * @return API_SUCCESS(1) or API_FAILURE(0 - see status) 
  */
-int sca_loadKey(BGPSecKey* key, bool fPrivate)
+int sca_loadKey(BGPSecKey* key, bool fPrivate, sca_status_t* status)
 {
   if (_key_ext_priv[0] == '\0')
   {
@@ -1091,7 +1186,21 @@ int sca_loadKey(BGPSecKey* key, bool fPrivate)
     sca_setX509_ext(DEF_KEY_EXT_PUB);
   }
 
-  return impl_loadKey(key, fPrivate, fPrivate ? _key_ext_priv : _key_ext_pub);
+  int retVal =  impl_loadKey(key, fPrivate, fPrivate ? _key_ext_priv 
+                                                     : _key_ext_pub);
+  if (retVal == API_LOADKEY_FAILURE)
+  {
+    retVal = API_FAILURE;
+    if (status != NULL)
+    {
+      *status |= API_STATUS_ERR_KEY_IO | API_STATUS_INFO_KEY_NOTFOUND;
+    }
+  }
+  else
+  {
+    retVal = API_SUCCESS;
+  }
+  return retVal;
 }
 
 /**
@@ -1106,119 +1215,555 @@ long sca_getCurrentLogLevel()
   return g_loglevel;
 }
 
-/**
- * Generate the message for the hash generation for the initial segment for
- * protocol draft 13
- *
- * @param buff The buffer to be used or NULL - In the later case or if the given 
- *             buffer is of insufficient size, either a new buffer will be 
- *             allocated or the existing buffer will be extended, both using 
- *             realloc.
- * @param blen IN/OUT for IN the size of buff, for OUT, the number of bytes used
- *             in buff which might be the total length of buff or less.s
- * @param targetAS The next AS to send the update to
- * @param originAS The origin AS
- * @param pCount the pCount of this hop (OriginAS)
- * @param flags The flags
- * @param algoID The Algorithm ID
- * @param afi The AFI (AFI_V4 | AFI_V6)
- * @param safi The SAFI
- * @param pLen The prefix length in bits. Used to calculate the bytes needed to
- *        store the prefix (padded)
- * @param nlri The prefix.
- *
- * @return The hash stored in either the given buff or a new allocated memory.
- *         The length of the new hash is stores in 'blen'
- */
-u_int8_t* sca_generateMSG1(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS,
-                           u_int32_t originAS, u_int8_t  pCount,
-                           u_int8_t  flags, u_int8_t  algoID, u_int16_t afi,
-                           u_int8_t  safi, u_int8_t  pLen, u_int8_t* nlri)
-{
-  if (blen != NULL)
-  {
-    // Determine the memory needed.
-    u_int8_t nlriLength = (pLen / 8) + (pLen % 8 == 0 ? 0 : 1);
-    u_int8_t neededLen = 4+4+1+1+1+2+1+1+nlriLength;
+////////////////////////////////////////////////////////////////////////////////
+// DRAFT 15 
+////////////////////////////////////////////////////////////////////////////////
 
-    if (buff == NULL || *blen < neededLen)
+/**
+ * Generate the message digest from the given data.
+ * It will return API_STATUS_ERR_USER2 if the signature block cannot be found in
+ * the BGPSec Path Attribute data
+ * 
+ * The following status settings are returned:
+ * 
+ * API_STATUS_ERR_USER1: The given data is corrupt.
+ * API_STATUS_ERR_USER2: No matching signature block could be found.
+ * API_STATUS_ERR_NO_DATA: Data of some kind is missing.
+ * 
+ * API_STATUS_INFO_USER1: A Hash message already exist (not NULL) so we
+ *                        do not generate a new one.
+ * 
+ * The optimizer breaks this function therefore the optimization level is hard 
+ * coded down to -O0
+ * 
+ * @param data Contains the BGPSec Path attribute as it is on the wire and all 
+ *             the required information.
+ * @param algoID Look for the signatures of the given algorithm suite id
+ * @param status The status flag in case of 0 return value
+ * 
+ * @return the number of bytes used in the internal buffer or 0.
+ */
+#pragma GCC push_options
+#ifndef FORCE_OPTIMIZING
+#pragma GCC optimize ("O0")
+#endif
+int sca_generateHashMessage(SCA_BGPSecValidationData* data, u_int8_t algoID, 
+                            sca_status_t* status)
+{
+  // @TODO: Revisit once data can have multiple hashMessage blocks. Then 
+  // it gets a bit more complicated. For now we use the HM_BLOCK and assume
+  // we only have one block. Remove the BLOCK_0/BLOCK_1 define once the 2 block
+  // handling is properly added.
+#define BLOCK_0 0
+#define BLOCK_1 1
+  
+  sca_status_t myStatus = API_STATUS_OK;
+  
+  // Some initial check
+  if (data != NULL)
+  {
+    // we accept the given hash Message and stop. 
+    if (data->hashMessage[BLOCK_0] != NULL) // Interestingly -02 removes this line only and removed check.
     {
-      buff = (u_int8_t*)realloc(buff, neededLen);
+      myStatus = API_STATUS_INFO_USER1; // info will be set in -O2 GCC 4.8.5 even though if data-digest != NULL
     }
-    memset(buff, 0, neededLen);
-    TplHash1* hash1 = (TplHash1*)buff;
-    hash1->targetAS = htonl(targetAS);
-    hash1->originAS = htonl(originAS);
-    hash1->pCount   = pCount;
-    hash1->flags    = flags;
-    hash1->algoID   = algoID;
-    hash1->afi      = htons(afi);
-    hash1->safi     = safi;
-    hash1->pLen     = pLen;
-    if (pLen > 0)
+    if (data->bgpsec_path_attr == NULL)
     {
-      u_int8_t* hashNlri = buff + sizeof(TplHash1);
-      memcpy(hashNlri, nlri, nlriLength);
+      myStatus = API_STATUS_ERR_NO_DATA;         
     }
-    *blen = neededLen;
   }
   else
   {
-    sca_debugLog(LOG_ERR, "Invalid buffer size 'NULL'\n");
-    buff = NULL;
+    myStatus = API_STATUS_ERR_NO_DATA;    
   }
+  
+  if (myStatus != API_STATUS_OK)
+  {
+    if (status != NULL)
+    {
+      *status = myStatus;
+    }
+    // Return valid if a hash message already existed. (some speedup)
+    return ((myStatus & API_STATUS_ERROR_MASK) == 0) ? API_VALRESULT_VALID
+                                                     : API_VALRESULT_INVALID;
+  }
+  
+  // Now set the pointers to the path segment and signature segments.
+  u_int8_t* bgpsecPathAttr = data->bgpsec_path_attr;
+  // Cast it to the BGPSEC Path Attribute to easily access the data and move the 
+  // pointer to the path segment portion of the data
+  SCA_BGPSEC_PathAttribute* bgpsecAttrHdr = 
+                                      (SCA_BGPSEC_PathAttribute*)bgpsecPathAttr;
+  bgpsecPathAttr += LEN_BGPSECPATHATTR_HDR;
+  // Contains the length of SecurePath and all Signature blocks.
+  u_int16_t remainder = ntohs(bgpsecAttrHdr->attrLength);
+  
+  // Cast it to the Secure Path header element and move it to the first secure 
+  // Path segments
+  SCA_BGPSEC_SecurePath* secPathHdr = (SCA_BGPSEC_SecurePath*)bgpsecPathAttr;
+  // Get the length in bytes. (div by 6 equals segment count))  
+  const u_int16_t secPathLen = ntohs(secPathHdr->length);
+  
+  // @TODO: Add management of second block - in case two signature blocks are 
+  //        available - here a loop would be the correct approach.
+  data->hashMessage[BLOCK_0] = malloc(sizeof(SCA_HashMessage));
+  data->hashMessage[BLOCK_1] = NULL;
+  memset (data->hashMessage[BLOCK_0], 0, sizeof(SCA_HashMessage));
+  data->hashMessage[BLOCK_0]->segmentCount = secPathLen / LEN_SECPATHSEGMENT;
 
-  return buff;
+  // Now Move it over the SecurePath Header and position it at the secure path
+  // segment.
+  bgpsecPathAttr += LEN_SECPATH_HDR;
+  remainder      -= LEN_SECPATH_HDR;  
+  
+  // Cast it to the first secure path segment and move the pointer to the 
+  // Signature block. (secPath->length includes the length field size which we 
+  // already moved out pointer by. subtract this size from the length and move
+  // to the signature block. 
+  SCA_BGPSEC_SecurePathSegment* pSeg = 
+                                  (SCA_BGPSEC_SecurePathSegment*)bgpsecPathAttr;
+  bgpsecPathAttr += (secPathLen - LEN_SECPATH_HDR);
+  // Adjust the remainder
+  remainder -= (secPathLen - LEN_SECPATH_HDR);
+  
+  // Now find the correct signature block
+  SCA_BGPSEC_SignatureBlock*   sBlock = NULL;
+  SCA_BGPSEC_SignatureSegment* sigSeg = NULL;
+  u_int16_t blockLength = 0;
+  while (remainder != 0)
+  {
+    sBlock = (SCA_BGPSEC_SignatureBlock*)bgpsecPathAttr;
+    blockLength = ntohs(sBlock->length);
+    if ((blockLength > remainder) || (blockLength == 0 && remainder != 0))
+    {
+      // Bugfix in case the given data is corrupted it might end up in an 
+      // endless loop or segmentation fault by reading over the allocated 
+      // memory
+      myStatus = API_STATUS_ERR_USER1;
+      free (data->hashMessage[BLOCK_0]);
+      data->hashMessage[BLOCK_0] = NULL;
+      
+      sBlock   = NULL;
+      break;
+    }
+    remainder -= blockLength;
+    if (sBlock->algoID != algoID)
+    {
+      // Move to the next block
+      bgpsecPathAttr += blockLength;
+      sBlock = NULL;
+      continue;
+    }
+    sigSeg = (SCA_BGPSEC_SignatureSegment*)(bgpsecPathAttr + LEN_SIGBLOCK_HDR);
+    // nothing more necessary!
+    break;
+  }
+  
+  // Now pointers are placed, generate the digest.
+  
+  int used = 0;
+  int size = 0;
+  if (sBlock != NULL)
+  {
+    // Now prepare the prefix information
+    u_int8_t  prefixBLen = (u_int8_t)((data->nlri->length + 7) / 8);
+
+    // Now we have all major pointers in place, calculate the required size and 
+    // see if the buffer fits:
+    int segments = data->hashMessage[BLOCK_0]->segmentCount;
+    
+    
+    // +---------------------------+
+    // | target AS   (4 octets)    | <- For signing to next peer
+    // +---------------------------+
+    // | Signature Segment N       | <- Signature coming to MyAS sig[0]
+    // +---------------------------+
+    // | Path Segment (myAS)       |
+    // |   pCount    (1 octet) = 0 | <- set myAS pCount for signing to peer
+    // |   flags     (1 octet) = 0 | <- set MyAS flags for signing to peer
+    // |   MyAS      (4 octets)    | <- Start digest degest[0]
+    // +---------------------------+
+    // | Signature Segment N-1     | <- Signature sig[1] - signed over digest[1]
+    // +---------------------------+
+    // | Path Segment (N)          |
+    // |   pCount    (1 octet)     |
+    // |   flags     (1 octet)     |
+    // |   asn       (4 octets)    | <- Start digest degest[1]
+    // +---------------------------+
+    // ...
+    // +---------------------------+
+    // | Signature Segment N-1     | <- Signature sig[Origin] 
+    // +---------------------------+
+    // | Path Segment (2)          |
+    // |   pCount    (1 octet)     |
+    // |   flags     (1 octet)     |
+    // |   asn       (4 octets)    |  <- Start digest [Origin]
+    // +---------------------------+
+    // | Path Segment (1)          |
+    // +---------------------------+
+    // | algoID, NLRI              |
+    // +---------------------------+
+    
+
+    size = 4 //s Target AS               
+           + ((segments + 1) * LEN_SECPATHSEGMENT) // always one segment more in the path
+           + (blockLength - LEN_SIGBLOCK_HDR)   // only the signature segments
+           + 1 + 4 + prefixBLen; // 1 for AlgoID, 2, for AFI, 1 for SAFI,
+                                 // 1 for pLength, compressed prefix in bytes
+
+    // Now create the digest buffer
+    data->hashMessage[BLOCK_0]->buffer     = malloc(size);
+    data->hashMessage[BLOCK_0]->bufferSize = size;    
+
+    // Now prepare the digest and signature pointers into the buffer
+    data->hashMessage[BLOCK_0]->hashMessageValPtr = malloc(sizeof(u_int8_t*) * segments);
+    memset (data->hashMessage[BLOCK_0]->hashMessageValPtr, 0, (sizeof(u_int8_t*)*segments));
+
+    // Now the buffer pointer we walk through  
+    u_int8_t* buffPtr = data->hashMessage[BLOCK_0]->buffer;
+    // initialize the buffer
+    memset (buffPtr, 0, size);
+
+    // Skip the first 4 bytes (placeholder for the target AS)
+    buffPtr += 4;    
+    used    += 4;
+
+    int segment = 0;
+    //set pointer to first signature N
+    u_int8_t* sigPtr  = (u_int8_t*)sigSeg;
+    //set pointer to fist path segment N
+    u_int8_t* pathPtr = (u_int8_t*)pSeg;
+
+    // Only needed to easily read the length field
+    SCA_BGPSEC_SignatureSegment*  sPtr = NULL;
+
+    int dataLength = 0;
+
+    //now add the segments and signatures, etc.  
+    for (; segment < segments; segment++)
+    {
+      sPtr = (SCA_BGPSEC_SignatureSegment*)sigPtr; 
+      // Determine the size of the signature segment
+      dataLength = LEN_SIGSEGMENT_HDR + ntohs(sPtr->siglen);
+      
+      // Create the digest pointers
+      data->hashMessage[BLOCK_0]->hashMessageValPtr[segment] = malloc(sizeof(SCA_HashMessagePtr));
+      //Copy the complete signature segment into the buffer
+      memcpy(buffPtr, sigPtr, dataLength);
+      // Set the signature pointer to the signature within the buffer
+      data->hashMessage[BLOCK_0]->hashMessageValPtr[segment]->signaturePtr = buffPtr;
+      // Move to next signature
+      sigPtr  +=  dataLength;
+      
+      // Move  buffer to the next position (secure Path element)
+      buffPtr += dataLength;
+      // Mark this data as used data. 
+      used    += dataLength;
+
+      // Now add the path segment
+      if (segment != 0) // a regular path segment incl. flags and pcount
+      {
+        memcpy(buffPtr, pathPtr, 6);
+        // Move to ASN as start for digest
+        buffPtr += 2; 
+        used    += 2;
+        // Now set the digest pointer into the buffer N
+        data->hashMessage[BLOCK_0]->hashMessageValPtr[segment]->hashMessagePtr = buffPtr;
+        // Now specify the remaining length of the digest
+        data->hashMessage[BLOCK_0]->hashMessageValPtr[segment]->hashMessageLength = 
+                                                                    size - used;
+        
+        // Now move to next signature (or origin path segment)
+        buffPtr += 4; 
+        pathPtr += 6;
+        used    += 4;
+      }
+      else
+      {
+        // This is the my AS (target AS of peer - skip flags and pcount.)
+        buffPtr += 2;
+        used    += 2;
+        // Now store myAS in the buffer
+        u_int32_t* asn = (u_int32_t*)buffPtr;
+        *asn = data->myAS;
+        // Now set the digest pointer
+        data->hashMessage[BLOCK_0]->hashMessageValPtr[segment]->hashMessagePtr = buffPtr;
+        // Set the length of the digest
+        data->hashMessage[BLOCK_0]->hashMessageValPtr[segment]->hashMessageLength = 
+                                                                      size-used;
+        
+        buffPtr += 4;
+        used    += 4;
+      }  
+    }
+    // Now add the origin path segment
+    
+    memcpy(buffPtr, pathPtr, 6);
+    buffPtr += 6;
+    used    += 6;
+
+    // Now add the algoID
+    *buffPtr = algoID;
+    buffPtr++;
+    used++;
+
+    // Copy prefix:
+    memcpy(buffPtr, data->nlri, prefixBLen+4);
+    used += prefixBLen + 4;
+  }
+  else
+  {
+    myStatus = API_STATUS_ERR_USER1;
+    used = 0;
+    if (data->hashMessage[BLOCK_0] != NULL)
+    {
+      sca_freeHashInput(data->hashMessage[BLOCK_0]);
+      data->hashMessage[BLOCK_0] = NULL;
+    }
+  }
+  
+  if (status != NULL)
+  {
+    *status = myStatus;
+  }
+  return used;
 }
 
 /**
- * Generate the message for the hash generation for the intermediate segment for
- * protocol draft 13
- *
- * @param buff The buffer to be used or NULL - In the later case or if the given 
- *             buffer is of insufficient size, either a new buffer will be 
- *             allocated or the existing buffer will be extended, both using 
- *             realloc.
- * @param buffLen The length of the input buffer (only used if buff != NULL)
- * @param targetAS The next AS to send the update to.
- * @param originAS The origin AS.
- * @param pCount the pCount of this hop (OriginAS).
- * @param flags The flags.
- * @param sigLen The length of the given signature.
- * @param signature The previous signature.
- *
- * @return The hash stored in either the given buff or a new allocated memory.
- *         The length of the new hash is stores in 'blen'
+ * This function generates the Hash for a prefix origination - This is used
+ * for signing.
+ * 
+ * @param targetAS The target AS (network format)
+ * @param spSeg The Secure Path segment of the origin (all network format)
+ * @param nlri The NLRI information
+ * @param algoID The algorithm site identifier.
+ * 
+ * @return Return the hash message.
  */
-u_int8_t* sca_generateMSG2(u_int8_t* buff, u_int8_t* blen, u_int32_t targetAS,
-                           u_int32_t signerAS, u_int8_t pCount, u_int8_t flags,
-                           u_int8_t sigLen, u_int8_t* signature)
+SCA_HashMessage* sca_gnenerateOriginHashMessage(u_int32_t targetAS, 
+                                            SCA_BGPSEC_SecurePathSegment* spSeg, 
+                                            SCA_Prefix* nlri, u_int8_t algoID)
 {
-  // Determine the memory needed.
-  u_int8_t neededLen = 4+4+1+1+sigLen;
-  if (blen != NULL)
+    //Now set the completeNLRI information
+    int nlriLen = ((nlri->length + 7) / 8) + 4; // afi(2), safi(1), len(1)
+    
+    // Now its up to us to generate the hash message.
+    int bLen =   4                  // targetAS
+               + LEN_SECPATHSEGMENT // Originator Path Segment
+               + 1                  // algoID
+               + nlriLen;           // all the prefix info (afi, safi, len, ip)
+    SCA_HashMessage* hashMsg = malloc(sizeof(SCA_HashMessage));
+    hashMsg->ownedByAPI   = true;
+    hashMsg->segmentCount = 1;
+    hashMsg->bufferSize = bLen;
+    hashMsg->buffer = malloc(bLen);
+    memset(hashMsg->buffer, 0, bLen);
+    hashMsg->hashMessageValPtr = malloc(sizeof(SCA_HashMessagePtr*));
+    hashMsg->hashMessageValPtr[0] = malloc(sizeof(SCA_HashMessagePtr));
+    hashMsg->hashMessageValPtr[0]->signaturePtr      = NULL;
+    hashMsg->hashMessageValPtr[0]->hashMessagePtr    = hashMsg->buffer;
+    hashMsg->hashMessageValPtr[0]->hashMessageLength = bLen;
+    // We don't need to set the peer as or flags or pCount. That will be done 
+    // in sign.
+    // We can immediately skipp the first 6 bytes and write directly the
+    // origin as followed by the bottom info (algoID, AFI, SAFI, NLRI)
+    u_int8_t* ptr = hashMsg->buffer;
+    
+    // Set the target AS:
+    u_int32_t* asn = (u_int32_t*)ptr;
+    *asn = targetAS;
+    ptr += 4;
+    
+    // Now set the origin
+    memcpy(ptr, spSeg, LEN_SECPATHSEGMENT);
+    ptr += LEN_SECPATHSEGMENT;
+    
+    // Now set the algoID
+    *ptr = algoID;
+    ptr++;
+    
+    memcpy (ptr, nlri, nlriLen);
+    
+    return hashMsg;
+}
+#pragma GCC pop_options    
+
+/**
+ * This function will free the copmlete digest structure if NOT owned by the 
+ * API.
+ * 
+ * @param data The validation data that contain the validation digest that
+ *             has to be deleted.
+ * 
+ * @return true if the hash input could be released.
+ */
+bool sca_freeHashInput(SCA_HashMessage* data)
+{
+  if (data != NULL)
   {
-    if (buff == NULL || *blen < neededLen)
+    if (data->ownedByAPI)
     {
-      buff = (u_int8_t*)realloc(buff, neededLen);
+      return false;
     }
-    memset(buff, 0, neededLen);
-
-    TplHash2* hash2 = (TplHash2*)buff;
-    hash2->targetAS = htonl(targetAS);
-    hash2->signerAS = htonl(signerAS);
-    hash2->pCount   = pCount;
-    hash2->flags    = flags;
-    u_int8_t* ptr = buff + sizeof(TplHash2);
-    memcpy(ptr, signature, sigLen);
-
-    *blen = neededLen;
+    
+    if (data->hashMessageValPtr != NULL)
+    {
+      int idx = 0;
+      for (idx = 0; idx < data->segmentCount; idx++)
+      {
+        free(data->hashMessageValPtr[idx]);
+        data->hashMessageValPtr[idx] = NULL;
+      }
+      free (data->hashMessageValPtr);
+      data->hashMessageValPtr = NULL;
+      data->segmentCount = 0;
+    }
+    if (data->buffer != NULL)
+    {
+      memset(data->buffer, 0, data->bufferSize);
+      free(data->buffer);
+      data->buffer     = NULL;
+      data->bufferSize = 0;
+    }
+    free(data);
   }
-  else
+  
+  return true;
+}
+
+/**
+ * Return the algorithm ID used for this hashMEssage
+ * 
+ * @param hashMessage The hash Message.
+ * 
+ * @return The algorithm ID for this hash Message or 0 if none can be found.
+ * 
+ * @since 0.2.0.0
+ */
+u_int8_t sca_getAlgorithmID(SCA_HashMessage* hashMessage)
+{
+  u_int8_t algoID = 0;
+  
+  if (hashMessage != NULL)
   {
-    sca_debugLog(LOG_ERR, "Invalid buffer size 'NULL'\n");
-    buff = NULL;
+    SCA_HashMessagePtr* hmPtr = hashMessage->hashMessageValPtr[hashMessage->segmentCount-1];
+    if (hmPtr != NULL)
+    {
+      if (hmPtr->hashMessageLength >= 11)
+      {
+        // This is the last hash message pointer. It points to the origination 
+        // and the data of the origination has the following format:
+        //
+        // +--------------------------------------+ Address - offset
+        // |  Target AS   (4 octets)              | 00 - 03
+        // |  pCount      (1 octet  - originator) | 04 - 04
+        // |  flags       (1 octet  - originator) | 05 - 05
+        // |  ASN         (4 octets - originator) | 06 - 10
+        // |  AlgorithmID (1 octet)               | 11 - 11
+        // | ...
+        algoID =  *(hmPtr->hashMessagePtr + 11);
+      }
+    }
   }
+  
+  return algoID;
+}
 
-  return buff;
+
+/**
+ * Print the status information in human readable format
+ * 
+ * @param status the status variable to be printed
+ * 
+ * @since 0.2.0.0
+ */
+void sca_printStatus(sca_status_t status)
+{     
+  if ((status & API_STATUS_INFO_MASK) > 0)
+  {
+    char* IS  = (status & API_STATUS_INFO_SIGNATURE) > 0 
+                ? "|1+--API_STATUS_INFO_SIGNATURE"
+                : " 0 ";
+    char* IKN = (status & API_STATUS_INFO_KEY_NOTFOUND) > 0 
+                ? "|1+-----API_STATUS_INFO_KEY_NOTFOUND"
+                : " 0 ";
+    char* IU1 = (status & API_STATUS_INFO_USER1) > 0 
+                ? "|1+---------------API_STATUS_INFO_USER1"
+                : " 0 ";
+    char* IU2 = (status & API_STATUS_INFO_USER2) > 0 
+                ? "|1+-----------------API_STATUS_INFO_USER_2"
+                : " 0 ";
+    
+    printf ("INFO:  0x%04X\n", status & API_STATUS_INFO_MASK);
+    printf ("       8 4 2 1 8 4 2 1\n");
+    printf ("       %c %c - - - - %c %c\n", IU2[1], IU1[1], IKN[1], IS[1]);
+    printf ("       %c %c         %c %c\n", IU2[0], IU1[0], IKN[0], IS[0]);
+    
+    if ((status & API_STATUS_INFO_SIGNATURE) > 0)
+      printf ("       %c %c         %c %s\n", *IU2, *IU1, *IKN, &IS[2]);//0x0001
+    if ((status & API_STATUS_INFO_KEY_NOTFOUND) > 0)
+      printf ("       %c %c         %s\n", *IU2, *IU1, &IKN[2]);      //  0x0002
+    if ((status & API_STATUS_INFO_USER1) > 0)
+      printf ("       %c %s\n", *IU2, &IU1[2]);                       //  0x0040
+    if ((status & API_STATUS_INFO_USER2) > 0)
+      printf ("       %s\n", &IU2[2]);                                //  0x0080
+  }
+  else if ((status & API_STATUS_ERROR_MASK) > 0)
+  {
+    char* END = (status & API_STATUS_ERR_NO_DATA) > 0 
+                ? "|1+--API_STATUS_ERR_NO_DATA"                         // 0x0100
+                : " 0 ";
+    char* ENP = (status & API_STATUS_ERR_NO_PREFIX) > 0                // 0x0200
+                ? "|1+----API_STATUS_ERR_NO_DATA"
+                : " 0 ";
+    char* EIK = (status & API_STATUS_ERR_INVLID_KEY) > 0               // 0x0400
+                ? "|1+------API_STATUS_ERR_INVALID_KEY"
+                : " 0 ";
+    char* EKI = (status & API_STATUS_ERR_KEY_IO) > 0                   // 0x0800
+                ? "|1+--------API_STATUS_ERR_KEY_IO"
+                : " 0 ";
+    char* EIB = (status & API_STATUS_ERR_INSUF_BUFFER) > 0             // 0x1000
+                ? "|1+----------API_STATUS_ERR_INSUF_BUFFER"
+                : " 0 ";
+    char* EIS = (status & API_STATUS_ERR_INSUF_KEYSTORAGE) > 0         // 0x2000
+                ? "|1+------------API_STATUS_ERR_INSUF_KEYSTORAGE"
+                : " 0 ";
+    char* EU1 = (status & API_STATUS_ERR_USER1) > 0                    // 0x4000
+                ? "|1+------------API_STATUS_ERR_USER1"
+                : " 0 ";
+    char* EU2 = (status & API_STATUS_ERR_USER2) > 0                    // 0x8000
+                ? "|1+------------API_STATUS_ERR_USER2"
+                : " 0 ";
+    
+    printf ("ERROR: 0x%04X\n", status & API_STATUS_ERROR_MASK);
+    printf ("       8 4 2 1 8 4 2 1\n");
+    printf ("       %c %c %c %c %c %c %c %c\n", EU2[1], EU1[1], EIS[1], EIB[1], 
+                                                EKI[1], EIK[1], ENP[1], END[1]);
+    printf ("       %c %c %c %c %c %c %c %c\n", EU2[0], EU1[0], EIS[0], EIB[0], 
+                                                EKI[0], EIK[0], ENP[0], END[0]);
+    
+    if ((status & API_STATUS_ERR_NO_DATA) > 0)
+      printf ("       %c %c %c %c %c %c %c %s\n", *EU2, *EU1, *EIS, *EIB, *EKI, 
+                                                   *EIK, *ENP, &END[2]);
+    if ((status & API_STATUS_ERR_NO_PREFIX) > 0)
+      printf ("       %c %c %c %c %c %c %s\n", *EU2, *EU1, *EIS, *EIB, *EKI, 
+                                               *EIK, &ENP[2]);
+    if ((status & API_STATUS_ERR_INVLID_KEY) > 0)
+      printf ("       %c %c %c %c %c %s\n", *EU2, *EU1, *EIS, *EIB, *EKI, 
+                                            &EIK[2]);
+    if ((status & API_STATUS_ERR_KEY_IO) > 0)
+      printf ("       %c %c %c %c %s\n", *EU2, *EU1, *EIS, *EIB, &EKI[2]);
+    if ((status & API_STATUS_ERR_INSUF_BUFFER) > 0)
+      printf ("       %c %c %c %s\n", *EU2, *EU1, *EIS, &EIB[2]);
+    if ((status & API_STATUS_ERR_INSUF_KEYSTORAGE) > 0)
+      printf ("       %c %c %s\n", *EU2, *EU1, &EIS[2]);
+    if ((status & API_STATUS_ERR_USER1) > 0)
+      printf ("       %c %s\n", *EU2, &EU1[2]);
+    if ((status & API_STATUS_ERR_USER2) > 0)
+      printf ("       %s\n", &EU2[2]);
+  }
+  if (status == API_STATUS_OK)
+  {
+    printf ("STATUS: OK\n");    
+  }
 }

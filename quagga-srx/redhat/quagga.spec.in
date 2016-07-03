@@ -132,7 +132,7 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 # Needed for QuaggaSRx
-Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.3.1, srxcryptoapi >= 0.1.2
+Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.4.0, srxcryptoapi >= 0.2.0
 
 
 %description

@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.4.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * Changed the input parameters of the ID generation. 
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Added Changelog
  *            * Fixed speller in documentation header
@@ -33,22 +35,25 @@
 
 #include <stdint.h>
 #include "util/prefix.h"
+#include "srx_defs.h"
 
 #ifndef SRX_IDENTIFIER_H
 #define	SRX_IDENTIFIER_H
 
 /**
- * This method generates an ID out of the given data.
+ * This particular method generates an ID out of the given data using a simple
+ * CRC32 algorithm. All data is used as is, no tranformation from host to
+ * network and vice versa is performed.
  *
  * @param originAS The origin AS of the data
  * @param prefix The prefix to be announced (IPPrefix)
- * @param dataLength the length of the following data blob
- * @param data The data blob.
+ * @param data The bgpsec data object which contains the BGP4 path as well.
  *
  * @return return an ID.
+ * 
  */
-uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix,
-                            uint32_t blobLength, void* blob);
+uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix, 
+                            BGPSecData* data);
 
 
 #endif	/* SRX_IDENTIFIER_H */

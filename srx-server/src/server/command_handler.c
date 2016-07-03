@@ -409,14 +409,14 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
     {
       SRXPROXY_VERIFY_V4_REQUEST* v4 = (SRXPROXY_VERIFY_V4_REQUEST*)item->data;
       prefix->ip.version = 4;
-      prefix->length = v4->prefixLen;
+      prefix->length = v4->common.prefixLen;
       cpyIPv4Address(&prefix->ip.addr.v4, &v4->prefixAddress);
       asn = ntohl(v4->originAS);
     }
     else
     {
       SRXPROXY_VERIFY_V6_REQUEST* v6 = (SRXPROXY_VERIFY_V6_REQUEST*)item->data;
-      prefix->length = v6->prefixLen;
+      prefix->length = v6->common.prefixLen;
       prefix->ip.version = 6;
       cpyIPv6Address(&prefix->ip.addr.v6, &v6->prefixAddress);
       asn = ntohl(v6->originAS);

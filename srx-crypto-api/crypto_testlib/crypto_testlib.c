@@ -17,9 +17,13 @@
  *
  * This software provides a test implementation for a BGPSec plugin. This
  * plugin does only provide empty functions. and is for test only.
+ * 
+ * @version 0.2.0.0
  *
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.0 - 2016/05/25 - oborchert
+ *             * Updated to new API
  *   0.1.2.1 - 2016/02/02 - oborchert
  *             * added init method
  *   0.1.2.0 - 2015/12/03 - oborchert
@@ -36,100 +40,69 @@
  */
 #include <syslog.h>
 #include <stddef.h>
+#include <string.h>
 #include "../srx/srxcryptoapi.h"
 
-#define YES     1
-#define NO      0
-
-/**
- * This is the internal wrapper function. Currently it does return only the 
- * error code and provides a debug log.
- * 
- * @param bgpsec_path pointer to the BGPSEC path attribute.
- * @param number_keys The number of keys passed within the key array.
- * @param keys an array containing the keys.
- * @param prefix pointer to the prefix.
- * @param localAS the callers local AS number.
- * 
- * @return API_VALRESULT_ERROR (-1( for error (a NULL value for path or prefix),
- *         API_VALRESULT_INVALID (0) for missing keys, or API_VALRESULT_VALID (1)
- */
-int validate(BgpsecPathAttr* bgpsec_path, u_int16_t number_keys,
-             BGPSecKey** keys, void *prefix, u_int32_t localAS )
+  /**
+   * Perform BGPSEC path validation. This function required the keys to be 
+   * pre-registered to perform the validation. 
+   * The caller manages the memory and MUST assure the memory is intact until
+   * the function returns.
+   * This function only returns API_VALRESULT_VALID and API_VALRESULT_INVALID.
+   * In case of erorrs API_VALRESULT_INVALID will be returned with an error code
+   * passed in the status flag. This flag also contains more details about the 
+   * validation status (why invalid, etc.)
+   *
+   * @param data This structure contains all necessary information to perform
+   *             the path validation. The status flag will contain more 
+   *             information
+   *
+   * @return API_VALRESULT_VALID (1) or API_VALRESULT_VALID (0) and the status 
+   *         flag contains further information - including errors.
+   *         
+   */
+int validate(SCA_BGPSecValidationData* data)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'validate'\n");
-  int retVal = (bgpsec_path == NULL) ?  API_VALRESULT_ERROR
-               : (number_keys == 0) ?   API_VALRESULT_INVALID
-                 : (keys == NULL) ?     API_VALRESULT_INVALID
-                   : (prefix == NULL) ? API_VALRESULT_ERROR
-                     : API_VALRESULT_VALID;
+  int status = (data != NULL) ? API_STATUS_OK : API_STATUS_ERR_NO_DATA;
   
-  return retVal;
-}
-
-  /**
-   * Perform BGPSEC path validation. (Optional) This function uses the list of 
-   * registered public keys and returns the validation state or -1 for an error. 
-   * The caller manages the memory and MUST assure the memory is intact until 
-   * the function returns. The implementation itself DOES NOT modify the given 
-   * data.
-   * 
-   * @param bgpsec_path pointer to the BGPSEC path attribute.
-   * @param prefix pointer to the prefix.
-   * @param localAS the callers local AS number.
-   * @param extCode contains more information in case the validation value is 
-   *                invalid. 0: validation failed, 1: key not found.
-   * 
-   * @return -1 for error (a NULL value) or 1 for valid
-   */
-int extValidate(BgpsecPathAttr* bgpsec_path, void *prefix, u_int32_t localAS, 
-                u_int8_t* extCode)
-{
-  // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'extValidate'\n");  
-  int retVal = (bgpsec_path == NULL) ? API_VALRESULT_ERROR
-               : (prefix == NULL) ?    API_VALRESULT_ERROR
-                 : API_VALRESULT_VALID;
+  if ((status & API_STATUS_ERROR_MASK) == 0)
+  {
+    if (data->bgpsec_path_attr == NULL || data->hashMessage == NULL)
+    {
+      status |= API_STATUS_ERR_NO_DATA;
+    }
+    if (data->nlri == NULL)
+    {
+      status |= API_STATUS_ERR_NO_PREFIX;
+    }
+    
+    data->status = status;
+  }  
   
-  return retVal;
-}
-             
-             
-/**
- * Sign the given BGPSEC path data with the provided key. This implementation 
- * does not sign the path.
- * 
- * @param bgpsec_data The BGPSEc data to be signed.
- * @param key The key to be used for signing
- * 
- * @return API_FAILURE (0) for failure
- */
-int sign_with_key(BGPSecSignData* bgpsec_data, BGPSecKey* key)
-{
-  // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'sign_with_key'\n");
-  
-  return API_FAILURE;    
+  return (status == API_STATUS_OK) ? API_VALRESULT_VALID : API_VALRESULT_INVALID;
 }
 
 /**
- * 
- * Wrapper for sign the given BGPSEC path data with the provided key. This 
- * implementation does not sign the path.
- * 
- * @param bgpsec_data The data to be signed.
- * @param keyID The id of the key
- * 
- * @return API_FAILURE (0) for failure
+ * Sign the given BGPSecSign data using the given key. This method fills the
+ * key into the BGPSecSignData object.
+ *
+ * @param bgpsec_data The data object to be signed. This also includes the
+ *                    generated signature.
+ * @param ski The ski of the key to be used.
+ *
+ * @return API_SUCCESS (0) or API_FAILURE (1)
  */
-int sign_with_id(BGPSecSignData* bgpsec_data, u_int8_t keyID)
+int sign(SCA_BGPSecSignData* bgpsec_data)
 {
   // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'sign_with_id'\n");
-  
-  return API_FAILURE;
+  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'validate'\n");
+  int status = bgpsec_data != NULL ? API_STATUS_OK : API_STATUS_ERR_NO_DATA;
+    
+  return status == API_STATUS_OK ? API_VALRESULT_VALID : API_VALRESULT_INVALID;    
 }
+
 
 /**
  * Register the private key. This method does not store the key. the return 
@@ -155,10 +128,10 @@ u_int8_t registerPrivateKey(BGPSecKey* key)
  * 
  * @return API_FAILURE (0) for failure
  */
-u_int8_t unregisterPrivateKey(u_int8_t keyID)
+u_int8_t unregisterPrivateKey(char* ski)
 {
   // Return an error for missing implementation.
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'unregisterPrivateKey'\n");
+  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'unregisterPrivateKey'\n");  
   
   return API_FAILURE;
 }
@@ -200,51 +173,12 @@ int unregisterPublicKey(BGPSecKey* key)
 }
 
 /**
- * This method determines if the API provides the extended public key 
- * management. In this case the extended validation method extValidate can be 
- * called.
- * 
- * @return 1: does provide extended functionality
- */
-int isExtended()
-{
-  // Return 1 for "yes, it is extended"
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'isExtended'\n");
-  return YES;
-}
-
-/**
- * Return 1 if this API allows the storage of private keys, otherwise 0.
- * 
- * @return 0: Does not provide private key storage
- */  
-int isPrivateKeyStorage()
-{
-  // Return 1 for "yes, it is extended"
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'isPrivateKeyStroage'\n");
-  return NO;
-}
-
-/**
- * Return 1 if this API allows the storage of private keys, otherwise 0.
- * 
- * @return 0: Does not provide private key storage
- */  
-int isPublicKeyStorage()
-{
-  // Return 1 for "yes, it is extended"
-  sca_debugLog (LOG_DEBUG, "CryptoTestLib: Called 'isPublicKeyStroage'\n");
-  return NO;
-}
-
-
-/**
  * Just print the given configuration string to logging framework using INFO 
  * level.
  * 
  * @param value some string
  * 
- * @return 1: Successfull 
+ * @return API_SUCCESS (1)
  */
 int init(const char* value)
 {
@@ -256,5 +190,19 @@ int init(const char* value)
   {
     sca_debugLog(LOG_INFO, "Called init(null)\n"); 
   }
-  return 1;  
+  return API_SUCCESS; 
 }
+
+  /**
+   * This will be called prior un-binding the library. This allows the API 
+   * implementation to perform a clean shutdown / cleanup.
+   * 
+   * @return API_SUCCESS(1)
+   * 
+   * @since 0.2.0.0
+   */
+  int release()
+  {
+    return API_SUCCESS;
+  }
+

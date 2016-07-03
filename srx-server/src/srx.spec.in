@@ -28,7 +28,7 @@ Prefix: %{_sysconfdir}
 
 BuildRequires:automake	
 #Requires:glibc libconfig >= 1.3 srxcryptoapi >= 0.1.1
-Requires:glibc libconfig >= 1.3 srx-proxy = %{version}
+Requires:glibc libconfig >= 1.3 srx-proxy = %{version} srxcryptoapi >= 0.2.0
 
 %description
 The SRx-server allows to out-source the validation of BGP updates using RPKI 

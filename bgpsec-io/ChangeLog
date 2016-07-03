@@ -1,0 +1,11 @@
+Version 0.2.0.0
+  * Increased BGPSEC_IO_RECORD_VERSION to 1
+  * Added draft parameter to stored record.
+  * Added proper handling of CEASE notifications during OpenSent
+  * Added capability to specify customized configuration for SRxCryptoAPI
+  * Changed configuration file parameter from -c to -f. This prevents 
+    accidentally overwriting of cofiguration file when using -C (upper case)
+  * Moved capi initialization and management into CAPI processing mode.
+  * Added Notification Cease Codes (RFC 4486)
+  * Modified the holdtimer to allow immediate shutdown of a session in case a 
+    notification is received.

@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.4.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * Changed the input parameters of the ID generation. 
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Added Changelog
  *            * Fixed speller in documentation header
@@ -38,6 +40,7 @@
 #include "shared/crc32.h"
 #include "shared/srx_identifier.h"
 #include "util/prefix.h"
+#include "srx_defs.h"
 
 /**
  * This particular method generates an ID out of the given data using a simple
@@ -46,14 +49,34 @@
  *
  * @param originAS The origin AS of the data
  * @param prefix The prefix to be announced (IPPrefix)
- * @param dataLength the length of the following data blob
- * @param data The data blob.
+ * @param data The bgpsec data object which contains the BGP4 path as well.
  *
  * @return return an ID.
  */
-uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix,
-                            uint32_t blobLength, void* blob)
-{  
+uint32_t generateIdentifier(uint32_t originAS, IPPrefix* prefix, 
+                            BGPSecData* data)
+{
+  // @TODO: Check what the data block should consist of, the BGP4 path or the 
+  //        BGPSec Path or maybe both ?
+  // The question comes up because we need ID's for both BGP4 only and BGPSec.
+  // Then if we receive a request if a particular BGPSEC path for a particular
+  // BGP4 path exist this can only be answered by the BGP4 path.
+  // This needs some more thoughts later one. 
+  uint32_t blobLength = 0;
+  uint8_t* blob = NULL;
+  // A change in the blob generation does impact the function 
+  // update_cache.c:storeCacheEntryBlob
+  if (data->bgpsec_path_attr != 0)
+  {
+    blobLength = data->attr_length;
+    blob = (uint8_t*)data->bgpsec_path_attr;    
+  }
+  else
+  {
+    blobLength = data->numberHops * 4;
+    blob = (uint8_t*)data->asPath;
+  }
+
   uint32_t crc  = 0;
   uint32_t prefixSize = prefix->ip.version == 4 ? 4
                                                 : sizeof(prefix->ip.addr.v6.u8);

@@ -584,7 +584,7 @@ ecommunity_bgpsec_str2com(int type, unsigned int state_value)
   ecom = ecommunity_new ();
 
   eval.val[0] = ECOMMUNITY_ENCODE_BGPSEC;   /* high order type */
-  //eval.val[0] = ECOMMUNITY_ENCODE_TRANSITIVE_BGESEC;   /* TEST high order type */
+  //eval.val[0] = ECOMMUNITY_ENCODE_TRANSITIVE_BGPSEC;   /* TEST high order type */
   //eval.val[1] = ECOMMUNITY_BGPSEC_SUB;      /* low order type */
   eval.val[1] = type;      /* low order type */
   eval.val[7] = state_value;

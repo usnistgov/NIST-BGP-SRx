@@ -10,7 +10,7 @@
 # encoded format. The pem encoded format is used to generate the certificate.
 # 
 
-EXT_PEM="key"
+EXT_PEM="pem"
 EXT_DER="der"
 EXT_CERT="cert"
 

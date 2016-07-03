@@ -27,7 +27,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define ECOMMUNITY_ENCODE_AS4               0x02
 #ifdef USE_SRX
 #define ECOMMUNITY_ENCODE_BGPSEC            0x43  /* opaque type */
-#define ECOMMUNITY_ENCODE_TRANSITIVE_BGESEC 0x03  /* opaque type */
+#define ECOMMUNITY_ENCODE_TRANSITIVE_BGPSEC 0x03  /* opaque type */
 #endif
 
 
@@ -51,9 +51,19 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 /* Extended Communities BGPSEC validation state values */
 #ifdef USE_SRX
-#define ECOMMUNITY_BGPSEC_VALID             0x00
-#define ECOMMUNITY_BGPSEC_NOT_FOUND         0x01
-#define ECOMMUNITY_BGPSEC_INVALID           0x02
+// INFO: Scripting these values as hex values implies that they might be bit 
+//       encoded which they are definitely NOT. So I changed them into integers.
+//       also UNDEFINED is missing - which is an SRX Origin validation result. 
+//       The name itself should be changed from ECOMMUNITY_BGPSEC_... to 
+//       E_COMMUNITY_SRX... because these values are same for RPKI as well as 
+//       PATH validation.
+//       additional it will make sense to add an SRX_COMMON.h where system wide
+//       variables are defined used in all products throughout the SRx Software
+//       suite. 
+#define ECOMMUNITY_BGPSEC_VALID             0
+#define ECOMMUNITY_BGPSEC_NOT_FOUND         1
+#define ECOMMUNITY_BGPSEC_INVALID           2
+#define ECOMMUNITY_BGPSEC_UNDEFINED         3
 #endif
 
 /* Extended Communities attribute.  */

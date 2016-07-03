@@ -23,10 +23,13 @@
  * Secure Routing extension (SRx) client API - This API provides a fully
  * functional proxy client to the SRx server.
  *
- * Version: 0.3.0.10
+ * Version: 0.4.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * redesigned the BGPSEC data blob and adjusted the code 
+ *              accordingly
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Removed unused variables.
  * 0.3.0    - 2013/02/27 - oborchert
@@ -625,32 +628,45 @@ void processDeleteUpdate(SRxProxy* proxy, SRXPROXY_DELETE_UPDATE* hdr);
  * @return The filled PDU
  */
 uint8_t* createV4Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
-                      SRxDefaultResult* defaultResult, IPPrefix* prefix,
-                      uint32_t as32, BGPSecData* bgpsec)
+                         SRxDefaultResult* defaultResult, IPPrefix* prefix,
+                         uint32_t as32, BGPSecData* bgpsec)
 {
   int i;
-  int bgpsecPos   = sizeof(SRXPROXY_VERIFY_V4_REQUEST);
-  uint32_t length = bgpsecPos + bgpsec->length;
+  uint32_t bgpsecLength = 0;
+  uint16_t numHops      = 0;
+  uint16_t attrLength   = 0;
+  if (bgpsec != NULL)
+  {
+    bgpsecLength = (bgpsec->numberHops * 4) + bgpsec->attr_length;
+    numHops      = bgpsec->numberHops;
+    attrLength   = bgpsec->attr_length;
+  }
+  uint32_t length = sizeof(SRXPROXY_VERIFY_V4_REQUEST) + bgpsecLength; 
   SRXPROXY_VERIFY_V4_REQUEST* hdr = (SRXPROXY_VERIFY_V4_REQUEST*)pdu;
 
-  hdr->type          = PDU_SRXPROXY_VERIFY_V4_REQUEST;
-  hdr->flags         = method;
-  hdr->roaResSrc     = defaultResult->resSourceROA;
-  hdr->bgpsecResSrc  = defaultResult->resSourceBGPSEC;
-  hdr->length        = htonl(length);
-  hdr->roaDefRes     = defaultResult->result.roaResult;
-  hdr->bgpsecDefRes  = defaultResult->result.bgpsecResult;
-  hdr->prefixLen     = prefix->length;
-  hdr->requestToken  = htonl(rToken);
+  hdr->common.type          = PDU_SRXPROXY_VERIFY_V4_REQUEST;
+  hdr->common.flags         = method;
+  hdr->common.roaResSrc     = defaultResult->resSourceROA;
+  hdr->common.bgpsecResSrc  = defaultResult->resSourceBGPSEC;
+  hdr->common.length        = htonl(length);
+  hdr->common.roaDefRes     = defaultResult->result.roaResult;
+  hdr->common.bgpsecDefRes  = defaultResult->result.bgpsecResult;
+  hdr->common.prefixLen     = prefix->length;
+  hdr->common.requestToken  = htonl(rToken);
   hdr->prefixAddress = prefix->ip.addr.v4;
   hdr->originAS      = htonl(as32);
-  hdr->bgpsecLength  = htonl(bgpsec->length);
-
-  for (i = 0; i < bgpsec->length; i++)
+  hdr->bgpsecLength  = htonl(bgpsecLength);
+  
+  // Now store the number of hops.
+  hdr->bgpsecValReqData.numHops = htons(numHops);
+  hdr->bgpsecValReqData.attrLen = htons(attrLength);
+  if ((numHops + attrLength) != 0)
   {
-    pdu[bgpsecPos + i] = bgpsec->data[i];
+    uint8_t* pduPtr = pdu + sizeof(SRXPROXY_VERIFY_V4_REQUEST);
+    memcpy(pduPtr, bgpsec->asPath, (numHops*4));
+    pduPtr += (numHops*4);
+    memcpy(pduPtr, bgpsec->bgpsec_path_attr, attrLength);
   }
-
   return pdu;
 }
 
@@ -669,28 +685,43 @@ uint8_t* createV6Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
                      uint32_t as32, BGPSecData* bgpsec)
 {
   int i;
-  int bgpsecPos   = sizeof(SRXPROXY_VERIFY_V6_REQUEST);
-  uint32_t length = bgpsecPos + bgpsec->length;
+  uint32_t bgpsecLength = 0;
+  uint16_t numHops      = 0;
+  uint16_t attrLength   = 0;
+  if (bgpsec != NULL)
+  {
+    bgpsecLength = (bgpsec->numberHops * 4) + bgpsec->attr_length;
+    numHops      = bgpsec->numberHops;
+    attrLength   = bgpsec->attr_length;
+  }
+  uint32_t length = sizeof(SRXPROXY_VERIFY_V6_REQUEST) + bgpsecLength; 
+  
   SRXPROXY_VERIFY_V6_REQUEST* hdr = (SRXPROXY_VERIFY_V6_REQUEST*)pdu;
 
-  hdr->type          = PDU_SRXPROXY_VERIFY_V6_REQUEST;
-  hdr->flags         = method;
-  hdr->roaResSrc     = defaultResult->resSourceROA;
-  hdr->bgpsecResSrc  = defaultResult->resSourceBGPSEC;
-  hdr->length        = htonl(length);
-  hdr->roaDefRes     = defaultResult->result.roaResult;
-  hdr->bgpsecDefRes  = defaultResult->result.bgpsecResult;
-  hdr->prefixLen     = prefix->length;
-  hdr->requestToken  = htonl(rToken);
+  hdr->common.type          = PDU_SRXPROXY_VERIFY_V6_REQUEST;
+  hdr->common.flags         = method;
+  hdr->common.roaResSrc     = defaultResult->resSourceROA;
+  hdr->common.bgpsecResSrc  = defaultResult->resSourceBGPSEC;
+  hdr->common.length        = htonl(length);
+  hdr->common.roaDefRes     = defaultResult->result.roaResult;
+  hdr->common.bgpsecDefRes  = defaultResult->result.bgpsecResult;
+  hdr->common.prefixLen     = prefix->length;
+  hdr->common.requestToken  = htonl(rToken);
   hdr->prefixAddress = prefix->ip.addr.v6;
   hdr->originAS      = htonl(as32);
-  hdr->bgpsecLength  = htonl(bgpsec->length);
-
-  for (i = 0; i < bgpsec->length; i++)
+  hdr->bgpsecLength  = htonl(bgpsecLength);
+  
+  // Now store the number of hops.
+  hdr->bgpsecValReqData.numHops = htons(numHops);
+  hdr->bgpsecValReqData.attrLen = htons(attrLength);
+  if ((numHops + attrLength) != 0)
   {
-    pdu[bgpsecPos+i] = bgpsec->data[i];
+    uint8_t* pduPtr = pdu + sizeof(SRXPROXY_VERIFY_V4_REQUEST);
+    memcpy(pduPtr, bgpsec->asPath, (numHops*4));
+    pduPtr += (numHops*4);
+    memcpy(pduPtr, bgpsec->bgpsec_path_attr, attrLength);
   }
-
+  
   return pdu;
 }
 
@@ -739,8 +770,13 @@ void verifyUpdate(SRxProxy* proxy, uint32_t localID,
                                    (ClientConnectionHandler*)proxy->connHandler;
 
   // create data packet.
+  uint16_t bgpsecLength = 0;
+  if (bgpsec != NULL)
+  {
+    bgpsecLength = (bgpsec->numberHops * 4) + bgpsec->attr_length;
+  }
   uint32_t length = (isV4 ? sizeof(SRXPROXY_VERIFY_V4_REQUEST)
-                          : sizeof(SRXPROXY_VERIFY_V6_REQUEST)) +bgpsec->length;
+                          : sizeof(SRXPROXY_VERIFY_V6_REQUEST)) + bgpsecLength;
   uint8_t  pdu[length];
   uint32_t requestToken = localID;
 
@@ -1073,15 +1109,16 @@ void processVerifyNotify(SRXPROXY_VERIFY_NOTIFICATION* hdr, SRxProxy* proxy)
  */
 void processSignNotify(SRXPROXY_SIGNATURE_NOTIFICATION* hdr, SRxProxy* proxy)
 {
+  // @TODO: Finishe the implementation with the correct data.
   if (proxy->sigCallback != NULL)
   {
     LOG(LEVEL_INFO, "processSignNotify: NOT IMPLEMENTED IN THIS PROTOTYPE!!!\n");
     SRxUpdateID updId = hdr->updateIdentifier;
     //TODO finish processSigNotify - especially the bgpsec data
-    BGPSecData bgpsec;
-    bgpsec.length = 0;
-    bgpsec.data = NULL;
-    proxy->sigCallback(updId, &bgpsec, proxy->userPtr);
+    BGPSecCallbackData bgpsecCallback;
+    bgpsecCallback.length = 0;
+    bgpsecCallback.data = NULL;
+    proxy->sigCallback(updId, &bgpsecCallback, proxy->userPtr);
   }
   else
   {

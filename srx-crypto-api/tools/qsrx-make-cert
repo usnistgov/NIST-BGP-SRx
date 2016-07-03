@@ -8,11 +8,25 @@
 #
 # They Certificate will be generated from the PEM file. The SRxCryptoAPI 
 # uses the key file though.
-# 
+#
 
-EXT_PEM="key"
+echo "$PATH" 
+
+EXT_PEM="pem"
 EXT_CERT="cert"
 EXT_CSR="csr"
+
+if [ "$1" == "--cnf" ] ; then
+  shift
+  echo "Set home for qsrx-router-key.cnf to '$1'"
+  QSRX_CONF_HOME="$1"
+  shift
+fi
+
+if [ "$1" == "" ] ; then
+  echo "call $0 [--cnf <location of qsrx-router-key.cnf> ] <keyname>"
+  exit 1
+fi
 
 if [ "$QSRX_CONF_HOME" == "" ] ; then
   QSRX_CONF_HOME="/etc"
@@ -23,10 +37,12 @@ QSRX_VIEW=qsrx-view-subject
 QSRX_MAKE_KEY=qsrx-make-key
 QSRX_SERIAL=20140220001
 
-if [ "$1" == "" ] ; then
-  echo "call $0 <keyname>"
+which $QSRX_VIEW > /dev/null 2>&1
+if [ $? -eq 1 ] ; then
+  echo "Make sure '$QSRX_VIEW' and '$QSRX_MAKE_KEY' are in the executable path"
   exit 1
 fi
+
 
 if [ -e "$1.$EXT_PEM" ] ; then
   # Create Certificate Request

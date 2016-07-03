@@ -1869,7 +1869,7 @@ as_t aspath_origin_as (struct aspath *ap)
   {
     return 0;
   }
-
+  
   // take the last element in each segment. At the end the origin is 
   // written in the oas value.
   for (cseg = ap->segments; cseg; cseg = cseg->next)

@@ -26,22 +26,22 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.10- 2013/01/25 - oborchert
- *           * Removed un-used include glib.h 
- *   0.3.0 - 2013/01/25 - oborchert
- *           * Removed error output if an attempt of removing an already removed
- *             client thread from the client list.
- *           * Removed dead code.
- *           * Re-formated some documentation and code.
- *         - 2013/01/04 - oborchert
- *           * Added parameter goodByeReceived to ClientThread structure.
- *         - 2012/12/13 - oborchert
- *           * //TODO Make SVN compare
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *   0.1.0 - 2009/12/23 - pgleichm
- *           * Code Created
+ *   0.3.0.10- 2013/01/25 - oborchert
+ *             * Removed un-used include glib.h 
+ *   0.3.0.0 - 2013/01/25 - oborchert
+ *             * Removed error output if an attempt of removing an already removed
+ *               client thread from the client list.
+ *             * Removed dead code.
+ *             * Re-formated some documentation and code.
+ *           - 2013/01/04 - oborchert
+ *             * Added parameter goodByeReceived to ClientThread structure.
+ *           - 2012/12/13 - oborchert
+ *             * //TODO Make SVN compare
+ *   0.2.0.0 - 2011/01/07 - oborchert
+ *             * Changelog added with version 0.2.0 and date 2011/01/07
+ *             * Version tag added
+ *   0.1.0.0 - 2009/12/23 - pgleichm
+ *             * Code Created
  * -----------------------------------------------------------------------------
  *
  */

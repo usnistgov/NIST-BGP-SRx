@@ -1691,7 +1691,7 @@ route_set_ecommunity_bgpsec (void *rule, struct prefix *prefix,
 
     /* TODO: modify ecomm value according to bgp_info */
     zlog_debug(" bgp_info->val_res_ROA:%d ", bgp_info->val_res_ROA);
-    zlog_debug(" ecom_value:%08x ", (unsigned int)new_ecom->val);
+    zlog_debug(" ecom_value: %08x ", *new_ecom->val);
 
     bgp_info->attr->extra->ecommunity = ecommunity_intern (new_ecom);
 

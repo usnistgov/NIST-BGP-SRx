@@ -24,10 +24,16 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  * 
- * @version 0.3.0.10
+ * @version 0.4.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * Moved the proxy-srx-server protocol to version 2.
+ *            * Split BGPSecValData into BGPSecValReqData and BGPSecValResData. 
+ *            * Added structure to BGPSECValResData.
+ *            * Removed pragma packed and replaced it with 
+ *              __attribute__((packed)) for the package structure.
  * 0.3.0.10 - 2015/11/06 - oborchert
  *            * Removed types.h
  *            * Added Changelog
@@ -40,11 +46,12 @@
 #define __SRX_PACKETS_H__
 
 #include <unistd.h>
+#include <srx/srxcryptoapi.h>
 #include "shared/srx_defs.h"
 #include "util/prefix.h"
 
 /** Version of the protocol listed in this document. */
-#define SRX_PROTOCOL_VER  1
+#define SRX_PROTOCOL_VER  2
 
 #define SRX_ALGORITHM_UNITTEST 0xFFFF
 
@@ -94,12 +101,6 @@ typedef enum {
   PDU_SRXPROXY_UNKNOWN           = 12    // NOT IN SPEC
 } SRxProxyPDUType;
 
-/*--------------------------------------------------------
- * Packed packet structs and corresponding field constants
- */
-
-#pragma pack(1)
-
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * Plain and simple void for better reading
@@ -115,12 +116,12 @@ typedef struct {
   // The total length of this header in bytes.
   uint32_t length;
   // MUCH MORE DATA FOLLOWS, SEE srx_packet.h
-} SRXPROXY_BasicHeader;
+} __attribute__((packed)) SRXPROXY_BasicHeader;
 
 // Just an empty struct that contains to the correct address within the data
 // array
 typedef struct {  
-} PeerASList;
+} __attribute__((packed)) PeerASList;
 
 /**
  * This struct specifies the hello packet
@@ -134,7 +135,7 @@ typedef struct {
   uint32_t   asn;
   uint32_t   noPeers;
   PeerASList peerAS;
-} SRXPROXY_HELLO;
+} __attribute__((packed)) SRXPROXY_HELLO;
 
 /**
  * This struct specifies the hello response packet
@@ -145,7 +146,7 @@ typedef struct {
   uint8_t   zero;
   uint32_t  length;            // 12 Bytes
   uint32_t  proxyIdentifier;
-} SRXPROXY_HELLO_RESPONSE;
+} __attribute__((packed)) SRXPROXY_HELLO_RESPONSE;
 
 /**
  * This struct specifies the goodbye packet
@@ -155,7 +156,10 @@ typedef struct {
   uint16_t  keepWindow;
   uint8_t   zero;
   uint32_t  length;            // 8 Bytes
-} SRXPROXY_GOODBYE;
+} __attribute__((packed)) SRXPROXY_GOODBYE;
+
+typedef struct {
+} BGPSEC_DATA_PTR;
 
 /**
  * This struct is currently 0 bytes long but allows to store the address of
@@ -163,53 +167,39 @@ typedef struct {
  * a byte array.
  */
 typedef struct {
-} BGPSECValData;
+  /** The number of hops in the bgp4 as path. */
+  uint16_t   numHops;
+  /** the bgpsec_path_attr as it is received (see BGPSEC RFC) */
+  uint16_t   attrLen;
+  /** The prefix as it is used in the validation. */
+  SCA_Prefix valPrefix;
+  // Data contains numHops integer values representing the bgp4 as path followed
+  // by a bgpsec_path_attr (see BGPSEC RFC) of the length attrLen. In case the
+  // bgpsec_path_attr is not provided then no path validation can be performed
+  // but a bgp4 - bgpsec path match can be requested. For more information on
+  // that see the attached documentation.
+  // The provided bgp4 as path is provided in the order towards the originator,
+  // the last ASN in the list is the originator.
+  BGPSEC_DATA_PTR valData;
+} __attribute__((packed)) BGPSECValReqData;
 
 /**
- * This struct specifies the Verify request IPv4 packet
+ * This data will contain the BGPSEC validation result.
  */
 typedef struct {
-  uint8_t       type;          // 3
-  uint8_t       flags;
-  uint8_t       roaResSrc;
-  uint8_t       bgpsecResSrc;
-  uint32_t      length;        // Variable 24(+) Bytes
-  uint8_t       roaDefRes;
-  uint8_t       bgpsecDefRes;
-  uint8_t       zero;
-  uint8_t       prefixLen;
-  uint32_t      requestToken; // Added with protocol version 1.0
-  IPv4Address   prefixAddress;
-  uint32_t      originAS;
-  uint32_t      bgpsecLength;
-  BGPSECValData bgpsecValData;
-} SRXPROXY_VERIFY_V4_REQUEST;
+  // @TODO: Fill in the necessary data. Signature or all signatures or
+  //        maybe a copmlete bgpsec_pathAttribute that can be send out as is.
+} __attribute__((packed)) BGPSECValResData;
 
-/**
- * This struct specifies the Verify request IPv6 packet
- */
-typedef struct {
-  uint8_t       type;          // 4
-  uint8_t       flags;
-  uint8_t       roaResSrc;
-  uint8_t       bgpsecResSrc;
-  uint32_t      length;        // Variable 40(+) Bytes
-  uint8_t       roaDefRes;
-  uint8_t       bgpsecDefRes;
-  uint8_t       zero;
-  uint8_t       prefixLen;
-  uint32_t      requestToken; // Added with protocol version 1.0
-  IPv6Address   prefixAddress;
-  uint32_t      originAS;
-  uint32_t      bgpsecLength;
-  BGPSECValData bgpsecValData;
-} SRXPROXY_VERIFY_V6_REQUEST;
+// @TODO V6 and V4 request can be combined once we use the SCA_PRefix instead
+// of the IPPrefix structure. Maybe within the srx server we can move from 
+// SCA_Prefix to IP-Prefix. This can be decided later.
 
 /**
  * This struct is a helper to read validation requests easier.
  */
 typedef struct {
-  uint8_t       type;          // 3
+  uint8_t       type;          // 3 and 4
   uint8_t       flags;
   uint8_t       roaResSrc;
   uint8_t       bgpsecResSrc;
@@ -219,7 +209,29 @@ typedef struct {
   uint8_t       zero;
   uint8_t       prefixLen;
   uint32_t      requestToken; // Added with protocol version 1.0
-} SRXRPOXY_BasicHeader_VerifyRequest;
+} __attribute__((packed)) SRXRPOXY_BasicHeader_VerifyRequest;
+
+/**
+ * This struct specifies the Verify request IPv4 packet
+ */
+typedef struct {
+  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 3
+  IPv4Address      prefixAddress;
+  uint32_t         originAS;
+  uint32_t         bgpsecLength;
+  BGPSECValReqData bgpsecValReqData;
+} __attribute__((packed)) SRXPROXY_VERIFY_V4_REQUEST;
+
+/**
+ * This struct specifies the Verify request IPv6 packet
+ */
+typedef struct {
+  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 4
+  IPv6Address      prefixAddress;
+  uint32_t         originAS;
+  uint32_t         bgpsecLength;
+  BGPSECValReqData bgpsecValReqData;
+} __attribute__((packed)) SRXPROXY_VERIFY_V6_REQUEST;
 
 /**
  * This struct specifies the sign request packet
@@ -232,7 +244,7 @@ typedef struct {
   uint32_t    updateIdentifier;
   uint32_t    prependCounter;
   uint32_t    peerAS;
-} SRXPROXY_SIGN_REQUEST;
+} __attribute__((packed)) SRXPROXY_SIGN_REQUEST;
 
 /**
  * This struct specifies the verification notification packet
@@ -245,20 +257,20 @@ typedef struct {
   uint32_t    length;          // 16 Bytes
   uint32_t    requestToken; // Added with protocol version 1.0
   SRxUpdateID updateID;
-} SRXPROXY_VERIFY_NOTIFICATION;
+} __attribute__((packed)) SRXPROXY_VERIFY_NOTIFICATION;
 
 /**
  * This struct specifies the signature notification packet
  */
 typedef struct {
-  uint8_t       type;            // 7
-  uint16_t      reserved;
-  uint8_t       zero;
-  uint32_t      length;          // 16(+) Bytes
-  uint32_t      updateIdentifier;
-  uint32_t      bgpsecLength;
-  BGPSECValData bgpsecData;
-} SRXPROXY_SIGNATURE_NOTIFICATION;
+  uint8_t          type;            // 7
+  uint16_t         reserved;
+  uint8_t          zero;
+  uint32_t         length;          // 16(+) Bytes
+  uint32_t         updateIdentifier;
+  uint32_t         bgpsecLength;
+  BGPSECValResData bgpsecResData;
+} __attribute__((packed)) SRXPROXY_SIGNATURE_NOTIFICATION;
 
 /**
  * This struct specifies the delete update packet
@@ -269,7 +281,7 @@ typedef struct {
   uint8_t     zero;
   uint32_t    length;          // 12 Bytes
   uint32_t    updateIdentifier;
-} SRXPROXY_DELETE_UPDATE;
+} __attribute__((packed)) SRXPROXY_DELETE_UPDATE;
 
 /**
  * This struct specifies the synchronisation request packet
@@ -280,7 +292,7 @@ typedef struct {
   uint8_t     changeType;
   uint32_t    length;          // 8 Bytes
   uint32_t    peerAS;
-} SRXPROXY_PEER_CHANGE;
+} __attribute__((packed)) SRXPROXY_PEER_CHANGE;
 
 /**
  * This struct specifies the synchronisation request packet
@@ -290,7 +302,7 @@ typedef struct {
   uint16_t    reserved;
   uint8_t     zero;
   uint32_t    length;          // 8 Bytes
-} SRXPROXY_SYNCH_REQUEST;
+} __attribute__((packed)) SRXPROXY_SYNCH_REQUEST;
 
 /**
  * This struct specifies the error packet
@@ -300,9 +312,7 @@ typedef struct {
   uint16_t    errorCode;
   uint8_t     zero;
   uint32_t    length;          // 8 Bytes
-} SRXPROXY_ERROR;
-
-#pragma pack()
+} __attribute__((packed)) SRXPROXY_ERROR;
 
 /**
  * Returns a string corresponding to the given \c type.

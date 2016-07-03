@@ -291,7 +291,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 INSTALL_SDATA = @INSTALL@ -m 600
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -ldl
 noinst_LIBRARIES = libbgp.a
 libbgp_a_SOURCES = \
 	bgpd.c bgp_fsm.c bgp_aspath.c bgp_community.c bgp_attr.c \

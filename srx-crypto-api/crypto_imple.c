@@ -22,9 +22,13 @@
  * Known Issue:
  *   At this time only pem formated private keys can be loaded.
  *
+ * @version 0.2.0.0
+ * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.2.0 - 3025/20/05 - oborchert
+ *   0.2.0.0 - 2016/06/08 - oborchert
+ *             * Fixed memory leak during loading of public key
+ *   0.1.2.0 - 2016/05/20 - oborchert
  *             * Removed unused defines and structures. 
  *             * cleaned up more code and streamlined implementation.
  *           - 2015/09/22 - oborchert
@@ -44,6 +48,7 @@
 #include <stdbool.h>
 
 #include <openssl/ec.h>
+#include <openssl/engine.h>
 #include <openssl/ecdsa.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/x509.h>
@@ -151,11 +156,14 @@ static bool _loadPrivKey(char* fName, BGPSecKey* key, bool checkKey)
 }
 
 /**
- * Create an EC_KEY from the given X509 certificate
+ * Extract the DER key from the given X509 certificate.
  * 
- * @param cert Teh X509 Cert
+ * @param cert The X509 Cert containing the key information
+ * @param ket The BGPSEc key where the DER key will be stored in
+ * @param curveID The IF of the key's curve
  * 
- * @return The EC_KEY or NULL.  
+ * @return true if the key could be loaded in DER form. The DER key is stored in
+ *              the given BGPSEC-Key
  */
 static bool _getPublicKey(X509* cert, BGPSecKey* key, int curveID)
 {
@@ -240,11 +248,12 @@ static bool _getPublicKey(X509* cert, BGPSecKey* key, int curveID)
             else
             {
               sca_debugLog(LOG_ERR, "+ [libcrypto] Public key check faulty\n");
-              EC_KEY_free(ecdsa_key);
-              ecdsa_key = NULL;
             }
           }
         }
+        // Clean up ecdsa_key, only needed to generate the public DER key
+        EC_KEY_free(ecdsa_key);
+        ecdsa_key = NULL;        
       }
       else
       { 
@@ -324,6 +333,13 @@ static bool _loadPubKey(char* fName, BGPSecKey* key)
   { // bio == NULL
     sca_debugLog(LOG_ERR, "+ [libcrypto] Unable to create BIO object\n");
   }
+  
+  // Clean the memory leaks.
+  EVP_cleanup();
+  ENGINE_cleanup();
+  CRYPTO_cleanup_all_ex_data();
+  ERR_remove_state(0);
+  ERR_free_strings();
   
   return retVal;
 }

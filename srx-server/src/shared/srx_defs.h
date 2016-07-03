@@ -30,6 +30,8 @@
  *
  * Change log:
  * -----------------------------------------------------------------------------
+ *   0.4.0 - 2016/06/19 - oborchert
+ *           * Modified the BGPSecData structure.
  *   0.3.0 - 2013/03/01 - oborchert
  *           * Added define for unusable ASN RFC6483, used ASN of number space
  *             for documentation examples RFC5398
@@ -80,13 +82,36 @@ typedef struct {
 } PeerSignature;
 
 /** This structure is currently a dummy that is needed though for validation. 
- * The data in here - if available - will be used to generate an update ID.
+ * The data in here - if available - will be used to generate an update ID.s
  */
-typedef struct {                                                                // TODO REVISIT
-  uint32_t length;
-  uint8_t* data;
+typedef struct {
+  /** Number of hops in the as path in host format. */
+  uint16_t numberHops;
+  /** Contains the AS path as an array of as numbers encoded in network format.
+   * AS repetitions are expected */
+  uint32_t* asPath;
+  /** The length of the bgpsec path attribute in host format. Even though this 
+   * length is also encoded within the attribute itself this value is in host 
+   * format and is added for convenience. If bgpsec_path_attr is NULL this value
+   * must be zero and vice versa.
+   */
+  uint16_t attr_length;
+  /** Contains the bgpsec path attribute according to the RFC. If this value
+   * is NULL only the as path will be used. */
+  uint8_t* bgpsec_path_attr;
 } BGPSecData;
 
+// @TODO: Revisit and modify structure. It will contain the signature and maybe
+//        the previous bgpsec path attribute is requested of maybe a complete
+//        signature block etc. This will be decided at a later point.
+/**
+ * This is a temporary structure for Proxy returns to the caller. It will be 
+ * changed later on.
+ */
+typedef struct {
+  uint32_t length;
+  uint8_t* data;
+} BGPSecCallbackData;
 
 /** The flag type used for verification. */
 typedef uint8_t SRxVerifyFlag;

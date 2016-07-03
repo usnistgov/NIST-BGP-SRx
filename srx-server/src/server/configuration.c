@@ -20,16 +20,16 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.1.0
+ * @version 0.3.0.10
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.10 - 2016-01-08 - oborchert
+ * 0.3.0.10- 2016-01-08 - oborchert
  *           * Fixed type cast problems in during configuration.
- *          - 2015/11/10 - oborchert
+ *         - 2015/11/10 - oborchert
  *           * Re-organized includes and added <pthread.h>
  *           * Fixes bug in configuration assignment for mode_no_receivequeue.
- *          - 2015/11/05 - oborchert
+ *         - 2015/11/05 - oborchert
  *           * Switch to stock libconfig.h resulted in loss of macro
  *             config_error_file. Updated code to use filename instead.
  * 0.3.0.7 - 2015/04/20 - oborchert

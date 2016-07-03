@@ -8,7 +8,7 @@
 # 
 
 EXT_DER="der"
-EXT_PEM="key"
+EXT_PEM="pem"
 EXT_CERT="cert"
 SKI_LIST="ski-list.txt"
 
@@ -18,11 +18,6 @@ QSRX_MAKE_CERT=qsrx-make-cert
 
 WITH_PEM=0
 
-if [ "$1" == "" ] ; then
-  echo "$0 [--with-pem] <cert-name> [<repository path>]"
-  exit 1
-fi
-
 if [ "$1" != "" ] ; then
   if [ "$1" == "--with-pem" ] ; then
     WITH_PEM=1
@@ -30,9 +25,22 @@ if [ "$1" != "" ] ; then
   fi
 fi
 
+if [ "$1" == "" ] ; then
+  echo "$0 [--with-pem] <cert-name> [<repository path>]"
+  exit 1
+fi
+
 REPO_ROOT="/var/lib/bgpsec-keys"
 if [ "$2" != "" ] ; then
   REPO_ROOT=$2
+fi
+BIRD_REPO="$REPO_ROOT/bird"
+if [ ! -e $BIRD_REPO ] ; then
+  echo "Create BIRT key repo at '$BIRD_REPO'"
+  mkdir -p $BIRD_REPO
+  if [ $? -eq 1 ] ; then
+    exit 3
+  fi
 fi
 
 ALL_GOOD=0
@@ -51,7 +59,10 @@ if [ -e "$1.$EXT_CERT" ] ; then
       SUBJECT=$($QSRX_VIEW $1)
       DIR1=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\).*/\1/g")
       DIR2=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z]\)\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\).*/\2/g")
-      FILE=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\)\(.*\)/\2/g")
+      FILE=$(echo $SUBJECT | sed -e "s/\([0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z][0-9a-zA-Z]\)\(.*\)/\2/g")      
+
+      BIRD_FILE_PUB=$1.$SUBJECT.0.key 
+      BIRD_FILE_PRIV=$1.$SUBJECT.key
 
       REPOSITORY=$REPO_ROOT/$DIR1/$DIR2
       KEYVOLT=$REPO_ROOT/$DIR1/$DIR2
@@ -59,13 +70,14 @@ if [ -e "$1.$EXT_CERT" ] ; then
 
       DO_REGISTER=0
 
-      echo "Publish cert and key into $REPOSITORY"
+      echo "Publish cert and key into $REPOSITORY and $BIRD_REPO"
       # Check if public key exists already!!
       if [ -e $REPOSITORY/$FILE.$EXT_CERT ] ; then
         echo " * public key $REPOSITORY/$FILE.$EXT_CERT already installed!!"
       else
         mkdir -p $REPOSITORY
         cp $1.$EXT_CERT $REPOSITORY/$FILE.$EXT_CERT
+        cp $1.$EXT_CERT $BIRD_REPO/$BIRD_FILE_PUB
         DO_REGISTER=1
       fi
 
@@ -74,6 +86,7 @@ if [ -e "$1.$EXT_CERT" ] ; then
       else
         mkdir -p $KEYVOLT
         cp $1.$EXT_DER  $KEYVOLT/$FILE.$EXT_DER
+        cp $1.$EXT_DER  $BIRD_REPO/$BIRD_FILE_PRIV
         DO_REGISTER=1
       fi
 

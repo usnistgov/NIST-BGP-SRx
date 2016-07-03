@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.3.1.0], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.4.0.1], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -118,7 +118,7 @@ AS_BOX(Processing customized variables)
 # argument 'sca_dir=<path>' - Depending on the version >= 0.4.0 
 #
 if test "${include_sca}" = "yes" ; then
-  AC_SUBST([LIB_SCA], ["-libSRxCryptoAPI"], [""])
+  AC_SUBST([LIB_SCA], ["-lSRxCryptoAPI"], [""])
 
   AC_MSG_CHECKING([whether argument 'sca_dir' is provided])
   AC_ARG_VAR(sca_dir, Use library libSRxCryptoAPI from a customized location)
@@ -129,6 +129,7 @@ if test "${include_sca}" = "yes" ; then
     if test -d ${sca_dir} ; then
       AC_MSG_NOTICE(Using customized SRxCryptoAPI installation in '${sca_dir}')
       AC_SUBST([LIB_SCA_LDFLAGS], ["-L${sca_dir}/lib$LD_ARCH_LOC"], [""])
+      CFLAGS="-I${sca_dir} $CFLAGS"
     else
       AC_MSG_ERROR([
 	--------------------------------------------------
@@ -218,21 +219,33 @@ AC_SEARCH_LIBS([pthread_create], [pthread],
 ## Library: SRxCryptoAPI - Starting with version >= 0.4.0
 ##
 if test ${include_sca} = yes ; then
+  AS_BOX(SRxCryptoAPI!)
   if test "x${sca_dir}" = "x" ; then
     # Check for regular installed library
     AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], 
                    [HAVE_LIBSRXCRYPTOAPI=yes], [HAVE_LIBSRXCRYPTOAPI=no])
+    AC_CHECK_HEADERS([ srx/srxcryptoapi.h ], [], [AC_MSG_ERROR([
+    --------------------------------------------------
+    Headers for SRxCryptoAPI not found.
+    --------------------------------------------------])])
+
   else
     # Search local install
     AC_MSG_CHECKING(for local installed SRxCryptoAPI)
 
     if test -e ${sca_dir}/lib$LD_ARCH_LOC/libSRxCryptoAPI.so ; then
+      AC_MSG_RESULT([not found])
+      AC_MSG_ERROR([
+    --------------------------------------------------
+    SRxCryptoAPI library not found.
+    --------------------------------------------------])
+    else
+      AC_MSG_RESULT([found])
       CFLAGS="-I${sca_dir}/include $CFLAGS"
-      LDFLAGS="-L${sca_dir}/lib$LD_ARCH_LOC $LDFLAGS"
+      LDFLAGS="-L${sca_dir}/lib$LD_ARCH_LOC/srx $LDFLAGS"
       LIBS="-lSRxCryptoAPI $LIBS"
       HAVE_LIBSRXCRYPTOAPI="yes"
     fi
-    AC_MSG_RESULT([$HAVE_LIBSRXCRYPTOAPI])
   fi
 
   if test "$HAVE_LIBSRXCRYPTOAPI" = "no" ; then
@@ -415,8 +428,8 @@ AC_SUBST(PACKAGE_VERSION)
 
 # Checks for library functions.
 AS_BOX(Processing library functions)
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
+#AC_FUNC_MALLOC
+#AC_FUNC_REALLOC
 AC_CHECK_FUNCS([bzero gethostbyname memset socket strchr strrchr strdup strerror strtol strtoul], 
                [], [AC_MSG_ERROR([
 	--------------------------------------------------

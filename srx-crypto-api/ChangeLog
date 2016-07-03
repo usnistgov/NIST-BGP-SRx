@@ -1,6 +1,25 @@
 More details on changes are scripted in the files itself.
 ===========================================================
 
+Version 0.2.0.0 - May/June - 2016
+  - Redesigned the API - This API is incompatible with any 0.1.x version.
+    * Modified the key generation tools in such that they also generate the 
+      key storage structure to be compatible with BIRD reference implementation.
+    * All functions are mandatory to be implemented
+    * Functions only return two values and more detailed information are 
+      returned using a status flag.
+    * Only one validate and one sign method - Keys are not passed anymore during
+      the validation / sign call - requires pre-registration of keys.
+    * API returns the validation hash as as the signature buffer. To free these
+      allocated memory the API provides the appropriate free methods.
+    * Added capability to set a debug level.
+    * Removed requirement to generate API specific BGPSec Path data structure,
+      validation will be performed on the BGPSEC path attribute as it is 
+      specified in the bgpsec draft (future RFC).
+  - Modules MUST provide key management (private / public).
+  - API BGPSec_OpenSSL is rewritten to reflect the changes in digest generation 
+    as well as API function changes. 
+    * Internal key storage is rewritten and moved into its own source
 Version 0.1.3.0 - March-April 2016
   - modified structure BGPSecKey to be packed
   - added prefix structure SCA_Prefix

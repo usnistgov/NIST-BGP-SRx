@@ -287,19 +287,26 @@ router bgp 7675
 ! [no] srx policy prefer-valid
   srx policy prefer-valid
 
-! Specify Local Prefixes
+! Specify Local Networks
 ! ======================
  network 10.0.0.0/9
 
 ! Specify BGPSEC private key
-! bgpsec ski <key>
-
-! Specify Signing method
-! ======================
-!   If the following option specified, sign_with_id method will be used as the
-!     BGPSec signing operation. Otherwise, default action, sign_with_key, will
-!     be used.
-! bgpsec sign id
+! =============================
+! QuaggaSRx allows to have two private keys registered. The parameter active 1|2
+!   specifies which of the keys are used for signing. The key must be available
+!   for the SRxCryptoAPI in DER form. For more information on the keys see the
+!   SRxCryptoAPI documentation.
+!
+! Specify each private key with its key number (0|1) and the algorithm id, and 
+! the 20 byte SKI as 40 byte ASCII hex string 
+! srx bgpsec ski (0|1) <1..254> <key>
+! srx bgpsec ski 0 1 DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF
+! srx bgpsec ski 1 1 <key>
+!
+! Select which key to specify as active key
+! srx bgpsec active (0|1) 
+! srx bgpsec active 0
 
 
 ! Specify Neighbors

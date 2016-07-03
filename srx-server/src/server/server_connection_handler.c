@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.4.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.1  - 2016/07/02 - oborchert
+ *            * Fixed wrongful conversion of a nework encoded word into a host
+ *              encoded int. Changed from ntol to ntohs.
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Fixed assignment bug in stopSCHReceiverQueue
  *            * Added return value (NULL) to schReceiverQueueThreadLoop
@@ -546,10 +549,11 @@ bool processValidationRequest(ServerConnectionHandler* self,
   
   bool      v4     = hdr->type == PDU_SRXPROXY_VERIFY_V4_REQUEST;
   // Set the BGPsec data
-  BGPSecData bgpsecData;
-  bgpsecData.length = 0;
-  bgpsecData.data   = (uint8_t*)hdr+(v4 ? sizeof(SRXPROXY_VERIFY_V4_REQUEST)
-                                        : sizeof(SRXPROXY_VERIFY_V6_REQUEST));
+//  uint16_t bgpsecDataLen = 0;
+//  BGPSecData bgpsecData;
+//  bgpsecData.length = 0;
+//  bgpsecData.data   = (uint8_t*)hdr+(v4 ? sizeof(SRXPROXY_VERIFY_V4_REQUEST)
+//                                        : sizeof(SRXPROXY_VERIFY_V6_REQUEST));
   
   uint32_t requestToken = receipt ? ntohl(hdr->requestToken) 
                                   : DONOTUSE_REQUEST_TOKEN;
@@ -566,30 +570,46 @@ bool processValidationRequest(ServerConnectionHandler* self,
   prefix = malloc(sizeof(IPPrefix));  
   memset(prefix, 0, sizeof(IPPrefix));
   prefix->length     = hdr->prefixLen;  
+  BGPSecData bgpsecData;
+  memset (&bgpsecData, 0, sizeof(BGPSecData));
+  // initialize the val pointer - it will be adjusted within the correct 
+  // request type.
+  uint8_t* valPtr = (uint8_t*)hdr;
   if (v4)
   {
     SRXPROXY_VERIFY_V4_REQUEST* v4Hdr = (SRXPROXY_VERIFY_V4_REQUEST*)hdr;
-    prefix->ip.version = 4;
-    prefix->ip.addr.v4 = v4Hdr->prefixAddress;
-    originAS           = ntohl(v4Hdr->originAS);
-    bgpsecData.length  = ntohl(v4Hdr->bgpsecLength);
+    valPtr += sizeof(SRXPROXY_VERIFY_V4_REQUEST);
+    prefix->ip.version     = 4;
+    prefix->ip.addr.v4     = v4Hdr->prefixAddress;
+    originAS               = ntohl(v4Hdr->originAS);
+    bgpsecData.numberHops  = ntohs(v4Hdr->bgpsecValReqData.numHops);
+    bgpsecData.attr_length = ntohs(v4Hdr->bgpsecValReqData.attrLen);
   }
   else
   {
     SRXPROXY_VERIFY_V6_REQUEST* v6Hdr = (SRXPROXY_VERIFY_V6_REQUEST*)hdr;
+    valPtr += sizeof(SRXPROXY_VERIFY_V6_REQUEST);
     prefix->ip.version = 6;
     prefix->ip.addr.v6 = v6Hdr->prefixAddress;
     originAS           = ntohl(v6Hdr->originAS);
-    bgpsecData.length  = ntohl(v6Hdr->bgpsecLength);
   }
-
+  
+  if (bgpsecData.numberHops != 0)
+  {
+    bgpsecData.asPath = (uint32_t*)valPtr;
+  }
+  if (bgpsecData.attr_length != 0)
+  {
+    // bgpsec attribute comes after the as4 path
+    bgpsecData.bgpsec_path_attr = valPtr + (bgpsecData.numberHops * 4);
+  }
+  
   // 2. Generate the CRC based updateID
-  updateID = generateIdentifier(originAS, prefix, bgpsecData.length, 
-                                bgpsecData.data);      
+  updateID = generateIdentifier(originAS, prefix, &bgpsecData);      
   // test for collision and attempt to resolve
   collisionID = updateID;    
   while(detectCollision(self->updateCache, &updateID, prefix, originAS,
-                        bgpsecData.length, bgpsecData.data))
+                        &bgpsecData))
   {
     updateID++;
   }  

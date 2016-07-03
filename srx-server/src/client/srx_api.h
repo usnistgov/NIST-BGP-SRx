@@ -23,10 +23,12 @@
  * Secure Routing extension (SRx) client API - This API provides a fully 
  * functional proxy client to the SRx server.
  *
- * Version 0.3.0.10
+ * Version 0.4.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * Modified the structure for the signaturesReady callback method
  * 0.3.0.10 - 2015/11/09 - oborchert 
  *            * Removed types.h
  * 0.3.0    - 2013/02/27 - oborchert
@@ -189,7 +191,7 @@ typedef bool (*ValidationReady)(SRxUpdateID          updateID,
  * @param usrPtr Pointer to SRxProxy.userPtr provided by router / user of the
  *               API.
  */
-typedef void (*SignaturesReady)(SRxUpdateID updId, BGPSecData* data,
+typedef void (*SignaturesReady)(SRxUpdateID updId, BGPSecCallbackData* data,
                                 void* userPtr);
 
 /**

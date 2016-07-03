@@ -18,19 +18,25 @@
  * 
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required 
- * by thsi software.
- *
- */
-/**
- * @file math.h
- * @date Created: 05/06/2010
+ * by this software.
  *
  * Mathematical utility functions.
+ * 
+ * @version 0.4.0.0
+ * 
+ * Changelog:
+ * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/21 - oborchert
+ *            * Added ifdef to remove MIN and MAX which are already defined if
+ *              the code includes srxcryptoapi.h. 
+ * 0.1.0    - 2010/05/06 - pgleichm
+ *            * Code created.
  */
-
 #ifndef __MATH_H__
 #define __MATH_H__
 
+// srxcryptoapi.h includes <sys/param.h> which defines MIN and MAX already.
+#ifndef MAX
 /**
  * Returns the larger value of two given values.
  *
@@ -39,7 +45,10 @@
  * @return Larger value
  */
 #define MAX(A,B) ((A >= B) ? A : B)
+#endif
 
+// srxcryptoapi.h includes <sys/param.h> which defines MIN and MAX already.
+#ifndef MIN
 /**
  * Returns the smaller value of two given values.
  *
@@ -48,7 +57,7 @@
  * @return Smaller value
  */
 #define MIN(A,B) ((A <= B) ? A : B)
-
+#endif
 /**
  * Checks if a value lies within given boundaries.
  *

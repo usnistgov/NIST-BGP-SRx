@@ -77,7 +77,7 @@ install-exec-local:
 		
 uninstall-local:
 	rm -f $(INC_OUT)/srxcryptoapi.h;
-	@if [ -e $(INC_OUT) && "$(ls -A $(INC_OUT))" == "" ] ; then \
+	@if [ -e $(INC_OUT) && "@DOLLAR_SIGN@(ls -A $(INC_OUT))" == "" ] ; then \
 	  rmdir $(INC_OUT) > /dev/null 2>&1; \
 	fi
 

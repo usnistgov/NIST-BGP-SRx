@@ -25,8 +25,12 @@
  * value. The other is a list, that allows to scan through all updates. Both 
  * MUST be maintained the same.
  * 
+ * @version 0.4.0.0
+ * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * added function storeCacheEntryBlob
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.3.0    - 2013/02/15 - oborchert
@@ -336,13 +340,31 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
  * @param updateID Update ID to be checked!
  * @param prefix the prefix of the update
  * @param asn the Origin AS of the update
- * @param dataLength The length of the bgpsec blob
- * @param data The bgpsec data blob.
+ * @param bgpsecData The bgpsec data blob.
  * 
  * @return true if a collision could be detected!
  */
 bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix, 
-                     uint32_t asn, uint32_t dataLength, uint8_t* data);
+                     uint32_t asn, BGPSecData* bgpsecData);
+
+/**
+ * This function selects the data from bgpsecData that is used for ID generation
+ * - see srx_identifier::generateIdentifier and stores it in the cache entry.
+ * It is important that both data blobs are same otherwise problems with the
+ * ID finding are given.
+ * This method copies the data from bgpsecData into the cache entry. Therefore
+ * the memory allocated in bgpsecData can safely be deallocated.
+ * 
+ * @param cEntry The cache entry where the blob data will be stored in.
+ * @param bgpsecData The bgpsec (and bgp4) data that has to be stored.
+ * 
+ * @return false if the cache entry already contains data,otherwise true.
+ * 
+ * @since 0.4.0.0 
+ * 
+ * @see srx_identifier.h::generateIdentifier
+ */
+//bool storeCacheEntryBlob(CacheEntry* cEntry, BGPSecData* bgpsecData);
 
 /**
  * Print the content of the update cache to the given file.

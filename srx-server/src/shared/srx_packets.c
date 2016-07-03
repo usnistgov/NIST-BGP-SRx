@@ -21,10 +21,12 @@
  * by this software.
  *
  *
- * @version 0.3.0.10
+ * @version 0.4.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * moved up to version 0.4.0.0 to be synched with header file.
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Removed unused static function sappendf
  *          - 2015/11/09 - oborchert
@@ -38,6 +40,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <arpa/inet.h>
+#include <srx/srxcryptoapi.h>
 #include "shared/srx_packets.h"
 #include "util/debug.h"
 #include "util/prefix.h"

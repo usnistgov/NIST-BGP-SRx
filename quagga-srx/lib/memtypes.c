@@ -154,15 +154,17 @@ struct memory_list memory_list_bgp[] =
   { MTYPE_BGP_ADDR,		"BGP own address"		},
 #ifdef USE_SRX
   { 0, NULL },
-  { MTYPE_SRX_HOST,           "SRx host name" },
-  { MTYPE_BGP_INFO_HASH,      "BGP info hash" },
-  { MTYPE_BGP_INFO_HASH_ITEM, "BGP info hash item" },
-  { MTYPE_BGP_INFO_HASH_MUTEX,    ""},
-  { MTYPE_BGPSEC_SKI,           "BGPSEC SKI string"},
-  { MTYPE_BGPSEC_PATH,          "BGPSEC PATH structure"},
-  { MTYPE_BGPSEC_PATH_SEG,      "BGPSEC PATH segment" },
-  { MTYPE_BGPSEC_SIG_SEG,       "Signal segment"},
-  { MTYPE_BGPSEC_SIG_BLK,       "Signal block"},
+  { MTYPE_SRX_HOST,            "SRx host name" },
+  { MTYPE_SRX_SCA_CAPI,        "SRx Crypto API" },
+  { MTYPE_SRX_SCA_CAPI,        "BGPSEC Signature" },
+  { MTYPE_BGP_INFO_HASH,       "BGP info hash" },
+  { MTYPE_BGP_INFO_HASH_ITEM,  "BGP info hash item" },
+  { MTYPE_BGP_INFO_HASH_MUTEX, ""},
+  { MTYPE_BGPSEC_SIGNATURE,    "BGPSEC signature"},
+  { MTYPE_BGPSEC_PATH,         "BGPSEC PATH structure"},
+  { MTYPE_BGPSEC_PATH_SEG,     "BGPSEC PATH segment" },
+  { MTYPE_BGPSEC_SIG_SEG,      "Signal segment"},
+  { MTYPE_BGPSEC_SIG_BLK,      "Signal block"},  
 #endif /* USE_SRX */
   { -1, NULL }
 };

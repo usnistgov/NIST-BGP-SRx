@@ -89,6 +89,18 @@ The load key function can only private files in PEM format. Therefore the .pem
 files are required. The PEM formated keys will be converted internally into 
 DER formated keys as required by the specification. 
 
+Compiling with -02 broke the message digest generation in function 
+sca_generateDigest with resulted in no message being created. To prevent this 
+from happening while compiling with -O2 we hardcoded a compiler optimization 
+level of -O0 for the method sca_generateDigest which can be disabled using the
+compiler flag CFLAGS="-DFORCE_OPTIMIZING" during the configuration. The issue 
+we experienced is that by optimizing on level -02 the compiler stripped away
+the if condition if (x != NULL) { command } but kept the one line command and 
+therefore executed the command even though X was not null. This behavior was
+observed on CentOS 7 with gcc version 4.8.5 20150623 (Red Hat 4.8.5-4)
+
+MEMORY Leak of 32 Bytes: This is related to the _dlerror call during loading the
+                         library and can be ignored. 
 
 Questions:
 ==========

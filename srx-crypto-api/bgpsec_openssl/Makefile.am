@@ -13,9 +13,8 @@ endif
 
 lib_LTLIBRARIES = libSRxBGPSecOpenSSL.la
 
-libSRxBGPSecOpenSSL_la_SOURCES = bgpsec_openssl.c bgpsec_openssl.h
+libSRxBGPSecOpenSSL_la_SOURCES = bgpsec_openssl.c key_storage.c
 libSRxBGPSecOpenSSL_la_LIBADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
 libSRxBGPSecOpenSSL_la_LDFLAGS = -version-info $(LIB_VER) -module #-avoid-version
 
-noinst_HEADERS = bgpsec_openssl.h
-
+noinst_HEADERS = key_storage.h

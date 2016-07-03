@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.1.5, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.2.1, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -1490,16 +1490,17 @@ if test "x${enable_srx}" == "xyes"; then
   #
   # Now Look for the dl or dld library
   #
-  AC_SEARCH_LIBS([dlopen], [dl dld], [], [AC_MSG_ERROR([
-    ---------------------------------------------------
-    The System requires the capability to dynamically 
-    load libraries. No library (libdl or libdld) was 
-    found on the system.
-    ---------------------------------------------------])])
+#  AC_SEARCH_LIBS([dlopen], [dl], [], [AC_MSG_ERROR([
+#    ---------------------------------------------------
+#    The System requires the capability to dynamically 
+#    load libraries. No library libldl was 
+#    found on the system.
+#    ---------------------------------------------------])])
 
   #
   # Now Check for SRxCryptoAPI
   #
+  AS_BOX(Processing SRxCryptoAPI configuration)
   AC_ARG_VAR([sca_dir], [Provide local install location of SRxCryptoAPI])
   if test "x${sca_dir}" = "x" ; then
     # Check for regular installed library

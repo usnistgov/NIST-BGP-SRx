@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.1.3.0], [bgpsrx-dev@nist.gov])
+AC_INIT([SRxCryptoAPI], [0.2.0.1], [bgpsrx-dev@nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -109,6 +109,7 @@ fi
 
 # Checks for programs.
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
@@ -221,7 +222,6 @@ if  test "${bgpsec_openssl}" = "yes" ; then
 	fedora/CentOS install uthash-devel.
 	--------------------------------------------------])
   fi  
-  CONFIG_MODULES="bgpsec_openssl/Makefile"
 else
   BGPSEC_OPENSSL=""
 fi
@@ -236,7 +236,6 @@ AC_ARG_WITH(testlib,
 AC_MSG_RESULT([${with_testlib}])
 if test "${with_testlib}" = "yes"; then  
   CRYPTO_TESTLIB="crypto_testlib"
-  CONFIG_MODULES="$CONFIG_MODULES crypto_testlib/Makefile"
 else
   CRYPTO_TESTLIB=""
 fi
@@ -254,7 +253,7 @@ case "$HOSTTYPE" in
      ;;
   *) 
      CPU_ARCH_FLAG=""
-     CPU_ARCH="32"
+     CPU_ARCH=""
      ;;
 esac
 AC_MSG_RESULT([$CPU_ARCH bit])
@@ -275,14 +274,16 @@ AC_ARG_ENABLE(static-openssl,
               [  --enable-static-openssl enable openssl being linked statically])
 if test "${enableval}" = "yes" ; then
   AC_MSG_RESULT([static])
-  OPENSSL_LIBS="-W1,-Bstatic -lssl -W1,-Bstatic -lcrypto"
+  OPENSSL_LIBS="-Wl,-Bstatic -lssl -Wl,-Bstatic -lcrypto"
 else
   AC_MSG_RESULT([dynamic])
   OPENSSL_LIBS="-lssl -lcrypto"
 fi
 
+dnl ----------
+dnl Some automake conditions
+dnl ----------
 AM_CONDITIONAL([LIB_VER_INFO_COND], [test $LIB_VER_INFO])
-AM_CONDITIONAL([BGPSEC_OPENSSL_COND], [test "x$BGPSEC_OPENSSL" = xbgpsec_openssl])
 AM_CONDITIONAL([OS_UBUNTU_COND], [test "x$OS_DIST" = xubuntu])
 
 dnl ----------
@@ -405,7 +406,10 @@ AS_BOX(Processing additional configuration settings)
 AC_SUBST([CFG_PREFIX], [${prefix}])
 AC_SUBST([SRX_DIR], [srx])
 
-AC_CONFIG_FILES([Makefile $CONFIG_MODULES \
+AC_SUBST([DOLLAR_SIGN],[$])
+
+# Use this if one of the 'Makefile.am ' files are modified prior autoreconf -i
+AC_CONFIG_FILES([Makefile bgpsec_openssl/Makefile crypto_testlib/Makefile \
                  srxcryptoapi-$PACKAGE_VERSION.spec:srxcryptoapi.spec.in \
                  srxcryptoapi_lib$CPU_ARCH.conf:srxcryptoapi_lib.conf.in])
 
@@ -424,6 +428,7 @@ echo "Configured...: AC_PACKAGE_NAME V AC_PACKAGE_VERSION"
 echo "Library......: $VER_INFO ($LIB_VER_INFO)"
 echo "CPU Arch.....: $CPU_ARCH"
 echo "CFLAGS.......: $CFLAGS"
+echo "LDFLAGS......: $LDFLAGS"
 echo "LIBDIR.......: ${libdir}"
 echo "RPM Incl. la.: ${incl_la_lib}"
 echo ""
@@ -438,7 +443,7 @@ echo "  - OPENSSL_LDFLAGS..: $OPENSSL_LDFLAGS"
 echo "  - OPENSSL_CFLAGS...: $OPENSSL_CFLAGS"
 
 echo ""
-echo "Installed PlugIns:"
+echo "Installed PlugIns: "
 if  test "x${BGPSEC_OPENSSL}" = x; then
   echo "  - SRxBGPSecOpenSSL...no"
 else

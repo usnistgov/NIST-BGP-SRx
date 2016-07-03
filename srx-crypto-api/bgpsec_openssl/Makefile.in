@@ -73,7 +73,7 @@ am__base_list = \
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libSRxBGPSecOpenSSL_la_DEPENDENCIES =
-am_libSRxBGPSecOpenSSL_la_OBJECTS = bgpsec_openssl.lo
+am_libSRxBGPSecOpenSSL_la_OBJECTS = bgpsec_openssl.lo key_storage.lo
 libSRxBGPSecOpenSSL_la_OBJECTS = $(am_libSRxBGPSecOpenSSL_la_OBJECTS)
 libSRxBGPSecOpenSSL_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -107,13 +107,16 @@ AWK = @AWK@
 BGPSEC_OPENSSL = @BGPSEC_OPENSSL@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
-CFLAGS = @CFLAGS@ -I.  @OPENSSL_CFLAGS@
+CFG_PREFIX = @CFG_PREFIX@
+CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CPU_ARCH = @CPU_ARCH@
 CRYPTO_TESTLIB = @CRYPTO_TESTLIB@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DOLLAR_SIGN = @DOLLAR_SIGN@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -163,6 +166,7 @@ RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SRX_DIR = @SRX_DIR@
 STRIP = @STRIP@
 UPD_VER = @UPD_VER@
 VERSION = @VERSION@
@@ -222,14 +226,15 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
+AM_CFLAGS = @CFLAGS@ -I.  @OPENSSL_CFLAGS@
 CLEAN_SUBDIRS = .libs .deps
-lib_LTLIBRARIES = libSRxBGPSecOpenSSL.la
-libSRxBGPSecOpenSSL_la_SOURCES = bgpsec_openssl.c bgpsec_openssl.h
-libSRxBGPSecOpenSSL_la_LIBADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
-noinst_HEADERS = bgpsec_openssl.h
 @LIB_VER_INFO_COND_FALSE@LIB_VER = 0:0:0
 @LIB_VER_INFO_COND_TRUE@LIB_VER = $(LIB_VER_INFO)
+lib_LTLIBRARIES = libSRxBGPSecOpenSSL.la
+libSRxBGPSecOpenSSL_la_SOURCES = bgpsec_openssl.c key_storage.c
+libSRxBGPSecOpenSSL_la_LIBADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
 libSRxBGPSecOpenSSL_la_LDFLAGS = -version-info $(LIB_VER) -module #-avoid-version
+noinst_HEADERS = key_storage.h
 all: all-am
 
 .SUFFIXES:
@@ -305,6 +310,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsec_openssl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/key_storage.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -534,8 +540,6 @@ uninstall-am: uninstall-libLTLIBRARIES
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am uninstall-libLTLIBRARIES
 
-
-#include_HEADERS = bgpsec_openssl.h
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

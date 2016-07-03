@@ -29,7 +29,7 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 BuildRequires:automake	
-Requires:glibc
+Requires:glibc srxcryptoapi >= 0.2.0
 
 %description
 The SRx-Proxy allows routers to connect to the srx-server using API calls.

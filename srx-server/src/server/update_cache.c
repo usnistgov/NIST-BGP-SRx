@@ -25,10 +25,18 @@
  * value. The other is a list, that allows to scan through all updates. Both 
  * MUST be maintained the same.
  * 
- * @version 0.3.0.10
+ * @version 0.4.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.1  - 2016/07/02 - oborchert
+ *            * Removed misleading error message. The system generated an error
+ *              for each update that could not be stored a second time. 
+ *              Duplicates will not be stored - correct behavior and therefore I
+ *              removed the misleading message.
+ * 0.4.0.0  - 2016/06/19 - oborchert
+ *            * Updated the collisionDetection method to conform with the 
+ *              algorithm within the id generation.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  *            * Removed unused variables.
@@ -94,6 +102,54 @@ typedef struct {
 bool _addClientReference(UpdateCache* self, CacheEntry* cEntry, 
                          uint8_t clientID, ProxyClientMapping* clientMapping);
 uint16_t getGCTime(uint16_t keepTime);
+
+/**
+ * This function selects the data from bgpsecData that is used for ID generation
+ * - see srx_identifier::generateIdentifier and stores it in the cache entry.
+ * It is important that both data blobs are same otherwise problems with the
+ * ID finding are given.
+ * This method copies the data from bgpsecData into the cache entry. Therefore
+ * the memory allocated in bgpsecData can safely be deallocated.
+ * 
+ * @param cEntry The cache entry where the blob data will be stored in.
+ * @param bgpsecData The bgpsec (and bgp4) data that has to be stored.
+ * 
+ * @return false if the cache entry already contains data,otherwise true.
+ * 
+ * @since 0.4.0.0 
+ * 
+ * @see srx_identifier.h::generateIdentifier
+ */
+bool storeCacheEntryBlob(CacheEntry* cEntry, BGPSecData* bgpsecData)
+{
+  bool retVal = false;
+  
+  if (cEntry->blob == NULL)
+  {
+    if (bgpsecData->attr_length != 0)
+    {
+      cEntry->blobLength = bgpsecData->attr_length;
+      cEntry->blob = malloc(cEntry->blobLength);
+      if (cEntry->blob != NULL)
+      {
+        memcpy(cEntry->blob, bgpsecData->bgpsec_path_attr, cEntry->blobLength);
+        retVal = true;
+      }
+    }
+    else
+    {
+      cEntry->blobLength = bgpsecData->numberHops * 4;
+      cEntry->blob = malloc(cEntry->blobLength);
+      if (cEntry->blob != NULL)
+      {
+        memcpy(cEntry->blob, bgpsecData->asPath, cEntry->blobLength);
+        retVal = true;
+      }
+    }
+  }
+  
+  return retVal;
+}
 
 /*---------------------
  * Hash-table functions
@@ -474,9 +530,11 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
     if (bgpSec != NULL)
     {
       //TODO: see BZ197 - this cases once a while a SEGDEV
-      cEntry->blobLength = bgpSec->length;
-      cEntry->blob = malloc(bgpSec->length);
-      memcpy(cEntry->blob, bgpSec->data, bgpSec->length);
+      if (!storeCacheEntryBlob(cEntry, bgpSec))
+      {
+        // Actually we end up here when the element exists already in the cache.
+        // It is not an error. BZ 1010
+      }
     }
     else
     {
@@ -1073,11 +1131,25 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
  * @return true if a collision could be detected!
  */
 bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix, 
-                     uint32_t asn, uint32_t dataLength, uint8_t* data)
+                     uint32_t asn, BGPSecData* bgpsecData)
 {
   CacheEntry* cEntry;
   bool collision = false;
+
+  uint32_t dataLength = 0;
+  uint8_t* data       = NULL;
   
+  if (bgpsecData->attr_length != 0)
+  {
+    dataLength = bgpsecData->attr_length;
+    data       = bgpsecData->bgpsec_path_attr;
+  }
+  else
+  {
+    dataLength = bgpsecData->numberHops * 4;
+    data       = (uint8_t*)bgpsecData->asPath;
+  }
+    
   // Try to find the update itself.
   if (tableFind(self, *updateID, &cEntry)) 
   {
