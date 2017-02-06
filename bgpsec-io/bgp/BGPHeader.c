@@ -24,10 +24,16 @@
  * send BGP updates. It keeps the session open as long as the program is running 
  * or for a pre-determined time after the last update is send.
  * 
- * @version 0.2.0.2
+ * @version 0.2.0.5
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2016/11/15 - oborchert
+ *            * Fixed BZ1053 - always use 4 bytes for IPv4 next hop in MPNLRI.
+ *          - 2016/10/21 - oborchert
+ *            * BZ1026: Due to a change in the capability data structure the 
+ *              construction code for capabilities needed to be changed slightly
+ *              as well. (The structure on the wire was not modified!)
  *  0.2.0.2 - 2016/06/26 - oborchert
  *            * Fixed bug in wrong ASN during open message when AS is 4 byte
  *              ASN (BZ994).
@@ -91,15 +97,18 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
     printf ("ERROR: OpenMessage - Configuration == NULL");
     return 0;
   }
+  int pHdrLen = sizeof(BGP_OpenMessage_OptParam);
   int paramLength = 0 
-               + (config->capConf.mpnlri_v4     ? sizeof(BGP_Cap_MPNLRI)   : 0)
-               + (config->capConf.mpnlri_v6     ? sizeof(BGP_Cap_MPNLRI)   : 0)
-               + (config->capConf.asn_4byte     ? sizeof(BGP_Cap_AS4)      : 0)
-               + (config->capConf.route_refresh ? sizeof(BGP_Cap_RREFRESH) : 0)
-               + (config->capConf.bgpsec_rcv_v4 ? sizeof(BGP_Cap_BGPSEC)   : 0)
-               + (config->capConf.bgpsec_rcv_v6 ? sizeof(BGP_Cap_BGPSEC)   : 0)
-               + (config->capConf.bgpsec_snd_v4 ? sizeof(BGP_Cap_BGPSEC)   : 0)
-               + (config->capConf.bgpsec_snd_v6 ? sizeof(BGP_Cap_BGPSEC)   : 0);
+    + (config->capConf.mpnlri_v4     ? sizeof(BGP_Cap_MPNLRI) + pHdrLen   : 0)
+    + (config->capConf.mpnlri_v6     ? sizeof(BGP_Cap_MPNLRI) + pHdrLen   : 0)
+    + (config->capConf.asn_4byte     ? sizeof(BGP_Cap_AS4) + pHdrLen      : 0)
+    + (config->capConf.route_refresh ? sizeof(BGP_Cap_RREFRESH) + pHdrLen : 0)
+    + (config->capConf.extMsgSupp    ? sizeof(BGP_Cap_ExtMsgSupport) + pHdrLen 
+                                                                     : 0)
+    + (config->capConf.bgpsec_rcv_v4 ? sizeof(BGP_Cap_BGPSEC) + pHdrLen   : 0)
+    + (config->capConf.bgpsec_rcv_v6 ? sizeof(BGP_Cap_BGPSEC) + pHdrLen   : 0)
+    + (config->capConf.bgpsec_snd_v4 ? sizeof(BGP_Cap_BGPSEC) + pHdrLen   : 0)
+    + (config->capConf.bgpsec_snd_v6 ? sizeof(BGP_Cap_BGPSEC) + pHdrLen   : 0);
             
   int requiredLength = sizeof(BGP_OpenMessage) 
                        + paramLength;
@@ -131,17 +140,22 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
   openMsg->opt_param_len   = paramLength;
   buff += sizeof(BGP_OpenMessage);
 
-  BGP_Cap_MPNLRI*   mpnlri   = NULL;
-  BGP_Cap_AS4*      as4      = NULL;
-  BGP_Cap_BGPSEC*   bgpsec   = NULL;
+  BGP_Cap_MPNLRI*           mpnlri   = NULL;
+  BGP_Cap_AS4*              as4      = NULL;
+  BGP_Cap_BGPSEC*           bgpsec   = NULL;  
+  BGP_Cap_RREFRESH*         rrefresh = NULL;
+  BGP_Cap_ExtMsgSupport*    extMsg   = NULL;
+  BGP_OpenMessage_OptParam* optParam = NULL;
           
   // Announce MPNLRI encoding IPv4
   if (config->capConf.mpnlri_v4)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_MPNLRI);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     mpnlri = (BGP_Cap_MPNLRI*)buff;
-    mpnlri->paramHdr.param_type = BGP_T_CAP; 
-    mpnlri->paramHdr.param_len  = sizeof(BGP_Cap_MPNLRI) 
-                                  - sizeof(BGP_OpenMessage_OptParam);
     mpnlri->capHdr.cap_code     = BGP_CAP_T_MPNLRI;
     mpnlri->capHdr.cap_length   = LEN_CAP_MPNLRI;
     mpnlri->afi                 = htons(AFI_V4);
@@ -153,10 +167,12 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
   // Announce MPNLRI encoding IPv6
   if (config->capConf.mpnlri_v6)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_MPNLRI);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     mpnlri = (BGP_Cap_MPNLRI*)buff;
-    mpnlri->paramHdr.param_type = BGP_T_CAP; 
-    mpnlri->paramHdr.param_len  = sizeof(BGP_Cap_MPNLRI)
-                                  - sizeof(BGP_OpenMessage_OptParam);
     mpnlri->capHdr.cap_code     = BGP_CAP_T_MPNLRI;
     mpnlri->capHdr.cap_length   = LEN_CAP_MPNLRI;
     mpnlri->afi                 = htons(AFI_V6);
@@ -168,21 +184,40 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
   // Announce Route Refresh
   if (config->capConf.route_refresh)
   {
-    mpnlri->paramHdr.param_type = BGP_T_CAP; 
-    mpnlri->paramHdr.param_len  = sizeof(BGP_Cap_RREFRESH)
-                                  - sizeof(BGP_OpenMessage_OptParam);
-    mpnlri->capHdr.cap_code     = BGP_CAP_T_RREFRESH;
-    mpnlri->capHdr.cap_length   = LEN_CAP_RREFRESH;
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_RREFRESH);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
+    rrefresh = (BGP_Cap_RREFRESH*)buff;
+    rrefresh->capHdr.cap_code   = BGP_CAP_T_RREFRESH;
+    rrefresh->capHdr.cap_length = LEN_CAP_RREFRESH;
+    buff += sizeof(BGP_Cap_RREFRESH);
+  }
+  
+  // Announce Extended Message Support
+  if (config->capConf.extMsgSupp)
+  {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_ExtMsgSupport);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
+    extMsg = (BGP_Cap_ExtMsgSupport*)buff;
+    extMsg->capHdr.cap_code   = BGP_CAP_T_EXT_MSG_SUPPORT;
+    extMsg->capHdr.cap_length = LEN_CAP_EXT_MSG_SUPPORT;
     buff += sizeof(BGP_Cap_RREFRESH);
   }
   
   // Announce 4 byte ASN
   if (config->capConf.asn_4byte)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_AS4);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     as4 = (BGP_Cap_AS4*)buff;
-    as4->paramHdr.param_type = BGP_T_CAP; 
-    as4->paramHdr.param_len  = sizeof(BGP_Cap_AS4)
-                               - sizeof(BGP_OpenMessage_OptParam);
     as4->capHdr.cap_code     = BGP_CAP_T_AS4;
     as4->capHdr.cap_length   = LEN_CAP_AS4;
     as4->myAS                = htonl(config->asn);
@@ -193,10 +228,12 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
   // The receiving could be stripped because the player does drop traffic.
   if (config->capConf.bgpsec_snd_v4)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_BGPSEC);    
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     bgpsec = (BGP_Cap_BGPSEC*)buff;
-    bgpsec->paramHdr.param_type = BGP_T_CAP;
-    bgpsec->paramHdr.param_len  = sizeof(BGP_Cap_BGPSEC)
-                                  - sizeof(BGP_OpenMessage_OptParam);
     bgpsec->capHdr.cap_code     = BGP_CAP_T_BGPSEC;
     bgpsec->capHdr.cap_length   = LEN_CAP_BGPSEC;
     bgpsec->firstOctet          =   (BGPSEC_VERSION << ADDR_IP_V4) 
@@ -207,10 +244,12 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
 
   if (config->capConf.bgpsec_rcv_v4)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_BGPSEC);
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     bgpsec = (BGP_Cap_BGPSEC*)buff;
-    bgpsec->paramHdr.param_type = BGP_T_CAP;
-    bgpsec->paramHdr.param_len  = sizeof(BGP_Cap_BGPSEC)
-                                  - sizeof(BGP_OpenMessage_OptParam);
     bgpsec->capHdr.cap_code     = BGP_CAP_T_BGPSEC;
     bgpsec->capHdr.cap_length   = LEN_CAP_BGPSEC;
     bgpsec->firstOctet          =   (BGPSEC_VERSION << ADDR_IP_V4) 
@@ -221,10 +260,12 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
   
   if (config->capConf.bgpsec_snd_v6)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_BGPSEC);
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     bgpsec = (BGP_Cap_BGPSEC*)buff;
-    bgpsec->paramHdr.param_type = BGP_T_CAP;
-    bgpsec->paramHdr.param_len  = sizeof(BGP_Cap_BGPSEC)
-                                  - sizeof(BGP_OpenMessage_OptParam);
     bgpsec->capHdr.cap_code     = BGP_CAP_T_BGPSEC;
     bgpsec->capHdr.cap_length   = LEN_CAP_BGPSEC;
     bgpsec->firstOctet          =   (BGPSEC_VERSION << ADDR_IP_V4) 
@@ -235,10 +276,12 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
 
   if (config->capConf.bgpsec_rcv_v6)
   {
+    optParam = (BGP_OpenMessage_OptParam*)buff;
+    optParam->param_type = BGP_T_CAP;
+    optParam->param_len  = sizeof(BGP_Cap_BGPSEC);
+    buff += sizeof(BGP_OpenMessage_OptParam);
+    
     bgpsec = (BGP_Cap_BGPSEC*)buff;
-    bgpsec->paramHdr.param_type = BGP_T_CAP;
-    bgpsec->paramHdr.param_len  = sizeof(BGP_Cap_BGPSEC)
-                                  - sizeof(BGP_OpenMessage_OptParam);
     bgpsec->capHdr.cap_code     = BGP_CAP_T_BGPSEC;
     bgpsec->capHdr.cap_length   = LEN_CAP_BGPSEC;
     bgpsec->firstOctet          =   (BGPSEC_VERSION << ADDR_IP_V4) 
@@ -574,11 +617,15 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     
     attrMPNLRI_1->afi  = nlri->afi;
     attrMPNLRI_1->safi = nlri->safi;
-    attrMPNLRI_1->nextHopLen = numBytesForIP(nextHop);
+    // Fix BZ1053: for IPV4 always use all 4 bytes.
     if (ntohs(nlri->afi) == AFI_V4)
     {
-      // if V4 the padding is off by 4 bytes.
-      attrMPNLRI_1->nextHopLen -= 4;
+      // if V4 don't use padding for the next hop
+      attrMPNLRI_1->nextHopLen = 4;
+    }
+    else
+    {
+        attrMPNLRI_1->nextHopLen = numBytesForIP(nextHop);    
     }
     
     // move the buffer to the next hop IP
@@ -685,6 +732,7 @@ u_int8_t numBytes(int bits)
  * Calculate the min number of bytes required to store the padded IP address
  * 
  * @param ip the IPv4 or IPv6 Address
+ * @param ipV4 Indicates if the address is an IPv4 address or IPv6 address.
  * 
  * @return the number of bytes needed to store the value.
  */

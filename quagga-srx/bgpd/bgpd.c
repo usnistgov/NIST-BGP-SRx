@@ -2422,19 +2422,19 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
       // unregister
       bgp_info_unregister (bgp->info_lid_hash, localID);
       info->localID  = 0;
-      
-      // @TODO: We eill get here the first time we hear back from srx-server.
-      // This is the moment where we will call the local validation. It allows 
+
+      // @TODO: We will get here the first time we hear back from srx-server.
+      // This is the moment where we will call the local validation. It allows
       // us to have lazy evaluation. We need connectivity to srx-server for it
       // to work though.
       //
       // Once the srx-server sends real bgpsec validation results, we have to
-      // find another place where to out it in if we want to continue local
+      // find another place where to put it in if we want to continue local
       // validation.
       //
       // Maybe local validation could be performed instead of the verify call
       // in case no srx-server is available.
-      
+
       //------ To be deleted later on-----------
       if (bgp->srxCAPI != NULL && info->attr->bgpsec_validationData != NULL)
       {
@@ -2443,17 +2443,17 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
         int valResult = bgp->srxCAPI->validate(info->attr->bgpsec_validationData);
         bgpsecResult = valResult == API_VALRESULT_VALID ? SRx_RESULT_VALID
                                                         : SRx_RESULT_INVALID;
-       
+
         if (bgpsecResult == SRx_RESULT_INVALID)
         {
           if ((info->attr->bgpsec_validationData->status & API_STATUS_ERROR_MASK) > 0)
           {
-            zlog_err("Update [0x%08X] validation returned invalid with an error: status=0x%X\n", 
+            zlog_err("Update [0x%08X] validation returned invalid with an error: status=0x%X\n",
                     updateID, info->attr->bgpsec_validationData->status);
           }
         }
       }
-      
+
       bgp_info_set_validation_result (info, valType, roaResult, bgpsecResult);
       retVal = true;
     }
@@ -2485,7 +2485,7 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
 void handleSRxSignatures(SRxUpdateID updateID, BGPSecCallbackData* data,
                                 void* bgpRouter)
 {
-  // @NOTE: At this moment we will only sign within quagga and NOT using 
+  // @NOTE: At this moment we will only sign within quagga and NOT using
   //        srx-server for that. We might re-visit this decission at a later
   //        point.
   zlog_info ("*** Received SRx Signatures for update [0x%08X]! ***\n",
@@ -2589,11 +2589,11 @@ void srx_set_default(struct bgp *bgp)
   bgp->srxProxy = createSRxProxy(handleSRxValidationResult, handleSRxSignatures,
                                  handleSRxSynchRequest, handleSRxMessages,
                                  bgp->srx_proxyID, bgp->as, bgp);
-  
+
   // @TODO: REvisit this portion.
-  // The following line should be replaced by the commented code. The CAPI is 
+  // The following line should be replaced by the commented code. The CAPI is
   // tightly connected to this bgp instance.
-  bgp->srxCAPI  = getSrxCAPI(); 
+  bgp->srxCAPI  = getSrxCAPI();
 //  bgp->scaAPI         = XMALLOC(MTYPE_SRX_SCA_API, sizeof(SRxCryptoAPI));
 //  memset(bgp->scaAPI, 0, sizeof(SRxCryptoAPI));
 //  sca_status_t sca_status = API_STATUS_OK;
@@ -2603,7 +2603,7 @@ void srx_set_default(struct bgp *bgp)
 //    XFREE(MTYPE_SRX_SCA_API, bgp->scaAPI);
 //    bgp->scaAPI = NULL;
 //  }
-  
+
   memset(bgp->srx_bgpsec_key, 0, sizeof (BGPSecKey));
 }
 #endif /* USE_SRX */
@@ -3027,6 +3027,7 @@ static const struct peer_flag_action peer_flag_action_list[] =
     { PEER_FLAG_BGPSEC_MPE_IPV4,          0, peer_change_none },
     { PEER_FLAG_BGPSEC_MIGRATE,           0, peer_change_none },
     { PEER_FLAG_BGPSEC_ROUTE_SERVER,      0, peer_change_none },
+    { PEER_FLAG_EXTENDED_MESSAGE_SUPPORT, 0, peer_change_none },
 #endif
     { 0, 0, 0 }
   };
@@ -6121,7 +6122,7 @@ bgp_config_write (struct vty *vty)
         }
         vty_out (vty, " srx bgpsec ski%u %s%s", kIdx, skiStr, VTY_NEWLINE);
       }
-      vty_out (vty, " srx bgpsec active-ski %u%s", bgp->srx_bgpsec_active_key, 
+      vty_out (vty, " srx bgpsec active-ski %u%s", bgp->srx_bgpsec_active_key,
                VTY_NEWLINE);
 #endif /* USE_SRX */
 

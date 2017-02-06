@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bgpsecio], [0.2.0.4], [bgpsrx-dev@antd.nist.gov])
+AC_INIT([bgpsecio], [0.2.0.5], [bgpsrx-dev@antd.nist.gov])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 
 # AC_CONFIG_SRCDIR specifies a file that the configuration checks for existence.
@@ -37,19 +37,28 @@ dnl echo "age=$age"
 # Determine if it is 64 Bit. This is needed for the ld.conf.d. file.
 AS_BOX([Processing system and compiler setup])
 AC_MSG_CHECKING([host architecture information])
+is_64_bit="no"
 case "$HOSTTYPE" in
+  x86_64-linux)
+    is_64_bit="yes"
+    ;;
   x86_64) 
-    CPU_ARCH_FLAG="-DCPU_64"
-    CPU_ARCH="64"
-    if test "${libdir}" = "\${exec_prefix}/lib" ; then
-      libdir="${libdir}64"
-    fi
+    is_64_bit="yes"
     ;;
   *)
     CPU_ARCH_FLAG=""
     CPU_ARCH=""
     ;;
 esac
+
+if test "${is_64_bit}" = "yes"; then
+    CPU_ARCH_FLAG="-DCPU_64"
+    CPU_ARCH="64"
+    if test "${libdir}" = "\${exec_prefix}/lib" ; then
+      libdir="${libdir}64"
+    fi
+fi
+
 AC_MSG_RESULT([$CPU_ARCH bit])
 
 # Checks for programs.
@@ -119,6 +128,16 @@ else
     header. For fedora/CentOS install libconfig-devel.
     --------------------------------------------------])
   fi
+  # Now specify which int type to use which depends on the library type.
+  AC_MSG_CHECKING(for libconfig int type)
+  /sbin/ldconfig -v 2>/dev/null | grep libconfig.so.8 > /dev/null
+  if test "$?" = "0"; then      
+    LCONFIG_INT=long
+  else
+    LCONFIG_INT=int
+  fi
+  CFLAGS="$CFLAGS -DLCONFIG_INT=$LCONFIG_INT"
+  AC_MSG_RESULT($LCONFIG_INT)
 fi
 
 ##
@@ -340,6 +359,7 @@ AC_SUBST(OPENSSL_LIBS)
 AC_SUBST(OPENSSL_LDFLAGS)
 AC_SUBST(OPENSSL_CFLAGS)
 AC_SUBST(TESTMAKE)
+AC_SUBST(LCONFIG_INT)
 
 AC_CONFIG_FILES([Makefile
                  antd-util/Makefile
@@ -357,6 +377,7 @@ echo "Library......: $VER_INFO ($LIB_VER_INFO)"
 echo "CPU Arch.....: $CPU_ARCH"
 echo "CFLAGS.......: $CFLAGS"
 echo "LDFLAGS......: $LDFLAGS"
+echo "LCONFIG_INT..: $LCONFIG_INT"
 echo ""
 echo "OpenSSL Configuration:"
 if test "x${openssl_dir}" = "x"; then

@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.4.0.1], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.4.0.2], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -93,7 +93,7 @@ case $host_os in
 	;;
 esac
 
-AC_MSG_CHECKING([whether SRxCryptoAPI is already required for this version of ${PACKAGE_NAME}])
+AC_MSG_CHECKING([whether SRxCryptoAPI is required for this version of ${PACKAGE_NAME}])
 CMPV="0.4.0"
 AS_VERSION_COMPARE(${PACKAGE_VERSION}, ${CMPV}, [include_sca=no], 
                    [include_sca=yes], [include_sca=yes])

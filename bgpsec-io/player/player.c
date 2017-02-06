@@ -22,10 +22,13 @@
  *
  * Stores and loads the BGPSEC data.
  * 
- * @version 0.1.2.0
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2016/11/15 - oborchert
+ *            * Added capability of storing/loading one byte length bgpsec path 
+ *              attributes.
  *  0.1.2.0 - 2016/05/05 - oborchert
  *            * Added draft number to header file.
  *  0.1.1.0 - 2016/05/03 - oborchert
@@ -99,7 +102,9 @@ bool loadData(FILE* file, u_int32_t myAS, u_int32_t peerAS, u_int8_t type,
             {
               if (ioBuff->keySize + sizeof(u_int16_t) < keyDataLength)
               {
-                printf ("ERROR: Key buffer too small to load keys.\n");
+                printf ("NOTICE: Key buffer too small to load keys.\n");
+                printf ("NOTICE: Skip loading keys.\n");
+                fseek(file, keyDataLength, SEEK_CUR);                              
               }
               else
               {

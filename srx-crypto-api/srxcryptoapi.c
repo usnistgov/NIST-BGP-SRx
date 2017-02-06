@@ -25,10 +25,17 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @Version 0.2.0.1
+ * @version 0.2.0.2
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.1 - 2016/02/02 - oborchert
+ *             * Corrected version number to 0.2.0.2 which was incorrect.
+ *          - 2016/11/15 - oborchert
+ *             * Fixed issue with one byte bgpsec path attribute (BZ1051)
+ *          - 2016/10/26 - oborchert
+ *            * Fixed compiler warning (BZ1035) while retrieving int values from
+ *              libconfig. (int for libconfig.so.9/ long for libconfig.so.8)
  *  0.2.0.1 - 2016/07/02 - oborchert
  *            * Added missing hash generation for origin announcements.
  *  0.2.0.0 - 2016/06/27 - oborchert
@@ -90,12 +97,9 @@
 #include <netinet/in.h>
 #include <openssl/bio.h>
 
+#include "config.h"
 #include "srx/srxcryptoapi.h"
 #include "crypto_imple.h"
-
-#ifndef LIBCFG_INT
-#define LIBCFG_INT int
-#endif
 
 #define MAX_CMD_LEN                1024
 #define MAX_EXT_SIZE               10
@@ -527,11 +531,11 @@ static int _checkConfigFile(SRxCryptoAPI* api)
 static void _loadGeneralConfiguration(config_t* cfg, sca_status_t* status)
 {
     /* debug level */
-  LIBCFG_INT newLogLevel = (LIBCFG_INT)g_loglevel;
-  if(config_lookup_int(cfg, "debug-type", (LIBCFG_INT*)&newLogLevel))
+  LCONFIG_INT newLogLevel = (LCONFIG_INT)g_loglevel;
+  if(config_lookup_int(cfg, "debug-type", &newLogLevel))
   {
     sca_debugLog(LOG_INFO, "- debug type: %d\n", newLogLevel);
-    g_loglevel = newLogLevel;
+    g_loglevel = (int)newLogLevel;
   }
   else
   {
@@ -1292,12 +1296,21 @@ int sca_generateHashMessage(SCA_BGPSecValidationData* data, u_int8_t algoID,
   u_int8_t* bgpsecPathAttr = data->bgpsec_path_attr;
   // Cast it to the BGPSEC Path Attribute to easily access the data and move the 
   // pointer to the path segment portion of the data
-  SCA_BGPSEC_PathAttribute* bgpsecAttrHdr = 
-                                      (SCA_BGPSEC_PathAttribute*)bgpsecPathAttr;
-  bgpsecPathAttr += LEN_BGPSECPATHATTR_HDR;
+  SCA_BGP_PathAttribute* bgpsecAttrHdr = (SCA_BGP_PathAttribute*)bgpsecPathAttr;
+  bgpsecPathAttr += sizeof(SCA_BGP_PathAttribute);
   // Contains the length of SecurePath and all Signature blocks.
-  u_int16_t remainder = ntohs(bgpsecAttrHdr->attrLength);
-  
+  u_int16_t remainder = 0;
+  if ((bgpsecAttrHdr->flags & BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
+  {
+    remainder = *bgpsecPathAttr;
+    bgpsecPathAttr++;
+  }
+  else
+  {
+    remainder = ntohs(*((u_int16_t*)bgpsecPathAttr));
+    bgpsecPathAttr += 2;
+  }
+
   // Cast it to the Secure Path header element and move it to the first secure 
   // Path segments
   SCA_BGPSEC_SecurePath* secPathHdr = (SCA_BGPSEC_SecurePath*)bgpsecPathAttr;

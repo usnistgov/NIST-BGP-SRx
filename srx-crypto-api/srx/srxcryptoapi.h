@@ -19,10 +19,14 @@
  * BGPSEC implementations. This library allows to switch the crypto 
  * implementation dynamically.
  *
- * @version 0.2.0.1
+ * @version 0.2.0.2
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.1 - 2016/02/02 - oborchert
+ *             * Corrected version number to 0.2.0.2 which was incorrect.
+ *           - 2016/11/15 - oborchert
+ *             * Fixed issue with one byte bgpsec path attribute (BZ1051)
  *   0.2.0.1 - 2016/07/02 - oborchert
  *             * Speller in variable name algorithID to algorithmID
  *             * Added missing hash generation for origin announcements.
@@ -127,7 +131,8 @@
 #define API_STATUS_ERR_USER1            0x4000
 /** A user defined error */
 #define API_STATUS_ERR_USER2            0x8000
-
+/** This flag specifies the length field in the BGP Path Attribute. */
+#define BGP_UPD_A_FLAGS_EXT_LENGTH      0x10
 
 ////////////////////////////////////////////////////////////////////////////////
 // BGPSEC Path Structures
@@ -157,9 +162,20 @@ typedef struct {
 
 typedef struct {
   u_int8_t  flags;
+  u_int8_t  type_code;    
+} __attribute__((packed)) SCA_BGP_PathAttribute;
+
+typedef struct {
+  u_int8_t  flags;
+  u_int8_t  type_code;
+  u_int8_t attrLength;
+} __attribute__((packed)) SCA_BGPSEC_NormPathAttribute;
+
+typedef struct {
+  u_int8_t  flags;
   u_int8_t  type_code;
   u_int16_t attrLength; // requires ext. length 0x10 set
-} __attribute__((packed)) SCA_BGPSEC_PathAttribute;
+} __attribute__((packed)) SCA_BGPSEC_ExtPathAttribute;
 
 typedef struct {
   u_int16_t length;  // contains the length of the entire SecurePath
@@ -185,13 +201,11 @@ typedef struct {
 } __attribute__((packed)) SCA_BGPSEC_SignatureSegment;
 
 /** Same as sizeof(SCA_BGPSEC_SecurePath) */
-#define LEN_SECPATH_HDR         2
+#define LEN_SECPATH_HDR          2
 /** Same as sizeof(SCA_BGPSEC_SecurePathSegment) */
-#define LEN_SECPATHSEGMENT      6
+#define LEN_SECPATHSEGMENT       6
 /** Same as sizeof(SCA_BGPSEC_SignatureBlock) */
-#define LEN_SIGBLOCK_HDR        3
-/** Same as sizeof(SCA_BGPSEC_PathAttribute) */
-#define LEN_BGPSECPATHATTR_HDR  4
+#define LEN_SIGBLOCK_HDR         3
 /** Same as sizeof(SCA_BGPSEC_SignatureSegment) */
 #define LEN_SIGSEGMENT_HDR      22
 

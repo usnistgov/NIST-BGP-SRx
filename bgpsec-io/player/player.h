@@ -23,10 +23,12 @@
  * This header file contains the data structure for the BGPSEC-IO player.
  * The player itself allows to write/read the data to and from a file.
  * 
- * @version 0.1.2.0
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2016/11/15 - oborchert
+ *            * modified BGPSEC_IO_DRAFT to version 18
  *  0.1.2.0 - 2016/05/05 - oborchert
  *            * Added draft number to header file.
  *            * Moved header version to 2
@@ -45,7 +47,7 @@
 #include "../bgp/BGPHeader.h"
 
 #define BGPSEC_IO_RECORD_VERSION    3
-#define BGPSEC_IO_DRAFT             15
+#define BGPSEC_IO_DRAFT             18
 
 #define BGPSEC_IO_TYPE_ALL          3
 #define BGPSEC_IO_TYPE_BGP_UPDATE   1

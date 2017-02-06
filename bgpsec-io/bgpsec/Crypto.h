@@ -22,10 +22,12 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.1.1.0
+ * @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5  -2017/01/03 - oborchert
+ *            * Added function parameter "k_mode" to CRYPTO_createSignature.
  *  0.1.1.0 - 2016/03/28 - oborchert
  *            * Modified signature of preloadKeys to indicate what keys have to
  *              be loaded
@@ -68,12 +70,15 @@ typedef enum T_Key {
  * @param algoID  Specifies the algorithm to be used for signing.
  * @param testSig If true the generated signature is validated right away. This
  *                is for test purpose only.
+ * @param k_mode  Specifies if a random k (preferred) or s specified k has to be 
+ *                used.
  * 
  * @return 0 if the signature could not be generated, otherwise the length of 
  *         the signature in host format
  */
 int CRYPTO_createSignature(TASList* asList, tPSegList* segElem, 
-                          u_int8_t* message, int len, int algoID, bool testSig);
+                           u_int8_t* message, int len, int algoID, bool testSig, 
+                           SignatureGenMode k_mode);
 
 /**
  * Read the given ASN-SKI file and generate an internal list containing all 

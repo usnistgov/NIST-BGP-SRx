@@ -223,6 +223,12 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
       binfo = adv->binfo;
 
 #ifdef USE_SRX
+    if (!CHECK_FLAG(peer->cap, PEER_CAP_EXTENDED_MSG_SUPPORT)
+        && STREAM_REMAIN(s) > BGP_MAX_PACKET_SIZE)
+    {
+      size_t oldsize, newsize = BGP_MAX_PACKET_SIZE;
+      newsize = stream_resize (s, newsize);
+    }
     if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
       zlog_debug("[BGPSEC] [%s] stream remain:%d prefix size: %d rn->p:%08x attr:%p ",
                  __FUNCTION__, STREAM_REMAIN (s),  PSIZE (rn->p.prefixlen),
@@ -592,7 +598,7 @@ bgp_default_update_send (struct peer *peer, struct attr *attr,
   stream_putw (s, 0);
 #ifdef USE_SRX
   bool fUsedAspath = false;
-  total_attr_len = bgp_packet_attribute (NULL, peer, s, attr, &p, afi, safi, 
+  total_attr_len = bgp_packet_attribute (NULL, peer, s, attr, &p, afi, safi,
                                          from, NULL, NULL, &fUsedAspath);
 #else
   total_attr_len = bgp_packet_attribute (NULL, peer, s, attr, &p, afi, safi, from, NULL, NULL);
@@ -2684,9 +2690,11 @@ bgp_read (struct thread *thread)
 				     &type, 1);
 	  goto done;
 	}
+
       /* Mimimum packet length check. */
       if ((size < BGP_HEADER_SIZE)
-	  || (size > BGP_MAX_PACKET_SIZE)
+	  || (size > ((peer->flags & PEER_FLAG_EXTENDED_MESSAGE_SUPPORT)?
+              BGP_MAX_PACKET_SIZE_EXTENDED:BGP_MAX_PACKET_SIZE))
 	  || (type == BGP_MSG_OPEN && size < BGP_MSG_OPEN_MIN_SIZE)
 	  || (type == BGP_MSG_UPDATE && size < BGP_MSG_UPDATE_MIN_SIZE)
 	  || (type == BGP_MSG_NOTIFY && size < BGP_MSG_NOTIFY_MIN_SIZE)

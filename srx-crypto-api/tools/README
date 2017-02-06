@@ -1,0 +1,9 @@
+# Version 0.2.0.2
+# 
+# The content of this folder will change in the next version(s)                                                                                                            
+# The configuration file will be removed and only the template will                                                                                                        
+# be used in future versions. Also the key/certificate generation                                                                                                          
+# will change and most likely the generation of a router key will                                                                                                          
+# produce right away the certificate.                                                                                                                                      
+#                                                                                                                                                                          
+# This file will be removed once the tools are updated.  

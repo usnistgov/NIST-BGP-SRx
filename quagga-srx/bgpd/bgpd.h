@@ -49,7 +49,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
   printf ("\n");                     \
 }
 
-/** For now two 
+/** For now two
  * different private keys seem to be enough.*/
 #define SRX_MAX_PRIVKEYS 2
 
@@ -536,7 +536,7 @@ struct bgp
   struct bgp_info_hash* info_uid_hash;
   /* The info hash for local id's */
   struct bgp_info_hash* info_lid_hash;
-  /** The SRx CryptoAPI instance. Will be currently maintained as g_capi in 
+  /** The SRx CryptoAPI instance. Will be currently maintained as g_capi in
    * bgp_validate.c */
   SRxCryptoAPI* srxCAPI;
 
@@ -742,6 +742,7 @@ struct peer
 #define PEER_CAP_AS4_ADV                    (1 << 7) /* as4 advertised */
 #define PEER_CAP_AS4_RCV                    (1 << 8) /* as4 received */
 #ifdef USE_SRX
+#define PEER_CAP_EXTENDED_MSG_SUPPORT       (1 << 13)/* bgpsec advertised send capability */
 #define PEER_CAP_BGPSEC_ADV_SEND            (1 << 14)/* bgpsec advertised send capability */
 #define PEER_CAP_BGPSEC_ADV                 (1 << 15)/* bgpsec advertised recv capability */
 #endif
@@ -769,6 +770,7 @@ struct peer
 #define PEER_FLAG_LOCAL_AS_NO_PREPEND       (1 << 7) /* local-as no-prepend */
 #define PEER_FLAG_LOCAL_AS_REPLACE_AS       (1 << 8) /* local-as no-prepend replace-as */
 #ifdef USE_SRX
+#define PEER_FLAG_EXTENDED_MESSAGE_SUPPORT  (1 << 9) /* BGP-Extended Message Support */
 #define PEER_FLAG_BGPSEC_MPE_IPV4           (1 << 10) /* mp extension for ipv4 */
 // The next two flags allow pcount=0, both in receiving and migrate also in sending
 #define PEER_FLAG_BGPSEC_MIGRATE            (1 << 11) /* enable migration mode with this peer */
@@ -909,11 +911,11 @@ struct peer
 
   /* ORF Prefix-list */
   struct prefix_list *orf_plist[AFI_MAX][SAFI_MAX];
-  
+
 #ifdef USE_SRX
   // Flag this peer to be migrated. In this case set the pCount to zero and
   // also allow this peer to set its pCount to zero.
-  bool bgpsec_migrate;  
+  bool bgpsec_migrate;
 #endif
 
   /* Prefix count. */
@@ -995,6 +997,7 @@ struct bgp_nlri
 #define BGP_MARKER_SIZE		                16
 #define BGP_HEADER_SIZE		                19
 #define BGP_MAX_PACKET_SIZE                   4096
+#define BGP_MAX_PACKET_SIZE_EXTENDED         65536
 
 /* BGP minimum message size.  */
 #define BGP_MSG_OPEN_MIN_SIZE                   (BGP_HEADER_SIZE + 10)

@@ -27,10 +27,12 @@
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *  0.2.0.2 - 2016/06/29 - oborchert
- *            * Fixed BZ995 segmentation failt during AS path conversion. 
+ *  0.2.0.2 - 2016/11/14 - borchert
+ *            * Fixed speller in documentation.
+ *          - 2016/06/29 - borchert
+ *            * Fixed BZ995 segmentation failed during AS path conversion. 
  *              Replaced sprintf with snprintf in convertAsnPath.
- *  0.2.0.1 - 2016/06/24 - oborchert
+ *  0.2.0.1 - 2016/06/24 - borchert
  *            * Assured that function convertAsnPath does return a zero 
  *              terminated string and not NULL.
  *  0.2.0.0 - 2016/05/10 - oborchert
@@ -88,7 +90,7 @@ static bool _checkSTDIN(int sec, int msec)
  * if updates are waiting on stdin if selected (inclStdIn). In this case the 
  * next update will be generated and added to the stack.
  *  
- * @param params The program parameters which in clude the stack
+ * @param params The program parameters which include the stack
  * @param inclStdIn Include the check for stdin
  * 
  * @return true if an update is on the stack.

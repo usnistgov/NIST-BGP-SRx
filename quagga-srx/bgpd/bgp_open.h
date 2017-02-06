@@ -86,6 +86,9 @@ struct capability_gr
 #define CAPABILITY_CODE_MP              1 /* Multiprotocol Extensions */
 #define CAPABILITY_CODE_REFRESH         2 /* Route Refresh Capability */
 #define CAPABILITY_CODE_ORF             3 /* Cooperative Route Filtering Capability */
+#ifdef USE_SRX
+#define CAPABILITY_CODE_EXTENDED        6 /* Extended Message Support for BGP */
+#endif /* USE_SRX */
 #define CAPABILITY_CODE_RESTART        64 /* Graceful Restart Capability */
 #define CAPABILITY_CODE_AS4            65 /* 4-octet AS number Capability */
 #define CAPABILITY_CODE_DYNAMIC        66 /* Dynamic Capability */
@@ -104,6 +107,7 @@ struct capability_gr
 #define CAPABILITY_CODE_AS4_LEN         4
 #ifdef USE_SRX
 #define CAPABILITY_CODE_BGPSEC_LEN      3
+#define CAPABILITY_CODE_EXTENDED_LEN    0 /* Extended Massage Support for BGP */
 #endif /* USE_SRX */
 
 /* Cooperative Route Filtering Capability.  */

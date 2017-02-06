@@ -44,24 +44,42 @@ bgpsec_openssl: {
 # in case the default specified method names are not implemented, the 
 # SRxCryptoAPI wrapper functions are mapped.
 #
-  method_validate      = "validate";
-  method_sign_with_key = "sign_with_key";
-  method_sign_with_id  = "sign_with_id";
+  init_value                  = "PUB:<filename>;PRIV:<filename>";
+  method_init                 = "";
+  method_release              = "";
 
-  method_registerPrivateKey = "";
-  method_unregisterKey      = "";
+  method_freeHashMessage      = "";
+  method_freeSignature        = "";
+
+  method_sign                 = "";
+  method_validate             = "";
+
+  method_registerPublicKey    = "";
+  method_unregisterPublicKey  = "";
+
+  method_registerPrivateKey   = "";
+  method_unregisterPrivateKey = "";
 };
 
 # Some other example configuration 
 testlib: {
   library_name="libcrypto_testlib.so";
 
-  method_validate      = "";
-  method_sign_with_key = "";
-  method_sign_with_id  = "";
+  init_value                  = "1;1;1";
+  method_init                 = "";
+  method_release              = "";
 
-  method_registerPrivateKey = "";
-  method_unregisterKey      = "";
+  method_freeHashMessage      = "";
+  method_freeSignature        = "";
+
+  method_sign                 = "";
+  method_validate             = "";
+
+  method_registerPublicKey    = "";
+  method_unregisterPublicKey  = "";
+
+  method_registerPrivateKey   = "";
+  method_unregisterPrivateKey = "";
 };
 --------------------------------------------------------------------------------
 
@@ -105,4 +123,3 @@ MEMORY Leak of 32 Bytes: This is related to the _dlerror call during loading the
 Questions:
 ==========
 Email to bgpsrx-dev@nist.gov
-

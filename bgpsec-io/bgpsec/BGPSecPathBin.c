@@ -23,10 +23,21 @@
  * This software allows to generate the BGPSEC Path attribute as binary stream.
  * The path will be fully signed as long as all keys are available.
  *
-* @version 0.2.0.0
+* @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/01/30 - oborchert
+ *            * increased initial buffer size from 3K to 60K (BZ1094)
+ *          - 2016/12/21 - oborchert
+ *            * Modified signature of the functions generateBGPSecAttr and
+ *              _fillSignatureBlock to allow signing to be done in CAPI mode.
+ *            2016/11/15 - oborchert
+ *            * Updated function generateBGPSecAttr to allow updates with 
+ *              extended flag not being set.
+ *  0.2.0.5 - 2016/11/01 - oborchert
+ *            * Fixed length of BGPSEC_PathAttr which depends on the extended 
+ *              flag.
  *  0.2.0.0 - 2016/06/02 - oborchert
  *            * Merged modifications from 0.1.1.1 branch for measurement 
  *              framework
@@ -87,11 +98,13 @@ static u_int8_t* TMP_SIGBLOCK = NULL;
 /** Contains the total size of the temporary signature block. */
 static u_int16_t TMP_SIGBLOCK_SIZE = 0;
 
-/** The initial size of the path attribute is 10K*/
-#define INIT_SIZE  3000
+/** The initial size of the path attribute is 64K*/
+#define INIT_SIZE  64000
+//#define INIT_SIZE  3000
 #define EXTRA_BUFF 1000
 
-static int _fillSignatureBlock(u_int8_t* data, AlgoParam* algo, int ctSegments, 
+static int _fillSignatureBlock(SRxCryptoAPI* capi, 
+                               u_int8_t* data, AlgoParam* algo, int ctSegments, 
                                u_int32_t nextAS, BGPSEC_PrefixHdr* prefix,
                                tPSegList* spSeg, TASList* asList);
 
@@ -113,12 +126,27 @@ void initData()
   }
   else
   {
-    BGPSEC_PathAttribute* attr = (BGPSEC_PathAttribute*)INT_DATA;
-    if (attr->attrLength != 0)
+    BGP_PathAttribute* pattr = (BGP_PathAttribute*)INT_DATA;
+    bool extended = (pattr->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0;
+    int length  = 0;
+    int attrLen = 0;
+    u_int8_t* attrLenPtr = INT_DATA + sizeof(BGP_PathAttribute);
+
+    if (extended)
+    {
+      length  = ntohs(*((u_int16_t*)attrLenPtr));
+      attrLen = length + sizeof(BGP_PathAttribute) + 2; // 2 byte length field
+    }
+    else
+    {
+      length  = *attrLenPtr;
+      attrLen = length + sizeof(BGP_PathAttribute);    
+    }
+    
+    if (attrLen != 0)
     {
       // Only initialize the memory previously used.
-      u_int16_t len = ntohs(attr->attrLength);
-      memset(INT_DATA, 0, len);
+      memset(INT_DATA, 0, attrLen);
       memset(TMP_SIGBLOCK, 0, TMP_SIGBLOCK_SIZE);
     }
   }
@@ -306,6 +334,8 @@ static tPSegList* _createPSegList(BGPSEC_SecurePathSegment* segment,
  *   a) not be signed sign to the given peer for transit paths
  *   b) not be generated for originations.
  * 
+ * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
+ *               performed using the internal signing implementation.
  * @param useGlobal use internal data stream (not thread safe but faster)
  * @param asPath (optional) a comma or blank separated string containing the AS 
  *               path (origin is the right most AS), Can be empty or NULL.
@@ -315,14 +345,18 @@ static tPSegList* _createPSegList(BGPSEC_SecurePathSegment* segment,
  * @param prefix The prefix to be used. Depending on the AFI value it will be 
  *               typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
  * @param asList The AS list
+ * @param onlyExtendedLength Indicates if the attributes flag must be set to 
+ *               extended length regardless of parameter length.
  * 
  * @return Return the BGPSEC path attribute or NULL if the path generation 
  *         failed or the peer is iBGP and the path would be an origination.
  */
-BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath, 
+BGP_PathAttribute* generateBGPSecAttr(SRxCryptoAPI* capi,
+                                      bool useGlobal, char* asPath, 
                                       u_int32_t* segmentCt, 
                                       BGP_SessionConf* bgp_conf,
-                                      BGPSEC_PrefixHdr* prefix, TASList* asList)
+                                      BGPSEC_PrefixHdr* prefix, TASList* asList,
+                                      bool onlyExtendedLength)
 {
   // Contains the attributes data
   u_int8_t* data = NULL;
@@ -417,7 +451,7 @@ BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath,
   
   ptr = data;
   
-  BGPSEC_PathAttribute* attr = (BGPSEC_PathAttribute*)data;
+  BGPSEC_Ext_PathAttribute* attr = (BGPSEC_Ext_PathAttribute*)data;
   attr->pathattr.attr_flags      = BGP_UPD_A_FLAGS_BGPSEC;
   attr->pathattr.attr_type_code  = BGP_UPD_A_TYPE_BGPSEC;
   attr->attrLength = 0; // Will be set later on.
@@ -425,7 +459,7 @@ BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath,
 //  attr->attrLength = htons(attrLength);
   
   // Move pointer to start of SecurePath
-  ptr += sizeof(BGPSEC_PathAttribute);
+  ptr += sizeof(BGPSEC_Ext_PathAttribute);
   
  // Fill the Secure Path
   BGPSEC_SecurePathSegment* pathSegments = (BGPSEC_SecurePathSegment*)
@@ -450,7 +484,8 @@ BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath,
       segList = _rewindPSegList(segList);
     }
     
-    tmpBlockLength = _fillSignatureBlock(tmp_data, useAlgoParam, ctSegments, 
+    tmpBlockLength = _fillSignatureBlock(capi,
+                                         tmp_data, useAlgoParam, ctSegments, 
                                          bgp_conf->peerAS, prefix, segList, 
                                          asList);
     if (tmpBlockLength != 0)
@@ -488,8 +523,24 @@ BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath,
     useAlgoParam = useAlgoParam->next;
     block++;
   }
-    
-  attr->attrLength = htons(attrLength);
+
+  // Now we might need to modify the attribute itself.
+  if (attrLength > 255 || onlyExtendedLength)
+  {
+    attr->attrLength = htons(attrLength);
+  }
+  else
+  {
+    // Remove the extended attribute.
+      attr->pathattr.attr_flags = attr->pathattr.attr_flags ^ BGP_UPD_A_FLAGS_EXT_LENGTH; // XOR
+      BGPSEC_Norm_PathAttribute* nattr;
+      nattr = (BGPSEC_Norm_PathAttribute*)attr;
+      nattr->attrLength = attrLength;
+      ptr = data + sizeof(BGPSEC_Ext_PathAttribute);
+      memcpy(tmp_data, ptr, attrLength);
+      ptr = data + sizeof(BGPSEC_Norm_PathAttribute);
+      memcpy(ptr, tmp_data, attrLength);
+  }
   
   if (!useGlobal)
   { 
@@ -607,6 +658,8 @@ static void __addFakeData(tPSegList* segListElem, AlgoParam* algoParam,
  * segList for later processing. The Hash is generated according to draft No. 15
  * The pointer to the keys used for signing will be stored in the algoParam
  * 
+ * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
+ *               performed using the internal signing implementation.
  * @param segList A simplified path list containing all info needed for the hash.
  * @param prefix The prefix
  * @param nextAS The next/peer ASN (host representation)
@@ -616,7 +669,8 @@ static void __addFakeData(tPSegList* segListElem, AlgoParam* algoParam,
  * 
  * @return 1 for success and 0 for failure
  */
-static int _signDraft15(tPSegList* segList, BGPSEC_PrefixHdr* prefix, 
+static int _signDraft15(SRxCryptoAPI* capi,
+                        tPSegList* segList, BGPSEC_PrefixHdr* prefix, 
                         u_int32_t nextAS, AlgoParam* algoParam, TASList* asList,
                         bool testSignature)
 {
@@ -683,8 +737,12 @@ static int _signDraft15(tPSegList* segList, BGPSEC_PrefixHdr* prefix,
       // Initialize for this run to indicate no fake is used yet
       algoParam->fakeUsed = false;
       
-      // Sign the hash and store the signature and length in the segListElement.
-      success = CRYPTO_createSignature(asList, segListElem, hashbuff, size, 
+      // Sign the hash and store the signature and length in the segListElement.      
+      success = algoParam->sigGenMode != SM_CAPI 
+              ? CRYPTO_createSignature(asList, segListElem, hashbuff, size, 
+                                       algoParam->algoID, testSignature, 
+                                       algoParam->sigGenMode)
+              : CAPI_createSignature(asList, segListElem, hashbuff, size, 
                                        algoParam->algoID, testSignature);
       if (success != 0)
       {
@@ -758,7 +816,11 @@ static int _signDraft15(tPSegList* segList, BGPSEC_PrefixHdr* prefix,
       memcpy(ptr, prevHash, prevSize);
       
       // Sign the hash and store the signature and length in the segListElement.
-      success = CRYPTO_createSignature(asList, segListElem, hashbuff, size, 
+      success = algoParam->sigGenMode != SM_CAPI 
+              ? CRYPTO_createSignature(asList, segListElem, hashbuff, size, 
+                                       algoParam->algoID, testSignature, 
+                                       algoParam->sigGenMode)
+              : CAPI_createSignature(asList, segListElem, hashbuff, size, 
                                        algoParam->algoID, testSignature);
       if (success != 0)
       {
@@ -810,6 +872,8 @@ static int _signDraft15(tPSegList* segList, BGPSEC_PrefixHdr* prefix,
  * Get the signature block. The block is written in the buffer data which must 
  * be of sufficient size.
  * 
+ * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
+ *               performed using the internal signing implementation.
  * @param data The data buffer where the data is written into
  * @param algo The algorithm parameter.
  * @param ctSegments The number of segments to be processed
@@ -821,7 +885,8 @@ static int _signDraft15(tPSegList* segList, BGPSEC_PrefixHdr* prefix,
  * @return the length of this signature block in bytes of zero "0" if not all
  *         signatures could be generated.
  */
-static int _fillSignatureBlock(u_int8_t* data, AlgoParam* algo, int ctSegments, 
+static int _fillSignatureBlock(SRxCryptoAPI* capi, 
+                               u_int8_t* data, AlgoParam* algo, int ctSegments, 
                                u_int32_t nextAS, BGPSEC_PrefixHdr* prefix,
                                tPSegList* spSegList, TASList* asList)
 {
@@ -846,7 +911,7 @@ static int _fillSignatureBlock(u_int8_t* data, AlgoParam* algo, int ctSegments,
 
   // Now move through the path starting by the origin, generate each hash
   // and sign it.
-  if (!_signDraft15(spSegList, prefix, nextAS, algo, asList, true))
+  if (!_signDraft15(capi, spSegList, prefix, nextAS, algo, asList, true))
   {
     sigBlockLength = 0;
     sigBlock->algoID = 0;
@@ -923,8 +988,21 @@ void freeData(u_int8_t* data)
   {
     if (data == INT_DATA)
     {
-      BGPSEC_PathAttribute* attr = (BGPSEC_PathAttribute*)data;
-      memset(data, 0, ntohs(attr->attrLength));
+      BGP_PathAttribute* pa = (BGP_PathAttribute*)data;
+      bool extended = (pa->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0;
+      int length  = 0;
+
+      if (extended)
+      {
+        length  = ntohs(((BGPSEC_Ext_PathAttribute*)pa)->attrLength)
+                  + sizeof(BGPSEC_Ext_PathAttribute);
+      }
+      else
+      {
+        length  = ((BGPSEC_Norm_PathAttribute*)pa)->attrLength
+                  + sizeof(BGPSEC_Norm_PathAttribute);
+      }
+      memset(data, 0, length);
     }
     else
     {
@@ -940,19 +1018,33 @@ void freeData(u_int8_t* data)
  * @param prefix the prefix to be printed (can be NULL).
  * @param title the title to be used (can be NULL)
  */
-void __printBGPSEC_PathAttr(BGPSEC_PathAttribute* attr, char* prefix, char* title)
+void __printBGPSEC_PathAttr(BGP_PathAttribute* attr, char* prefix, char* title)
 {
-  u_int8_t* data = (u_int8_t*)attr;
-  u_int16_t attrLength = ntohs(attr->attrLength);
+  bool      extended   = (attr->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0;  
+  u_int8_t* data       = (u_int8_t*)attr;
+  u_int16_t attrLength = 0;
+  int headerSize       = 0;
+  
+  if (extended)
+  {
+    attrLength = ntohs(((BGPSEC_Ext_PathAttribute*)attr)->attrLength);
+    headerSize = sizeof(BGPSEC_Ext_PathAttribute);
+  }
+  else
+  {
+    attrLength = ((BGPSEC_Norm_PathAttribute*)attr)->attrLength;
+    headerSize = sizeof(BGPSEC_Norm_PathAttribute);
+  }  
+  
   u_int8_t* end = data + attrLength;
   char sep;
   char tabStr[STR_MAX];
   memset (tabStr, '\0', STR_MAX);
   printf ("BGPSec Path Attribute\n");
-  printf (" +--flags:  %1x\n", attr->pathattr.attr_flags);
-  printf (" +--type:   %u\n", attr->pathattr.attr_type_code);
+  printf (" +--flags:  %1x\n", attr->attr_flags);
+  printf (" +--type:   %u\n", attr->attr_type_code);
   printf (" +--Length: %u\n", attrLength);
-  data += sizeof(BGPSEC_PathAttribute);
+  data += headerSize;
   u_int8_t* ptr = data;
   
   BGPSEC_SecurePath* sp = (BGPSEC_SecurePath*)ptr;

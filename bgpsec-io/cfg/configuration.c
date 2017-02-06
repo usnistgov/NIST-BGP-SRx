@@ -22,10 +22,18 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.0.3
+ * @version 0.2.0.5
  *  
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/01/31 - oborchert
+ *            * Added missing configuration for extended message size capability
+ *          - 2017/01/03 - oborchert
+ *            * Added parameter P_CFG_SIGMODE
+ *          - 2016/11/15 - oborchert
+ *            * Added parameter P_CFG_ONLY_EXTENDED_LENGTH
+ *          - 2016/10/21 - oborchert
+ *            * Fixed issue with 32/64 bit libconfig integer type BZ1033.
  *  0.2.0.3 - 2016/06/28 - oborchert
  *            * Added missing description of parameter -U to help output.
  *  0.2.0.2 - 2016/06/27 - oborchert
@@ -82,10 +90,6 @@
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPPrinterUtil.h"
 
-#ifndef LIBCFG_INT
-#define LIBCFG_INT int
-#endif
-
 /**
  * This message fills the error message with the given string.
  * 
@@ -140,7 +144,8 @@ void printSyntax()
   printf ("          type BGP: run BGP player\n");
   printf ("          type CAPI: run as SRxCryptoAPI tester.\n");
   printf ("          type GEN: Generate the binary data.\n");
-  // ASN
+  
+  // ASN  
   printf ("  -%c <asn>, %s <asn>\n", P_C_MY_ASN, P_MY_ASN);
   printf ("          Specify the own AS number.\n");
   // BGP identifier
@@ -160,8 +165,14 @@ void printSyntax()
   printf ("          The port number of the peer.\n");
   
   printf ("  -%c, %s\n", P_C_NO_MPNLRI, P_NO_MPNLRI);
+  printf ("          DEPRECATED.\n");
   printf ("          Disable MPNLRI encoding for IPv4 addresses.\n");
   printf ("          If disabled prefixes are encoded as NLRI only.\n");
+
+  printf ("  -%c, %s\n", P_C_NO_EXTMSG_SIZE, P_NO_EXTMSG_SIZE);
+  printf ("          DEPRECATED.\n");
+  printf ("          Enable the usage of messages larger than 4096 bytes.\n");
+ printf ("          This includes the capability exchange.(Default enabled)\n");
   
   // Disconnect time
   printf ("  -%c <time>, %s <time>\n", P_C_DISCONNECT_TIME, P_DISCONNECT_TIME);
@@ -205,6 +216,43 @@ void printSyntax()
   printf ("          specified.\n");
   
   printf ("\n Configuration file only parameters:\n");
+
+  // BGPSEC Configuration
+  // Enable and disable BGPSEC IPv4 Receive
+  printf ("  %s\n", P_CFG_BGPSEC_V4_R);
+  printf ("          Specify if bgpsec-io can receive IPv4 BGPSEC traffic.\n");
+  printf ("          Default: true\n");
+  // Enable and disable BGPSEC IPv4 Send
+  printf ("  %s\n", P_CFG_BGPSEC_V4_S);
+  printf ("          Specify if bgpsec-io can send IPv4 BGPSEC traffic.\n");
+  printf ("          Default: true\n");
+  // Enable and disable BGPSEC IPv6 Receive
+  printf ("  %s\n", P_CFG_BGPSEC_V6_R);
+  printf ("          Specify if bgpsec-io can receive IPv6 BGPSEC traffic.\n");
+  printf ("          Default: true\n");
+  // Enable and disable BGPSEC IPv6 Send
+  printf ("  %s\n", P_CFG_BGPSEC_V6_S);
+  printf ("          Specify if bgpsec-io can send IPv6 BGPSEC traffic.\n");
+  printf ("          Default: false\n");
+  
+  // signature_generation
+  printf ("  %s\n", P_CFG_SIG_GENERATION);
+  printf ("          Specify the signature generation mode:\n");
+  printf ("          mode CAPI: Use CAPI to sign the updates.\n");
+  printf ("          mode BIO: Use internal signature algorithm (default).\n");
+  printf ("          mode BIO-K1: Same as BIO except it uses a static k.\n");
+  printf ("          mode BIO-K2: Same as BIO except it uses a static k.\n");
+  printf ("          The signature modes BIO-K1 and BIO-K2 both use a k \n");
+  printf ("          which is specified in RFC6979 Section A.2.5\n");
+  printf ("          BIO-K1 uses k for SHA256 and msg=sample.\n");
+  printf ("           %s.\n", SM_BIO_K1_STR);
+  printf ("          BIO-K2 uses k for SHA256 and msg=test.\n");
+  printf ("           %s.\n", SM_BIO_K2_STR);
+  
+  // Force extended length for BGPSEC path attribtue.
+  printf ("  %s\n", P_CFG_ONLY_EXTENDED_LENGTH);
+  printf ("          Force usage of extended length also for BGPSEC\n");
+  printf ("          path attributes with a length of less than 255 bytes.\n");
   
   // Fake signature portion
   printf ("  %s\n", P_CFG_NULL_SIGNATURE_MODE);
@@ -295,6 +343,8 @@ char getShortParam(char* argument)
     else if (strcmp(argument, P_OUTFILE) == 0)     { retVal = P_C_OUTFILE; }
     else if (strcmp(argument, P_APPEND_OUT) == 0)  { retVal = P_C_APPEND_OUT; }
     else if (strcmp(argument, P_NO_MPNLRI) == 0)   { retVal = P_C_NO_MPNLRI; }
+    else if (strcmp(argument, P_NO_EXTMSG_SIZE) == 0) 
+         { retVal = P_C_NO_EXTMSG_SIZE; }
     else if (strcmp(argument, P_NO_PL_ECKEY) == 0) { retVal = P_C_NO_PL_ECKEY; }
     else if (strcmp(argument, P_CAPI_CFG) == 0)    { retVal = P_C_CAPI_CFG; }
     else if (strcmp(argument, P_MAX_UPD) == 0)     { retVal = P_C_MAX_UPD; }
@@ -556,7 +606,7 @@ bool readConfig(PrgParams* params)
   IPAddress ipAddr;
   
   const char* strVal  = NULL;
-  long        intVal  = 0;
+  LCONFIG_INT intVal  = 0;
   
   PrgParams*  sParam  = params; // used to allows later on an easy transition to 
                              // multi sessions.
@@ -611,9 +661,19 @@ bool readConfig(PrgParams* params)
       params->preloadECKEY = (bool)intVal;
     }
     
-    if (config_lookup_int(&cfg, P_CFG_MAX_UPD, (LIBCFG_INT*)&intVal) == CONFIG_TRUE)
+    if (config_lookup_bool(&cfg, P_CFG_ONLY_EXTENDED_LENGTH, (int*)&intVal) == CONFIG_TRUE)
+    {
+      params->onlyExtLength = (bool)intVal;
+    }
+    
+    if (config_lookup_int(&cfg, P_CFG_MAX_UPD, &intVal) == CONFIG_TRUE)
     {
       params->maxUpdates = intVal != 0 ? (u_int32_t)intVal : MAX_UPDATES;
+    }
+    
+    if (config_lookup_bool(&cfg, P_CFG_ONLY_EXTENDED_LENGTH, (int*)&intVal) == CONFIG_TRUE)
+    {
+      params->onlyExtLength = (bool)intVal;
     }
 
     if (config_lookup_string(&cfg, P_CFG_TYPE, &strVal) == CONFIG_TRUE)
@@ -639,7 +699,7 @@ bool readConfig(PrgParams* params)
         sprintf(params->errMsgBuff, "Invalid 'type' %s", strVal);        
       }
     }
-
+    
     cfgHlp = config_lookup(&cfg, P_CFG_SESSION);
     if (cfgHlp && params->errMsgBuff[0] == '\0')
     {
@@ -733,12 +793,75 @@ bool readConfig(PrgParams* params)
             }
           }
           
+          // Read Ext Message Size Capability
+          sessVal = config_setting_get_member(session, P_CFG_EXTMSG_SIZE);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.extMsgSupp=config_setting_get_bool(sessVal);
+          }
+          
+          // Read BGPSEC Configuration
+          // Enable and disable BGPSEC IPv4 Receive          
+          sessVal = config_setting_get_member(session, P_CFG_BGPSEC_V4_R);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.bgpsec_rcv_v4 = 
+                                               config_setting_get_bool(sessVal);
+          }
+          // Enable and disable BGPSEC IPv4 Send
+          sessVal = config_setting_get_member(session, P_CFG_BGPSEC_V4_S);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.bgpsec_snd_v4 = 
+                                               config_setting_get_bool(sessVal);
+          }
+          // Enable and disable BGPSEC IPv6 Receive
+          sessVal = config_setting_get_member(session, P_CFG_BGPSEC_V6_R);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.bgpsec_rcv_v6 = 
+                                               config_setting_get_bool(sessVal);
+          }
+          // Enable and disable BGPSEC IPv6 Send
+          sessVal = config_setting_get_member(session, P_CFG_BGPSEC_V6_S);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.bgpsec_snd_v6 = 
+                                               config_setting_get_bool(sessVal);
+          }          
+          
           // Read Algorithm Settings
           // AlgoID
           sessVal = config_setting_get_member(session, P_CFG_ALGO_ID);
           intVal = sessVal == NULL ? DEF_ALGO_ID
                                    : (u_int32_t)config_setting_get_int(sessVal);
-          params->bgpConf.algoParam.algoID = (u_int8_t)intVal;
+          params->bgpConf.algoParam.algoID = (u_int8_t)intVal;          
+          
+          sessVal = config_setting_get_member(session, P_CFG_SIG_GENERATION);
+          if (sessVal != NULL)
+          { // Here we do it a bit different, don't throw an error 
+            strVal = (char*)config_setting_get_string(sessVal);
+            if (strcmp(strVal, P_TYPE_SIGMODE_CAPI) == 0)
+            {
+              params->bgpConf.algoParam.sigGenMode = SM_CAPI;
+            }
+            else if (strcmp(strVal, P_TYPE_SIGMODE_BIO) == 0)
+            {
+              params->bgpConf.algoParam.sigGenMode = SM_BIO;
+            }
+            else if (strcmp(strVal, P_TYPE_SIGMODE_BIO_K1) == 0)
+            {
+              params->bgpConf.algoParam.sigGenMode = SM_BIO_K1;
+            }
+            else if (strcmp(strVal, P_TYPE_SIGMODE_BIO_K2) == 0)
+            {
+              params->bgpConf.algoParam.sigGenMode = SM_BIO_K2;
+            }
+            else
+            {
+              sprintf(params->errMsgBuff, "Invalid 'type' %s", strVal);        
+            }
+          }          
           
           sessVal = config_setting_get_member(session, P_CFG_NULL_SIGNATURE_MODE);
           if (sessVal != NULL)
@@ -867,7 +990,8 @@ bool readConfig(PrgParams* params)
 }
 
 /**
- * Initialize the params and set default values.
+ * Initialize the params and set default values. Here we also set the default 
+ * capabilities we provide (such as send bgpsec V4 and V6)
  * 
  * @param params The parameters object.
  * 
@@ -878,13 +1002,14 @@ void initParams(PrgParams* params)
   memset(params, 0, sizeof(PrgParams));
   
   // Now initialize what should not be 0 - false - NULL
-  sprintf((char*)&params->skiFName, "%s%c", DEF_SKIFILE, '\0');
-  sprintf((char*)&params->keyLocation, "%s%c", DEF_KEYLOCATION, '\0');
-  params->bgpConf.useMPNLRI = true;
-  params->preloadECKEY      = true;
-  params->appendOut         = false;
-  params->bgpConf.printPollLoop  = false;
-  params->bgpConf.printOnInvalid = false;
+  snprintf((char*)&params->skiFName, FNAME_SIZE, "%s", DEF_SKIFILE);
+  snprintf((char*)&params->keyLocation, FNAME_SIZE, "%s", DEF_KEYLOCATION);
+  params->bgpConf.useMPNLRI          = true;
+  params->preloadECKEY               = true;
+  params->onlyExtLength              = true;
+  params->appendOut                  = false;
+  params->bgpConf.printPollLoop      = false;
+  params->bgpConf.printOnInvalid     = false;
   for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
   {
     params->bgpConf.printOnSend[idx]    = false;
@@ -894,7 +1019,17 @@ void initParams(PrgParams* params)
   params->maxUpdates = MAX_UPDATES;
   
   memset(&params->bgpConf.algoParam, 0, sizeof (AlgoParam)); 
-
+  // The following line is normally not needed, I just add it in case the SM_BIO
+  // value will be modified and SM_BIO is the default value.
+  params->bgpConf.algoParam.sigGenMode = SM_BIO;
+  
+  // Set all capabilities to true
+  memset(&params->bgpConf.capConf, 1, sizeof(BGP_Cap_Conf));
+  // Turn capabilities selectively off
+  params->bgpConf.capConf.route_refresh = false;
+  // Turn capabilities selectively off
+  params->bgpConf.capConf.bgpsec_snd_v6 = false;
+  
   initStack(&params->updateStack);
 }
 
@@ -1074,6 +1209,10 @@ int parseParams(PrgParams* params, int argc, char** argv)
         
       case P_C_NO_MPNLRI:
         params->bgpConf.useMPNLRI = false;
+        break;
+        
+      case P_C_NO_EXTMSG_SIZE:
+        params->bgpConf.capConf.extMsgSupp = false;
         break;
         
       case P_C_NO_PL_ECKEY:

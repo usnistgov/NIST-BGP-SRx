@@ -1,4 +1,3 @@
-# DEPRECATED - will be replaced in the next version
 #
 # OpenSSL example configuration file.
 # This is mostly being used for generation of certificate requests.
@@ -27,10 +26,15 @@ extensions		= bgpsec_router_ext
 [ new_oids ]
 
 # XXX: replace with the real assignments at some point
-# (from draft-ietf-sidr-bgpsec-pki-profiles-00.txt)
-id_kp_bgpsec_router = 1.3.6.1.5.5.7.99.99
+# (from draft-ietf-sidr-bgpsec-pki-profiles-21.txt paragraph 3.1.3.2)
+#id_kp = 1.3.6.1.5.5.7.3
+id_kp_bgpsec_router = 1.3.6.1.5.5.7.3.30
 
 #extKeyUsage         = 2.5.29.37
+
+#id_pkix = 1.3.6.1.5.5.7
+#id_pe = 1.3.6.1.5.5.7.1
+id_pe_autonomousSysIds = 1.3.6.1.5.5.7.1.8
 
 ####################################################################
 ####################################################################
@@ -75,10 +79,11 @@ cert_opt 	= ca_default		# Certificate field options
 # crlnumber must also be commented out to leave a V1 CRL.
 # crl_extensions	= crl_ext
 
-default_days	= 365		# how long to certify for
-default_crl_days= 30	# how long before next CRL
+#default_days	= 365		# how long to certify for
+default_days	= 540		# 18 month (a 30 days)
+default_crl_days= 30	        # how long before next CRL
 default_md	= default	# use public key default MD
-preserve	= no			  # keep passed DN ordering
+preserve	= no		# keep passed DN ordering
 
 # A few difference way of specifying how similar the request should look
 # For type CA, the listed attributes must be the same, and the optional
@@ -204,10 +209,17 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 # 3.1.3.1.  Extended Key Usage 
 #extKeyUsage = id_kp_bgpsec_router
 keyUsage = digitalSignature
-basicConstraints=CA:FALSE
+
+# RFC 6487:
+# The Basic Constraints extension field is a critical extension in the
+#   resource certificate profile, and MUST be present when the subject is
+#   a CA, and MUST NOT be present otherwise.
+#basicConstraints=CA:FALSE
+
+
 subjectKeyIdentifier=hash
 #extendedKeyUsage = id_kp_bgpsec_router
-extendedKeyUsage = 1.3.6.1.5.5.7.99.99
+extendedKeyUsage = 1.3.6.1.5.5.7.3.30
 
 #extKeyUsage = id_kp_bgpsec_router
 
@@ -215,6 +227,10 @@ extendedKeyUsage = 1.3.6.1.5.5.7.99.99
 # as specified in section 4.8.11 of [ID.sidr-res-cert-profile]
 #asNumber                 = AS number for this router (digits only)
 #asNumber_default         = XXXX
+#sbgp-autonomousSysNum = critical, AS:49, RDI:inherit
+# { QSRX_ASN } will be replaced with the ASN number
+sbgp-autonomousSysNum = critical, AS:{QSRX_ASN}, RDI:inherit
+
 
 [bgpsec_router_csr]
 # defined in 3.2.  BGPSEC Router Certificate Request Profile

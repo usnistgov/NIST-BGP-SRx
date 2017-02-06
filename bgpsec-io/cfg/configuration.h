@@ -22,10 +22,22 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/01/31 - oborchert
+ *            * Added configuration setting to enable/disable extended message 
+ *              size capability // draft-ietf-idr-bgp-extended-messages
+ *            * Added configuration to selectively enable/disable V4 and V6 
+ *              support for BGPSEC
+ *          - 2016/11/15 - oborchert
+ *            * Added parameter P_CFG_ONLY_EXTENDED_LENGTH
+ *          - 2016/10/21 - oborchert
+ *            * Fixed issue with 32/64 bit libconfig integer type BZ1033 - added
+ *              define LCONFIG_INT.
+ *          - 2016/10/19 - oborchert
+ *            * Fixed errors in documentation.
  *  0.2.0.0 - 2016/05/13 - oborchert
  *            * Added maximum update processing BZ:961
  *          - 2016/05/10 - oborchert
@@ -60,6 +72,12 @@
 #define PRG_VERSION ""
 #endif
 
+// CONFIG_INT will be set to int for 64 bit platform during configure. See
+// configuration.ac - used for libconfig 
+#ifndef LCONFIG_INT
+#define LCONFIG_INT long
+#endif
+
 #define DEF_KEYLOCATION     "/var/lib/key-volt/\0"
 #define DEF_SKIFILE         "/var/lib/key-volt/ski-list.txt\0"
 #define DEF_PEER_PORT       179
@@ -80,6 +98,12 @@
 #define P_TYPE_NSM_FAKE "FAKE" 
 /* Use BGP4 attribute instead of BGPSec*/
 #define P_TYPE_NSM_BGP4 "BGP4"
+
+// Specification for signature mode
+#define P_TYPE_SIGMODE_CAPI   "CAPI"
+#define P_TYPE_SIGMODE_BIO    "BIO"
+#define P_TYPE_SIGMODE_BIO_K1 "BIO-K1"
+#define P_TYPE_SIGMODE_BIO_K2 "BIO-K2"
 
 // -?                   -help screen
 #define P_HELP          "--help"
@@ -121,6 +145,9 @@
 #define P_TYPE          "--" P_CFG_TYPE
 // -m <BGP|CAPI|GEN>" - The type, BGP, CAPI, or GEN
 #define P_C_TYPE        'm'
+
+// signature_generation="CAPI|BIO|BIO-K1|BIO-K2" - The signature generation mode.
+#define P_CFG_SIG_GENERATION   "signature_generation"
 
 // max=<number> - the maximum number of updates to be processed.
 #define P_CFG_MAX_UPD   "max"
@@ -165,9 +192,9 @@
 // -I <ip> - The Peer IP address
 #define P_C_PEER_IP     'I'
 
-// peer-port=<int> - The peer port (Default 179)
+// peer_port=<int> - The peer port (Default 179)
 #define P_CFG_PEER_PORT "peer_port"
-// --peer-port <int>  - The peer port (Default 179)
+// --peer_port <int>  - The peer port (Default 179)
 #define P_PEER_PORT     "--" P_CFG_PEER_PORT
 // -P <int>  - The peer port
 #define P_C_PEER_PORT   'P'
@@ -186,12 +213,21 @@
 // -y <filename> - Allows to specify a custom SRxCryptoAPI config file
 #define P_C_CAPI_CFG    'p'
 
-// encodeMPNLRI="true|false" - enable / disable MPNLRI (default enabled)
+// encodeMPNLRI="true|false" - enable / disable MPNLRI IPv4 (default enabled)
+// DEPRECATED ATTRIBUTE
 #define  P_CFG_MPNLRI   "encodeMPNLRI"
 // --no_mpnlri         - do not use MPNLRI encoding for IPv4
 #define  P_NO_MPNLRI    "--no_mpnlri"
-// -M                  - do not use MPNLRI encoding for V4
+// -M                  - do not use MPNLRI encoding for IPv4
 #define  P_C_NO_MPNLRI  'M'
+
+// extendedMsgSize="true|false" - enable / disable the extended message size 
+//                                    capability (default enabled)
+#define  P_CFG_EXTMSG_SIZE   "extMsgSize"
+// --no_extmsgsize     - do not use extended message size capability
+#define  P_NO_EXTMSG_SIZE    "no_extmsgsize"
+// -E                  - do not use extended message size capability
+#define  P_C_NO_EXTMSG_SIZE  'e'
 
 // preload_eckey="true|false" - enable / disable the pre-computation of EC_KEY
 //                                                           (default enabled)
@@ -244,7 +280,7 @@
 // print the status information on invalid - CAPI mode"
 #define P_CFG_PRINT_CAPI_ON_INVALID "printOnInvalid"
 
-/// algorithmID
+// algorithmID
 #define P_CFG_ALGO_ID              "algo_id" 
 #define P_CFG_ALGO_ID_DEF_VAL      1
 // allow fake signatures
@@ -253,6 +289,19 @@
 #define P_CFG_FAKE_SIGNATURE       "fake_signature"
 // fake ski
 #define P_CFG_FAKE_SKI             "fake_ski"
+
+// Force generation of one byte BGPSEC Path Attribute length field if attribute
+// length is less than 255 byte.
+#define P_CFG_ONLY_EXTENDED_LENGTH "only_extended_length"
+
+// Enable and disable BGPSEC IPv4 Receive
+#define P_CFG_BGPSEC_V4_R          "bgpsec_v4_rcv"
+// Enable and disable BGPSEC IPv4 Send
+#define P_CFG_BGPSEC_V4_S          "bgpsec_v4_snd"
+// Enable and disable BGPSEC IPv6 Receive
+#define P_CFG_BGPSEC_V6_R          "bgpsec_v6_rcv"
+// Enable and disable BGPSEC IPv6 Send
+#define P_CFG_BGPSEC_V6_S          "bgpsec_v6_snd"
 
 // Max size for the error message buffer
 #define PARAM_ERRBUF_SIZE 255
@@ -298,6 +347,10 @@ typedef struct
   char      keyLocation[FNAME_SIZE];
   /** Indicate if the OpenSSL EC_KEY should be generated during loading.*/
   bool      preloadECKEY;
+  
+  /** Specify if all BGPSec Path Attributes must be generated with extended 
+   * length flag set and 2 byte length field. */
+  bool      onlyExtLength;
   
   /** Holds all updates */
   Stack     updateStack;

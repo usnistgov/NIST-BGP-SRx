@@ -1420,9 +1420,9 @@ DEFUN (srx_show_config,
   vty_out (vty, "  keep-window....: %d%s", bgp->srx_keepWindow, VTY_NEWLINE);
   vty_out (vty, "  connected......: %s%s", (isConnected(bgp->srxProxy)
                                           ? "true" : "false"), VTY_NEWLINE);
-  
+
   vty_out (vty, "BGPSEC configuration settings:%s", VTY_NEWLINE);
-  vty_out (vty, "  active key.....: %u%s", bgp->srx_bgpsec_active_key, 
+  vty_out (vty, "  active key.....: %u%s", bgp->srx_bgpsec_active_key,
            VTY_NEWLINE);
   int kIdx = 0;
   int bIdx = 0;
@@ -1436,16 +1436,16 @@ DEFUN (srx_show_config,
     {
       skiPtr += sprintf(skiPtr, "%02X", bgp->srx_bgpsec_key[kIdx].ski[bIdx]);
     }
-    vty_out (vty, "  Private key %u %sactive%s", kIdx, 
+    vty_out (vty, "  Private key %u %sactive%s", kIdx,
              bgp->srx_bgpsec_active_key == kIdx ? "- ":"- in", VTY_NEWLINE);
     vty_out (vty, "  - algorith-id..: %u%s", bgp->srx_bgpsec_key[kIdx].algoID,
              VTY_NEWLINE);
     vty_out (vty, "  - ski..........: %s%s", skiStr, VTY_NEWLINE);
-    vty_out (vty, "  - DER-loaded...: %s%s", 
+    vty_out (vty, "  - DER-loaded...: %s%s",
             bgp->srx_bgpsec_key[kIdx].keyLength > 0 ? "yes":"no", VTY_NEWLINE);
   }
-  
-  vty_out (vty, "SRx Router Configuration settings:%s", VTY_NEWLINE);  
+
+  vty_out (vty, "SRx Router Configuration settings:%s", VTY_NEWLINE);
   vty_out (vty, "  evaluation.....: ");
   if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH))
   {
@@ -1636,18 +1636,18 @@ DEFUN (srx_connect_short,
 
 /**
  * This function sets the key for the given ski.
- * 
+ *
  * @param vty The vty
  * @param skiNum The ski that is being used - 0 or 1
  * @param algoID The algorithm ID of the used key.
- * 
+ *
  * @return CMD_SUCCESS, CMD_WARNING, or CMD_ERR_INCOMPLETE
  */
 int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
 {
   int retVal = CMD_SUCCESS;
   struct bgp* bgp = vty->index;
-  
+
   if (strlen(skiStr) != SKI_HEX_LENGTH)
   {
     vty_out (vty, "SKI must be exact 20 bytes ASCII %s", VTY_NEWLINE);
@@ -1655,12 +1655,12 @@ int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
   }
   if (skiNum >= SRX_MAX_PRIVKEYS)
   {
-    vty_out (vty, "Select an ski between 0..%u, The selected ski %u is outside of there boundaries", 
+    vty_out (vty, "Select an ski between 0..%u, The selected ski %u is outside of there boundaries",
              SRX_MAX_PRIVKEYS-1, skiNum, VTY_NEWLINE);
-    return CMD_ERR_INCOMPLETE;    
+    return CMD_ERR_INCOMPLETE;
   }
 
-  // The array index starts by zero "0" but the key numbering by one "1"  
+  // The array index starts by zero "0" but the key numbering by one "1"
   BGPSecKey* key = &bgp->srx_bgpsec_key[skiNum];
   if (key->keyLength > 0)
   {
@@ -1670,29 +1670,29 @@ int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
       sca_status_t keyStatus = API_STATUS_OK;
       if (bgp->srxCAPI->unregisterPrivateKey(key, &keyStatus) == API_FAILURE)
       {
-        vty_out (vty, "Removal of previous router key '%s' failed (status:0x%X)!%s", 
+        vty_out (vty, "Removal of previous router key '%s' failed (status:0x%X)!%s",
                  skiStr, keyStatus, VTY_NEWLINE);
       }
       else
       {
-        vty_out (vty, "Old router key '%s' successfully removed!%s", 
+        vty_out (vty, "Old router key '%s' successfully removed!%s",
                  skiStr, VTY_NEWLINE);
       }
     }
-    
+
     // Free previously set values.
     free(key->keyData);
     key->keyData   = NULL;
     key->keyLength = 0;
   }
-  
+
   // @TODO: This value should va
   key->algoID = algoID;
   key->asn    = htonl(bgp->as);
   memset(key->ski, 0, SKI_LENGTH);
-  
+
   // Now set the key ski values
-  int max = strlen(skiStr) < SKI_LENGTH ? strlen(skiStr) : SKI_LENGTH; 
+  int max = strlen(skiStr) < SKI_LENGTH ? strlen(skiStr) : SKI_LENGTH;
   int idx = 0;
   char* ch = skiStr;
   for (; idx < max; idx++)
@@ -1700,8 +1700,8 @@ int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
     key->ski[idx] = hex2bin_byte(ch);
     ch += 2;
   }
-  
-  
+
+
   // First try to load the key, if this fails we cannot register.
   sca_status_t keyStatus = API_STATUS_OK;
   if (sca_loadKey(key, true, &keyStatus) == API_SUCCESS)
@@ -1711,44 +1711,44 @@ int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
     {
       if (bgp->srxCAPI->registerPrivateKey(key, &keyStatus) == API_FAILURE)
       {
-        zlog_err ("Installation of router key: #%u, algorithm-id: %u, ski: '%s' failed (status:0x%X)!\n", 
+        zlog_err ("Installation of router key: #%u, algorithm-id: %u, ski: '%s' failed (status:0x%X)!\n",
                    skiNum, algoID, skiStr, keyStatus);
-        vty_out (vty, "Installation of router key: #%u, algorithm-id: %u, ski: '%s' failed (status:0x%X)!%s", 
+        vty_out (vty, "Installation of router key: #%u, algorithm-id: %u, ski: '%s' failed (status:0x%X)!%s",
                  skiNum, algoID, skiStr, keyStatus, VTY_NEWLINE);
         retVal = CMD_WARNING;
       }
       else
       {
-        zlog_info ("Router key: #%u, algorithm-id: %u, ski: '%s' successfully installed!\n", 
+        zlog_info ("Router key: #%u, algorithm-id: %u, ski: '%s' successfully installed!\n",
                    skiNum, algoID, skiStr);
-        vty_out (vty, "Router key: #%u, algorithm-id: %u, ski: '%s' successfully installed!%s", 
+        vty_out (vty, "Router key: #%u, algorithm-id: %u, ski: '%s' successfully installed!%s",
                  skiNum, algoID, skiStr, VTY_NEWLINE);
-      }    
+      }
     }
     else
     {
-      zlog_warn ("Cannot install router key '%s', crypto api not available!", 
+      zlog_warn ("Cannot install router key '%s', crypto api not available!",
                  skiStr);
-      vty_out (vty, "Cannot install router key '%s', crypto api not available!%s", 
+      vty_out (vty, "Cannot install router key '%s', crypto api not available!%s",
                skiStr, VTY_NEWLINE);
-      
+
       retVal = CMD_WARNING;
-    }  
+    }
   }
   else
   {
-    zlog_warn ("Router key %u '%s' not found in key_volt - Check configuration of SRxCryptoAPI!", 
-             skiNum, skiStr);        
-    vty_out (vty, "Router key %u '%s' not found in key_volt - Check configuration of SRxCryptoAPI!%s", 
+    zlog_warn ("Router key %u '%s' not found in key_volt - Check configuration of SRxCryptoAPI!",
+             skiNum, skiStr);
+    vty_out (vty, "Router key %u '%s' not found in key_volt - Check configuration of SRxCryptoAPI!%s",
              skiNum, skiStr, VTY_NEWLINE);
     retVal = CMD_WARNING;
   }
-  
+
   return retVal;
 }
 
-/** 
- * This function is deprecated and just kept for compatibility 
+/**
+ * This function is deprecated and just kept for compatibility
  * I did not ALIAS it to allow printing out a deprecation message.
  */
 DEFUN (bgpsec_ski,
@@ -1763,17 +1763,17 @@ DEFUN (bgpsec_ski,
   {
     return CMD_ERR_INCOMPLETE;
   }
-  
-  vty_out(vty, "WARNING: The configuration command '%s' is deprecated! Use '%s %s' instead %s", 
-          SRX_VTY_CMD_BGPSEC_DEP_SKI_PRNT, SRX_VTY_CMD_BGPSEC_SKI_PRNT, argv[0], 
+
+  vty_out(vty, "WARNING: The configuration command '%s' is deprecated! Use '%s %s' instead %s",
+          SRX_VTY_CMD_BGPSEC_DEP_SKI_PRNT, SRX_VTY_CMD_BGPSEC_SKI_PRNT, argv[0],
           VTY_NEWLINE);
-  zlog_warn("The configuration command '%s' is deprecated! Use '%s %s' instead %s", 
-          SRX_VTY_CMD_BGPSEC_DEP_SKI_PRNT, SRX_VTY_CMD_BGPSEC_SKI_PRNT, argv[0], 
+  zlog_warn("The configuration command '%s' is deprecated! Use '%s %s' instead %s",
+          SRX_VTY_CMD_BGPSEC_DEP_SKI_PRNT, SRX_VTY_CMD_BGPSEC_SKI_PRNT, argv[0],
           VTY_NEWLINE);
 
   // in this old setting mode, we store it as the first key only.
-  bgp->srx_bgpsec_active_key = 0;  
-  return srx_set_ski(vty, bgp->srx_bgpsec_active_key, (char*)argv[0], 
+  bgp->srx_bgpsec_active_key = 0;
+  return srx_set_ski(vty, bgp->srx_bgpsec_active_key, (char*)argv[0],
                      SCA_ECDSA_ALGORITHM);
 }
 
@@ -1783,9 +1783,9 @@ DEFUN (bgpsec_sign,
        SRX_VTY_CMD_BGPSEC_DEP_SIGN,
        SRX_VTY_HLP_BGPSEC_DEP_SIGN)
 {
-  vty_out(vty, "This command does not have any affect anymore - remove it.%s", 
-          VTY_NEWLINE);    
-    
+  vty_out(vty, "This command does not have any affect anymore - remove it.%s",
+          VTY_NEWLINE);
+
   return CMD_WARNING;
 }
 
@@ -1801,7 +1801,7 @@ DEFUN (srx_bgpsec_ski,
   {
     return CMD_ERR_INCOMPLETE;
   }
-  
+
   // in this old setting mode, we store it as the first key only.
   uint32_t skiNum = (uint32_t)atoi(argv[0]);
   int      algoID = atoi(argv[1]);
@@ -1809,27 +1809,27 @@ DEFUN (srx_bgpsec_ski,
   int retVal = CMD_ERR_INCOMPLETE;
   if (skiNum >= SRX_MAX_PRIVKEYS)
   {
-    zlog_err("This provided ski number is outside of the accepted boundaries%s", 
-            VTY_NEWLINE);    
-    vty_out(vty, "This provided ski number is outside of the accepted boundaries%s", 
-            VTY_NEWLINE);    
+    zlog_err("This provided ski number is outside of the accepted boundaries%s",
+            VTY_NEWLINE);
+    vty_out(vty, "This provided ski number is outside of the accepted boundaries%s",
+            VTY_NEWLINE);
   }
   else
   {
-    if (   (algoID < SRX_VTY_PARAM_BGPSEC_MIN_ALGOID) 
+    if (   (algoID < SRX_VTY_PARAM_BGPSEC_MIN_ALGOID)
         || (algoID > SRX_VTY_PARAM_BGPSEC_MAX_ALGOID))
     {
-      zlog_err("This provided algorithm identifier is outside of the accepted boundaries%s", 
-              VTY_NEWLINE);    
-      vty_out(vty, "This provided algorithm identifier is outside of the accepted boundaries%s", 
-              VTY_NEWLINE);    
+      zlog_err("This provided algorithm identifier is outside of the accepted boundaries%s",
+              VTY_NEWLINE);
+      vty_out(vty, "This provided algorithm identifier is outside of the accepted boundaries%s",
+              VTY_NEWLINE);
     }
     else
     {
       retVal = srx_set_ski(vty, skiNum, skiStr, algoID);
     }
   }
-  
+
   return retVal;
 }
 
@@ -1845,13 +1845,13 @@ DEFUN (srx_bgpsec_active_ski,
   {
     return CMD_ERR_INCOMPLETE;
   }
-  
+
   int retVal = CMD_SUCCESS;
-  
+
   uint32_t activeNum = (uint32_t)atoi(argv[0]);
   if (activeNum >= SRX_MAX_PRIVKEYS)
   {
-    vty_out(vty, "This provided ski number is outside of the accepted boundaries%s", 
+    vty_out(vty, "This provided ski number is outside of the accepted boundaries%s",
             VTY_NEWLINE);
     retVal = CMD_ERR_INCOMPLETE;
   }
@@ -1859,7 +1859,7 @@ DEFUN (srx_bgpsec_active_ski,
   {
     bgp->srx_bgpsec_active_key = activeNum;
   }
-  
+
   return retVal;
 }
 
@@ -1875,9 +1875,9 @@ DEFUN (srx_bgpsec_register_pkeys,
   {
     return CMD_ERR_INCOMPLETE;
   }
-  
+
   int retVal = CMD_SUCCESS;
-  
+
   // Check if the keys are available in DER format and if not use the srx-crytpao-api
   // to load them.
   int kIdx = 0;
@@ -1888,15 +1888,15 @@ DEFUN (srx_bgpsec_register_pkeys,
       sca_status_t myStatus = API_STATUS_OK;
       if (sca_loadKey(&bgp->srx_bgpsec_key[kIdx], true, &myStatus) == API_FAILURE)
       {
-        zlog_warn ("Router key %u not found in key_volt (status: 0x%X) - Check configuration of SRxCryptoAPI!", 
-                   kIdx, myStatus);        
-        vty_out (vty, "Router key %u not found in key_volt (status: 0x%X) - Check configuration of SRxCryptoAPI!%s", 
+        zlog_warn ("Router key %u not found in key_volt (status: 0x%X) - Check configuration of SRxCryptoAPI!",
+                   kIdx, myStatus);
+        vty_out (vty, "Router key %u not found in key_volt (status: 0x%X) - Check configuration of SRxCryptoAPI!%s",
                  kIdx, myStatus, VTY_NEWLINE);
         retVal = CMD_WARNING;
       }
     }
   }
-  
+
   // Now register the keys (again)
   if (bgp->srxCAPI != NULL)
   {
@@ -1905,10 +1905,10 @@ DEFUN (srx_bgpsec_register_pkeys,
       sca_status_t keyStatus = API_STATUS_OK;
       if (bgp->srxCAPI->registerPrivateKey(&bgp->srx_bgpsec_key[kIdx], &keyStatus) == API_FAILURE)
       {
-        zlog_err ("Installation of router key %u failed (status:0x%X)!", 
+        zlog_err ("Installation of router key %u failed (status:0x%X)!",
                    kIdx, keyStatus);
-        vty_out (vty, "Installation of router key %u failed (status:0x%X)!%s", 
-                 kIdx, keyStatus, VTY_NEWLINE);        
+        vty_out (vty, "Installation of router key %u failed (status:0x%X)!%s",
+                 kIdx, keyStatus, VTY_NEWLINE);
       }
     }
   }
@@ -1916,11 +1916,11 @@ DEFUN (srx_bgpsec_register_pkeys,
   {
     {
       zlog_warn ("Cannot install router keys, crypto api not available!");
-      vty_out (vty, "Cannot install router keys, crypto api not available!%s", 
+      vty_out (vty, "Cannot install router keys, crypto api not available!%s",
                VTY_NEWLINE);
-      
+
       retVal = CMD_WARNING;
-    }      
+    }
   }
   return retVal;
 }
@@ -3023,15 +3023,81 @@ DEFUN (neighbor_bgpsec_mpnlri_ipv4,
   u_int16_t flag = 0;
 
   flag = PEER_FLAG_BGPSEC_MPE_IPV4;
-  
+
   vty_out (vty, "This command is deprecated and not used anymore. " \
-          "This flag will be set automatically if bgpsec send is enabled for this neighbor%s", 
+          "This flag will be set automatically if bgpsec send is enabled for this neighbor%s",
           VTY_NEWLINE);
 
 //  return peer_flag_set_vty(vty, argv[0], flag);
   peer_flag_set_vty(vty, argv[0], flag);
   return CMD_WARNING;
 }
+
+
+/* BGP Extended Message Support */
+DEFUN (neighbor_capability_extended_message_support,
+       neighbor_capability_extended_message_support_cmd,
+       NEIGHBOR_CMD2 "extended",
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "Advertise capability to the peer\n"
+       "Advertise extended message support for bgp to the neighbor\n")
+{
+
+  struct peer *peer;
+  size_t oldsize, newsize = BGP_MAX_PACKET_SIZE_EXTENDED;
+
+  peer = peer_and_group_lookup_vty (vty, argv[0]);
+  if (peer)
+  {
+    if(peer->ibuf)
+    {
+      oldsize = stream_get_size (peer->ibuf);
+      newsize = stream_resize (peer->ibuf, newsize);
+    }
+    if(peer->work)
+    {
+      oldsize = stream_get_size (peer->work);
+      newsize = stream_resize (peer->work, newsize);
+    }
+  }
+
+  return peer_flag_set_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+}
+
+DEFUN (no_neighbor_capability_extended_message_support,
+       no_neighbor_capability_extended_message_support_cmd,
+       NO_NEIGHBOR_CMD2 "extended",
+       NO_STR
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "Advertise capability to the peer\n"
+       "Advertise extended message support for bgp to the neighbor\n")
+{
+
+  struct peer *peer;
+  size_t oldsize, newsize = BGP_MAX_PACKET_SIZE;
+
+  peer = peer_and_group_lookup_vty (vty, argv[0]);
+  if (peer)
+  {
+    if(peer->ibuf)
+    {
+      oldsize = stream_get_size (peer->ibuf);
+      if( oldsize > newsize )
+        newsize = stream_resize (peer->ibuf, newsize);
+    }
+    if(peer->work)
+    {
+      oldsize = stream_get_size (peer->work);
+      if( oldsize > newsize )
+        newsize = stream_resize (peer->work, newsize);
+    }
+  }
+
+  return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+}
+
 
 
 #endif /* USE_SRX */
@@ -10319,14 +10385,14 @@ bgp_vty_init (void)
   // all previous configurations. It will be mapped into install ski 1 and also
   // selects this ski. Also a warning will be printed.
   install_element (BGP_NODE, &bgpsec_ski_cmd);
-  // This will only display a NOT USED anymore warning. Printout for running 
+  // This will only display a NOT USED anymore warning. Printout for running
   // config and all other functional code will be removed.
   install_element (BGP_NODE, &bgpsec_sign_cmd);
-  // New key management  
+  // New key management
   install_element (BGP_NODE, &srx_bgpsec_ski_cmd);
   install_element (BGP_NODE, &srx_bgpsec_active_ski_cmd);
   install_element (BGP_NODE, &srx_bgpsec_register_pkeys_cmd);
-  
+
   install_element (BGP_NODE, &srx_send_extcommunity_cmd);
   install_element (BGP_NODE, &srx_send_extcommunity_ebgp_cmd);
   install_element (BGP_NODE, &no_srx_send_extcommunity_cmd);
@@ -10654,6 +10720,10 @@ bgp_vty_init (void)
   install_element (BGP_NODE, &no_neighbor_capability_bgpsec_cmd);
   // this one is deprecated
   install_element (BGP_NODE, &neighbor_bgpsec_mpnlri_ipv4_cmd);
+
+  /* bgp extended message support */
+  install_element (BGP_NODE, &neighbor_capability_extended_message_support_cmd);
+  install_element (BGP_NODE, &no_neighbor_capability_extended_message_support_cmd);
 #endif
 
   /* "neighbor capability dynamic" commands.*/

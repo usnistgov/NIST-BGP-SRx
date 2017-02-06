@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.2.1, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.2.2, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -36,7 +36,6 @@ AS_CASE([$host_cpu],
         [x86_64], [ARCH="64"],
         []
         )
-#LDFLAGS=-L/usr/lib$ARCH/srx $LDFLAGS
 
 AC_SUBST(PKG_VER)
 AC_SUBST(MAJOR_VER)
@@ -1402,75 +1401,72 @@ if test "${enable_opaque_lsa}" != "no"; then
 fi
 AM_CONDITIONAL(OSPFCLIENT, test "x$OSPFCLIENT" = "xospfclient")
 
-dnl ----------------------
-dnl  Check SRX integration
-dnl ----------------------
-AS_BOX(Processing SRxProxy configuration)
-AC_MSG_CHECKING(Checking wether to embed srx)
-SRX_LDFLAGS=""
-SRX_CFLAGS=""
-SCA_LDFLAGS=""
-SCA_CFLAGS=""
-CACHED_LDFLAGS=""
-if test "x${enable_srx}" == "xyes"; then  
+dnl ---------------------------------------------
+dnl  SRx-Proxy, SCA and SRxCryptoAPI Integration
+dnl ---------------------------------------------
+AS_BOX(Processing BGP SRx Suite configuration)
+
+# Initialize parameters
+# ..._include_dir is only used for AC_CHECK_HEADER, not for CFLAGS - maybe it is
+srx_include_dir=""
+sca_include_dir=""
+srx_lib_dir=""
+sca_lib_dir=""
+used_def_ldpath=""
+
+dnl ----------------------------
+dnl  Check SRxProxy integration
+dnl ----------------------------
+AC_MSG_CHECKING(Checking wether to enable BGP SRx Software Integration)
+if test "x${enable_srx}" = "xyes"; then  
 
   AC_MSG_RESULT(yes)
   AC_DEFINE(USE_SRX,,SRX)
 
-  # ..._include_dir is only used for AC_CHECK_HEADER, not for CFLAGS
-  srx_include_dir=""
-  sca_include_dir=""
-
+  AC_MSG_NOTICE(checking configuration of SRxProxy)
+  AC_MSG_CHECKING(if 'srx_dir' is provided)
   AC_ARG_VAR([srx_dir], [Provide local install location of SRxProxy])  
   if test "x${srx_dir}" = "x" ; then
-    if test -d /usr/lib${ARCH}/srx ; then
-      if test "x${CACHED_LDFLAGS}" = "x" ; then
-        CACHED_LDFLAGS="-L/usr/lib${ARCH}/srx"
-        LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
-      fi
-      srx_include_dir="/usr/include/srx/"
-    fi
+    AC_MSG_RESULT(no)
+    
+    srx_include_dir="/usr/include/srx/"
+    LDFLAGS="-L/usr/lib${ARCH}/srx $LDFLAGS"
+    used_def_ldpath="yes"
     # Check for installed library, no custom location provided
-    AC_SEARCH_LIBS([createSRxProxy], [SRxProxy srx], 
+    AC_SEARCH_LIBS([createSRxProxy], [SRxProxy srx],
                    [], [
        AC_MSG_ERROR([
-	--------------------------------------------------
-	The library 'libSRxProxy' or 'libsrx' could not be 
-  found, reinstall using: 
-	  'yum install srx-proxy'
-	or specify: 
-	  'srx_dir=<location>'
-	--------------------------------------------------])])
+	----------------------------------------------------
+   The library 'libSRxProxy' or 'libsrx' could not be 
+   found, reinstall using: 
+	    'yum install srx-proxy'
+	  or specify: 
+	    'srx_dir=<location>'
+	----------------------------------------------------])])
   else
     # Custom location provided.    
+    AC_MSG_RESULT(yes)
+
     srx_include_dir="${srx_dir}/include/srx/"
+    srx_lib_dir="${srx_dir}/lib${ARCH}/srx"
 
     # Search local install
-    AC_MSG_CHECKING(for local installed SRx Proxy)
-    if test -e ${srx_dir}/lib${ARCH}/srx/libSRxProxy.so ; then
-      CFLAGS="-I${srx_dir}/include $CFLAGS"
-
-      # Check if the new library path is already added
-      if "x$CACHED_LDFLAGS" = "x" ; then
-        LDFLAGS="-L${srx_dir}/lib${ARCH}/srx $LDFLAGS"
-      fi
-      LIBS="-lSRxProxy $LIBS"
+    AC_MSG_CHECKING(for local installed SRx Proxy '${srx_lib_dir}/libSRxProxy.so')
+    if test -e ${srx_lib_dir}/libSRxProxy.so ; then
       AC_MSG_RESULT([found])
+
+      CFLAGS="-I${srx_dir}/include ${CFLAGS}"
+      LDFLAGS="-L${srx_lib_dir} ${LDFLAGS}"
+      LIBS="-lSRxProxy ${LIBS}"
+
     else
       AC_MSG_RESULT([not found])
-      if test -e ${srx_dir} ; then
-        AC_MSG_ERROR([
+      AC_MSG_ERROR([
 	--------------------------------------------------
 	The library 'libSRxProxy.so' could not be 
 	found at location:
-	  '${srx_dir}/lib${ARCH}/srx/libSRxProxy.so'
+	  '${srx_lib_dir}'
 	--------------------------------------------------])
-      else
-        AC_MSG_ERROR([
-	--------------------------------------------------
-	Location srx_dir=${srx_dir} not found.
-	--------------------------------------------------])
-      fi
     fi
   fi
 
@@ -1483,82 +1479,73 @@ if test "x${enable_srx}" == "xyes"; then
 			${srx_include_dir}slist.h \
       uthash.h ], 
       [], [AC_MSG_ERROR([
-	--------------------------------------------------
-	The required headers for 'SRxProxy' not Found.
-	--------------------------------------------------])])
+	---------------------------------------------------------------
+	 One or more of the required headers for 'SRxProxy' not Found.
+	---------------------------------------------------------------])])
   
-  #
-  # Now Look for the dl or dld library
-  #
-#  AC_SEARCH_LIBS([dlopen], [dl], [], [AC_MSG_ERROR([
-#    ---------------------------------------------------
-#    The System requires the capability to dynamically 
-#    load libraries. No library libldl was 
-#    found on the system.
-#    ---------------------------------------------------])])
-
   #
   # Now Check for SRxCryptoAPI
   #
-  AS_BOX(Processing SRxCryptoAPI configuration)
-  AC_ARG_VAR([sca_dir], [Provide local install location of SRxCryptoAPI])
+  AC_MSG_NOTICE(checking configuration of SRxCryptoAPI)
+  AC_MSG_CHECKING(if 'sca_dir' is provided)
+  AC_ARG_VAR([sca_dir], [Provide local install location of SRxCryptoAPI])  
+
   if test "x${sca_dir}" = "x" ; then
-    # Check for regular installed library
-    if test -d /usr/lib${ARCH}/srx ; then
-      if test "x$CACHED_LDFLAGS" = "x"; then
-        CACHED_LDFLAGS="/usr/lib${ARCH}/srx"
-        LDFLAGS="$CACHED_LDFLAGS $LDFLAGS"
-      fi
-      sca_include_dir="/usr/include/srx/"
+    AC_MSG_RESULT(no)
+    
+    sca_include_dir="/usr/include/srx/"
+
+    if test "x${used_def_ldpath}" = "x" ; then
+      LDFLAGS="-L/usr/lib${ARCH}/srx $LDFLAGS"
     fi
+
+    # Check for installed library, no custom location provided
     AC_SEARCH_LIBS([srxCryptoInit], [SRxCryptoAPI], 
                    [], [AC_MSG_ERROR([
 	--------------------------------------------------
-	The library 'SRxCryptoAPI' is required to build 
-	quagga-srx. Install it using:
-	  'yum install srxcryptoapi'
-	or specify: 
-	  'sca_dir=<location>'
+	 The library 'SRxCryptoAPI' is required to build 
+	 quagga-srx. Install it using:
+	   'yum install srxcryptoapi'
+	 or specify: 
+	   'sca_dir=<location>'
 	--------------------------------------------------])])
-
   else
-    # Search local install
+    # Custom location provided.    
+    AC_MSG_RESULT(yes)
+
     sca_include_dir="${sca_dir}/include/srx/"
-    AC_MSG_CHECKING(for local installed SRxCryptoAPI)
+    sca_lib_dir="${sca_dir}/lib${ARCH}/srx"
 
-    if test -e ${sca_dir}/lib${ARCH}/srx/libSRxCryptoAPI.so ; then
+    # Search local install
+    AC_MSG_CHECKING(for local installed SRxCryptoAPI '${sca_lib_dir}/libSRxCryptoAPI.so')
+    if test -e ${sca_lib_dir}/libSRxCryptoAPI.so ; then
       AC_MSG_RESULT([found])
-      LDFLAGS="-L${sca_dir}/lib${ARCH}/srx $LDFLAGS"
-      LIBS="-lSRxCryptoAPI $LIBS"
 
-      if test "$sca_dir" != "$srx_dir" ; then
-        # This check only for the include section, the lib section for SRx Proxy
-        # is different even if sca_dir and srx_dir is same.
-        CFLAGS="-I${sca_dir}/include $CFLAGS"
+      if test "x${srx_dir}" != "x${sca_dir}"; then
+        CFLAGS="-I${sca_dir}/include ${CFLAGS}"
       fi
+      if test "x${srx_lib_dir}" != "x${sca_lib_dir}" ; then
+        LDFLAGS="-L${sca_lib_dir} ${LDFLAGS}"
+      fi
+      LIBS="-lSRxCryptoAPI ${LIBS}"
+
     else
       AC_MSG_RESULT([not found])
-      if test -e ${sca_dir} ; then
-        AC_MSG_ERROR([
+      AC_MSG_ERROR([
 	--------------------------------------------------
 	The library 'libSRxCryptoAPI.so' could not be 
 	found at location:
-	  '${sca_dir}/lib${ARCH}/srx/libSRxCryptoAPI.so'
+	  '${sca_lib_dir}'
 	--------------------------------------------------])
-      else
-        AC_MSG_ERROR([
-	--------------------------------------------------
-	Location sca_dir=${sca_dir} not found.
-	--------------------------------------------------])
-      fi
     fi
   fi
 
-  AC_CHECK_HEADERS([${sca_include_dir}srxcryptoapi.h], 
-                   [], [AC_MSG_ERROR([
-	--------------------------------------------------
-	The required header for 'SRxCryptoAPI' not Found.
-	--------------------------------------------------])])
+  AC_CHECK_HEADERS([ \
+			${sca_include_dir}srxcryptoapi.h ], 
+      [], [AC_MSG_ERROR([
+	---------------------------------------------------------------
+	 Header required for 'SRxCryptoAPI' not Found.
+	---------------------------------------------------------------])])
   
 else 
   # Don't Embedd SRx

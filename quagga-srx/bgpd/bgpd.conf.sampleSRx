@@ -320,6 +320,10 @@ router bgp 7675
 ! neighbor 10.0.2.1 bgpsec (snd|rec|both)
  neighbor 10.0.1.1 bgpsec both
 
+
+! Support Extended Message for BGP
+! neighbor (A.B.C.D|X:X::X:X|WORD) extended
+
 !
 ! access-list all permit any
 !

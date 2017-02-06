@@ -57,14 +57,14 @@ bgp_md5_set_socket (int socket, union sockunion *su, const char *password)
 {
   int ret = -1;
   int en = ENOSYS;
-  
+
   assert (socket >= 0);
-  
-#if HAVE_DECL_TCP_MD5SIG  
+
+#if HAVE_DECL_TCP_MD5SIG
   ret = sockopt_tcp_signature (socket, su, password);
   en  = errno;
 #endif /* HAVE_TCP_MD5SIG */
-  
+
   if (ret < 0)
     zlog (NULL, LOG_WARNING, "can't set TCP_MD5SIG option on socket %d: %s",
           socket, safe_strerror (en));
@@ -78,19 +78,19 @@ bgp_md5_set_connect (int socket, union sockunion *su, const char *password)
 {
   int ret = -1;
 
-#if HAVE_DECL_TCP_MD5SIG  
+#if HAVE_DECL_TCP_MD5SIG
   if ( bgpd_privs.change (ZPRIVS_RAISE) )
     {
       zlog_err ("%s: could not raise privs", __func__);
       return ret;
     }
-  
+
   ret = bgp_md5_set_socket (socket, su, password);
 
   if (bgpd_privs.change (ZPRIVS_LOWER) )
     zlog_err ("%s: could not lower privs", __func__);
 #endif /* HAVE_TCP_MD5SIG */
-  
+
   return ret;
 }
 
@@ -106,7 +106,7 @@ bgp_md5_set (struct peer *peer)
       zlog_err ("%s: could not raise privs", __func__);
       return -1;
     }
-  
+
   /* Just set the password on the listen socket(s). Outbound connections
    * are taken care of in bgp_connect() below.
    */
@@ -119,7 +119,7 @@ bgp_md5_set (struct peer *peer)
 
   if (bgpd_privs.change (ZPRIVS_LOWER) )
     zlog_err ("%s: could not lower privs", __func__);
-  
+
   return ret;
 }
 
@@ -155,7 +155,7 @@ bgp_accept (struct thread *thread)
 
   if (BGP_DEBUG (events, EVENTS))
     zlog_debug ("[Event] BGP connection from host %s", inet_sutop (&su, buf));
-  
+
   /* Check remote IP address */
   peer1 = peer_lookup (NULL, &su);
   if (! peer1 || peer1->status == Idle)
@@ -196,6 +196,16 @@ bgp_accept (struct thread *thread)
     peer->v_holdtime = peer1->v_holdtime;
     peer->v_keepalive = peer1->v_keepalive;
 
+    if (CHECK_FLAG (peer1->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+    {
+      if(stream_get_size (peer1->ibuf) > BGP_MAX_PACKET_SIZE)
+        stream_resize (peer->ibuf, BGP_MAX_PACKET_SIZE_EXTENDED);
+
+      if(CHECK_FLAG(peer->cap, PEER_CAP_EXTENDED_MSG_SUPPORT)
+          && (stream_get_size (peer1->work) > BGP_MAX_PACKET_SIZE))
+        stream_resize (peer->work, BGP_MAX_PACKET_SIZE_EXTENDED);
+    }
+
     /* Make peer's address string. */
     sockunion2str (&su, buf, SU_ADDRSTRLEN);
     peer->host = XSTRDUP (MTYPE_BGP_PEER_HOST, buf);
@@ -221,8 +231,8 @@ bgp_bind (struct peer *peer)
 
   if ( bgpd_privs.change (ZPRIVS_RAISE) )
   	zlog_err ("bgp_bind: could not raise privs");
-  
-  ret = setsockopt (peer->fd, SOL_SOCKET, SO_BINDTODEVICE, 
+
+  ret = setsockopt (peer->fd, SOL_SOCKET, SO_BINDTODEVICE,
 		    &ifreq, sizeof (ifreq));
 
   if (bgpd_privs.change (ZPRIVS_LOWER) )
@@ -315,7 +325,7 @@ bgp_connect (struct peer *peer)
 
   sockopt_reuseaddr (peer->fd);
   sockopt_reuseport (peer->fd);
-  
+
 #ifdef IPTOS_PREC_INTERNETCONTROL
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
@@ -456,17 +466,17 @@ bgp_socket (unsigned short port, const char *address)
 
       if (ainfo->ai_family != AF_INET && ainfo->ai_family != AF_INET6)
 	continue;
-     
+
       sock = socket (ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
       if (sock < 0)
 	{
 	  zlog_err ("socket: %s", safe_strerror (errno));
 	  continue;
 	}
-	
+
       /* if we intend to implement ttl-security, this socket needs ttl=255 */
       sockopt_ttl (ainfo->ai_family, sock, MAXTTL);
-      
+
       ret = bgp_listener (sock, ainfo->ai_addr, ainfo->ai_addrlen);
       if (ret == 0)
 	++count;
@@ -518,7 +528,7 @@ bgp_socket (unsigned short port, const char *address)
 #endif /* HAVE_STRUCT_SOCKADDR_IN_SIN_LEN */
 
   ret = bgp_listener (sock, (struct sockaddr *) &sin, socklen);
-  if (ret < 0) 
+  if (ret < 0)
     {
       close (sock);
       return ret;

@@ -22,10 +22,13 @@
  *
  * Contains functionality to print update messages
  * 
- * @version 0.1.1.0
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2016/11/01 - oborchert
+ *            * Adjusted the signature of the method printBGPSEC_PathAttr to
+ *              use BGP_PathAttr as parameter.
  *  0.1.1.0 - 2016/03/25 - oborchert
  *            * Added function printBGPSEC_PathAttr to header
  *          - 2016/03/18 - borchert
@@ -54,7 +57,7 @@ void printUpdateData(BGP_UpdateMessage_1* update);
  * 
  * @return true if the attributes data was included in the print.
  */
-bool printBGPSEC_PathAttr(BGPSEC_PathAttribute* pa, char* tab, bool more);
+bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool more);
 
 #endif	/* BGPUPDATEPRINTER_H */
 

@@ -17,10 +17,15 @@
  *
  * This plugin provides an OpenSSL ECDSA implementation for BGPSEC.
  *
- * @version 0.2.0.1
+ * @version 0.2.0.2
  *
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.2 - 2016/01/12 - oborchert
+ *             * Fixed bug 1068, hash memory allocated by this API did not get
+ *               freed upon freeHashMessage call.
+ *           - 2016/11/16 - oborchert
+ *             * Added some more documentation regarding the error reporting.
  *   0.2.0.1 - 2016/07/03 - oborchert
  *             * Fixed bug in while signing. The Sign method did not sign over
  *               hash, it signed over the hash message from which the hash is
@@ -432,6 +437,11 @@ int release(sca_status_t* status)
  */
 bool freeHashMessage(SCA_HashMessage* hashMessage)
 {
+  // To allow the memory being freed, set ownedByAPI to false. BZ1068
+  if (hashMessage != NULL)
+  {
+    hashMessage->ownedByAPI = false;
+  }
   return sca_freeHashInput(hashMessage);
 }
 
@@ -796,6 +806,10 @@ int validate(SCA_BGPSecValidationData* data)
    * private key with the API object. The key must be internally copied. 
    * The memory is NOT shared for longer than the registration execution cycle.
    * NOTE: The key information MUST be copied within the API.
+   * 
+   * The following errors can be reported:
+   *   API_STATUS_ERR_NO_DATA: Some of the required data is missing.
+   *   Also see key_storage.ks_storeKey()
    *
    * @param key The key to be registered. The BGPSecKey Structure contains all
    *            needed key information.
@@ -823,6 +837,9 @@ int validate(SCA_BGPSecValidationData* data)
    *
    * @param key The key needs at least contain the ASN and SKI.
    * @param status Will contain the status information of this call.
+   * 
+   * The following errors can be reported:
+   *   See key_storage.ks_delKey()
    *
    * @return API_SUCCESS(1) or API_FAILURE(0 - check status)
    */
@@ -838,6 +855,10 @@ int validate(SCA_BGPSecValidationData* data)
    * the caller. The API will determine which key to be used.
    * NOTE: The key information MUST be copied within the API.
    *
+   * The following errors can be reported:
+   *   API_STATUS_ERR_NO_DATA: Some of the required data is missing.
+   *   See key_storage.ks_storeKey()
+   * 
    * @param key The key itself.
    * @param status Will contain the status information of this call.
    *
@@ -860,6 +881,9 @@ int validate(SCA_BGPSecValidationData* data)
    * This method allows to remove a particular key that is registered for the
    * given SKI and ASN.
    *
+   * The following errors can be reported:
+   *   See key_storage.ks_delKey()
+   * 
    * @param key The key itself.
    * @param status Will contain the status information of this call.
    *

@@ -6,6 +6,7 @@
 # certificate structure.
 # They are not intended to be used elsewhere than the test bed.
 # 
+# DEPRECATED - will be replaced in the next version
 
 EXT_DER="der"
 EXT_PEM="pem"
@@ -77,7 +78,7 @@ if [ -e "$1.$EXT_CERT" ] ; then
       else
         mkdir -p $REPOSITORY
         cp $1.$EXT_CERT $REPOSITORY/$FILE.$EXT_CERT
-        cp $1.$EXT_CERT $BIRD_REPO/$BIRD_FILE_PUB
+        cp $BIRD_FILE_PUB $BIRD_REPO/$BIRD_FILE_PUB
         DO_REGISTER=1
       fi
 

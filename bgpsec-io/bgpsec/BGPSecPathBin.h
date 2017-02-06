@@ -23,10 +23,16 @@
  * This software allows to generate the BGPSEC Path attribute as binary stream.
  * The path will be fully signed as long as all keys are available.
  *
- * @version 0.2.0.0
+ * @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2016/12/21 - oborchert
+ *            * Modified signature of function generateBGPSecAttr to allow 
+ *              signing to be done in CAPI mode.
+ *            2016/11/15 - oborchert
+ *            * Updated function generateBGPSecAttr to allow updates with 
+ *              extended flag not being set.
  *  0.2.0.0 - 2016/06/02 - oborchert
  *            * Merged modifications from 0.1.1.1 branch for measurement 
  *              framework
@@ -157,6 +163,8 @@ void releaseData();
  * Generate the BGPSec Path attribute byte stream. All values inside the stream 
  * are written in network format, all parameters are given in host format.
  * 
+ * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
+ *               performed using the internal signing implementation.
  * @param useGlobal use internal data stream (not thread safe but faster)
  * @param asPath (optional) a comma or blank separated string containing the AS 
  *               path (origin is the right most AS), Can be empty or NULL.
@@ -166,13 +174,17 @@ void releaseData();
  * @param prefix The prefix to be used. Depending on the AFI value it will be 
  *               typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
  * @param asList The AS list
+ * @param onlyExtendedLength Indicates if the attributes flag must be set to 
+ *               extended length regardless of parameter length.
  * 
  * @return Return the BGPSEC path attribute
  */
-BGP_PathAttribute* generateBGPSecAttr(bool useGlobal, char* asPath, 
+BGP_PathAttribute* generateBGPSecAttr(SRxCryptoAPI* capi,
+                                      bool useGlobal, char* asPath, 
                                       u_int32_t* segmentCt, 
                                       BGP_SessionConf* bgp_conf,
-                                     BGPSEC_PrefixHdr* prefix, TASList* asList);
+                                      BGPSEC_PrefixHdr* prefix, TASList* asList,
+                                      bool onlyExtendedLength);
 
 /**
  * Free the test data stream.
@@ -188,7 +200,7 @@ void freeData(u_int8_t* data);
  * @param prefix the prefix to be printed (can be NULL).
  * @param title the title to be used (can be NULL)
  */
-void __printBGPSEC_PathAttr(BGPSEC_PathAttribute* attr, char* prefix, 
+void __printBGPSEC_PathAttr(BGP_PathAttribute* attr, char* prefix, 
                           char* title);
 #endif	/* BGPSECPATHBIN_H */
 

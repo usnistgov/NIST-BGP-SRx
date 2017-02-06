@@ -23,10 +23,29 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.0.2
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/02/01 - oborchert
+ *            * Removed quotes from true values. The configuration does not read
+ *              understand quotes in boolean values.
+ *          - 2017/01/31 - oborchert
+ *            * Fixed some configuration documentation spellers.
+ *            * Added missing extended message size capability configuration.
+ *            * Added configuration to selectively enable/disable bgpsec
+ *          - 2017/01/11 - oborchert
+ *            * Fixed invalid type for signature_generation to use "BIO" 
+ *              (P_TYPE_SIGMODE_BIO) as default type. (BZ:1066)
+ *          - 2017/01/03 - oborchert
+ *            * Adjusted fake signature in template generation to be 70 bytes 
+ *              long.
+ *            * Added switch to allow selecting the signature mode.
+ *          - 2016/11/31 - oborchert
+ *            * Updated the fake signature and fake SKI to a more readable hex 
+ *              stream.
+ *          - 2016/11/15 - oborchert
+ *            * Added parameter onlyExtLength
  *  0.2.0.2 - 2016/06/29 - oborchert
  *            * Fixed usage of invalid algorithm ID in auto generation. (BZ997)
  *            * Added check if file exists already (BZ996)
@@ -66,8 +85,8 @@
  * 
  * @param fName The name of the configuration file.
  * 
- * @return true if the file could be generated, false if no name was given or the
- *              file already exists.
+ * @return true if the file could be generated, false if no name was given or 
+ *              the file already exists.
  */
 bool generateFile(char* fName)
 {
@@ -102,6 +121,11 @@ bool generateFile(char* fName)
                    "for MAX INT\n");
     fprintf (file, "%s = 0;\n\n", P_CFG_MAX_UPD);
     
+    // Force Extended flag being set.
+    fprintf (file, "# Allow to force the usage of the flag for extended length "
+                   "being set. \n");
+    fprintf (file, "%s = true;\n\n", P_CFG_ONLY_EXTENDED_LENGTH);    
+    
     // infile
     fprintf (file, "# %s = \"<binary input file>\";\n", P_CFG_BINFILE);
     
@@ -113,10 +137,10 @@ bool generateFile(char* fName)
     fprintf (file, "%s = \"false\";\n\n", P_CFG_APPEND_OUT);
     
     // capi_cfg
-    fprintf (file, "# Allow to specify a config file for srx-crypto-api, If "
-                   "this is not specified,\n");
+    fprintf (file, "# Allow to specify a configuration file for srx-crypto-api,"
+                   "If this is not specified,\n");
     fprintf (file, "# the default srx-crypto-api configuration (determined by "
-                   "the api) will be used.\n");
+                   "the API) will be used.\n");
     fprintf (file, "#%s = \"<configuration file>\";\n\n", P_CFG_CAPI_CFG);
        
     // Create the session information
@@ -133,6 +157,15 @@ bool generateFile(char* fName)
 
     fprintf (file, "    # Run forever or until the peer shuts down.\n");
     fprintf (file, "    %s = 0;\n\n", P_CFG_DISCONNECT_TIME);
+    
+    fprintf (file, "    # Allow to enable/disable extended message capability.\n");
+    fprintf (file, "    %s = true;\n\n", P_CFG_EXTMSG_SIZE);
+
+    fprintf (file, "    # Configure BGPSEC capabilities.\n");
+    fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_S);
+    fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_R);
+    fprintf (file, "    %s = false;\n", P_CFG_BGPSEC_V6_S);
+    fprintf (file, "    %s = true;\n\n", P_CFG_BGPSEC_V6_R);
 
     fprintf (file, "    # Updates for this session only\n");
     fprintf (file, "    %s = (  \"%s\"\n", P_CFG_UPD_PARAM, 
@@ -142,30 +175,36 @@ bool generateFile(char* fName)
     fprintf (file, "              , \"%s, %s\"\n", "10.0.3.0/24", "10 20 60 70");
     fprintf (file, "             );\n\n");
 
-// Removed this parameter from being added in default cofiguration. It will 
+// Removed this parameter from being added in default configuration. It will 
 // be completely removed in future revisions and was only needed during the 
 // draft13 -> draft15 merger.  
 //    fprintf (file, "    #%s = true;\n\n", P_CFG_MPNLRI);
         
     fprintf (file, "    %s = %u;\n\n", P_CFG_ALGO_ID, P_CFG_ALGO_ID_DEF_VAL);
     
-    fprintf (file, "    #The following settings are possible (%s| %s| %s)\n",
+    fprintf (file, "    # Choose from the following signature modes (%s|%s|%s|"
+                   "%s)\n", P_TYPE_SIGMODE_CAPI, P_TYPE_SIGMODE_BIO, 
+                   P_TYPE_SIGMODE_BIO_K1, P_TYPE_SIGMODE_BIO_K2);
+            
+    fprintf (file, "    %s = \"%s\";\n\n", P_CFG_SIG_GENERATION, P_TYPE_SIGMODE_BIO);
+    
+    fprintf (file, "    #In case the signature generation does fail, the\n");
+    fprintf (file, "    #following settings are possible (%s| %s| %s)\n",
              P_TYPE_NSM_DROP, P_TYPE_NSM_FAKE, P_TYPE_NSM_BGP4);
     fprintf (file, "    %s = \"%s\";\n", P_CFG_NULL_SIGNATURE_MODE, 
                                         P_TYPE_NSM_FAKE);
 
     char* fakeTab = "                          \0";
-    char* fakeSig = "BAD0BAD0BAD0BAD\0";
-    fprintf (file, "    %s      = \"0%s\" \"1%s\"\n", P_CFG_FAKE_SIGNATURE, 
+    char* fakeSig = "BADBEEFDEADFEED\0";    
+    fprintf (file, "    %s      = \"1%s\" \"2%s\"\n", P_CFG_FAKE_SIGNATURE, 
              fakeSig, fakeSig);
-      fprintf (file, "%s\"0%s\" \"1%s\"\n", fakeTab, fakeSig, fakeSig);
-      fprintf (file, "%s\"2%s\" \"3%s\"\n", fakeTab, fakeSig, fakeSig);
-      fprintf (file, "%s\"4%s\" \"5%s\"\n", fakeTab, fakeSig, fakeSig);
-      fprintf (file, "%s\"6%s\" \"7%s\"\n", fakeTab, fakeSig, fakeSig);
-      fprintf (file, "%s\"8BAD0BAD0BAD\";\n", fakeTab);
-    fprintf (file, "    %s            = \"1122334455667788\" "
-                   "\"9900AABBCCDDEEFF\"\n", P_CFG_FAKE_SKI);
-      fprintf (file, "%s\"11223344\";\n\n", fakeTab);
+      fprintf (file, "%s\"3%s\" \"4%s\"\n", fakeTab, fakeSig, fakeSig);
+      fprintf (file, "%s\"5%s\" \"6%s\"\n", fakeTab, fakeSig, fakeSig);
+      fprintf (file, "%s\"7%s\" \"8%s\"\n", fakeTab, fakeSig, fakeSig);
+      fprintf (file, "%s\"ABADBEEFFACE\";\n", fakeTab);
+    fprintf (file, "    %s            = \"0102030405060708\" "
+                   "\"090A0B0C0D0E0F10\"\n", P_CFG_FAKE_SKI);
+      fprintf (file, "%s\"11121314\";\n\n", fakeTab);
     
     // @TODO: This MUST be modified to each message type once it is 
     //        supported.

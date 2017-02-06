@@ -424,6 +424,7 @@ static const struct message capcode_str[] =
   { CAPABILITY_CODE_DYNAMIC,		"Dynamic"			},
   { CAPABILITY_CODE_REFRESH_OLD,	"Route Refresh (Old)"		},
   { CAPABILITY_CODE_ORF_OLD,		"ORF (Old)"			},
+  { CAPABILITY_CODE_EXTENDED,		"Extended Message Support"      },
 };
 static const int capcode_str_max = array_size(capcode_str);
 
@@ -438,6 +439,7 @@ static const size_t cap_minsizes[] =
   [CAPABILITY_CODE_DYNAMIC]	= CAPABILITY_CODE_DYNAMIC_LEN,
   [CAPABILITY_CODE_REFRESH_OLD]	= CAPABILITY_CODE_REFRESH_LEN,
   [CAPABILITY_CODE_ORF_OLD]	= sizeof (struct capability_orf_entry),
+  [CAPABILITY_CODE_EXTENDED]    = CAPABILITY_CODE_EXTENDED_LEN,
 };
 
 /**
@@ -506,6 +508,7 @@ bgp_capability_parse (struct peer *peer, size_t length, int *mp_capability,
           case CAPABILITY_CODE_DYNAMIC:
 #ifdef USE_SRX
           case CAPABILITY_CODE_BGPSEC:
+          case CAPABILITY_CODE_EXTENDED:
 #endif
               /* Check length. */
               if (caphdr.length < cap_minsizes[caphdr.code])
@@ -608,6 +611,21 @@ bgp_capability_parse (struct peer *peer, size_t length, int *mp_capability,
                   zlog_debug("[BGPSEC] peer Capability SEND set");
               }
               break;
+
+          /* Extended Message Support for BGP */
+          case CAPABILITY_CODE_EXTENDED:
+                SET_FLAG (peer->cap, PEER_CAP_EXTENDED_MSG_SUPPORT);
+                if(peer->ibuf)
+                {
+                  if(stream_get_size (peer->ibuf) <= BGP_MAX_PACKET_SIZE)
+                    stream_resize (peer->ibuf, BGP_MAX_PACKET_SIZE_EXTENDED);
+                }
+                if(peer->work)
+                {
+                  if(stream_get_size (peer->work) <= BGP_MAX_PACKET_SIZE)
+                    stream_resize (peer->work, BGP_MAX_PACKET_SIZE_EXTENDED);
+                }
+                break;
 #endif
           default:
             if (caphdr.code > 128)
@@ -1108,6 +1126,18 @@ bgp_open_capability (struct stream *s, struct peer *peer)
   {
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       zlog_debug("[BGPSEC]  %s: BGPSEC Capability NOT set", __FUNCTION__);
+  }
+
+  /* Extended Message Support for BGP */
+  if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+  {
+    if (BGP_DEBUG (normal, NORMAL))
+      zlog_debug("%s: Extended Message Support Capability Set", __FUNCTION__);
+
+    stream_putc (s, BGP_OPEN_OPT_CAP);
+    stream_putc (s, CAPABILITY_CODE_EXTENDED_LEN+ 2);
+    stream_putc (s, CAPABILITY_CODE_EXTENDED);
+    stream_putc (s, CAPABILITY_CODE_EXTENDED_LEN);
   }
 #endif
 

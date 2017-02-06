@@ -22,10 +22,16 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.1
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/01/11 - oborchert
+ *            * Added the correct label MP_REACH_NLRI to the printout of 
+ *              attributes of that type (BZ1065).
+ *          - 2016/11/01 - oborchert
+ *            * Adjusted the signature of the method printBGPSEC_PathAttr to
+ *              use BGP_PathAttr as parameter.
  *  0.2.0.1 - 2016/06/25 - oborchert
  *            * Fixed wrong format in printout of path attributes.
  *  0.2.0.0 - 2016/05/11 - oborchert
@@ -35,7 +41,7 @@
  *  0.1.1.0 - 2016/03/25 - oborchert
  *            * Changed static function __printBGPSEC into function 
  *              printBGPSEC_PathAttr which is added to the header.
- *          - 2016/03/18 - borchert
+ *          - 2016/03/18 - oborchert
  *            * Created File.
  */
 
@@ -414,10 +420,23 @@ static int __printBGPSEC_SignatureBlockPath(u_int8_t* data, int buffSize,
  * 
  * @return true if the attributes data was included in the print.
  */
-bool printBGPSEC_PathAttr(BGPSEC_PathAttribute* pa, char* tab, bool more)
+bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool more)
 {
-  int length = ntohs(pa->attrLength);
-  int attrLen  = length + sizeof(BGPSEC_PathAttribute);
+  bool extended = (pa->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0;
+  int length  = 0;
+  int attrLen = 0;  
+  
+  if (extended)
+  {
+    length  = ntohs(((BGPSEC_Ext_PathAttribute*)pa)->attrLength);
+    attrLen = length + sizeof(BGPSEC_Ext_PathAttribute);
+  }
+  else
+  {
+    length  = ((BGPSEC_Norm_PathAttribute*)pa)->attrLength;
+    attrLen = length + sizeof(BGPSEC_Norm_PathAttribute);    
+  }
+  
   char myTab[TAB_MAX];
   if (tab == NULL)
   {
@@ -435,8 +454,8 @@ bool printBGPSEC_PathAttr(BGPSEC_PathAttribute* pa, char* tab, bool more)
   
   // here pass tab rather than myTab because the additional tabs will be 
   // added in __printDef...
-  __printDefaultPAttrHdr((BGP_PathAttribute*)pa, "BGPSEC Path Attribute", 
-                         attrLen, length, NULL, tab, more);
+  __printDefaultPAttrHdr(pa, "BGPSEC Path Attribute", attrLen, length, NULL, 
+                         tab, more);
 
   // Goto the beginning of the real data.
   u_int8_t* data = (u_int8_t*)pa + (attrLen - length);
@@ -541,9 +560,12 @@ static int _printPathAttr(u_int8_t* data, int buffSize, char* tab)
       __printDefaultPAttrHdr(pa, "EXTENDED_COMMUNITIES\0", attrLen, length, 
                              NULL, myTab, buffSize > 0);
       break;
+    case BGP_UPD_A_TYPE_MP_REACH_NLRI:
+      __printDefaultPAttrHdr(pa, "MP_REACH_NLRI\0", attrLen, length, NULL,
+                             myTab, buffSize > 0);          
+      break;      
     case BGP_UPD_A_TYPE_BGPSEC:
-      printData = !printBGPSEC_PathAttr((BGPSEC_PathAttribute*)pa, myTab, 
-                                        buffSize > 0);
+      printData = !printBGPSEC_PathAttr(pa, myTab, buffSize > 0);
       break;
     default: 
       __printDefaultPAttrHdr(pa, "UNKNOWN\0", attrLen, length, NULL,

@@ -129,16 +129,16 @@ unsigned int bgpsec_path_attr_key_make (void *p)
   return key;
 }
 
-/* 
+/*
  * Initialize the bgpsec path hash - similar to the as path hash and initializes
  * the srx-crypto-api
- * 
+ *
  */
 void bgpsec_path_attr_init()
 {
  // @TODO: If no crypto is performed on the router side (e.g. srx-server does
  //        crypto - then the API might not need to be initialized.)
- //        One exception though, if we keep signing here even with the use of 
+ //        One exception though, if we keep signing here even with the use of
  //        srx-server.
   // aspath_init initialize its aspath hash as many as the number of 32767 hashes, so follows the same number
   bgpsechash = hash_create_size (32767, bgpsec_path_attr_key_make, bgpsec_path_attr_cmp);
@@ -154,7 +154,7 @@ void bgpsec_path_attr_init()
 
 /**
  * Returns the pointer to the internal crypto api.
- *  
+ *
  * @return Returns the pointer to the internal crypto api
  */
 SRxCryptoAPI* getSrxCAPI()
@@ -248,9 +248,9 @@ static void * bgpsec_path_hash_alloc (void *arg)
 
 /**
  * Instantiate an initialize a new BgpsecPathAttr instance.
- * 
+ *
  * @return the new instantiated BgpsecPathAttr.
- * 
+ *
  * @see bgpsec_path_free
  */
 static struct BgpsecPathAttr * bgpsec_path_attr_new (void)
@@ -262,11 +262,11 @@ static struct BgpsecPathAttr * bgpsec_path_attr_new (void)
 }
 
 /**
- * Create a complete BgpsecPathAttr structure including all internal 
- * allocations to the pointers. 
- *  
+ * Create a complete BgpsecPathAttr structure including all internal
+ * allocations to the pointers.
+ *
  * @return A fully instantiated BgpsecPathAttr.
- * 
+ *
  * @see bgpsec_path_free
  */
 static struct BgpsecPathAttr * bgpsec_path_attr_all_new(void)
@@ -283,9 +283,9 @@ static struct BgpsecPathAttr * bgpsec_path_attr_all_new(void)
 
 /**
  * Free the path segment of the segment structure.
- * 
+ *
  * @param seg The secure path segment to be freed
- * 
+ *
  * @see pathSegment_New
  */
 static void bgpsec_path_segment_free (struct PathSegment *seg)
@@ -299,9 +299,9 @@ static void bgpsec_path_segment_free (struct PathSegment *seg)
   return;
 }
 
-/** 
+/**
  * Free entire chain of segments.
- * 
+ *
  * @param seg The chain of signature segments.
  */
 static void bgpsec_path_segment_free_all (struct PathSegment *seg)
@@ -318,30 +318,30 @@ static void bgpsec_path_segment_free_all (struct PathSegment *seg)
 
 /**
  * Frees the allocated memory for the given signature segment.
- * 
+ *
  * @param ss The signature segment to be freed.
- * 
+ *
  * @see sigSegment_New
- * 
+ *
  */
 static void sigSegment_free(struct SigSegment *ss)
 {
   if (ss != NULL)
   {
-   // Free the ski 
+   // Free the ski
    if (ss->ski != NULL)
    {
      memset( ss->ski, 0, SKI_LENGTH);
      free(ss->ski);
    }
-   
+
    // Free the signature
    if (ss->signature != NULL)
    {
      memset(ss->signature, 0, ss->sigLen);
      free(ss->signature);
    }
-   
+
    memset (ss, 0, sizeof(struct SigSegment));
    /* but here, call xfree for Signature Segment itself */
    XFREE (MTYPE_BGPSEC_SIG_SEG, ss);
@@ -350,7 +350,7 @@ static void sigSegment_free(struct SigSegment *ss)
 
 /**
  * Free the complete signature segment chain
- * 
+ *
  * @param ss The signature segment chain.
  */
 static void sigSegment_free_all(struct SigSegment *ss)
@@ -367,9 +367,9 @@ static void sigSegment_free_all(struct SigSegment *ss)
 
 /**
  * Free the signature block of the list structure
- * 
+ *
  * @param sb The signature block to be freed.
- * 
+ *
  * @see sigBlock_New
  */
 static void bgpsec_sigBlock_free (struct SigBlock *sb)
@@ -384,8 +384,8 @@ static void bgpsec_sigBlock_free (struct SigBlock *sb)
 }
 
 /**
- * free entire chain of Signature_Block segments 
- * 
+ * free entire chain of Signature_Block segments
+ *
  * @param sb Free all signature blocks.
  */
 static void bgpsec_sigBlock_free_all (struct SigBlock *sb)
@@ -400,11 +400,11 @@ static void bgpsec_sigBlock_free_all (struct SigBlock *sb)
   }
 }
 
-/** 
- * Free BGPSEC path attr structure. 
- * 
- * @param bgp The complete 
- * 
+/**
+ * Free BGPSEC path attr structure.
+ *
+ * @param bgp The complete
+ *
  * @see bgpsec_path_attr_all_new
  */
 void bgpsec_path_free (struct BgpsecPathAttr *bpa)
@@ -474,7 +474,7 @@ struct BgpsecPathAttr *bgpsec_path_intern (struct BgpsecPathAttr *bpa)
  * Allocates memory for the new secure path segment
  *
  * @return Return a newly allocates secure path segment
- * 
+ *
  * @see bgpsec_path_segment_free
  */
 static struct PathSegment* pathSegment_New(void)
@@ -488,7 +488,7 @@ static struct PathSegment* pathSegment_New(void)
 
 /**
  * Generates and returns a zero initialized ski of length SKI_LENGTH
- * 
+ *
  * @return Generates and returns a zero initialized ski of length SKI_LENGTH
  */
 static u_int8_t* ski_new()
@@ -510,9 +510,9 @@ static void *signature_new(size_t size)
 
 /**
  * Create a new signature segment for the pointer structure.
- * 
+ *
  * @return The signature segment.
- * 
+ *
  * @see sigSegment_free
  */
 static struct SigSegment* sigSegment_New(void)
@@ -527,9 +527,9 @@ static struct SigSegment* sigSegment_New(void)
 
 /**
  * Generate a new Signature Block for the pinter structure.
- * 
+ *
  * @return The new created signature block
- * 
+ *
  * @see bgpsec_sigBlock_free
  */
 static struct SigBlock* sigBlock_New(void)
@@ -553,23 +553,23 @@ static struct SigBlock* sigBlock_New(void)
  * @param length total length of bgpsec pdu including Secure_Path and Signature_Block
  *
  * @return The BgpsecPathAttr as pointer structure or NULL in case the BGPSEC
- *         attribute is malformed. 
+ *         attribute is malformed.
  */
-struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer, 
+struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
                                     struct stream *s, size_t length)
 {
   // @INFO:  The pointer structure makes sense for generation of the sending out
   //         attribute.
   u_char* startp = NULL;
   u_char* endp   = NULL;
-//  struct stream *s = peer->ibuf; 
+//  struct stream *s = peer->ibuf;
   size_t start_getp = 0;
   size_t start_endp = 0;
   // This is the secure path pointer
   size_t spp = 0;
   // This is the secure block pointer
   size_t sbp = 0;
-  
+
   /* sanity check */
   // @TODO: Add the correct sanity check as specified in the DRAFT, This means
   //        Check the existence of max 2 signature blocks etc.
@@ -590,8 +590,8 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
         stream_pnt(s), startp, (int)start_getp, (int)start_endp, endp, (int)length);
   }
 
-  // Retrieving the prefix is not needed anymore, this function just does 
-  // Syntax check and generation of the helper structure.  
+  // Retrieving the prefix is not needed anymore, this function just does
+  // Syntax check and generation of the helper structure.
   int numSecurePathSegment = 0;
 
   if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
@@ -603,27 +603,27 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
   /* calculation of total aspath length using SecurePath Len */
   u_int16_t spl    = stream_getw_from(s, start_getp);
   u_int16_t numSeg = 0;
-  
+
   if ( (spl-OCTET_SECURE_PATH_LEN) % OCTET_SECURE_PATH_SEGMENT != 0)
   {
     zlog_err(" SecurePath Length parsing error");
     return NULL;
   }
-  
+
   numSeg = (spl - OCTET_SECURE_PATH_LEN) / OCTET_SECURE_PATH_SEGMENT;
 
   struct BgpsecPathAttr* bpa = NULL;
   struct PathSegment *seg;
   struct SigBlock    *sb;
-  
+
   bool syntaxError = false;
 
   /*
    * If this is the originating AS
    */
-  // @INFO: OK this is wrong. if numSeg is < 2 this does not mean that this is 
+  // @INFO: OK this is wrong. if numSeg is < 2 this does not mean that this is
   // the originator. numSeg is also < 2 if this is the second hop. I will modify
-  // the code in such that it uses the iteration in both parts. 
+  // the code in such that it uses the iteration in both parts.
   /*
    * in case not origin as, which means transit router
    */
@@ -677,7 +677,7 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
   } /* end of while */
 
   // @INFO: I don't really know the meaning of the comment below but for now,
-  // I let it stand and do check during debug what is going on. Also very 
+  // I let it stand and do check during debug what is going on. Also very
   // important here is to make sure that we have a maximum of 2 signature blocks
   // if we have more, we encountered a syntax error and have to clean up all our
   // data.
@@ -686,14 +686,14 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
    * But, here, just assumed one Sigature Block received.
   */
   struct SigSegment *ss_prev = NULL, *ss_curr = NULL;
-  
-  // @INFO Now add my change of parsing through the signature block. Also add 
+
+  // @INFO Now add my change of parsing through the signature block. Also add
   // the RFC required syntax check.
   if (STREAM_READABLE(s) < 1)
   {
     syntaxError = true;
   }
-  
+
   int numSigBlocks = 0;
   while (STREAM_READABLE(s) > 0)
   {
@@ -703,18 +703,18 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
       syntaxError = true;
       break;
     }
-    // Now generate the BgpsecPathAttribtue Signature block structure. 
+    // Now generate the BgpsecPathAttribtue Signature block structure.
     if (bpa->sigBlocks == NULL)
     {
       // This is the first signature block
       sb = bpa->sigBlocks = sigBlock_New(); // new Signature_Block instance
     }
     else
-    {      
+    {
       sb->next = sigBlock_New();
-      sb = sb->next;      
+      sb = sb->next;
     }
-    
+
     sb->sigBlockLen = stream_getw(s);   // Signature_Block Length incl. this field.
     if ((sb->sigBlockLen-2) > STREAM_READABLE(s))
     {
@@ -724,16 +724,16 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
     }
     sb->algoSuiteId     = stream_getc(s);   // Algorithm Suite Identifier
     // The remaining bytes for the signature segments
-    u_int16_t remainingBytes = sb->sigBlockLen - 3; 
+    u_int16_t remainingBytes = sb->sigBlockLen - 3;
 
     if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
     {
-      zlog_debug("[IN] Secure_Block --> %d, AlgoID: %u, Length: %u", 
+      zlog_debug("[IN] Secure_Block --> %d, AlgoID: %u, Length: %u",
                  numSigBlocks, sb->algoSuiteId, sb->sigBlockLen);
     }
 
     int numSignatures = 0;
-  // @INFO: Actually according to the RFC we need to parse according to the 
+  // @INFO: Actually according to the RFC we need to parse according to the
   // block length, not blindly through the number of segments. This is false.
   // Only this way we can detect a structural error with the update.
     while (remainingBytes > 0)
@@ -751,30 +751,30 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
         ss_curr = ss_prev->next;
       }
       ss_prev = ss_curr;
-      
+
       ss_curr->ski = ski_new();
       stream_get(ss_curr->ski, s, SKI_LENGTH); // SKI
       remainingBytes -= SKI_LENGTH;
       ss_curr->sigLen = stream_getw(s);        // Signature Length
       remainingBytes -= 2;
-      
+
       if (STREAM_READABLE(s) < ss_curr->sigLen)
       {
-        // Invalid signature length 
+        // Invalid signature length
         zlog_err("Bad bgpsec signatUre length: bigger than remaining byte");
         syntaxError = true;
         break;
       }
-      
+
       ss_curr->signature = signature_new(ss_curr->sigLen);
-      stream_get(ss_curr->signature, s, ss_curr->sigLen);     // signature   
+      stream_get(ss_curr->signature, s, ss_curr->sigLen);     // signature
       remainingBytes -= ss_curr->sigLen;
-      
+
       if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
       {
-        zlog_debug("[IN]    signature --> %d, Length: %u", 
+        zlog_debug("[IN]    signature --> %d, Length: %u",
                    numSignatures, ss_curr->sigLen);
-      }   
+      }
     }
     if (numSignatures != numSecurePathSegment)
     {
@@ -783,79 +783,85 @@ struct BgpsecPathAttr* bgpsec_parse(struct attr *attr, struct peer *peer,
       break;
     }
   }
-  
+
   if (syntaxError)
   {
     // cleanup
     bgpsec_path_free(bpa);
     bpa = NULL;
   }
-  
+
   if (BGP_DEBUG (bgpsec, BGPSEC_IN) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
   {
     zlog_debug("[IN]  %s: return value(final bpa): %p", __FUNCTION__, bpa);
   }
-  
+
   return bpa;
 }
 
 /**
  * This method does call the signing of the BGPSEC path attribute. This method
  * assumes that the peer is NOT an iBGP peer.
- * 
+ *
  * @param bgp The bgp session.
  * @param peer The peer to sign it too
  * @param pfx The prefix to sign over (only for origin anouncements)
  * @param attr The attribute containing the path information.
  * @param pCount The pCount of this update
  * @param flags the update flags.
- * 
+ *
  * @return The generated signature. If managed by the SrxCryptoAPI module
  *         then it must be freed by the crypto module, otherwise it can be freed
  *         using sca_freeSignature or manual using free etc.
- * 
+ *
  * @see srxcryptoapi.h:sca_freeSignature
  */
-SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer, 
-                                  struct prefix* pfx, struct attr* attr, 
+SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
+                                  struct prefix* pfx, struct attr* attr,
                                   u_int8_t pCount, u_int8_t flags)
 {
   // @TODO: The current implementation only deals with one hash message,
   //        modify this by using both - Then remove the two defines below
 #define BLOCK_0 0
 #define BLOCK_1 1
-  
+
+  // This is used to determine if the bgpsec_validation data is temp or not.
+  // The data will be set to temporary for originations only.
+  // See BZ#1022
+  bool tmpData = false;
+
   if (bgp->srxCAPI == NULL)
   {
     return NULL;
   }
-  
+
   // If this is the originator, nothing might exist yet, no bgpsec_path_attr,
   // no valdata etc. If nothing exist we have to build it, it it exists
-  // we can use it. 
+  // we can use it.
 
   as_t targetAS = htonl(peer->as);
   as_t localAS  = htonl(bgp->as);
 
-  // @TODO: here we would need some more info about a pCount > 0  
+  // @TODO: here we would need some more info about a pCount > 0
   SCA_BGPSEC_SecurePathSegment spSeg;
   spSeg.pCount = pCount;
   spSeg.flags  = flags;
   spSeg.asn    = htonl(bgp->as);
-  
+
   // Removed ski str to bin conversion. this is now done during configuration.
-    
+
   if (attr->bgpsec_validationData == NULL)
   {
     // This will be the case if the update never was send out before - it mainly
     // is an origination..
     attr->bgpsec_validationData = malloc(sizeof(SCA_BGPSecValidationData));
     memset(attr->bgpsec_validationData, 0, sizeof(SCA_BGPSecValidationData));
+    tmpData = true;
   }
   // @TODO: I think [0] cannot be NULL and [1] be filled. At least this would
   //        not make sense. At this point we anyhow only work with [0] until one
   //        of the near future updates.
-  
+
   // The idea here is that if we have no hash message, the API needs to generate
   // it. Now lets make sure the API has all information needed to do so.
   if (attr->bgpsec_validationData->hashMessage[0] == NULL)
@@ -878,10 +884,10 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
         int bLen = (pfx->prefixlen + 7) / 8;
         memcpy(attr->bgpsec_validationData->nlri->addr.ip, pfx->u.val, bLen);
       }
-      
+
     }
   }
-  
+
   SCA_BGPSecSignData  scaSignData;
   memset (&scaSignData, 0, sizeof(SCA_BGPSecSignData));
 
@@ -892,12 +898,12 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
   scaSignData.nlri        = attr->bgpsec_validationData->nlri;
   scaSignData.ski         = bgp->srx_bgpsec_key[bgp->srx_bgpsec_active_key].ski;
   scaSignData.status      = API_STATUS_OK;
-  // Get the hash Message, if it was received and already validated, the 
+  // Get the hash Message, if it was received and already validated, the
   // hashMessage will not be NULL. If it is null, the signature algorithm
   // assumes it is an origination.
   scaSignData.hashMessage = attr->bgpsec_validationData->hashMessage[BLOCK_0];
   scaSignData.signature   = NULL;
-  
+
   // Now do the signing. If it fails, cleanup what needs to be clean up
   // and return 0
   if (bgp->srxCAPI->sign(&scaSignData) == API_FAILURE)
@@ -906,7 +912,7 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
             peer->as, scaSignData.status);
     if (attr->bgpsec_validationData->hashMessage[BLOCK_0] == NULL)
     {
-      // We only need to clean up if the validation data was generated during 
+      // We only need to clean up if the validation data was generated during
       // this call
       if (!bgp->srxCAPI->freeHashMessage(scaSignData.hashMessage))
       {
@@ -918,7 +924,7 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
     }
     return 0;
   }
-  
+
   if (attr->bgpsec_validationData->hashMessage[BLOCK_0] != scaSignData.hashMessage)
   {
     if (attr->bgpsec_validationData->hashMessage[BLOCK_0] != NULL)
@@ -929,44 +935,61 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
       }
       attr->bgpsec_validationData->hashMessage[BLOCK_0] = NULL;
     }
-    
-    // Now set the new hash message.
-    attr->bgpsec_validationData->hashMessage[BLOCK_0] = scaSignData.hashMessage;
+
+    // Now store the new hash message - only if this is NOT an origin announcement
+    if (!tmpData)
+    {
+      attr->bgpsec_validationData->hashMessage[BLOCK_0] = scaSignData.hashMessage;
+    }
+    else
+    {
+      freeSCA_HashMessage(scaSignData.hashMessage);
+    }
   }
-  
+
+  if (tmpData)
+  {
+    // THis is an origin announcement, clean up
+    free (attr->bgpsec_validationData->nlri);
+    attr->bgpsec_validationData->nlri = NULL;
+    free (attr->bgpsec_validationData);
+    attr->bgpsec_validationData = NULL;
+    scaSignData.hashMessage = NULL;
+  }
+
   return scaSignData.signature;
 }
 
 /**
- * Construct the BGPSEC Path attribute. This includes signing the as path if it 
+ * Construct the BGPSEC Path attribute. This includes signing the as path if it
  * is not signed already.
  * This function writes the data into the stream.
- * 
+ *
  * @param bgp    The bgp session
  * @param peer   The peer information
  * @param aspath Pointer to the bgp4 as path representing the bgpsec path.
  * @param p      The prefix
  * @param s      The stream
- * @param attr   The bgp attribute. 
+ * @param attr   The bgp attribute.
  *
  * @return The length of the attribtue
  */
-int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer, 
+int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
                                  struct aspath *aspath, struct prefix* p,
                                  struct stream *s, struct attr *attr,
                                  u_int8_t flags, u_int8_t pCount,
                                  SCA_Signature** signatures, int numSignatures)
-{ 
+{
   size_t attrLenPtr = stream_get_endp(s);
-  // We already established that we do bgpsec and if internal, We already 
+  // We already established that we do bgpsec and if internal, We already
   // forwarded the traffic.
-  //  
+  //
   struct BgpsecPathAttr* bpa = bgpsecDup(attr->bgpsecPathAttr, true);
   // Create the secure path
-  uint16_t secPathLen = LEN_SECPATHSEGMENT 
+  uint16_t secPathLen = LEN_SECPATHSEGMENT
                         + ((bpa->securePathLen == 0) ? 2 : bpa->securePathLen);
   stream_putw (s, secPathLen);
-  
+
   // Now add my own signature path segment
   int numPathSegments = 1;
   stream_putc (s, pCount);
@@ -983,10 +1006,10 @@ int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
   }
 
   int sigIdx = 0;
-  struct SigBlock* sigBlock = NULL;  
+  struct SigBlock* sigBlock = NULL;
   // The prevBlock is used to allow removing the signature block.
-  // if we remove a signature block we might need to allow taking it out of the 
-  // list. OK currently the list MUST NOT exceed two segments but this might 
+  // if we remove a signature block we might need to allow taking it out of the
+  // list. OK currently the list MUST NOT exceed two segments but this might
   // change in the future - So I just prepare that.
   struct SigBlock* prevBlock = NULL;
   // Now add the signature block(s) - one for each signature generated.
@@ -996,7 +1019,7 @@ int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
     sigBlock  = bpa->sigBlocks;
     prevBlock = sigBlock;
     signature = signatures[sigIdx];
-    
+
     // Now locate the correct signature block that matches the signature.
     // What about if we have more signature block with the same signature ID?????
     // Maybe we have to remove the block once we found it?
@@ -1012,25 +1035,25 @@ int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
         zlog_err("[BGPSEC] no path segments, something went completely wrong!\n");
         return 0;
       }
-      // OK we are originating. 
-      
+      // OK we are originating.
+
       // Now generate a signature block for the signature we just generated
       sigBlock  = sigBlock_New();
       prevBlock = NULL;
       sigBlock->algoSuiteId = signature->algoID;
-    }    
-    
+    }
+
     // store the stream position to later determine the length of the block
     size_t sbPointer = stream_get_endp (s);
     stream_putw (s, 0); // Store a dummy as signature block length and come back
                         // and store the correct value.
     stream_putc (s, sigBlock->algoSuiteId);
-    
+
     // Now store latest generated signature
     stream_put  (s, signature->ski, SKI_LENGTH);
     stream_putw (s, signature->sigLen);
     stream_put  (s, signature->sigBuff, signature->sigLen);
-    
+
     // Now add the remaining signatures to the block
     struct SigSegment* sigSeg = sigBlock->sigSegments;
     while (sigSeg != NULL)
@@ -1040,18 +1063,18 @@ int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
       stream_put  (s, sigSeg->signature, sigSeg->sigLen);
       sigSeg = sigSeg->next;
     }
-    
+
     // Now calculate the signatrue block length
     size_t sbEndPointer = stream_get_endp(s);
     uint16_t sbLength = (uint16_t)(sbEndPointer - sbPointer);
     //stream_putw_at (s, sizep_PathLen, tmpBpa->securePathLen); // Secure_Path Len
     stream_putw_at (s, sbPointer, sbLength); // Secure_Path Len
-    
+
     if (bpa->sigBlocks == sigBlock)
     { // This block was the first one, move the head
       bpa->sigBlocks = sigBlock->next;
-    } 
-    else if (prevBlock != NULL)            
+    }
+    else if (prevBlock != NULL)
     { // The block was not the first one. In case the list exceeds two blocks we
       // might be somewhere in the middle. Now point the previous block to the
       // next one
@@ -1066,7 +1089,7 @@ int constructBGPSecPathAttribute(struct bgp *bgp, struct peer *peer,
   uint16_t attrLen = (uint16_t)(endPtr - attrLenPtr);
   bgpsec_path_free(bpa);
   bpa = NULL;
-  
+
   return attrLen;
 }
 
@@ -1160,22 +1183,22 @@ int bgpsecSanityCheck(struct BgpsecPathAttr *bpa)
 }
 
 /**
- * This function duplicate the original attribute and its sub structures into a 
+ * This function duplicate the original attribute and its sub structures into a
  * new instance or generate a new empty one if requested. Freeing the memory
  * of the original one does NOT affect the duplicate.
- * 
+ *
  * @param orig The original bgpsec path attribute (can be NULL)
  * @param newIfNULL generate a new empty structure if the original one is NULL.
- * 
- * @return A copy of the given structure or a new one if the original is NULL 
+ *
+ * @return A copy of the given structure or a new one if the original is NULL
  *         and the attribute newIfNULL is set to true.
  */
 struct BgpsecPathAttr * bgpsecDup(struct BgpsecPathAttr *orig, bool newIfNULL)
 {
   struct BgpsecPathAttr* new = NULL;
-  
+
   if(bgpsecSanityCheck(orig) == 0)
-  {  
+  {
     /* pointer links */
     new = bgpsec_path_attr_all_new();
 
@@ -1191,7 +1214,7 @@ struct BgpsecPathAttr * bgpsecDup(struct BgpsecPathAttr *orig, bool newIfNULL)
   {
     new = bgpsec_path_attr_new();
   }
-  
+
   return new;
 }
 
@@ -1303,9 +1326,9 @@ unsigned char hex2bin_byte(char* in)
 /**
  * This function is a wrapper for the corresponding CAPI function. This function
  * is needed to allow the memory management performed by the CAPI itself.
- * 
+ *
  * @param message The hashInput to be freed.
- * 
+ *
  * @since 0.4.2.0
  */
 void freeSCA_HashMessage(SCA_HashMessage* message)

@@ -22,10 +22,13 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.4
+ * @version 0.2.0.5
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/01/31 - oborchert
+ *            * Added text for "Bad Message Length" notification.
+ *            * Fixed data printout in Notification printer. (BZ1095)
  *  0.2.0.4 - 2016/07/01 - oborchert
  *            * BZ1007 - speller in Notification output.
  *  0.2.0.0 - 2016/05/12 - oborchert
@@ -68,7 +71,7 @@ void printNotificationData(BGP_NotificationMessage* notification)
         case BGP_ERR1_SUB_NOT_SYNC:
           subCodeStr = "\0"; break;
         case BGP_ERR1_SUB_BAD_LENGTH:
-          subCodeStr = "\0"; break;
+          subCodeStr = "Bad Message Length\0"; break;
         case BGP_ERR1_SUB_BAD_TYPE:
           subCodeStr = "\0"; break;
         default:
@@ -174,16 +177,26 @@ void printNotificationData(BGP_NotificationMessage* notification)
       errStr = "UNKNOWN\0";
       subCodeStr = "UNKNOWN\0";
   }
-  printf("%s+--Error code: %u (%s)\n", TAB_2, notification->error_code, errStr);
+  printf("%s+--Error code:    %u (%s)\n", TAB_2, notification->error_code, errStr);
   printf("%s+--Error subcode: %u (%s)\n", TAB_2, notification->sub_code, 
          subCodeStr);
   if (data < end)
   {
     int dataLength = (int)(end - data);
     char dataStr[STR_MAX];
-    snprintf(dataStr, STR_MAX, "%s+--data: %c", TAB_2, '\0');
+    // write the text first in the variable to see how long it becomes. This 
+    // will be the tab for the final print in case data is very large.
+    
+    snprintf(dataStr, STR_MAX, "%s+--data:   ", TAB_2);
+    // Now print the tree leaf name
+    printf("%s", dataStr);
+    // Now generate the tab
     memset(dataStr, ' ', strlen(dataStr));
-
+    // Now write the hex data (formatted)
     printHex(data, dataLength, dataStr);
+  }
+  else
+  {
+    printf("%s+--data:   (no data)", TAB_2);    
   }
 }

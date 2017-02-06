@@ -28,10 +28,12 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.3.0.10
+ * @version 0.4.0.2
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.0.2  - 2016/08/12 - oborchert
+ *            * Changed default port from 50000 to 323 as specified by RFC6811
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Added parentheses around comparison in operand & in sendPrefixes
  *            * Removed unused sessionID from function readPrefixData
@@ -138,13 +140,19 @@ typedef struct {
 #define CMD_ID_RUN       17
 #define CMD_ID_SLEEP     18
 
+#define DEF_PORT         323
+
 /*----------
  * Constants
  */
-const char* RPKI_RTR_SRV_VER          ="0.3.0.2";
-const char* RPKI_RTR_SRV_NAME         ="RPKI Cache Test Harness";
-const char* HISTORY_FILENAME          = ".rpkirtr_svr.history";
-const char* USER_PROMPT               = ">> ";
+#ifdef PACKAGE_VERSION
+const char* RPKI_RTR_SRV_VER          = PACKAGE_VERSION "\0";
+#else
+const char* RPKI_RTR_SRV_VER          = "> 0.4\0";
+#endif
+const char* RPKI_RTR_SRV_NAME         = "RPKI Cache Test Harness\0";
+const char* HISTORY_FILENAME          = ".rpkirtr_svr.history\0";
+const char* USER_PROMPT               = ">> \0";
 const int   SERVICE_TIMER_INTERVAL    = 60;   ///< Service interval (sec)
 const int   CACHE_EXPIRATION_INTERVAL = 3600; ///< Sec. to keep removed entries
 
@@ -1953,6 +1961,14 @@ bool setupService()
   return true;
 }
 
+/**
+ * Start the RPKI Test Harness.
+ * 
+ * @param argc The number of arguments passed to the program
+ * @param argv The arguments passed to the program
+ * 
+ * @return The program exit level. 
+ */
 int main(int argc, const char* argv[])
 {
   int       port;
@@ -1962,8 +1978,7 @@ int main(int argc, const char* argv[])
   // Help and port number
   if (argc < 2)
   {
-    printf("Start RPKI-Cache test harness using default port 50001\n");
-    port = 50001;
+    port = DEF_PORT;
   }
   else
   {
@@ -1975,6 +1990,7 @@ int main(int argc, const char* argv[])
     return -1;
   }
 
+  printf("Start %s using port %u\n", RPKI_RTR_SRV_NAME, port);
   // Output all log messages to stderr
   setLogMethodToCallback(printLogMessage);
 

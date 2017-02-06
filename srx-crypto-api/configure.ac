@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.2.0.1], [bgpsrx-dev@nist.gov])
+AC_INIT([SRxCryptoAPI], [0.2.0.2], [bgpsrx-dev@nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -128,7 +128,7 @@ if test "${have_config}" = no; then
   AC_MSG_ERROR([
 	--------------------------------------------------
 	The config library required to build srx_server.
-	For Fedora/CentOS please install "libconfig"
+	For Fedora/CentOS please install "libconfig and libconfig-devel"
 	--------------------------------------------------])
 else  
   AC_CHECK_HEADERS([libconfig.h], [have_headers=yes], [have_headers=no])
@@ -138,7 +138,18 @@ else
 	libconfig.h is missing, install the libconfig 
 	header. For fedora/CentOS install libconfig-devel.
 	--------------------------------------------------])
+  else
+    # Now specify which int type to use which depends on the library type.
+    AC_MSG_CHECKING(for libconfig int type)
+    ldconfig -v 2>/dev/null | grep libconfig.so.8 > /dev/null
+    if test "$?" = "0"; then      
+      LCONFIG_INT=long
+    else
+      LCONFIG_INT=int
+   fi
+   CFLAGS="$CFLAGS -DLCONFIG_INT=$LCONFIG_INT"
   fi
+  AC_MSG_RESULT([$LCONFIG_INT])
 fi
 
 # General checks for header files.
@@ -243,19 +254,26 @@ fi
 # Determine if it is 64 or 32 bit architecture
 AS_BOX([Processing system and compiler setup])
 AC_MSG_CHECKING([host architecture information])
+is_64_bit="no"
 case "$HOSTTYPE" in
   x86_64) 
-     CPU_ARCH_FLAG="-DCPU_64"
-     CPU_ARCH="64"
-     if test "${libdir}" = "\${exec_prefix}/lib" ; then
-       libdir="${libdir}64"
-     fi
+     is_64_bit="yes"
+     ;;
+  x86_64-linux) 
+     is_64_bit="yes"
      ;;
   *) 
      CPU_ARCH_FLAG=""
      CPU_ARCH=""
      ;;
 esac
+if test "${is_64_bit}" = "yes"; then
+  CPU_ARCH_FLAG="-DCPU_64"
+  CPU_ARCH="64"
+  if test "${libdir}" = "\${exec_prefix}/lib" ; then
+    libdir="${libdir}64"
+  fi
+fi
 AC_MSG_RESULT([$CPU_ARCH bit])
 
 LIB_VER_INFO=$current:$revision:$age
@@ -386,8 +404,6 @@ fi
 AC_MSG_CHECKING([preload symbol status])
 AC_MSG_RESULT([need: $need_preload_symbol  avaliable: $available_preload_symbol])
 
-
-
 AC_SUBST(BGPSEC_OPENSSL)
 AC_SUBST(CRYPTO_TESTLIB)
 AC_SUBST(LIB_VER_INFO)
@@ -401,6 +417,7 @@ AC_SUBST(OPENSSL_LIBS)
 AC_SUBST(OPENSSL_LDFLAGS)
 AC_SUBST(OPENSSL_CFLAGS)
 AC_SUBST(CPU_ARCH)
+AC_SUBST(LCONFIG_INT)
 
 AS_BOX(Processing additional configuration settings)
 AC_SUBST([CFG_PREFIX], [${prefix}])
@@ -430,6 +447,7 @@ echo "CPU Arch.....: $CPU_ARCH"
 echo "CFLAGS.......: $CFLAGS"
 echo "LDFLAGS......: $LDFLAGS"
 echo "LIBDIR.......: ${libdir}"
+echo "LCONFIG_INT..: $LCONFIG_INT"
 echo "RPM Incl. la.: ${incl_la_lib}"
 echo ""
 echo "OpenSSL Configuration:"

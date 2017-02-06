@@ -22,16 +22,38 @@
  *
  * This API contains a the headers and function to generate proper BGP messages.
  *
- * @version 0.2.0.1
+ * @version 0.2.0.5
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.1 - 2016/06/24 - oborchert
+ *  0.2.0.5 - 2017/01/31 - oborchert
+ *            * Added unsupported capability
+ *          - 2017/01/31 - oborchert
+ *            * Added documentation for capability structure
+ *            * Added defines and checking mechanism for BGP message sizes
+ *          - 2017/01/30 - oborchert
+ *            * Added missing capability for extended message length (> 4096)
+ *          - 2017/01/03 - oborchert
+ *            * Added struct ignatureGenMode
+ *          - 2016/11/14 - oborchert
+ *            * Added documentation to struct type
+ *          - 2016/11/01 - oborchert
+ *            * Split BGPSEC_PathAttribute into two structures, one with one 
+ *              byte length (BGPSEC_NormPathAttr) and one with 2 bytes of length
+ *              (BGPSEC_ExtPathAttr)
+ *            * Fixed bug in printing bgpsec path attribute for received updates
+ *              where the extended length flag in the bgpsec path attribute is 
+ *              not set.
+ *  0.2.0.1 - 2016/10/21 - oborchert
+ *            * Added all capability codes according to IANA (2016-08-15)
+ *            * Modified BGP_Cap_... typed to allow easy parsing of capabilities
+ *              concatenated within a single optional parameter.
+ *          - 2016/06/24 - oborchert
  *            * Modified function generateBGP_PathAttr to allow detection of
  *              iBGP sessions.
  *            * Added missing BGP_Upd_Attr_LocPref structure.
  *  0.2.0.0 - 2016/05/16 - oborchert
- *            * Added CEASE Notificatoin Subcodes RFC 4486
+ *            * Added CEASE Notification Subcodes RFC 4486
  *          - 2016/05/12 - oborchert
  *            * Modified nexthop to u_int64_t in header of createUpdate
  *  0.1.1.0 - 2016/04/21 - oborchert
@@ -68,13 +90,16 @@
 #define PRNT_MSG_NOTIFICATION  2
 #define PRNT_MSG_KEEPALIVE     3
 
+// The default maximum size of BGP packets RFC 4271 Section 4. Message Formats
+#define BGP_MAX_MESSAGE_SIZE 4096
+// The default maximum size of BGP packets RFC draft-ietf-idr-extended-messages
+#define BGP_EXTMAX_MESSAGE_SIZE 64000
+
 // BGP MESSAGE TYPES
 #define BGP_T_OPEN          1  
 #define BGP_T_UPDATE        2
 #define BGP_T_NOTIFICATION  3
 #define BGP_T_KEEPALIVE     4
-
-
 
 #define BGP_T_OPEN          1  
 #define BGP_T_UPDATE        2
@@ -83,23 +108,43 @@
 
 #define BGP_MARKER_VAL      0xFF
 #define BGP_MARKER_SIZE     16
-#define BGP_MAX_HDR_SIZE    10000
 #define BGP_VERSION         4
 #define BGP_MIN_OPEN_LENGTH 29
 
 #define BGP_T_CAP           2
+// Capability codes: RFC 5492
+// http://www.iana.org/assignments/capability-codes/capability-codes.xhtml
+#define BGP_CAP_T_RESERVED        0
+// 1-63 IETF Review
 #define BGP_CAP_T_MPNLRI          1
 #define BGP_CAP_T_RREFRESH        2
+#define BGP_CAP_T_OUT_FLTR        3
+#define BGP_CAP_T_MULTI_ROUTES    4
+#define BGP_CAP_T_EXT_NEXTHOPENC  5
+#define BGP_CAP_T_EXT_MSG_SUPPORT 6
+// unassigned 7-63
+// 64-127 First Come First Served
+#define BGP_CAP_T_GRACE_RESTART  64
 #define BGP_CAP_T_AS4            65
-// 72 is in Conflict
+#define BGP_CAP_T_DEPRECATED     66
+#define BGP_CAP_T_SUPP_DYNCAP    67
+#define BGP_CAP_T_MULTI_SESS     68
+#define BGP_CAP_T_ADD_PATH       69
+#define BGP_CAP_T_ENHANCED_RR    70
+#define BGP_CAP_T_LLGR           71
+// 72 - Unassigned
 // http://www.iana.org/assignments/capability-codes/capability-codes.xhtml
 #define BGP_CAP_T_BGPSEC         72
+#define BGP_CAP_T_FQDN           73
+// Unassigned 74-127
+// Private Usage 128-255 - IANA does not assign
 #define BGP_CAP_T_RREFRESH_PRIV 128
 
-#define LEN_CAP_MPNLRI      4
-#define LEN_CAP_AS4         4
-#define LEN_CAP_BGPSEC      3
-#define LEN_CAP_RREFRESH    0
+#define LEN_CAP_MPNLRI          4
+#define LEN_CAP_AS4             4
+#define LEN_CAP_BGPSEC          3
+#define LEN_CAP_RREFRESH        0
+#define LEN_CAP_EXT_MSG_SUPPORT 0
 
 #define AFI_V4              1
 #define AFI_V6              2  
@@ -152,6 +197,9 @@
 #define BGP_ERR6_CEASE              6
 
 #define BGP_ERR_SUB_UNDEFINED   0
+
+// Unsupported Capability RFC 5492
+#define BGP_ERR_SUB_UNSUPPORTED_CAPABILITY 7
 
 #define BGP_ERR1_SUB_NOT_SYNC   1
 #define BGP_ERR1_SUB_BAD_LENGTH 2
@@ -273,7 +321,7 @@ typedef struct {
 
 /** The capability for bgpsec encoding */
 typedef struct {
-  BGP_OpenMessage_OptParam paramHdr;
+//  BGP_OpenMessage_OptParam paramHdr;
   BGP_Capabilities capHdr;
   u_int8_t  firstOctet; // 4 bit version (1), 1 bit direction, 3 bits reserved 0
   u_int16_t afi;        // 0 v6, 1 v4
@@ -281,7 +329,7 @@ typedef struct {
 
 /** The capability for MPNLRI encoding */
 typedef struct {
-  BGP_OpenMessage_OptParam paramHdr;
+//  BGP_OpenMessage_OptParam paramHdr;
   BGP_Capabilities capHdr;
   u_int16_t afi;       // 1 for IPv4; 0 IPv5
   u_int8_t  reserved;  // 0
@@ -290,13 +338,18 @@ typedef struct {
 
 /** The capability for route refresh */
 typedef struct {
-  BGP_OpenMessage_OptParam paramHdr;
+//  BGP_OpenMessage_OptParam paramHdr;
   BGP_Capabilities capHdr; // length 0
 } __attribute__((packed)) BGP_Cap_RREFRESH;
 
+/** The capability for Extended Message support */
+typedef struct {
+  BGP_Capabilities capHdr; // length 0
+} __attribute__((packed)) BGP_Cap_ExtMsgSupport;
+
 /* The data structure for the AS4 capability */
 typedef struct {
-  BGP_OpenMessage_OptParam paramHdr;
+//  BGP_OpenMessage_OptParam paramHdr;
   BGP_Capabilities capHdr;
   u_int32_t myAS;
 } __attribute__((packed)) BGP_Cap_AS4;
@@ -360,10 +413,17 @@ typedef struct {
 
 ///// BGPSEC STRUCTS //////////////////////
 
+// Only used for generating the attribute
 typedef struct {
   BGP_PathAttribute pathattr;
   u_int16_t attrLength; // requires ext. length 0x10 set
-} __attribute__((packed)) BGPSEC_PathAttribute;
+} __attribute__((packed)) BGPSEC_Ext_PathAttribute;
+
+// Only used for generating the attribute
+typedef struct {
+  BGP_PathAttribute pathattr;
+  u_int8_t attrLength; // requires ext. length 0x10 NOT set
+} __attribute__((packed)) BGPSEC_Norm_PathAttribute;
 
 typedef struct {
   u_int16_t length;  // contains the length of the entire SecurePath
@@ -407,6 +467,32 @@ typedef enum {
   NS_BGP4 = 2
 } NullSignatureMode;
 
+/**
+ * Determines the signature mode to be used.
+ */
+typedef enum SignatureGenMode
+{
+  // Use the default internal signature algorithm
+  SM_BIO    = 0,          
+  // Use the default internal signature algorithm with predefined K specified 
+  // in RFC 6979 A.2.5 SHA-256 message 'sample'
+  // - This allows debugging with constant signatures. 
+  //    !!! Does expose the private key
+  SM_BIO_K1 = 1,
+  // Use the default internal signature algorithm with predefined K specified 
+  // in RFC 6979 A.2.5 SHA-256 message 'test'
+  // - This allows debugging with constant signatures. 
+  //    !!! Does expose the private key
+  SM_BIO_K2 = 2,
+  // Use the signing method of CAPI. 
+  // - This mode allows to perform performance measurements for the CAPI
+  //  provided sign method.
+  SM_CAPI   = 3
+} SignatureGenMode;
+
+#define SM_BIO_K1_STR "k = A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60"
+#define SM_BIO_K2_STR "k = D16B6AE827F17175E040871A1C7EC3500192C4C92677336EC2537ACAEE0008E0"
+
 typedef struct _AlgoParam {
   /** pointer to next used algorithm. */
   struct _AlgoParam* next;
@@ -430,6 +516,10 @@ typedef struct _AlgoParam {
    */
   BGPSecKey* pubKey[MAX_KEYS_IN_UPDATE];
     
+  /** Specify the mode used to generate the signatures. Default is BIO (0) which
+   * means it uses the internal signature method.*/
+  SignatureGenMode sigGenMode;
+  
   /* Specify if fake signatures are allowed, BGP4 traffic should be generated or
    * if a null signature results in a dropped update.*/
   NullSignatureMode ns_mode;
@@ -445,13 +535,23 @@ typedef struct _AlgoParam {
 /** The configuration for the open message. For each attribute set to true a 
  *  capability will be send. */
 typedef struct {
+  /** Indicates the usage of IPv4 MPNLRI encoding */
   bool mpnlri_v4;
+  /** Indicates the usage of IPv6 MPNLRI encoding */
   bool mpnlri_v6;
+  /** Indicates the usage of 4 byte ASN numbers */
   bool asn_4byte;
+  /** Indicates if the session supports route refresh */
   bool route_refresh;
+  /** Indicates if the session supports BGP updates larger than 4096 bytes */
+  bool extMsgSupp;
+  /** Indicates if BGPSEC IPv4 Updates can be send */
   bool bgpsec_snd_v4;
+  /** Indicates if BGPSEC IPv6 Updates can be send */
   bool bgpsec_snd_v6;
+  /** Indicates if BGPSEC IPv4 Updates can be received */
   bool bgpsec_rcv_v4;
+  /** Indicates if BGPSEC IPv6 Updates can be received */
   bool bgpsec_rcv_v6;
 } BGP_Cap_Conf;
 
@@ -465,7 +565,7 @@ typedef struct {
   u_int16_t holdTime;
   /** Time in seconds to keep the session up after the last update is send. 
    * 0 - forever. */
-  u_int16_t disconnectTime;  
+  u_int16_t disconnectTime;
   
   // @TODO: Add V6 support
   /** The peer server address ipv4 and port */
@@ -498,6 +598,8 @@ typedef struct {
   
   /* the capabilities configuration. */
   BGP_Cap_Conf capConf;
+  /* the capabilities of the peer. */
+  BGP_Cap_Conf peerCap;
   
   /* The Algorithm Parameter */
   AlgoParam algoParam;

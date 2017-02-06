@@ -1,6 +1,11 @@
 More details on changes are scripted in the files itself.
 ===========================================================
 
+Version 0.2.0.2 - November - 2016
+  - Fixed some bugs
+  - Added functionality to print bgpsec data using the testlib.
+Version 0.2.0.1 - July - 2016
+  - Bug fixes
 Version 0.2.0.0 - May/June - 2016
   - Redesigned the API - This API is incompatible with any 0.1.x version.
     * Modified the key generation tools in such that they also generate the 

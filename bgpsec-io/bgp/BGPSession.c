@@ -23,10 +23,31 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.0
+ * @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.5 - 2017/02/01 - oborchert
+ *            * Moved the capabilities configuration in the session creation.
+ *            * Added more details explanation if an update could not be send 
+ *              due to message size. BZ1100
+ *          - 2017/01/31 - oborchert
+ *            * Added capabilities configuration.
+ *          - 2017/01/21 - oborchert
+ *            * Added extended message size capability
+ *            * Modified Capability check during open receive.
+ *          - 2017/01/03 - oborchert
+ *            * Added transfer of new algo parameter from configuration into 
+ *              session.
+ *          - 2016/10/24 - oborchert
+ *            * Previous change introduced an incompatibility with quagga which
+ *              is fixed now.
+ *          - 2016/10/21 - oborchert
+ *            * Fixed formating of error / warning output.
+ *            * Fixed parsing of capabilities to allow multiple capabilities 
+ *              being bundled within a single optional parameter. BZ1026
+ *          - 2016/10/19 - oborchert
+ *            * Removed 4-byte ASN capability requirement from peer.
  *  0.2.0.0 - 2016/06/13 - oborchert
  *            * Added more information in case of a failed TCP connection.
  *          - 2016/05/17 - oborchert
@@ -110,11 +131,12 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
 
     sessConfig = &session->bgpConf;
     
-    sessConfig->asn            = config->asn;
-    sessConfig->bgpIdentifier  = config->bgpIdentifier;
-    sessConfig->holdTime       = config->holdTime;
-    sessConfig->disconnectTime = config->disconnectTime;
-    sessConfig->useMPNLRI      = config->useMPNLRI;
+    sessConfig->asn                = config->asn;
+    sessConfig->bgpIdentifier      = config->bgpIdentifier;
+    sessConfig->holdTime           = config->holdTime;
+    sessConfig->disconnectTime     = config->disconnectTime;
+    sessConfig->useMPNLRI          = config->useMPNLRI;
+    sessConfig->capConf.extMsgSupp = config->capConf.extMsgSupp;
     for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
     {
       sessConfig->printOnReceive[idx] = config->printOnReceive[idx];
@@ -146,7 +168,7 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
     sessAlgo   = &sessConfig->algoParam;
     configAlgo = &config->algoParam;
 
-    // Do the loop.    
+    // Configure the algorithms - Do the loop (currently only 1)
     while (configAlgo != NULL && sessAlgo != NULL)
     {
       sessAlgo->addPubKeys     = configAlgo->addPubKeys;
@@ -163,6 +185,7 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
              configAlgo->fake_sigLen);
       sessAlgo->pubKeysStored  = 0;
       sessAlgo->ns_mode        = configAlgo->ns_mode;
+      sessAlgo->sigGenMode     = configAlgo->sigGenMode;
       configAlgo = configAlgo->next;
       if (configAlgo != NULL)
       {
@@ -170,6 +193,19 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
         memset(sessAlgo, 0, sizeof(AlgoParam));
       }
     }
+    
+    // Now set the capabilities for this session
+    // Configure BGP capabilities - set all true except route refresh
+    memset (&(session->bgpConf.capConf), 1, sizeof(BGP_Cap_Conf));
+    sessConfig->capConf.asn_4byte     = config->capConf.asn_4byte;
+    sessConfig->capConf.bgpsec_rcv_v4 = config->capConf.bgpsec_rcv_v4;
+    sessConfig->capConf.bgpsec_rcv_v6 = config->capConf.bgpsec_rcv_v6;
+    sessConfig->capConf.bgpsec_snd_v4 = config->capConf.bgpsec_snd_v4;
+    sessConfig->capConf.bgpsec_snd_v6 = config->capConf.bgpsec_snd_v6;
+    sessConfig->capConf.extMsgSupp    = config->capConf.extMsgSupp;
+    sessConfig->capConf.mpnlri_v4     = config->capConf.mpnlri_v4;
+    sessConfig->capConf.mpnlri_v6     = config->capConf.mpnlri_v6;
+    sessConfig->capConf.route_refresh = config->capConf.route_refresh;  
   }
   
   return session;
@@ -593,7 +629,7 @@ int readNextBGPMessage(BGPSession* session, int timeout)
       if (length > maxLen)
       {
         // increase the header buffer.
-        if (length < BGP_MAX_HDR_SIZE)
+        if (length < BGP_EXTMAX_MESSAGE_SIZE)
         {
           void* new = NULL;
           new = realloc(session->recvBuff, length+1);
@@ -606,7 +642,7 @@ int readNextBGPMessage(BGPSession* session, int timeout)
         else
         {
           printf("BGP header to large %u - Max allowed size id %i\n", 
-                 hdr->length, BGP_MAX_HDR_SIZE);
+                 hdr->length, BGP_EXTMAX_MESSAGE_SIZE);
           hdr->length = 0;
           memset(session->recvBuff, '0', maxLen);
           return -1;
@@ -779,109 +815,142 @@ void processOpenMessage(BGPSession* session)
   }
 
   // Get the peer Configuration and capabilities
-  BGP_Cap_Conf peerCap;
-  memset(&peerCap, 0, sizeof(BGP_Cap_Conf));
+  BGP_Cap_Conf* peerCap = &session->bgpConf.peerCap;
+  // Reset the peer capabilities
+  memset(peerCap, 0, sizeof(BGP_Cap_Conf));
   
   u_int32_t peerASN   = ntohs(hdr->my_as);
-  u_int8_t  paramLen  = hdr->opt_param_len;
   u_int8_t  bgpsecVer = 0;
   u_int8_t  dir       = 255;
   BGP_Cap_MPNLRI*   mpnlri   = NULL;
   BGP_Cap_AS4*      as4      = NULL;
   BGP_Cap_BGPSEC*   bgpsec   = NULL; 
 
-  char* buff = session->recvBuff + sizeof(BGP_OpenMessage);
-  char* hlpPtr = NULL;
-  int consumed = 0;
-  int pLen = 0; // the length of the individual parameter
-  // Go through the all optional parameters
-  while (consumed < paramLen)
+  char* buff  = session->recvBuff + sizeof(BGP_OpenMessage);
+  int capSize = 0;
+  // The number bytes consumed of the Optional Parameter
+  int bytesRead = 0;
+  
+  // Now loop through all optional parameters.
+  while (bytesRead < hdr->opt_param_len)
   {
+    // Now get the parameter
     BGP_OpenMessage_OptParam* param = (BGP_OpenMessage_OptParam*)buff;
-    pLen = param->param_len + sizeof(BGP_OpenMessage_OptParam);
-    consumed += pLen;      
-    hlpPtr = buff + sizeof(BGP_OpenMessage_OptParam);
+    bytesRead += sizeof(BGP_OpenMessage_OptParam); // processed parameter header
+    // Move buffer to Parameter Value
+    buff      += sizeof(BGP_OpenMessage_OptParam);
     
-    if (param->param_type == BGP_T_CAP)
+    // Number of parameter value bytes processed
+    int paramProcessed = 0;
+    BGP_Capabilities* cap = NULL;            
+    while (paramProcessed < param->param_len)
     {
-      BGP_Capabilities* cap = (BGP_Capabilities*)hlpPtr;
-      // Process the capability
-      switch (cap->cap_code)
+      // Now look into the type - For now we only accept capability parameters.
+      switch (param->param_type)
       {
-        case BGP_CAP_T_MPNLRI:
-          mpnlri = (BGP_Cap_MPNLRI*)buff;
-          switch (ntohs(mpnlri->afi))
+        case  BGP_T_CAP:
+          // Loop through multiple capabilities all written in the payload of
+          // this parameter. (BIRD is doing this kind of capability packing.)
+          cap             = (BGP_Capabilities*)buff;
+          capSize         = sizeof(BGP_Capabilities) + cap->cap_length;
+          paramProcessed += capSize;
+          bytesRead      += capSize;
+          // Move the buffer over over this capability.
+          buff           += capSize;        
+          // Process the capability
+          switch (cap->cap_code)
           {
-            case AFI_V4: 
-              peerCap.mpnlri_v4 = true;
+            case BGP_CAP_T_MPNLRI:
+              mpnlri = (BGP_Cap_MPNLRI*)cap;
+              switch (ntohs(mpnlri->afi))
+              {
+                case AFI_V4: 
+                  peerCap->mpnlri_v4 = true;
+                  break;
+                case AFI_V6:
+                  peerCap->mpnlri_v6 = true;
+                  break;
+                default:
+                  printf("WARNING: Unknown MPNLRI AFI Capability %u - Ignore\n", 
+                          ntohs(mpnlri->afi));
+              }
               break;
-            case AFI_V6:
-              peerCap.mpnlri_v6 = true;
+            case BGP_CAP_T_AS4:
+              as4 = (BGP_Cap_AS4*)cap;
+              peerASN = ntohl(as4->myAS);
+              peerCap->asn_4byte = true;
               break;
+            case BGP_CAP_T_BGPSEC:
+              bgpsec    = (BGP_Cap_BGPSEC*)cap;
+              bgpsecVer = bgpsec->firstOctet >> 4;
+              dir       = (bgpsec->firstOctet >> 3) & 0x01;
+              if (bgpsecVer != BGPSEC_VERSION)
+              {
+                printf ("ERROR: Wrong BGPSEC version %u!\n", bgpsecVer);
+                sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                                 BGP_ERR3_SUB_UNSUPPORTED_BGPSEC_VER, 0, NULL);
+                return;
+              }
+              switch (ntohs(bgpsec->afi))
+              {
+                case AFI_V4:
+                  if (dir == BGPSEC_DIR_SND)
+                  {
+                    peerCap->bgpsec_snd_v4 = true;
+                  }
+                  else
+                  {
+                    peerCap->bgpsec_rcv_v4 = true;
+                  }
+                  break;
+                case AFI_V6:
+                  if (dir == BGPSEC_DIR_SND)
+                  {
+                    peerCap->bgpsec_snd_v6 = true;
+                  }
+                  else
+                  {
+                    peerCap->bgpsec_rcv_v6 = true;
+                  }
+                  break;
+                default:
+                  printf("WARNING: Unknown BGPSEC AFI Capability %u - Ignore\n", 
+                          ntohs(mpnlri->afi));
+              }
+              break;
+            case BGP_CAP_T_RREFRESH:
+            case BGP_CAP_T_RREFRESH_PRIV:
+              peerCap->route_refresh = true;
+              break;
+            case BGP_CAP_T_EXT_MSG_SUPPORT:
+              peerCap->extMsgSupp = true;
+              break;
+            case BGP_CAP_T_GRACE_RESTART:
+            case BGP_CAP_T_OUT_FLTR:
+            case BGP_CAP_T_MULTI_ROUTES:
+            case BGP_CAP_T_EXT_NEXTHOPENC:
+            case BGP_CAP_T_DEPRECATED:
+            case BGP_CAP_T_SUPP_DYNCAP:
+            case BGP_CAP_T_MULTI_SESS:
+            case BGP_CAP_T_ADD_PATH:
+            case BGP_CAP_T_ENHANCED_RR:
+            case BGP_CAP_T_LLGR:
+            case BGP_CAP_T_FQDN:
             default:
-              printf("WARNING: Unknown MPNLRI AFI Capability %u - Ignore\n", 
-                      ntohs(mpnlri->afi));
+              printf ("WARNING: Unsupported BGP Capability %u - Ignore!\n", 
+                      cap->cap_code);
           }
           break;
-        case BGP_CAP_T_AS4:
-          as4 = (BGP_Cap_AS4*)buff;
-          peerASN = ntohl(as4->myAS);
-          peerCap.asn_4byte = true;
-          break;
-        case BGP_CAP_T_BGPSEC:
-          bgpsec    = (BGP_Cap_BGPSEC*)buff;
-          bgpsecVer = bgpsec->firstOctet >> 4;
-          dir       = (bgpsec->firstOctet >> 3) & 0x01;
-          if (bgpsecVer != BGPSEC_VERSION)
-          {
-            printf ("ERROR: Wrong BGPSEC version %u!\n", bgpsecVer);
-            sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                             BGP_ERR3_SUB_UNSUPPORTED_BGPSEC_VER, 0, NULL);
-            return;
-          }
-          switch (ntohs(bgpsec->afi))
-          {
-            case AFI_V4:
-              if (dir == BGPSEC_DIR_SND)
-              {
-                peerCap.bgpsec_snd_v4 = true;
-              }
-              else
-              {
-                peerCap.bgpsec_rcv_v4 = true;
-              }
-              break;
-            case AFI_V6:
-              if (dir == BGPSEC_DIR_SND)
-              {
-                peerCap.bgpsec_snd_v6 = true;
-              }
-              else
-              {
-                peerCap.bgpsec_rcv_v6 = true;
-              }
-              break;
-            default:
-              printf("WARNING: Unknown BGPSEC AFI Capability %u - Ignore", 
-                      ntohs(mpnlri->afi));
-          }
-          break;
-        case BGP_CAP_T_RREFRESH:
-        case BGP_CAP_T_RREFRESH_PRIV:
-          peerCap.route_refresh = true;
-          break;
+          
         default:
-          printf ("WARNING: Unknown BGP Capability %u - Ignore!\n", 
-                  param->param_type);
+          // For parameters other than CAPABILITIES
+          // Unsupported optional Parameter
+          printf ("WARNING: Unsupported parameter[%u]!\n", param->param_type);
+          sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                           BGP_ERR2_SUB_UNSUPP_OPT_PARAM, 0, NULL);
+          return;        
+          break;
       }
-      buff += pLen;
-    }
-    else
-    {
-      // Unsupported optional Parameter
-      sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                       BGP_ERR2_SUB_UNSUPP_OPT_PARAM, 0, NULL);
-      return;
     }
   }
   
@@ -895,52 +964,55 @@ void processOpenMessage(BGPSession* session)
     return;
   }
     
-  // Now check the required Capabilities
-  
+  // Now check the peer Capabilities
+  // Removed this check, peers that do not have the ASN4 capability will use
+  // the 4 byte ASN simply as AS 23456 BZ 1026/1027
   // If "we" do 4-byte ASN the peer MUST do so too.
-  if (session->bgpConf.capConf.asn_4byte && !peerCap.asn_4byte)
-  {
-    printf ("ERROR: Peer does not support 4-byte ASN\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
-                     0, NULL);
-    return;    
-  }
+  //if (session->bgpConf.capConf.asn_4byte && !peerCap->asn_4byte)
+  //{
+  //  printf ("ERROR: Peer does not support 4-byte ASN\n");
+  //  sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
+  //                   0, NULL);
+  //  return;    
+  //}
 
-  // If "we" send V4 BGPSEC the peer MUST be able to receive it  
-  if (session->bgpConf.capConf.bgpsec_snd_v4 && !peerCap.bgpsec_rcv_v4)
-  {
-    printf ("ERROR: Peer does not support BGPSEC for IPv4\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
-                     0, NULL);
-    return;    
-  }
-  
-  // If "we" send V6 BGPSEC the peer MUST be able to receive it  
-  if (session->bgpConf.capConf.bgpsec_snd_v6 && !peerCap.bgpsec_rcv_v6)
-  {
-    printf ("ERROR: Peer does not support BGPSEC for IPv6\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
-                     0, NULL);
-    return;    
-  }
-  
-  // If "we" support V4 MPNLRI the peer MUST do so too
-  if (session->bgpConf.capConf.mpnlri_v4 && !peerCap.mpnlri_v4)
+  // 1st. Check MPNLRI capability for peer where required
+  // Verify that the peer can to mpnlri V4 if it can receive or send bgpsec V4
+  if (   (peerCap->bgpsec_rcv_v4 || peerCap->bgpsec_snd_v4)
+      && !peerCap->mpnlri_v4)
   {
     printf ("ERROR: Peer does not support MPNLRI for IPv4\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
-                     0, NULL);
+    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
+    return;        
+  }
+
+  if (   (peerCap->bgpsec_rcv_v6 || peerCap->bgpsec_snd_v6)
+      && !peerCap->mpnlri_v6)
+  {
+    printf ("ERROR: Peer does not support MPNLRI for IPv6\n");
+    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
+    return;        
+  }
+
+  // If "we" want to send V6 BGPSEC the peer MUST be able to receive it  
+  if (session->bgpConf.capConf.bgpsec_snd_v4 && !peerCap->bgpsec_rcv_v4)
+  {
+    printf ("ERROR: Peer does not support BGPSEC for IPv4\n");
+    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
     return;    
   }
   
-  // If "we" support V6 MPNLRI the peer MUST do so too
-  if (session->bgpConf.capConf.mpnlri_v6 && !peerCap.mpnlri_v6)
+  // If "we" want to send V6 BGPSEC the peer MUST be able to receive it  
+  if (session->bgpConf.capConf.bgpsec_snd_v6 && !peerCap->bgpsec_rcv_v6)
   {
-    printf ("ERROR: Peer does not support MPNLRI for IPv6\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR_SUB_UNDEFINED,
-                     0, NULL);
+    printf ("ERROR: Peer does not support BGPSEC for IPv6\n");
+    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
     return;    
-  }  
+  }
   
   // OK, we reached here, change FSM
   if (!fsmSwitchState(&session->fsm, FSM_STATE_OpenConfirm))
@@ -1232,10 +1304,12 @@ bool sendNotification(BGPSession* session, int error_code, int subcode,
  */
 bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update)
 {
+  bool retVal = false;
+  
   if (session->fsm.state != FSM_STATE_ESTABLISHED)
   {
     printf ("NOTICE: Cannot send Update, FSM is not in ESTABLISHED state!\n");
-    return false;
+    return retVal;
   }
   
   if (!_isSocketAlive(session, POLL_TIMEOUT_MS, false))
@@ -1258,16 +1332,47 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update)
         printf ("ERROR: Cannot switch to IDLE!\n");        
       }
     }
-    return false;
+    return retVal;
   }
     
-  bool retVal = false;
   int written = 0;
   u_int16_t size = ntohs(update->messageHeader.length);
+  
+  // Check if we can send the message!
+  if (size > BGP_MAX_MESSAGE_SIZE)
+  {
+    // We can only send the message if extended message was negotiated!
+    bool doSend =    session->bgpConf.peerCap.extMsgSupp 
+                  && session->bgpConf.capConf.extMsgSupp;
+    if (!doSend)
+    {
+      printf ("WARNING: Cannot send message due to message size > %d\n", 
+              BGP_MAX_MESSAGE_SIZE);
+      if (!session->bgpConf.capConf.extMsgSupp)
+      {
+        printf ("         * To send this messages, enable the extended message"
+                " size capability!\n");
+      }
+      if (!session->bgpConf.peerCap.extMsgSupp)
+      {
+        printf ("         * Peer did not announce the extended message"
+                " size capability!\n");
+      }
+      return retVal;
+    }
+    if (size > BGP_EXTMAX_MESSAGE_SIZE)
+    {
+      printf ("ERROR: Cannot send message due to message size > %d\n", 
+              BGP_EXTMAX_MESSAGE_SIZE);
+      return retVal;      
+    }
+  }
+  
   written = _writeData(session, (u_int8_t*)update, size);
   if (session->bgpConf.printOnSend[PRNT_MSG_UPDATE])
   {
-    printUpdateData((BGP_UpdateMessage_1*)update);
+    printBGP_Message((BGP_MessageHeader*)update, "Send Update Message", false);
+    //printUpdateData((BGP_UpdateMessage_1*)update);
   }
   
   retVal = (written == size);

@@ -4,7 +4,24 @@ management system. Please see:
 	http://www.quagga.net/devel.php
 
 
-QuaggaSRx:
+QuaggaSRx changes are:
+======================
+  0.4.2.2 - February 2017
+    * Minor Bug Fixes
+    * Added capability negotiation for Extended Message (> 4094)
+
+  0.4.2.1 - July 2016
+    * Removed unused in line documentation
+    * Minor Bug Fixes
+
+  0.4.2.0 - July 2016
+    * Rewrote BGPSEC Path processing according to bgpsec draft 17
+    * Removed handling of public keys. This musat be done in SRxCryptoAPI as 
+      well as SRx-Server
+    * Enabled MPNLRI encoding for IPv4 addresses
+    * Allowing to specify more than one private key for path signing
+    * Minor Bug Fixes
+
   0.4.1.5 - March 2016
     * Minor bug fixes
 

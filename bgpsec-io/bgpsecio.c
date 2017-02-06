@@ -20,10 +20,21 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.0.2
+ * @version 0.2.0.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.5 - 2017/02/01 - oborchert
+ *           * Moved session configuration (capabilities) to the session 
+ *             creation.
+ *         - 2017/01/30 - oborchert
+ *           * Added extended message processing and configuration of 
+ *             capabilities.
+ *         - 2016/11/15 - oborchert
+ *           * Extended previous modification to allow generation of BGPSec Path
+ *             Attributes with one byte of length.
+ *         - 2016/11/01 - oborchert
+ *           * Replaced BGPSEC_PathAttribute with BGPSEC_Ext_PathAttribute.
  * 0.2.0.2 - 2016/06/29 - oborchert
  *           * Removed function __createSCAPrefix - not used anymore.
  *         - 2016/06/27 - oborchert
@@ -157,12 +168,6 @@ static int _runBGPRouterSession(PrgParams* params)
 {
     // perform BGP  
   BGPSession* session = createBGPSession(1024, &params->bgpConf, NULL);
-  // Configure BGP requirements - set all true except route refresh
-  memset (&(session->bgpConf.capConf), 1, sizeof(BGP_Cap_Conf));
-  session->bgpConf.capConf.bgpsec_snd_v6 = false;
-  session->bgpConf.capConf.bgpsec_rcv_v6 = false;
-  session->bgpConf.capConf.route_refresh = false;
-  session->bgpConf.capConf.mpnlri_v6     = false;
   session->run = true;
   
   bool useGlobalMemory = true;
@@ -244,8 +249,10 @@ static int _runBGPRouterSession(PrgParams* params)
           // the following pointer points into globally managed memory and
           // therefore does not need to be freed
           prefix = (BGPSEC_PrefixHdr*)&update->prefixTpl;
-          bgpPathAttr = (BGP_PathAttribute*)generateBGPSecAttr(useGlobalMemory, 
-                      update->pathStr, NULL, &session->bgpConf, prefix, asList);
+          bgpPathAttr = (BGP_PathAttribute*)generateBGPSecAttr(NULL,
+                         useGlobalMemory, update->pathStr, NULL, 
+                         &session->bgpConf, prefix, 
+                         asList, params->onlyExtLength);
           // if bgpsec attribute could not be generated use AS_PATH and no 
           // MPNLRI encoding for V4 prefixes
           useMPNLRI = useMPNLRI & (bgpPathAttr != NULL);
@@ -411,7 +418,7 @@ typedef struct {
  */
 static int __capiProcessBGPSecAttr(SRxCryptoAPI* capi, PrgParams* params, 
                                    BGPSEC_PrefixHdr* prefix, 
-                                   BGPSEC_PathAttribute* pathAttr,
+                                   BGP_PathAttribute* pathAttr,
                                    u_int64_t* elapsedTime, sca_status_t* status)
 {
   SCA_BGPSecValidationData valdata;
@@ -563,9 +570,9 @@ static void __capiRegisterPublicKeys(SRxCryptoAPI* capi,
  */
 static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
 {
-  UpdateData*           update   = NULL;
-  BGPSEC_PathAttribute* pathAttr = NULL;
-  BGPSEC_PrefixHdr*     prefix   = NULL;
+  UpdateData*               update   = NULL;
+  BGP_PathAttribute*        pathAttr = NULL;
+  BGPSEC_PrefixHdr*         prefix   = NULL;
   
   BGPSEC_IO_Buffer ioBuff;
   memset (&ioBuff, 0, sizeof(BGPSEC_IO_Buffer));
@@ -597,10 +604,12 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
     prefix   = (BGPSEC_PrefixHdr*)&update->prefixTpl;  
     
     segments = 0;
-    pathAttr = (BGPSEC_PathAttribute*)generateBGPSecAttr(true, update->pathStr, 
-                                                         &segments,
-                                                         &params->bgpConf, 
-                                                         prefix, asList);
+    pathAttr = (BGP_PathAttribute*)generateBGPSecAttr(capi, true, 
+                                                      update->pathStr, 
+                                                      &segments,
+                                                      &params->bgpConf, 
+                                                      prefix, asList,
+                                                      params->onlyExtLength);
     elapsed   = 0;
     valStatus = API_STATUS_OK;
     valResult = __capiProcessBGPSecAttr(capi, params, prefix, pathAttr,&elapsed,
@@ -643,7 +652,7 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
     // Read all data from binary in file
     FILE* dataFile = fopen(params->binInFile, "r");
     BGPSEC_IO_Record record;
-    BGPSEC_PathAttribute* pathAttr = NULL;
+    BGP_PathAttribute* pathAttr = NULL;
     // re-initialize the data buffer
     memset (ioBuff.data, 0, ioBuff.dataSize);
     
@@ -662,7 +671,7 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
              && (params->maxUpdates != 0))
       {
         params->maxUpdates--;
-        pathAttr  = (BGPSEC_PathAttribute*)ioBuff.data;
+        pathAttr  = (BGP_PathAttribute*)ioBuff.data;
         prefix    = (BGPSEC_PrefixHdr*)&record.prefix;
         __capiRegisterPublicKeys(capi, &ioBuff);
         
@@ -700,7 +709,7 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
         
         // re-initialize the beginning of the data buffer that contains the 
         // length field of data stored in the buffer.
-        memset (ioBuff.data, 0, sizeof(BGPSEC_PathAttribute));
+        memset (ioBuff.data, 0, sizeof(BGPSEC_Ext_PathAttribute));
         memset (ioBuff.keys, 0, 2);        
       }
       fclose(dataFile);
@@ -760,8 +769,10 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
     printf ("\n");
   }
   free (ioBuff.data);
+  ioBuff.data = NULL;
   ioBuff.dataSize = 0;
   free (ioBuff.keys);
+  ioBuff.keys = NULL;
   ioBuff.keySize = 0;
 
   return EXIT_SUCCESS;
@@ -790,11 +801,11 @@ static int _runGEN(PrgParams* params, u_int8_t type)
     {
       // move to function that also reads from stdin
       UpdateData* update = NULL;
-      BGPSEC_PathAttribute* bgpsecPathAttr = NULL;
+      BGP_PathAttribute* bgpsecPathAttr = NULL;
       BGPSEC_PrefixHdr* prefix = NULL;
       BGPSEC_IO_StoreData store;
-      int attrSize     = 0;
-      int msgLen       = 0;
+      u_int16_t attrSize = 0;
+      int msgLen         = 0;
       
       while (!isUpdateStackEmpty(params, true) && (params->maxUpdates != 0))
       {
@@ -814,14 +825,22 @@ static int _runGEN(PrgParams* params, u_int8_t type)
         u_int32_t segmentCount = 0;
         bool iBGP = params->bgpConf.asn == params->bgpConf.peerAS;
         u_int32_t locPref = iBGP ? BGP_UPD_A_FLAGS_LOC_PREV_DEFAULT : 0;
-        bgpsecPathAttr = (BGPSEC_PathAttribute*)generateBGPSecAttr(true, 
+        bgpsecPathAttr = (BGP_PathAttribute*)generateBGPSecAttr(NULL, true, 
                        update->pathStr, &segmentCount, &params->bgpConf, prefix, 
-                       asList);        
+                       asList, params->onlyExtLength);        
         if (bgpsecPathAttr != NULL)
         {
           // Include the attribute header information.
-          attrSize = ntohs(bgpsecPathAttr->attrLength)
-                       + sizeof(BGPSEC_PathAttribute);
+          u_int8_t* attrLen = ((u_int8_t*)bgpsecPathAttr) + sizeof(BGP_PathAttribute);
+          if (bgpsecPathAttr->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH > 0)
+          {
+            attrSize = ntohs(*((u_int16_t*)attrLen)) + sizeof(BGP_PathAttribute) 
+                       + 2; // 2 byte for length field in header.
+          }
+          else
+          {
+            attrSize = *attrLen + sizeof(BGP_PathAttribute) + 1; // one byte
+          }
           store.prefix       = prefix;
           store.usesFake     = params->bgpConf.algoParam.fakeUsed;
           store.numKeys      = params->bgpConf.algoParam.pubKeysStored;
@@ -959,10 +978,25 @@ int main(int argc, char** argv)
       keepGoing = _checkSettings(&params, &retVal);
       break;
   }
-    
+  
   if (keepGoing)
   {
     printf ("Starting %s...\n", PACKAGE_STRING);
+    
+  switch (params.bgpConf.algoParam.sigGenMode)
+  {
+    case SM_BIO_K1:
+      printf ("WARNING: Signatures will be generated using constant %s!\n",
+              SM_BIO_K1_STR);
+      break;
+    case SM_BIO_K2:
+      printf ("WARNING: Signatures will be generated using constant %s!\n",
+              SM_BIO_K2_STR);
+      break;
+    default:
+      break;
+  }
+ 
     // initialize the main memory;
     initData();
 
@@ -1029,6 +1063,7 @@ int main(int argc, char** argv)
           sca_status_t status;
           srxCryptoUnbind(capi, &status);
           free(capi);
+          capi = NULL;
         }
         break;
       case OPM_GEN_C:

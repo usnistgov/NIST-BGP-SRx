@@ -38,7 +38,7 @@ bgpsec_openssl: {
 # SRxCryptoAPI wrapper functions are mapped.
 #
 
-# A String or "NULL" as initialization parameter.
+# A String "PUB:<filename>;PRIV:<filename>" or "NULL" as initialization parameter.
   init_value                  = "PUB:/var/lib/bgpsec-keys/ski-list.txt;PRIV:/var/lib/bgpsec-keys/priv-ski-list.txt";
   method_init                 = "init";
   method_release              = "release";
@@ -60,8 +60,11 @@ bgpsec_openssl: {
 testlib: {
   library_name="libSRxCryptoTestlib.so";
 
-# A String or NULL as initialization parameter.
-  init_value                  = "NULL";
+# A String "0|1;0|1;0|1" or "NULL" as initialization parameter.
+# This initialization value is as follows: (each value 0 or 1)
+#    validation_result;parse-bgpec;print-ski-and-signatures
+# with print-ski-and-signatures only if parse-bgpec is enabled.
+  init_value                  = "1;1;1";
   method_init                 = "init";
   method_release              = "release";
 

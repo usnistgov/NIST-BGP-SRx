@@ -1,3 +1,14 @@
+Version 0.2.0.5
+  * Added configuration of bgpsec capabilities.
+  * Added missing capability exchange for extended BGP messages (>4096) bytes
+    as specified in draft-ietf-idr-extended-messages
+  * Added capability to specify K for generating signatures using ECDSA
+  * Added capability to specify if the BGP Path Attribute should use a one byte
+    length field or if the length field should be 2 byte (3xtended length). 
+    For this the parameter only_extended_length (default: true) is added to the
+    configuration file. 
+  * Fixed BUG in printing received bgpsec path attributes where the path 
+    attributes length field is only one byte of size.
 Version 0.2.0.0
   * Increased BGPSEC_IO_RECORD_VERSION to 1
   * Added draft parameter to stored record.

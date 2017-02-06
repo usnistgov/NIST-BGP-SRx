@@ -6,6 +6,7 @@
 # certificate structure.
 # They are not intended to be used elsewhere than the test bed.
 # 
+# DEPRECATED - will be replaced in the next version
 
 EXT_CERT="cert"
 
