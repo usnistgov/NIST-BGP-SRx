@@ -23,10 +23,16 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.5
+ * @version 0.2.0.6
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.6 - 2017/02/15 - oborchert
+ *            * Added switch to force sending extended messages regardless if
+ *              capability is negotiated. This is a TEST setting only.
+ *          - 2018/02/14 - oborchert
+ *            * BZ1111: Added switch for liberal extended message processing.
+ *            * BZ1110: Added check for message size on receive.
  *  0.2.0.5 - 2017/02/01 - oborchert
  *            * Moved the capabilities configuration in the session creation.
  *            * Added more details explanation if an update could not be send 
@@ -131,12 +137,14 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
 
     sessConfig = &session->bgpConf;
     
-    sessConfig->asn                = config->asn;
-    sessConfig->bgpIdentifier      = config->bgpIdentifier;
-    sessConfig->holdTime           = config->holdTime;
-    sessConfig->disconnectTime     = config->disconnectTime;
-    sessConfig->useMPNLRI          = config->useMPNLRI;
-    sessConfig->capConf.extMsgSupp = config->capConf.extMsgSupp;
+    sessConfig->asn                   = config->asn;
+    sessConfig->bgpIdentifier         = config->bgpIdentifier;
+    sessConfig->holdTime              = config->holdTime;
+    sessConfig->disconnectTime        = config->disconnectTime;
+    sessConfig->useMPNLRI             = config->useMPNLRI;
+    sessConfig->capConf.extMsgSupp    = config->capConf.extMsgSupp;
+    sessConfig->capConf.extMsgLiberal = config->capConf.extMsgLiberal;
+    sessConfig->capConf.extMsgForce   = config->capConf.extMsgForce;
     for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
     {
       sessConfig->printOnReceive[idx] = config->printOnReceive[idx];
@@ -203,6 +211,8 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
     sessConfig->capConf.bgpsec_snd_v4 = config->capConf.bgpsec_snd_v4;
     sessConfig->capConf.bgpsec_snd_v6 = config->capConf.bgpsec_snd_v6;
     sessConfig->capConf.extMsgSupp    = config->capConf.extMsgSupp;
+    sessConfig->capConf.extMsgLiberal = config->capConf.extMsgLiberal;
+    sessConfig->capConf.extMsgForce   = config->capConf.extMsgForce;
     sessConfig->capConf.mpnlri_v4     = config->capConf.mpnlri_v4;
     sessConfig->capConf.mpnlri_v6     = config->capConf.mpnlri_v6;
     sessConfig->capConf.route_refresh = config->capConf.route_refresh;  
@@ -349,9 +359,40 @@ static void* _rcvBGP(void* bgpSession)
     if (bytesReady > 0)
     {
       bytesRead = readNextBGPMessage(session, SESS_DEF_RCV_TIMEOUT);
-      if (bytesRead > 0)
+      switch (bytesRead)
       {
-        _processPacket(session);
+        case 0:
+          // EOF, nothing came in.
+          break;
+        case -1:
+          // Error
+          // Session is not established or closed.
+          break;
+        case -2:
+          // Larger 64K Notification already send and session is closed
+          break;
+        default:
+          // Check if message is of acceptable length
+          if (bytesRead < BGP_MAX_MESSAGE_SIZE) // 4K boundary
+          {
+            // This is most likely the case
+            _processPacket(session);
+          }
+          else
+          {
+            if (session->bgpConf.capConf.extMsgLiberal 
+                || (session->bgpConf.capConf.extMsgSupp 
+                    && session->bgpConf.peerCap.extMsgSupp))
+            {
+              _processPacket(session);              
+            }
+            else
+            {
+              // Send notification of invalid message size
+              sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
+                               BGP_ERR1_SUB_BAD_LENGTH, 0, NULL);
+            }
+          }
       }
     }
     else
@@ -570,12 +611,14 @@ static bool _canReceiveBGPMessage(BGPFinalStateMachine fsm)
 
 /** 
  * Read the next BGP message and writes it into the sessions buffer. This method
- * will only read as long as FSM is in ESTABLISHED or OpenSent mode.
+ * will only read as long as FSM is in ESTABLISHED or OpenSent mode. This 
+ * message ONLY returns an error if the socket was broken.
  * 
  * @param session the session to read from.
  * @param timeout timeout in seconds. No timeout if 0;
  * 
- * @return 0 = EOF / timeout, &lt; 0 error, &gt; 0 number bytes read.
+ * @return 0 = EOF / timeout, &gt; 0 number bytes read, -1 Error, -2 Message 
+ * larger than 64 K (notification send)
  */
 int readNextBGPMessage(BGPSession* session, int timeout)
 {
@@ -628,7 +671,8 @@ int readNextBGPMessage(BGPSession* session, int timeout)
       length = ntohs(hdr->length);
       if (length > maxLen)
       {
-        // increase the header buffer.
+        // increase the header buffer only if it is less than the maximum 
+        // allowed size.
         if (length < BGP_EXTMAX_MESSAGE_SIZE)
         {
           void* new = NULL;
@@ -645,7 +689,10 @@ int readNextBGPMessage(BGPSession* session, int timeout)
                  hdr->length, BGP_EXTMAX_MESSAGE_SIZE);
           hdr->length = 0;
           memset(session->recvBuff, '0', maxLen);
-          return -1;
+          printf ("ERROR - Received Message > 64K - Move to IDLE");
+          sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
+                           BGP_ERR1_SUB_BAD_LENGTH, 0, NULL);
+          return -2;
         }
       }
       // now adjust the length and subtract the number of already read bytes.
@@ -668,7 +715,7 @@ int readNextBGPMessage(BGPSession* session, int timeout)
           error = true;
           break;
         }
-      }
+      }                  
       if (error)
       {
         // @TODO: Send Notification - maybe count error and don't immediately 
@@ -676,6 +723,7 @@ int readNextBGPMessage(BGPSession* session, int timeout)
         printf ("ERROR - close socket - Move to IDLE!");
         session->tcpConnected = false;
         shutDownTCPSession(session, true);
+        return -1;
       }
     }
   }
@@ -1342,8 +1390,10 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update)
   if (size > BGP_MAX_MESSAGE_SIZE)
   {
     // We can only send the message if extended message was negotiated!
-    bool doSend =    session->bgpConf.peerCap.extMsgSupp 
-                  && session->bgpConf.capConf.extMsgSupp;
+    // Or if forced - Only to allow testing the peer
+    bool doSend = (    session->bgpConf.peerCap.extMsgSupp 
+                    && session->bgpConf.capConf.extMsgSupp)
+                  || session->bgpConf.capConf.extMsgForce;
     if (!doSend)
     {
       printf ("WARNING: Cannot send message due to message size > %d\n", 

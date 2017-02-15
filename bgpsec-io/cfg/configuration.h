@@ -22,10 +22,19 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.0.5
+ * @version 0.2.0.6
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.6 - 2017/02/15 - oborchert
+ *            * Added switch to force sending extended messages regardless if
+ *              capability is negotiated. This is a TEST setting only.
+ *          - 2017/02/14 - oborchert
+ *            * Added missing include config.h
+ *          - 2017/02/13 - oborchert
+ *            * Renamed define from ..._EXTMSG_SIZE to EXT_MSG_CAP
+ *            * BZ1111: Added liberal policy to extended message capability 
+ *              processing
  *  0.2.0.5 - 2017/01/31 - oborchert
  *            * Added configuration setting to enable/disable extended message 
  *              size capability // draft-ietf-idr-bgp-extended-messages
@@ -65,6 +74,7 @@
 #include "bgpsec/BGPSecPathBin.h"
 
 #ifdef HAVE_CONFIG_H
+#include "config.h"
 #define PRG_NAME    PACKAGE
 #define PRG_VERSION "V" VERSION
 #else
@@ -221,13 +231,26 @@
 // -M                  - do not use MPNLRI encoding for IPv4
 #define  P_C_NO_MPNLRI  'M'
 
-// extendedMsgSize="true|false" - enable / disable the extended message size 
+// ext_msg_cap="true|false" - enable / disable the extended message size 
 //                                    capability (default enabled)
-#define  P_CFG_EXTMSG_SIZE   "extMsgSize"
-// --no_extmsgsize     - do not use extended message size capability
-#define  P_NO_EXTMSG_SIZE    "no_extmsgsize"
-// -E                  - do not use extended message size capability
-#define  P_C_NO_EXTMSG_SIZE  'e'
+#define  P_CFG_EXT_MSG_CAP   "ext_msg_cap"
+// --no_ext_msg_cap         - do not use extended message size capability
+#define  P_NO_EXT_MSG_CAP    "--no_" P_CFG_EXT_MSG_CAP
+// -e                        - do not use extended message size capability
+#define  P_C_NO_EXT_MSG_CAP  'e'
+
+// ext_msg_liberal="true|false" - enable / disable liberal processing of 
+//                                extended message capability
+#define P_CFG_EXT_MSG_LIBERAL "ext_msg_liberal"
+// --ext_msg_liberal
+#define P_NO_EXT_MSG_LIBERAL  "--no_" P_CFG_EXT_MSG_LIBERAL
+// -:
+#define P_C_NO_EXT_MSG_LIBERAL   'L'
+
+// --ext_msg_force (For debugging peer only!!)
+#define P_CFG_EXT_MSG_FORCE  "ext_msg_force"
+// --ext_msg_force (For debugging peer only!!)
+#define P_EXT_MSG_FORCE      "--" P_CFG_EXT_MSG_FORCE
 
 // preload_eckey="true|false" - enable / disable the pre-computation of EC_KEY
 //                                                           (default enabled)

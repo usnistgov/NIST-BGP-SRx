@@ -3037,7 +3037,7 @@ DEFUN (neighbor_bgpsec_mpnlri_ipv4,
 /* BGP Extended Message Support */
 DEFUN (neighbor_capability_extended_message_support,
        neighbor_capability_extended_message_support_cmd,
-       NEIGHBOR_CMD2 "extended",
+       NEIGHBOR_CMD2 "capability extended",
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
        "Advertise capability to the peer\n"
@@ -3067,7 +3067,7 @@ DEFUN (neighbor_capability_extended_message_support,
 
 DEFUN (no_neighbor_capability_extended_message_support,
        no_neighbor_capability_extended_message_support_cmd,
-       NO_NEIGHBOR_CMD2 "extended",
+       NO_NEIGHBOR_CMD2 "capability extended",
        NO_STR
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
@@ -3096,6 +3096,62 @@ DEFUN (no_neighbor_capability_extended_message_support,
   }
 
   return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+}
+
+
+/* extended message support for bgp (optional) */
+DEFUN (neighbor_capability_extended_message_support_liberal,
+       neighbor_capability_extended_message_support_liberal_cmd,
+       NEIGHBOR_CMD2 "capability extended (liberal)",
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "Advertise capability to the peer\n"
+       "Advertise extended message support for bgp to the neighbor\n"
+       "Accept extended message even if peer did not advertise capability\n")
+{
+
+  struct peer *peer;
+  peer = peer_and_group_lookup_vty (vty, argv[0]);
+
+  if (peer)
+  {
+    if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+    {
+      vty_out (vty, "extended liberal policy selected %s", VTY_NEWLINE);
+      return peer_flag_set_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_LIBERAL);
+    }
+    else
+      return CMD_WARNING;
+  }
+
+}
+
+
+DEFUN (no_neighbor_capability_extended_message_support_liberal,
+       no_neighbor_capability_extended_message_support_liberal_cmd,
+       NO_NEIGHBOR_CMD2 "capability extended (liberal)",
+       NO_STR
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "Advertise capability to the peer\n"
+       "Advertise extended message support for bgp to the neighbor\n"
+       "Accept extended message even if peer did not advertise capability\n")
+{
+
+  struct peer *peer;
+  peer = peer_and_group_lookup_vty (vty, argv[0]);
+
+  if (peer)
+  {
+    if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+    {
+      vty_out (vty, "extended liberal policy de-selected %s", VTY_NEWLINE);
+      return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_LIBERAL);
+    }
+    else
+      return CMD_WARNING;
+  }
+
 }
 
 
@@ -10724,6 +10780,8 @@ bgp_vty_init (void)
   /* bgp extended message support */
   install_element (BGP_NODE, &neighbor_capability_extended_message_support_cmd);
   install_element (BGP_NODE, &no_neighbor_capability_extended_message_support_cmd);
+  install_element (BGP_NODE, &neighbor_capability_extended_message_support_liberal_cmd);
+  install_element (BGP_NODE, &no_neighbor_capability_extended_message_support_liberal_cmd);
 #endif
 
   /* "neighbor capability dynamic" commands.*/

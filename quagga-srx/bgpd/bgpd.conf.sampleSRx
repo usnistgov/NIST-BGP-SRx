@@ -322,7 +322,10 @@ router bgp 7675
 
 
 ! Support Extended Message for BGP
-! neighbor (A.B.C.D|X:X::X:X|WORD) extended
+! If liberal is activated, the router will accept extended messages even if
+! the peer did not anounce the capability
+! neighbor (A.B.C.D|X:X::X:X|WORD) capability extended (liberal)
+ neighbor 10.0.1.1 capability extended liberal
 
 !
 ! access-list all permit any

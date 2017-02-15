@@ -22,10 +22,18 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.0.5
- *  
+ * @version 0.2.0.6
+ * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.6 - 2017/02/15 - oborchert
+ *            * Added switch to force sending extended messages regardless if
+ *              capability is negotiated. This is a TEST setting only.
+ *          - 2017/02/13 - oborchert
+ *            * Renamed define from ..._EXTMSG_SIZE to EXT_MSG_CAP
+ *            * Removed invalid DEPRECATION message
+ *            * BZ1111: Added liberal policy to extended message capability 
+ *              processing
  *  0.2.0.5 - 2017/01/31 - oborchert
  *            * Added missing configuration for extended message size capability
  *          - 2017/01/03 - oborchert
@@ -82,10 +90,13 @@
 #include <libconfig.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "antd-util/prefix.h"
 #include "antd-util/printer.h"
 #include "antd-util/stack.h"
-#include "configuration.h"
+#include "cfg/configuration.h"
 #include "bgp/BGPSession.h"
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPPrinterUtil.h"
@@ -169,10 +180,14 @@ void printSyntax()
   printf ("          Disable MPNLRI encoding for IPv4 addresses.\n");
   printf ("          If disabled prefixes are encoded as NLRI only.\n");
 
-  printf ("  -%c, %s\n", P_C_NO_EXTMSG_SIZE, P_NO_EXTMSG_SIZE);
-  printf ("          DEPRECATED.\n");
-  printf ("          Enable the usage of messages larger than 4096 bytes.\n");
+  printf ("  -%c, %s\n", P_C_NO_EXT_MSG_CAP, P_NO_EXT_MSG_CAP);
+  printf ("          Disable the usage of messages larger than 4096 bytes.\n");
  printf ("          This includes the capability exchange.(Default enabled)\n");
+  printf ("  -%c, %s\n", P_C_NO_EXT_MSG_LIBERAL, P_NO_EXT_MSG_LIBERAL);
+  printf ("          Reject extended messages if not properly negotiated.\n");
+  printf ("  %s\n", P_EXT_MSG_FORCE);
+  printf ("          Force sending extended messages regardless if capability\n");
+  printf ("          is negotiated. Allows debugging the peer.\n");
   
   // Disconnect time
   printf ("  -%c <time>, %s <time>\n", P_C_DISCONNECT_TIME, P_DISCONNECT_TIME);
@@ -343,8 +358,10 @@ char getShortParam(char* argument)
     else if (strcmp(argument, P_OUTFILE) == 0)     { retVal = P_C_OUTFILE; }
     else if (strcmp(argument, P_APPEND_OUT) == 0)  { retVal = P_C_APPEND_OUT; }
     else if (strcmp(argument, P_NO_MPNLRI) == 0)   { retVal = P_C_NO_MPNLRI; }
-    else if (strcmp(argument, P_NO_EXTMSG_SIZE) == 0) 
-         { retVal = P_C_NO_EXTMSG_SIZE; }
+    else if (strcmp(argument, P_NO_EXT_MSG_CAP) == 0) 
+         { retVal = P_C_NO_EXT_MSG_CAP; }
+    else if (strcmp(argument, P_NO_EXT_MSG_LIBERAL) == 0) 
+         { retVal = P_C_NO_EXT_MSG_LIBERAL; }
     else if (strcmp(argument, P_NO_PL_ECKEY) == 0) { retVal = P_C_NO_PL_ECKEY; }
     else if (strcmp(argument, P_CAPI_CFG) == 0)    { retVal = P_C_CAPI_CFG; }
     else if (strcmp(argument, P_MAX_UPD) == 0)     { retVal = P_C_MAX_UPD; }
@@ -793,12 +810,30 @@ bool readConfig(PrgParams* params)
             }
           }
           
-          // Read Ext Message Size Capability
-          sessVal = config_setting_get_member(session, P_CFG_EXTMSG_SIZE);
+          // Read Ext Message Capability
+          sessVal = config_setting_get_member(session, P_CFG_EXT_MSG_CAP);
           if (sessVal != NULL)
           {
-            params->bgpConf.capConf.extMsgSupp=config_setting_get_bool(sessVal);
+            params->bgpConf.capConf.extMsgSupp = 
+                                               config_setting_get_bool(sessVal);
           }
+
+          // Read Ext Message Capability Liberal Processing
+          sessVal = config_setting_get_member(session, P_CFG_EXT_MSG_LIBERAL);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.extMsgLiberal = 
+                                               config_setting_get_bool(sessVal);
+          }
+          
+          // Allows to enable forcing to send extended message regardless of
+          // capability negotiation. For TESTING PEER ONLY
+          sessVal = config_setting_get_member(session, P_CFG_EXT_MSG_FORCE);
+          if (sessVal != NULL)
+          {
+            params->bgpConf.capConf.extMsgForce = 
+                                               config_setting_get_bool(sessVal);
+          }          
           
           // Read BGPSEC Configuration
           // Enable and disable BGPSEC IPv4 Receive          
@@ -1004,12 +1039,12 @@ void initParams(PrgParams* params)
   // Now initialize what should not be 0 - false - NULL
   snprintf((char*)&params->skiFName, FNAME_SIZE, "%s", DEF_SKIFILE);
   snprintf((char*)&params->keyLocation, FNAME_SIZE, "%s", DEF_KEYLOCATION);
-  params->bgpConf.useMPNLRI          = true;
-  params->preloadECKEY               = true;
-  params->onlyExtLength              = true;
-  params->appendOut                  = false;
-  params->bgpConf.printPollLoop      = false;
-  params->bgpConf.printOnInvalid     = false;
+  params->bgpConf.useMPNLRI           = true;
+  params->preloadECKEY                = true;
+  params->onlyExtLength               = true;
+  params->appendOut                   = false;
+  params->bgpConf.printPollLoop       = false;
+  params->bgpConf.printOnInvalid      = false;
   for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
   {
     params->bgpConf.printOnSend[idx]    = false;
@@ -1029,6 +1064,9 @@ void initParams(PrgParams* params)
   params->bgpConf.capConf.route_refresh = false;
   // Turn capabilities selectively off
   params->bgpConf.capConf.bgpsec_snd_v6 = false;
+  // Turn off TEST setting for forcing ext message sending without ext 
+  // capability being negotiated
+  params->bgpConf.capConf.extMsgForce = false;
   
   initStack(&params->updateStack);
 }
@@ -1211,8 +1249,12 @@ int parseParams(PrgParams* params, int argc, char** argv)
         params->bgpConf.useMPNLRI = false;
         break;
         
-      case P_C_NO_EXTMSG_SIZE:
+      case P_C_NO_EXT_MSG_CAP:
         params->bgpConf.capConf.extMsgSupp = false;
+        break;
+
+      case P_C_NO_EXT_MSG_LIBERAL:
+        params->bgpConf.capConf.extMsgLiberal = false;
         break;
         
       case P_C_NO_PL_ECKEY:
@@ -1249,10 +1291,18 @@ int parseParams(PrgParams* params, int argc, char** argv)
         break;
         
       default:
-        snprintf(params->errMsgBuff, PARAM_ERRBUF_SIZE, 
-                 "Unknown Parameter '%s'!", argv[idx]);
-        idx = argc; // stop further processing.
-        printSyntax();
+        // Some parameters do only have a -- setting and no single char option
+        if (strcmp(argv[idx], P_EXT_MSG_FORCE) == 0)
+        {
+          params->bgpConf.capConf.extMsgForce = true;
+        }
+        else
+        {
+          snprintf(params->errMsgBuff, PARAM_ERRBUF_SIZE, 
+                   "Unknown Parameter '%s'!", argv[idx]);
+          idx = argc; // stop further processing.
+          printSyntax();
+        }
     }
 
     // something went wrong during the update processing, free the leftover

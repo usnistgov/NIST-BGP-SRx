@@ -22,10 +22,15 @@
  *
  * This API contains a the headers and function to generate proper BGP messages.
  *
- * @version 0.2.0.5
+ * @version 0.2.0.6
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.6 - 2017/02/15 - oborchert
+ *            * Added switch to force sending extended messages regardless if
+ *              capability is negotiated. This is a TEST setting only.
+ *          - 2017/02/14 - oborchert
+ *            * Fixed invalid size of maximum BGP message with extended message
  *  0.2.0.5 - 2017/01/31 - oborchert
  *            * Added unsupported capability
  *          - 2017/01/31 - oborchert
@@ -93,7 +98,7 @@
 // The default maximum size of BGP packets RFC 4271 Section 4. Message Formats
 #define BGP_MAX_MESSAGE_SIZE 4096
 // The default maximum size of BGP packets RFC draft-ietf-idr-extended-messages
-#define BGP_EXTMAX_MESSAGE_SIZE 64000
+#define BGP_EXTMAX_MESSAGE_SIZE 65536
 
 // BGP MESSAGE TYPES
 #define BGP_T_OPEN          1  
@@ -545,6 +550,11 @@ typedef struct {
   bool route_refresh;
   /** Indicates if the session supports BGP updates larger than 4096 bytes */
   bool extMsgSupp;
+  /** Indicates if the session processed extended capability liberal or strict*/
+  bool extMsgLiberal;
+  /** Allows testing the peer by sending extended messages regardless if 
+   * negotiated!*/
+  bool extMsgForce;
   /** Indicates if BGPSEC IPv4 Updates can be send */
   bool bgpsec_snd_v4;
   /** Indicates if BGPSEC IPv6 Updates can be send */

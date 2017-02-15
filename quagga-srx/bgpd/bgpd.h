@@ -775,6 +775,7 @@ struct peer
 // The next two flags allow pcount=0, both in receiving and migrate also in sending
 #define PEER_FLAG_BGPSEC_MIGRATE            (1 << 11) /* enable migration mode with this peer */
 #define PEER_FLAG_BGPSEC_ROUTE_SERVER       (1 << 12) /* the peer is a route server */
+#define PEER_FLAG_EXTENDED_MESSAGE_LIBERAL  (1 << 13) /* BGP-Extended Message Support liberal */
 #define PEER_FLAG_BGPSEC_CAPABILITY_RECV    (1 << 14)/* bgpsec capability - RECV */
 #define PEER_FLAG_BGPSEC_CAPABILITY_SEND    (1 << 15)/* bgpsec capability - SEND */
 #define PEER_FLAG_BGPSEC_CAPABILITY         (1 << 15)/* bgpsec capability - SEND */
@@ -997,7 +998,7 @@ struct bgp_nlri
 #define BGP_MARKER_SIZE		                16
 #define BGP_HEADER_SIZE		                19
 #define BGP_MAX_PACKET_SIZE                   4096
-#define BGP_MAX_PACKET_SIZE_EXTENDED         65536
+#define BGP_MAX_PACKET_SIZE_EXTENDED         65535
 
 /* BGP minimum message size.  */
 #define BGP_MSG_OPEN_MIN_SIZE                   (BGP_HEADER_SIZE + 10)

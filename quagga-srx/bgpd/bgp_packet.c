@@ -2691,10 +2691,36 @@ bgp_read (struct thread *thread)
 	  goto done;
 	}
 
+
+      bgp_size_t size_policy;
+      if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+      {
+        /* extended message support - strict policy */
+        if (CHECK_FLAG (peer->cap, PEER_CAP_EXTENDED_MSG_SUPPORT))
+        {
+          size_policy = BGP_MAX_PACKET_SIZE_EXTENDED;
+        }
+        else
+        {
+          /* extended message support - liberal policy */
+          if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_LIBERAL))
+          {
+            size_policy = BGP_MAX_PACKET_SIZE_EXTENDED;
+          }
+          else
+            size_policy = BGP_MAX_PACKET_SIZE;
+
+        }
+      }
+      else
+        size_policy = BGP_MAX_PACKET_SIZE;
+
+
+
+
       /* Mimimum packet length check. */
       if ((size < BGP_HEADER_SIZE)
-	  || (size > ((peer->flags & PEER_FLAG_EXTENDED_MESSAGE_SUPPORT)?
-              BGP_MAX_PACKET_SIZE_EXTENDED:BGP_MAX_PACKET_SIZE))
+	  || (size > size_policy)
 	  || (type == BGP_MSG_OPEN && size < BGP_MSG_OPEN_MIN_SIZE)
 	  || (type == BGP_MSG_UPDATE && size < BGP_MSG_UPDATE_MIN_SIZE)
 	  || (type == BGP_MSG_NOTIFY && size < BGP_MSG_NOTIFY_MIN_SIZE)

@@ -1,12 +1,12 @@
-This folder containts NIST BGP-SRx Software Suite V4.2.1
- * quagga-srx V0.99.22.srx.0.4.2.2_release
+This folder containts NIST BGP-SRx Software Suite V4.2.2
+ * quagga-srx V0.99.22.srx.0.4.2.3_release
  * srx-server V0.4.0.2_release
  * srx-crypto-api V0.2.0.2_release
- * bgpsec-io version_0.2.0.5
+ * bgpsec-io version_0.2.0.6
 
 Comments for this software package:
 ===================================
-* quagga-srx 0.99.22.srx.0.4.2.2_release was developed and tested under CentOS.
+* quagga-srx 0.99.22.srx.0.4.2.3_release was developed and tested under CentOS.
   - requires srx-server (Proxy API)
   - requires srx-crypto-api
   - requires net-snmp
@@ -26,7 +26,7 @@ Comments for this software package:
   - requires libconfig-devel
   - requires openssl-devel
   - requires uthash-devel
-* bgpsec-io version_0.2.0.5 developed and tested under CentOS.
+* bgpsec-io version_0.2.0.6 developed and tested under CentOS.
   - requires srx-crypto-api
   - requires libconfig-devel
   - requires openssl-devel

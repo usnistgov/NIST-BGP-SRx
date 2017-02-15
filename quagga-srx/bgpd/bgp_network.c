@@ -201,9 +201,15 @@ bgp_accept (struct thread *thread)
       if(stream_get_size (peer1->ibuf) > BGP_MAX_PACKET_SIZE)
         stream_resize (peer->ibuf, BGP_MAX_PACKET_SIZE_EXTENDED);
 
-      if(CHECK_FLAG(peer->cap, PEER_CAP_EXTENDED_MSG_SUPPORT)
+      if(CHECK_FLAG(peer1->cap, PEER_CAP_EXTENDED_MSG_SUPPORT)
           && (stream_get_size (peer1->work) > BGP_MAX_PACKET_SIZE))
         stream_resize (peer->work, BGP_MAX_PACKET_SIZE_EXTENDED);
+
+      if(!CHECK_FLAG(peer1->cap, PEER_CAP_EXTENDED_MSG_SUPPORT))
+        if (CHECK_FLAG (peer1->flags, PEER_FLAG_EXTENDED_MESSAGE_LIBERAL))
+          if(stream_get_size (peer1->ibuf) > BGP_MAX_PACKET_SIZE)
+            stream_resize (peer->ibuf, BGP_MAX_PACKET_SIZE_EXTENDED);
+
     }
 
     /* Make peer's address string. */

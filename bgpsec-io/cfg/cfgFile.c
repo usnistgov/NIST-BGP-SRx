@@ -23,10 +23,19 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.0.5
+ * @version 0.2.0.6
  * 
- * Changelog:
+ * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.6 - 2017/02/15 - oborchert
+ *            * Added switch to force sending extended messages regardless if
+ *              capability is negotiated. This is a TEST setting only.
+ *   - 2017/02/15 - oborchert
+ *            * Added ext_msg_liberal to generation of example configuration
+ *          - 2017/02/13 - oborchert
+ *            * Renamed define from ..._EXTMSG_SIZE to EXT_MSG_CAP
+ *            * BZ1111: Added liberal policy to extended message capability 
+ *              processing
  *  0.2.0.5 - 2017/02/01 - oborchert
  *            * Removed quotes from true values. The configuration does not read
  *              understand quotes in boolean values.
@@ -158,8 +167,16 @@ bool generateFile(char* fName)
     fprintf (file, "    # Run forever or until the peer shuts down.\n");
     fprintf (file, "    %s = 0;\n\n", P_CFG_DISCONNECT_TIME);
     
-    fprintf (file, "    # Allow to enable/disable extended message capability.\n");
-    fprintf (file, "    %s = true;\n\n", P_CFG_EXTMSG_SIZE);
+    fprintf (file, "    # Allow to enable/disable extended message capability."
+                          "\n");
+    fprintf (file, "    %s = true;\n\n", P_CFG_EXT_MSG_CAP);
+    fprintf (file, "    # Allow to enable/disable liberal behavior when \n");
+    fprintf (file, "    # receiving extended message capability.\n");
+    fprintf (file, "    %s = true;\n\n", P_CFG_EXT_MSG_LIBERAL);
+    fprintf (file, "    # Overwrite draft / RFC specification and force.\n");
+    fprintf (file, "    # sending extended message regardless if negotiated or "
+                        "not.\n");
+    fprintf (file, "    #%s = true;\n\n", P_CFG_EXT_MSG_FORCE);
 
     fprintf (file, "    # Configure BGPSEC capabilities.\n");
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_S);
