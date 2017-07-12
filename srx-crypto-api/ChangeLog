@@ -1,6 +1,10 @@
 More details on changes are scripted in the files itself.
 ===========================================================
-
+Version 0.2.0.3 - July - 2017
+  - Fixed some bugs
+  - Added some defines to the header file
+  - Added init string to test lib to allow some runtime debugging
+  - Fixed default assignment if configuration method mapping is incomplete
 Version 0.2.0.2 - November - 2016
   - Fixed some bugs
   - Added functionality to print bgpsec data using the testlib.

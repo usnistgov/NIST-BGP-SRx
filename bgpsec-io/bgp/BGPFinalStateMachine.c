@@ -22,10 +22,15 @@
  *
  * Provides the BGP Final State Machine
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - BZ1043: Added socket flow control.
+ *          - 2017/03/09 - oborchert
+ *            * BZ1133: Modified the session establishment. BGP header checks 
+ *              are now processed within the session code. Added interpretation 
+ *              of failure return values within function fsmEstablishBGP.
  *  0.2.0.0 - 2016/05/17 - oborchert
  *            * Added receiver thread to session structure. This allows to 
  *              send signals to the thread if needed.
@@ -44,6 +49,7 @@
 #include <bits/signum.h>
 #include "bgp/BGPFinalStateMachine.h"
 #include "bgp/BGPSession.h"
+#include "printer/BGPHeaderPrinter.h"
 
 /**
  * Verifies that the given state has only one (known) bit set.
@@ -190,8 +196,8 @@ void fsmInit(BGPFinalStateMachine* fsm)
 }
 
 /**
- * Establish a BGP connection.s
-s * 
+ * Establish a BGP connection('s)
+ * 
  * @param fsm The state machine
  * 
  * @return false if unsuccessful, otherwise true
@@ -246,15 +252,30 @@ bool fsmEstablishBGP(BGPFinalStateMachine* fsm)
           int read = readNextBGPMessage(session, SESS_TIMEOUT_RCV_OPEN);
           if (read > 0)
           {
-            if (checkMessageHeader(session))
-            {
-              processOpenMessage(session);
-            }
+            // No header check needed anymore, this is moved into the function 
+            // readNextBGPMEssage. Once here, we are good to go.
+            processOpenMessage(session);
           }
           else 
           {
-            // The socket seems to be stale
-            printf("WARNING: Seems to be a stale connection - Abort!\n");
+            // process the return value. See readNextBGPMessage for possible
+            // values
+            switch (read)
+            {
+              case 0:
+                printf("WARNING: Seems to be a stale connection - Abort!\n");
+                break;
+              case -1:
+                printf("ERROR: No configured session!!!\n");
+                break;
+              case -2: 
+                // Message was too large. 
+                printf ("ERROR: Message was too large!");
+                break;
+              default:
+                // The socket seems to be stale
+                printf("ERROR: unknown error [%i] - Abort!\n", read);
+            }
             // Stop any further attempts
             session->fsm.connectRetryCounter = FSM_MAX_RETRY;
           }
@@ -268,18 +289,18 @@ bool fsmEstablishBGP(BGPFinalStateMachine* fsm)
       case FSM_STATE_OpenConfirm:
         if (fsmSwitchState(fsm, FSM_STATE_ESTABLISHED))
         {
-          if (!sendKeepAlive(session))
+          if (!sendKeepAlive(session, SESS_FLOW_CONTROL_REPEAT))
           {
             printf("ERROR: Could not send initial KeepAlive receipt!\n");
-            sendNotification(session, BGP_ERR6_CEASE,
-                             BGP_ERR6_SUB_ADMIN_SHUTDOWN, 0, NULL);
+            sendNotification(session, BGP_ERR6_CEASE, BGP_ERR6_SUB_ADMIN_SHUTDOWN, 
+                             0, NULL, SESS_FLOW_CONTROL_REPEAT);
           }
         }
         else
         {
           printf ("ERROR: Could not set FSM to ESTABLISHED!\n");
           sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 
-                           0, NULL);
+                           0, NULL, SESS_FLOW_CONTROL_REPEAT);
         }
         break;
       case FSM_STATE_ESTABLISHED:
@@ -338,7 +359,7 @@ void fsmRunHoldTimeLoop(BGPFinalStateMachine* fsm)
       printf("ERROR: Did not hear back from peer AS %u - seems dead!\n",
              session->bgpConf.peerAS);
       sendNotification(session, BGP_ERR4_HOLD_TIMER_EXPIRED, 
-                       BGP_ERR_SUB_UNDEFINED, 0, NULL);
+                       BGP_ERR_SUB_UNDEFINED, 0, NULL, SESS_FLOW_CONTROL_REPEAT);
       break;
     }
 
@@ -347,7 +368,7 @@ void fsmRunHoldTimeLoop(BGPFinalStateMachine* fsm)
     if ((session->lastSent + intervalTime) <= now)
     {
       // its time to send a keep alive
-      if (!sendKeepAlive(session))
+      if (!sendKeepAlive(session, SESS_FLOW_CONTROL_REPEAT))
       {
         // let the peer handle with the missing keep alive - the next one might 
         // work and we have time to send approx. 2 more keep alive messages.

@@ -94,6 +94,17 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_CMD_NO_EVALUATE "no srx evaluation"
 #define SRX_VTY_HLP_NO_EVALUATE  NO_STR SRX_VTY_HLP_STR \
                                 "Deactivate the policy processing.\n" \
+                                
+
+#define SRX_VTY_CMD_EVAL_WITHSRX "srx evaluation " SRX_VTY_EVAL_BGPSEC \
+                                 " distributed"
+#define SRX_VTY_OUT_EVAL_WITHSRX "srx evaluation " SRX_VTY_EVAL_BGPSEC \
+                                 " distributed%s"
+#define SRX_VTY_HLP_EVAL_WITHSRX SRX_VTY_HLP_STR \
+                                "Activate the policy processing\n" \
+                                "Perform both, prefix origin validation using" \
+                                  " ROA's and path validation\n" \
+                                "Perform path validation using srx-server.\n"
 
 #define SRX_VTY_CMD_KEEPWINDOW_SHORT "srx keep-window"
 #define SRX_VTY_CMD_KEEPWINDOW  SRX_VTY_CMD_KEEPWINDOW_SHORT " <0-65535>"
@@ -181,8 +192,6 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 // POLICY
 #define SRX_VTY_HLP_POLICY      "Evaluation policy command\n"
-#define SRX_VTY_HLP_POLICY_ROA  "Prefix-origin validation using ROA's\n"
-#define SRX_VTY_HLP_POLICY_PATH "Path validation (NOT IMPLEMENTED YET)\n"
 #define SRX_VTY_HLP_ORIGIN_ONLY "(" SRX_VTY_EVAL_ORIGIN_ONLY ") "
 
 // POLICY IGNORE NOTFOUND / INVALID
@@ -419,7 +428,8 @@ struct bgp
 #define SRX_CONFIG_EVAL_PATH     (1 << 2)
 #define SRX_CONFIG_EVALUATE      (SRX_CONFIG_EVAL_ORIGIN | SRX_CONFIG_EVAL_PATH)
 
-#define SRX_CONFIG_DISPLAY_INFO  (1 << 3)
+#define SRX_CONFIG_EVAL_DISTR    ((1 << 3) | SRX_CONFIG_EVALUATE)
+#define SRX_CONFIG_DISPLAY_INFO  (1 << 4)
 #endif /* USE_SRX */
 
   /* BGP router identifier.  */
@@ -742,7 +752,7 @@ struct peer
 #define PEER_CAP_AS4_ADV                    (1 << 7) /* as4 advertised */
 #define PEER_CAP_AS4_RCV                    (1 << 8) /* as4 received */
 #ifdef USE_SRX
-#define PEER_CAP_EXTENDED_MSG_SUPPORT       (1 << 13)/* bgpsec advertised send capability */
+#define PEER_CAP_EXTENDED_MSG_SUPPORT       (1 << 13)/* extended message support*/
 #define PEER_CAP_BGPSEC_ADV_SEND            (1 << 14)/* bgpsec advertised send capability */
 #define PEER_CAP_BGPSEC_ADV                 (1 << 15)/* bgpsec advertised recv capability */
 #endif
@@ -998,7 +1008,9 @@ struct bgp_nlri
 #define BGP_MARKER_SIZE		                16
 #define BGP_HEADER_SIZE		                19
 #define BGP_MAX_PACKET_SIZE                   4096
+#ifdef USE_SRX
 #define BGP_MAX_PACKET_SIZE_EXTENDED         65535
+#endif
 
 /* BGP minimum message size.  */
 #define BGP_MSG_OPEN_MIN_SIZE                   (BGP_HEADER_SIZE + 10)
@@ -1041,9 +1053,8 @@ struct bgp_nlri
 #define BGP_ATTR_AS4_PATH                       17
 #define BGP_ATTR_AS4_AGGREGATOR                 18
 #define BGP_ATTR_AS_PATHLIMIT                   21
-#ifdef USE_SRX
-//#define BGP_ATTR_BGPSEC                         11
-#define BGP_ATTR_BGPSEC                         30
+#if defined(USE_SRX) && !defined(BGP_ATTR_BGPSEC)
+#define BGP_ATTR_BGPSEC                         33
 #endif
 
 /* BGP update origin.  */

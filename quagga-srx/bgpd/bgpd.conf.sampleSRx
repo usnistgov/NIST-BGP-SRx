@@ -79,7 +79,7 @@ router bgp 7675
 ! no srx extcommunity
 
 
-! Configure RPKI Origin Validation and BGPSEC Path Validation
+! Configure RPKI Origin Validation and BGPsec Path Validation
 ! ===========================================================
 
 
@@ -92,7 +92,11 @@ router bgp 7675
 !     for calculating the validation result. 
 !   * In the "bgpsec" mode, the origin validation result and the path validation 
 !     result, both are used to determine the final validation result.
-! srx evaluation (origin_only | bgpsec)
+!     This command allows to specify "distributed" which enabled the remote 
+!     path validation using the srx-server. The srx-server provides the 
+!     implementation of RFC 8210 which allows receiving public keys from the 
+!     validation cache.
+! srx evaluation (origin_only | bgpsec [distributed])
   srx evaluation origin_only
 
 ! "origin_only"
@@ -120,17 +124,24 @@ router bgp 7675
 ! --------
 ! This evaluation mode activates origin validation and path validation. 
 ! QuaggaSRx uses the validation results of origin validation and path validation
-! to compute the final BGPSEC validation result (valid|invalid|undefined). 
+! to compute the final BGPsec validation result (valid|invalid|undefined). 
 ! SRx reports prefix-origin validation and path validation independently as soon
 ! as they are available. Note that the SRx path validation refers only to the 
 ! validation of the path signatures, NOT including the origin validation. 
 ! QuaggaSRx merges the independent results of origin and path validation into 
-! one final BGPSEC validation. For BGPSEC Path validation configuration skip to
+! one final BGPsec validation. For BGPsec Path validation configuration skip to
 ! the end of this configuration section.
 !
-! The following table illustrates the possible BGPSEC validation results:
+! The option "distributed" specifies the location where the BGPsec path 
+! validation will take place. If provided, the BGPsec path validation will be 
+! done by the SRx-Server, if omitted the BGPsec path validation will be 
+! performed locally within the router itself. in te latter case, all keys must
+! be pre-installed in the router. To use the validation cache for retrieving the
+! router key (public keys), the validation must be performed by the SRx-Server.
+!
+! The following table illustrates the possible BGPsec validation results:
 !   +------------------------------------------------------+
-!   |  BGPSEC       |           Path Validation            |
+!   |  BGPsec       |           Path Validation            |
 !   |               |   Valid    |  Invalid   | Undefined  |
 !   +---------------+------------+------------+------------+
 !   | Prefix Origin |            |            |            |
@@ -291,7 +302,7 @@ router bgp 7675
 ! ======================
  network 10.0.0.0/9
 
-! Specify BGPSEC private key
+! Specify BGPsec private key
 ! =============================
 ! QuaggaSRx allows to have two private keys registered. The parameter active 1|2
 !   specifies which of the keys are used for signing. The key must be available
@@ -315,16 +326,26 @@ router bgp 7675
  neighbor 10.0.1.1 ebgp-multihop
 ! neighbor 10.0.1.1 route-map set-nexthop out
 
-! Specify type of BGPSEC connection
+! Specify type of BGPsec connection
 ! ---------------------------------
 ! neighbor 10.0.2.1 bgpsec (snd|rec|both)
  neighbor 10.0.1.1 bgpsec both
 
 
 ! Support Extended Message for BGP
-! If liberal is activated, the router will accept extended messages even if
-! the peer did not anounce the capability
-! neighbor (A.B.C.D|X:X::X:X|WORD) capability extended (liberal)
+! To enable (announce) the capability use
+! neighbor 10.0.1.1 capability extended
+!
+! To enable a liberal behavior and allow the receiving of extended messages
+! regardless if the capability is negotiated us
+! neighbor 10.0.1.1 capability extended liberal
+!
+! Enabling the liberal behavior does NOT result in announcing the capability.
+! It just allows processing such messages without the negotiation.
+! the liberal behavior can be enabled / disabled during session established.
+! but is not recommended because it might modify the size of the buffer.
+
+ neighbor 10.0.1.1 capability extended
  neighbor 10.0.1.1 capability extended liberal
 
 !

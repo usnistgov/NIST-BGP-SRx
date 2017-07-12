@@ -27,10 +27,16 @@
  * Known Issue:
  *   At this time only pem formated private keys can be loaded.
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.3
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.3 - 2017/07/09 - oborchert
+ *            * Modified return value documentation of function ks_getKey which
+ *              mentioned DER key but did not mention it encapsulated in the 
+ *              BGPsecKey data structure.
+ *          - 2017/04/21 - oborchert
+ *            * Modified some method documentation to be more precise.
  *  0.2.0.0 - 2016/06/30 - oborchert
  *            * Cleaned up unused code and removed compiler warnings
  *  0.2.0.0 - 2016/06/20 - oborchert
@@ -70,10 +76,13 @@ typedef struct _KS_Key_Element
   /** The array containing the ASKI of the key. */
   u_int8_t    ski[SKI_LENGTH];
   /** An array containing the DER formated key - Normally contains only one key 
-   * but in case of an SKI conflict multiple keys might be possible. */
+   * but in case of an SKI conflict multiple keys might be possible. 
+   * IMPORTANT: All derKeys are allocated using malloc, NOT OpenSSL_malloc.*/
   BGPSecKey** derKey;
   /** Contains the OpenSSL Key if loaded into memory - each array element 
-   * corresponds to the DER formated key. */
+   * corresponds to the DER formated key. 
+   * IMPORTANT: All ec_keys are allocated using OpenSSL based malloc, 
+   * NOT malloc. To free them use ECKEY_free()*/
   EC_KEY**    ec_key; 
   /** Number of times this key is used up to MAX_KEY_USED. */
   u_int16_t  timesUsed;
@@ -121,8 +130,8 @@ void ks_init(KeyStorage* storage, u_int8_t algoID, bool isPrivate);
  *        API_STATUS_INFO_USER1 is used to indicate that additional keys are
  *        available at a higher position
  * 
- * @return the array of EC_Keys/DER_Keys or NULL of not found. if NULL check 
- *         status value.
+ * @return the array of EC_Keys/BGPsecKeys(DER_Keys) or NULL of not found. If 
+ *         NULL check status value.
  */
 void** ks_getKey(KeyStorage* storage, u_int8_t* ski, u_int32_t asn, 
                  u_int16_t* noKeys, KS_Key_Type kType, sca_status_t* status);

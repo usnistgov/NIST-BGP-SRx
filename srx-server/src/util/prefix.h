@@ -23,10 +23,12 @@
  * IPv4 and IPv6 address and prefix structures and functions.
  * log.h is used for error message handling.
  * 
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.5.0.0  - 2017/07/07 - oborchert
+ *              * Added more detailed documentation to types.
  *   0.3.0.10 - 2015/11/06 - oborchert
  *              * removed types.h
  *   0.3.0    - 2013/01/28 - oborchert
@@ -61,16 +63,22 @@ typedef union {
 
 /** An IP (4, 6) address */
 typedef struct {
+  /** The version of the IP prefix (5 for IPv4, 6 for IPv6)*/
   uint8_t  version; // 4 or 6
+  /* The addres portion */
   union {
+    /** the IPv4 address*/
     IPv4Address v4;
+    /** The IPv6 address*/
     IPv6Address v6;
   } addr;
 } IPAddress;
 
 /** An IP prefix */
 typedef struct {
+  /** The IP address of the prefix. */
   IPAddress ip;
+  /** Prefix length in bits */
   uint8_t   length;
 } IPPrefix;
 

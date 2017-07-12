@@ -62,7 +62,9 @@ testlib: {
 
 # A String "0|1;0|1;0|1" or "NULL" as initialization parameter.
 # This initialization value is as follows: (each value 0 or 1)
+#
 #    validation_result;parse-bgpec;print-ski-and-signatures
+#
 # with print-ski-and-signatures only if parse-bgpec is enabled.
   init_value                  = "1;1;1";
   method_init                 = "init";

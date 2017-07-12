@@ -19,10 +19,12 @@
  * to set the log method at the beginning of the application - otherwise 
  * eventual message will be discarded.
  *  
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/03 - oborchert
+ *            * Added some documentation
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.3.0.7  - 2015/04/21 - oborchert
@@ -46,8 +48,7 @@
 
 /** 
  * Log levels.
- * The code corresponds to the syslog levels.
- * 
+ * The code corresponds to the syslog levels. (Except LEVEL_COMM
  */
 typedef enum {
   /** Non-urgent failures - these should be relayed to developers or admins; 
@@ -67,7 +68,9 @@ typedef enum {
   /** Info useful to developers for debugging the application, not useful during
    * operations */
   LEVEL_DEBUG   = 7,
-  LEVEL_COMM   = 8
+  /** This debug level is outside the scope of syslog severity levels as 
+   * specified in https://en.wikipedia.org/wiki/Syslog#Severity_level*/
+  LEVEL_COMM    = 8
 } LogLevel;
 
 /** 

@@ -207,6 +207,14 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
   unsigned long pos;
 #ifdef USE_SRX
   u_char bFrag =0;
+
+  // By default we assume the update will be send out using BGPSEC. the
+  // function bgp_packer_attribute will do the final decision and return
+  // the final result back. For now we assume we do BGPSEC and NOT AS_PATH
+
+  /* This value stay here, otherwise it will affect BGPv4 packing which
+   * is to put prefixes into the stream */
+  bool useASpath = false;
 #endif
 
   s = peer->work;
@@ -238,12 +246,6 @@ bgp_update_packet (struct peer *peer, afi_t afi, safi_t safi)
     if (STREAM_REMAIN (s) <= BGP_NLRI_LENGTH + PSIZE (rn->p.prefixlen))
 	    break;
 
-#ifdef USE_SRX
-    // By default we assume the update will be send out using BGPSEC. the
-    // function bgp_packer_attribute will do the final decision and return
-    // the final result back. For now we assume we do BGPSEC and NOT AS_PATH
-    bool useASpath = false;
-#endif
     /* If packet is empty, set attribute. */
     if (stream_empty (s))
 	  {
@@ -2692,6 +2694,7 @@ bgp_read (struct thread *thread)
 	}
 
 
+#ifdef USE_SRX
       bgp_size_t size_policy;
       if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
       {
@@ -2714,13 +2717,18 @@ bgp_read (struct thread *thread)
       }
       else
         size_policy = BGP_MAX_PACKET_SIZE;
+#endif
 
 
 
 
       /* Mimimum packet length check. */
       if ((size < BGP_HEADER_SIZE)
+#ifdef USE_SRX
 	  || (size > size_policy)
+#else
+	  || (size > BGP_MAX_PACKET_SIZE)
+#endif
 	  || (type == BGP_MSG_OPEN && size < BGP_MSG_OPEN_MIN_SIZE)
 	  || (type == BGP_MSG_UPDATE && size < BGP_MSG_UPDATE_MIN_SIZE)
 	  || (type == BGP_MSG_NOTIFY && size < BGP_MSG_NOTIFY_MIN_SIZE)

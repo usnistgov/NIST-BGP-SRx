@@ -22,10 +22,20 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/06/29 - oborchert
+ *            * Added documentation to function handlePDURouterKey
+ *            * Added function handleEndOfData
+ *            * renamed processPDURouterKey into handlePDURouterKey
+ *          - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *          - 2016/08/30 - oborchert
+ *            * Added capability to only have the receiving of PDU's done once
+ *              by using the clients stopAfterEndofData attribute rather than a
+ *              hard coded bool value in manageConnection.
  * 0.3.0.10 - 2016/01/21 - kyehwanl
  *            * added pthread cancel state for enabling keyboard interrupt
  * 0.3.0.10 - 2015/11/10 - oborchert
@@ -52,11 +62,13 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include "server/rpki_queue.h"
 #include "server/rpki_router_client.h"
 #include "util/client_socket.h"
 #include "util/log.h"
 #include "util/socket.h"
 #include "util/prefix.h"
+#include "main.h"
 
 #define HDR "([0x%08X] RPKI Router Client): "
 
@@ -177,6 +189,56 @@ static int handleErrorReport(RPKIRouterClient* client,
 }
 
 /**
+ * Processes the router key PDU 
+ * 
+ * @param client The client connection
+ * @param hdr The header with the information
+ * 
+ * @return true
+ */
+static bool handlePDURouterKey(RPKIRouterClient* client,
+                               RPKIRouterKeyHeader* hdr)
+{
+  bool      isAnn;
+  uint32_t  clientID;
+  uint16_t  sessionID;
+  uint8_t*  ski;
+  uint8_t*  keyInfo;
+
+
+
+  isAnn     = (hdr->flags & PREFIX_FLAG_ANNOUNCEMENT);
+  clientID  = client->routerClientID;
+  sessionID = client->sessionID;
+  ski       = hdr->ski;
+  keyInfo   = hdr->keyInfo;
+
+  client->params->routerKeyCallback(clientID, sessionID, isAnn, ntohl(hdr->as),
+                                    ski, keyInfo, client->user);
+  return true;
+}
+
+/**
+ * Process the End Of Data PDU
+ * 
+ * @param client The client connection
+ * @param hdr The header with the information
+ * 
+ * @since 0.5.0.0
+ */
+static void handleEndOfData(RPKIRouterClient* client,
+                             RPKIEndOfDataHeader* hdr)
+{
+  uint32_t  clientID;
+  uint16_t  sessionID;
+
+  clientID  = client->routerClientID;
+  sessionID = client->sessionID;
+  
+  client->params->endOfDataCallback(clientID, sessionID, client->user);
+}
+
+/**
  * Verify that the cache session id is correct. In case the cache session id is
  * incorrect == changed the flag session id_changed will be set to true. The old
  * session id value will be preserved to allow referencing old values.
@@ -232,7 +294,7 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
   // memory will be extended to the space needed. In case the space can not be
   // extended, the PDU will be loaded as much as possible and the rest will be
   // skipped.
-  uint32_t         bytesAllocated = sizeof(RPKIIPv6PrefixHeader);
+  uint32_t         bytesAllocated = sizeof(RPKIRouterKeyHeader);
   // Keep going is used to keep the received thread up and running. It will be
   // set false once the connection is shut down.
   bool             keepGoing = true;
@@ -351,12 +413,17 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
         {
           // store not byte-swapped
           client->serial = ((RPKIEndOfDataHeader*)byteBuffer)->serial;
+          // Now process the RPKI_QUEUE
+          handleEndOfData(client, (RPKIEndOfDataHeader*)byteBuffer);
           keepGoing = !returnAterEndOfData;
         }
         else
         {
           keepGoing = false;
         }
+        break;
+      case PDU_TYPE_ROUTER_KEY:
+        handlePDURouterKey(client, (RPKIRouterKeyHeader*)byteBuffer);
         break;
       case PDU_TYPE_CACHE_RESET :
         // Reset our cache
@@ -432,8 +499,14 @@ static void* manageConnection (void* clientPtr)
     if (sendResetQuery(client))
     {
       // Receive and process all PDUs - This is a loop until the connection
-      // is either lost or closed.
-      receivePDUs(client, false);
+      // is either lost, closed, or the end of data is received (single request)
+      // Modified call with 0.5.0.0 to use variable as second parameter rather
+      // than false
+      receivePDUs(client, client->stopAfterEndOfData);
+      if (client->stopAfterEndOfData)
+      {
+        client->stop = true;
+      }
     }
 
     // The connection is lost or did not even exist yet.
@@ -578,6 +651,7 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
   self->startup          = true;
 
   self->routerClientID = createRouterClientID(self);
+  self->version         = params->version;
 
   ret = pthread_create (&self->thread, NULL, manageConnection, self);
   if (ret)
@@ -605,8 +679,15 @@ void releaseRPKIRouterClient (RPKIRouterClient* self)
   int s;
   // Wait until the thread terminates
   s = pthread_cancel(self->thread);
-  if (s != 0)
-    handle_error_en(s, "pthread_join");
+  switch (s)
+  {
+    case 0: // No error at all
+    case 3: // No such process
+      break;
+    default:
+      handle_error_en(s, "pthread_join");
+      break;
+  }
 }
 
 /**
@@ -626,7 +707,7 @@ bool sendResetQuery (RPKIRouterClient* self)
   {
     LOG(LEVEL_DEBUG, HDR "Send Reset Query(srq)...", pthread_self());
 
-    hdr.version  = RPKI_RTR_PROTOCOL_VERSION;
+    hdr.version  = self->version;
     hdr.type     = PDU_TYPE_RESET_QUERY;
     hdr.reserved = 0x0000;
     hdr.length   = htonl(sizeof(RPKIResetQueryHeader));
@@ -669,7 +750,7 @@ bool sendResetQuery (RPKIRouterClient* self)
 bool sendSerialQuery (RPKIRouterClient* self)
 {
   RPKISerialQueryHeader hdr;
-  hdr.version   = RPKI_RTR_PROTOCOL_VERSION;
+  hdr.version   = self->version;
   hdr.type      = PDU_TYPE_SERIAL_QUERY;
   hdr.sessionID = self->sessionID;
   hdr.length    = htonl(sizeof(RPKISerialQueryHeader));

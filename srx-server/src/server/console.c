@@ -20,10 +20,16 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/03 - oborchert
+ *            * Added some initialization after free.
+ *          - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *          - 2016/10/26 - oborchert
+ *            * BZ1037: Replaces legacy calls to bzero with memset
  * 0.3.0.10 - 2016/01/21 - kyehwanl
  *            * added pthread cancel function for enabling keyboard interrupt
  * 0.3.0.10 - 2015/11/10 - oborchert
@@ -341,7 +347,7 @@ bool createConsole(SRXConsole* self, int port, ShutDownMethod shutDown,
   }
 
   // Bind to a server-address
-  bzero(&srvAddr, sizeof (struct sockaddr_in));
+  memset(&srvAddr, 0, sizeof (struct sockaddr_in));
   srvAddr.sin_family = AF_INET;
   srvAddr.sin_addr.s_addr = INADDR_ANY; // inet_pton
   srvAddr.sin_port = htons(port);
@@ -393,6 +399,8 @@ bool releaseConsole(SRXConsole* self)
 
   free(self->cmd);
   free(self->param);
+  self->cmd   = NULL;
+  self->param = NULL;
 
   return retVal;
 }
@@ -440,7 +448,7 @@ static void* consoleLoop(void* selfPtr)
       keepSession = sendToConsoleClient(self, CON_WELCOME_RESP, true);
       while (keepSession)
       {
-        bzero(buffer, buffLength);
+        memset(buffer, 0, buffLength);
         bytesRead = read(self->clientSockFd, buffer, buffLength);
         if (bytesRead <= 0)
         {
@@ -1378,7 +1386,7 @@ static void doShowUpdateID(SRXConsole* self, SRxUpdateID* updateID,
     char  msg[msgLen];
     memset(msg, '\0', msgLen);
 
-    if (getUpdateData(self->commandHandler->updCache, &stat))
+    if (getUpdateStats(self->commandHandler->updCache, &stat))
     {
 
       char* msgPtr = msg;
@@ -1615,19 +1623,23 @@ static void doShowSRX(SRXConsole* self, char* cmd, char* param)
   memset(str,'\0',1024);
 
   strPtr += sprintf(strPtr, "\r\nConfiguration:\r\n==============\r\n");
-  strPtr += sprintf(strPtr, "port..................: %u\r\n", cfg->server_port);
-  strPtr += sprintf(strPtr, "loglevel..............: %u\r\n", cfg->loglevel);
-  strPtr += sprintf(strPtr, "sync..................: %s\r\n",
+  strPtr += sprintf(strPtr, "port.....................: %u\r\n", 
+                            cfg->server_port);
+  strPtr += sprintf(strPtr, "loglevel.................: %u\r\n", cfg->loglevel);
+  strPtr += sprintf(strPtr, "sync.....................: %s\r\n",
                             cfg->syncAfterConnEstablished ? "true" : "false");
-  strPtr += sprintf(strPtr, "rpki.host.............: %s\r\n", cfg->rpki_host);
-  strPtr += sprintf(strPtr, "rpki.port.............: %u\r\n", cfg->rpki_port);
-  strPtr += sprintf(strPtr, "bgpsec.host...........: %s\r\n", cfg->bgpsec_host);
-  strPtr += sprintf(strPtr, "bgpsec.port...........: %u\r\n", cfg->bgpsec_port);
-  strPtr += sprintf(strPtr, "console.port..........: %u\r\n",cfg->console_port);
-  strPtr += sprintf(strPtr, "mode.no-sendque.......: %s\r\n",
+  strPtr += sprintf(strPtr, "rpki.host................: %s\r\n", 
+                            cfg->rpki_host);
+  strPtr += sprintf(strPtr, "rpki.port................: %u\r\n", 
+                            cfg->rpki_port);
+  strPtr += sprintf(strPtr, "bgpsec.srxcryptoapi_cfg..: %s\r\n", 
+                            cfg->sca_configuration);
+  strPtr += sprintf(strPtr, "console.port.............: %u\r\n",
+                            cfg->console_port);
+  strPtr += sprintf(strPtr, "mode.no-sendque..........: %s\r\n",
                        cfg->mode_no_sendqueue ? "true  (send queue turned off)"
                                               : "false (send queue turned on)");
-  strPtr += sprintf(strPtr, "mode.no-receivequeue..: %s\r\n",
+  strPtr += sprintf(strPtr, "mode.no-receivequeue.....: %s\r\n",
                  cfg->mode_no_receivequeue ? "true  (receive queue turned off)"
                                            : "false (receive queue turned on)");
   strPtr += sprintf(strPtr, "\r\n");

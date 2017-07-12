@@ -107,14 +107,14 @@ inline int waitCond(Cond *cond, Mutex *self, uint32_t millis)
     to.tv_sec  = stime + time(0);
     to.tv_nsec = ntime;
     LOG(LEVEL_COMM, "([0x%08X] Condition wait): --> [0x%08X] at Mutex[0x%08x] "
-                  "for %i milliseconds = (%i seconds! and %i nanoseconds)",
-                  pthread_self(), cond, self, millis, stime, ntime);
+                    "for %i milliseconds = (%i seconds! and %i nanoseconds)",
+                    pthread_self(), cond, self, millis, stime, ntime);
     return pthread_cond_timedwait(cond, self, &to);
   }
   else
   {
     LOG(LEVEL_COMM, "([0x%08X] Condition wait): --> [0x%08X] at Mutex[0x%08x] ",
-                   pthread_self(), cond, self);
+                    pthread_self(), cond, self);
     return pthread_cond_wait(cond, self);
   }
 }

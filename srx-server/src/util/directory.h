@@ -21,10 +21,12 @@
  *
  * Directory helper functions.
  * 
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/03 - oborchert
+ *            * Fixed speller in header documentation
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  *            * Added Changelog
@@ -41,7 +43,7 @@
  * Checks if a file is readable.
  *
  * @param path Path pointing to the file
- * @return \c true = is readable, \c false = does not exist/permisions
+ * @return \c true = is readable, \c false = does not exist/permissions
  */
 bool fileIsReadable(const char* path);
 

@@ -6,6 +6,21 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.4.2.4 - July 2017
+    * Update implementation to comply with latest BGPsec Protocol specification
+    * Modified the valies of CAPABILITY_CODE_BGPSEC and BGP_ATTR_BGPSEC to
+      the IANA assigned values. 
+      For backwards compatibility with code written during the time where IANA 
+      did not have the values assigned yet, these values still can be modified 
+      during compile time to other values using -DCAPABILITY_CODE_BGPSEC=<num>
+      and -DBGP_ATTR_BGPSEC=<num>
+      - for backwards compatibility the previously used values were 
+        [CAPABILITY_CODE_BGPSEC=72] and [CAPABILITY_CODE_BGPSEC=30]
+    * Minor Bug Fixes
+
+  0.4.2.3 - February 2017
+    * Minor BUG Fixes
+
   0.4.2.2 - February 2017
     * Minor Bug Fixes
     * Added capability negotiation for Extended Message (> 4094)

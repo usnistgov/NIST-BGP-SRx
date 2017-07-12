@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.2.0.2], [bgpsrx-dev@nist.gov])
+AC_INIT([SRxCryptoAPI], [0.2.0.3], [bgpsrx-dev@nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -197,6 +197,11 @@ if test "$MCHECK" = "" ; then
   AC_MSG_RESULT([no])
 else
   AC_MSG_RESULT([yes])
+  have_gcc_s=no
+  AC_SEARCH_LIBS([free], [gcc_s], [have_gcc_s=yes])
+  if test "x${have_gcc_s}" = "xno" ; then
+    AC_MSG_ERROR([Libraty libgcc_s is required for --enable-mcheck.])
+  fi
 fi
 AC_SUBST(MCHECK)
 

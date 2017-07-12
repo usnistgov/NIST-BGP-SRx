@@ -23,14 +23,23 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.0.6
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/03/17 - oborchert
+ *            * Fixed speller in generated configuration.
+ *          - 2017/03/15 - oborchert
+ *            * BZ1114 : Removed extra empty lines
+ *            * Modified print filter setting.
+ *          - (branch) 2017/02/07 - oborchert
+ *            * Added missing IPv6 next hop. Also added alternative IPv4 next 
+ *              next hop in the same effort.
+ *            * Added printout filter configuration.
  *  0.2.0.6 - 2017/02/15 - oborchert
  *            * Added switch to force sending extended messages regardless if
  *              capability is negotiated. This is a TEST setting only.
- *   - 2017/02/15 - oborchert
+ *          - 2017/02/15 - oborchert
  *            * Added ext_msg_liberal to generation of example configuration
  *          - 2017/02/13 - oborchert
  *            * Renamed define from ..._EXTMSG_SIZE to EXT_MSG_CAP
@@ -159,6 +168,14 @@ bool generateFile(char* fName)
     fprintf (file, "    %s        = 64;\n", P_CFG_MY_ASN);
     fprintf (file, "    %s  = \"10.0.1.64\";\n", P_CFG_BGP_IDENT);
     fprintf (file, "    %s = 180;\n\n", P_CFG_HOLD_TIME);
+    
+    
+    fprintf (file, "    # Allows to specify enxt hop address. If not,\n");
+    fprintf (file, "    # specified the bgp identifier is used instead!\n");
+    fprintf (file, "    #%s = \"10.0.1.64\";\n", P_CFG_NEXT_HOP_IPV4);
+    fprintf (file, "    # Required for sending IPv6 updates.\n");     
+    fprintf (file, "    #%s = \"0:0:0:0:0:FFFF:A00:140\";\n\n", 
+                                                           P_CFG_NEXT_HOP_IPV6);
 
     fprintf (file, "    %s   = 32;\n", P_CFG_PEER_AS);
     fprintf (file, "    %s    = \"10.0.1.32\";\n", P_CFG_PEER_IP);
@@ -169,10 +186,10 @@ bool generateFile(char* fName)
     
     fprintf (file, "    # Allow to enable/disable extended message capability."
                           "\n");
-    fprintf (file, "    %s = true;\n\n", P_CFG_EXT_MSG_CAP);
+    fprintf (file, "    %s = true;\n", P_CFG_EXT_MSG_CAP);
     fprintf (file, "    # Allow to enable/disable liberal behavior when \n");
     fprintf (file, "    # receiving extended message capability.\n");
-    fprintf (file, "    %s = true;\n\n", P_CFG_EXT_MSG_LIBERAL);
+    fprintf (file, "    %s = true;\n", P_CFG_EXT_MSG_LIBERAL);
     fprintf (file, "    # Overwrite draft / RFC specification and force.\n");
     fprintf (file, "    # sending extended message regardless if negotiated or "
                         "not.\n");
@@ -181,7 +198,7 @@ bool generateFile(char* fName)
     fprintf (file, "    # Configure BGPSEC capabilities.\n");
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_S);
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_R);
-    fprintf (file, "    %s = false;\n", P_CFG_BGPSEC_V6_S);
+    fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V6_S);
     fprintf (file, "    %s = true;\n\n", P_CFG_BGPSEC_V6_R);
 
     fprintf (file, "    # Updates for this session only\n");
@@ -228,8 +245,25 @@ bool generateFile(char* fName)
     fprintf (file, "    # Do some debug printout.\n");
     fprintf (file, "    # For BGP Mode.\n");    
     fprintf (file, "    %s    = false;\n", P_CFG_PRINT_ON_SEND);
-    fprintf (file, "    %s = false;\n", P_CFG_PRINT_ON_RECEIVE);
-    fprintf (file, "    %s  = false;\n\n", P_CFG_PRINT_POLL_LOOP);    
+    fprintf (file, "    # Or more detailed as a filter\n");
+    fprintf (file, "    #%s = {\n", P_CFG_PRINT_ON_SEND);
+    fprintf (file, "    #  %s         = true;\n", P_CFG_PRNFLTR_OPEN);
+    fprintf (file, "    #  %s       = true;\n", P_CFG_PRNFLTR_UPDATE);
+    fprintf (file, "    #  %s    = true;\n", P_CFG_PRNFLTR_KEEPALIVE);
+    fprintf (file, "    #  %s = true;\n", P_CFG_PRNFLTR_NOTIFICATION);
+    fprintf (file, "    #  %s      = true;\n", P_CFG_PRNFLTR_UNKNOWN);
+    fprintf (file, "    #}\n");
+    fprintf (file, "    %s    = false;\n", P_CFG_PRINT_ON_RECEIVE);
+    fprintf (file, "    # Or more detailed as a filter\n");
+    fprintf (file, "    #%s = {\n", P_CFG_PRINT_ON_RECEIVE);
+    fprintf (file, "    #  %s         = true;\n", P_CFG_PRNFLTR_OPEN);
+    fprintf (file, "    #  %s       = true;\n", P_CFG_PRNFLTR_UPDATE);
+    fprintf (file, "    #  %s    = true;\n", P_CFG_PRNFLTR_KEEPALIVE);
+    fprintf (file, "    #  %s = true;\n", P_CFG_PRNFLTR_NOTIFICATION);
+    fprintf (file, "    #  %s      = true;\n", P_CFG_PRNFLTR_UNKNOWN);
+    fprintf (file, "    #}\n");
+    
+    fprintf (file, "    %s  = false;\n\n", P_CFG_PRINT_POLL_LOOP);
     fprintf (file, "    # For CAPI Mode.\n");    
     fprintf (file, "    %s = false;\n\n", P_CFG_PRINT_CAPI_ON_INVALID);    
     

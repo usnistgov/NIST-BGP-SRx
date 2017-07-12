@@ -424,7 +424,9 @@ static const struct message capcode_str[] =
   { CAPABILITY_CODE_DYNAMIC,		"Dynamic"			},
   { CAPABILITY_CODE_REFRESH_OLD,	"Route Refresh (Old)"		},
   { CAPABILITY_CODE_ORF_OLD,		"ORF (Old)"			},
+#ifdef USE_SRX
   { CAPABILITY_CODE_EXTENDED,		"Extended Message Support"      },
+#endif
 };
 static const int capcode_str_max = array_size(capcode_str);
 
@@ -439,7 +441,9 @@ static const size_t cap_minsizes[] =
   [CAPABILITY_CODE_DYNAMIC]	= CAPABILITY_CODE_DYNAMIC_LEN,
   [CAPABILITY_CODE_REFRESH_OLD]	= CAPABILITY_CODE_REFRESH_LEN,
   [CAPABILITY_CODE_ORF_OLD]	= sizeof (struct capability_orf_entry),
+#ifdef USE_SRX
   [CAPABILITY_CODE_EXTENDED]    = CAPABILITY_CODE_EXTENDED_LEN,
+#endif
 };
 
 /**
@@ -1015,6 +1019,11 @@ bgp_open_capability (struct stream *s, struct peer *peer)
       stream_putc (s, 0);
       stream_putc (s, SAFI_MPLS_LABELED_VPN);
     }
+  
+#ifdef USE_SRX
+  bool mpnlri_v6_announced = false;
+#endif
+  
 #ifdef HAVE_IPV6
   /* IPv6 unicast. */
   if (peer->afc[AFI_IP6][SAFI_UNICAST])
@@ -1026,7 +1035,12 @@ bgp_open_capability (struct stream *s, struct peer *peer)
       stream_putc (s, CAPABILITY_CODE_MP_LEN);
       stream_putw (s, AFI_IP6);
       stream_putc (s, 0);
-      stream_putc (s, SAFI_UNICAST);
+      stream_putc (s, SAFI_UNICAST);      
+#endif
+#if defined(USE_SRX) && defined(HAVE_IPV6)
+      mpnlri_v6_announced = true;
+#endif
+#ifdef HAVE_IPV6
     }
   /* IPv6 multicast. */
   if (peer->afc[AFI_IP6][SAFI_MULTICAST])
@@ -1039,6 +1053,11 @@ bgp_open_capability (struct stream *s, struct peer *peer)
       stream_putw (s, AFI_IP6);
       stream_putc (s, 0);
       stream_putc (s, SAFI_MULTICAST);
+#endif
+#if defined(USE_SRX) && defined(HAVE_IPV6)
+      mpnlri_v6_announced = true;
+#endif
+#ifdef HAVE_IPV6
     }
 #endif /* HAVE_IPV6 */
 
@@ -1107,7 +1126,7 @@ bgp_open_capability (struct stream *s, struct peer *peer)
     makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_SEND, BGPSEC_CAP_AFI_IPv4);
 
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC]  %s: BGPSEC SEND Capability set", __FUNCTION__);
+      zlog_debug("[BGPSEC]  %s: BGPSEC SEND Capability set for IPv4", __FUNCTION__);
   }
 
   if(CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
@@ -1120,12 +1139,46 @@ bgp_open_capability (struct stream *s, struct peer *peer)
     makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_RECV, BGPSEC_CAP_AFI_IPv4);
 
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC]  %s: BGPSEC RECV Capability set", __FUNCTION__);
+      zlog_debug("[BGPSEC]  %s: BGPSEC RECV Capability set for IPv4", __FUNCTION__);
   }
   else if(!CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
   {
     if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC]  %s: BGPSEC Capability NOT set", __FUNCTION__);
+      zlog_debug("[BGPSEC]  %s: BGPSEC Capability NOT set for IPv4", __FUNCTION__);
+  }
+
+  /* BGPSec capability IPv6  */
+  if (mpnlri_v6_announced 
+      && (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND)))
+  {
+    /* direction - send, IPv6 capability */
+    stream_putc (s, BGP_OPEN_OPT_CAP);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN + 2);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN);
+    makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_SEND, BGPSEC_CAP_AFI_IPv6);
+
+    if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      zlog_debug("[BGPSEC]  %s: BGPSEC SEND Capability set for IPv6", __FUNCTION__);
+  }
+
+  if (mpnlri_v6_announced 
+      && (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV)))
+  {
+    /* direction -  recv, IPv6 capability */
+    stream_putc (s, BGP_OPEN_OPT_CAP);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN + 2);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC);
+    stream_putc (s, CAPABILITY_CODE_BGPSEC_LEN);
+    makeBgpsecCapability(s, BGPSEC_CAP_VERSION, BGPSEC_CAP_DIR_RECV, BGPSEC_CAP_AFI_IPv6);
+
+    if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      zlog_debug("[BGPSEC]  %s: BGPSEC RECV Capability set for IPv6", __FUNCTION__);
+  }
+  else if(!CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
+  {
+    if (BGP_DEBUG (bgpsec, BGPSEC_OUT) || BGP_DEBUG(bgpsec, BGPSEC_DETAIL))
+      zlog_debug("[BGPSEC]  %s: BGPSEC Capability NOT set for IPv6", __FUNCTION__);
   }
 
   /* Extended Message Support for BGP */

@@ -19,10 +19,14 @@
  * to set the log method at the beginning of the application - otherwise
  * eventual message will be discarded.
  *
- * @version 0.3.0.7
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0 - 2017/07/03 - oborchert
+ *           * Added missing debug level text
+ *           * Fixed issue in _writeToFile where levels are passed that are 
+ *             unknown.
  * 0.3.0.7 - 2015/04/21 - oborchert
  *           * Added ChangeLog.
  * 0.1.1.0 - 2010/06/25 - borchert
@@ -53,7 +57,8 @@ static const char* LOG_LEVEL_TEXT[] = {
      "WARNING", // 4:LEVEL_WARNING
      "   NOTE", // 5:LEVEL_NOTICE
      "   INFO", // 6:LEVEL_INFO
-     "  DEBUG"  // 7:LEVEL_DEBUG
+     "  DEBUG", // 7:LEVEL_DEBUG
+     "   COMM"  // 8:LEVEL_COMM
 };
 
 /*-----------------

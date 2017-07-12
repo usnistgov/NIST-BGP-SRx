@@ -1,3 +1,35 @@
+Version 0.2.0.8
+  * Modified the valies of BGP_CAP_T_BGPSEC and BGP_UPD_A_TYPE_BGPSEC to
+    the IANA assigned values. 
+    For backwards compatibility with code written during the time where IANA did
+    not have the values assigned yet, these values still can be modified during 
+    compile time to other values using -DBGP_CAP_T_BGPSEC=<num> etc.
+Version 0.2.0.7
+  * Added define CREATE_TESTVECTOR to allow easy generation of a test vector
+    printout as it is done for draft-ietf-sidr-bgpsec-algs-17
+  * Modified k for BIO-K1 to use the k as advertised.
+  * Added flow control if peer cannot keep up with the packets BIO slows down
+    sending.
+  * Added code to generate BGP4 updates if bgpsec is not negotiated for the 
+    particular update type (IPv4/IPv6). This only applies to updates that are 
+    generated "on the fly". Pre-stored updates still are send regardless of the
+    negotiation.
+  * Removed default disabling of BGPsec IPv6 Sending capability.
+  * Enhanced Notification printer to include Capabilities being printed for
+    'Unsupported Capabilities' Notification message.
+  * Added missing capabilities to 'Unsupported Capability' notification.
+  * Added missing portions of detailed OPEN message in printer.
+  * Added script bio-traffic.sh for large update generation.
+  * Added more info to error message for invalid scripted update messages.
+  * Fixed IPv6 handling
+  * Added CFLAGS parameter to allow printing digest and signature during
+    signing operation. This switch might be replaced with a configuration
+    setting in future versions.
+  * Added CFLAGS attributes BGP_CAP_T_BGPSEC and BGP_UPD_A_TYPE_BGPSEC to
+    allow setting these IANA assigned values during configuration / compile
+    time. These switches are temporary.
+Version 0.2.0.6
+  * Added extended message capability
 Version 0.2.0.5
   * Added configuration of bgpsec capabilities.
   * Added missing capability exchange for extended BGP messages (>4096) bytes

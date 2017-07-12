@@ -23,10 +23,12 @@
  * 
  * The reverse mode might be possible in future updates.
  * 
- * @version 0.2.0.2
+ * @version 0.2.0.7
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/05/03 - borchert
+ *            * BZ1122: Fixed problems with piped updates.
  *  0.2.0.2 - 2016/11/14 - borchert
  *            * Fixed speller in documentation.
  *          - 2016/06/29 - borchert
@@ -81,7 +83,7 @@ static bool _checkSTDIN(int sec, int msec)
   {
     ready = true;
   }
-
+  
   return ready;
 }
 
@@ -110,21 +112,31 @@ bool isUpdateStackEmpty(PrgParams* params, bool inclStdIn)
       lineLen = strlen(line);
       if (lineLen != 0)
       {
-        if (line[lineLen-1] == '\n')
+        if (lineLen <= MAX_LINE_LEN)
         {
-          line[lineLen-1] = '\0';
-          update = createUpdate(line, params);
-          if (update != NULL)
+          if (line[lineLen-1] == '\n')
           {
-            pushStack(&params->updateStack, update);
-            isEmpty = false;
+            // Replace a possible CR with '\0'
+            line[lineLen-1] = '\0';
+            update = createUpdate(line, params);
+            if (update != NULL)
+            {
+              pushStack(&params->updateStack, update);
+              isEmpty = false;
+            }
+          }
+          else
+          {
+            printf("ERROR: Piped input is not closed with new line (\\n)- "
+                   "drop input to prevent dead loop!!'\n");            
+            printf ("   Line: '%s'\n", line);
           }
         }
         else
         {
-          printf("ERROR: Input line exceeded maximum size of %i bytes.\n", 
-                 MAX_DATABUF);
-          printf ("Line: %s\n", line);
+          printf("ERROR: Piped input line exceeded maximum size of %i bytes.\n", 
+                 MAX_LINE_LEN);
+          printf ("   Line: '%s'\n", line);
         }
       }
     }

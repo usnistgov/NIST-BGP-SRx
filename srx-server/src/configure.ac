@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.4.0.2], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.5.0.0], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -30,18 +30,26 @@ VER_INFO=$current.$age.$revision
 
 
 # Determine if it is 64 Bit. This is needed for the ld.conf.d. file.
+is_64_bit="no"
 case "$HOSTTYPE" in
+  x86_64-linux)
+    is_64_bit="yes"
+    ;;
   x86_64) 
-    AC_SUBST([CPU_ARCH],[-x86_64])
-    AC_SUBST([LD_ARCH_LOC],[64])
+    is_64_bit="yes"
     ;;
   *) 
     AC_SUBST([CPU_ARCH],[]) 
     AC_SUBST([LD_ARCH_LOC],[])
+    AC_SUBST([CONFIG_INT],[long])
     ;;
 esac
-if test "${libdir}" = "\${exec_prefix}/lib" ; then
-  libdir="${libdir}$LD_ARCH_LOC"
+if test "${is_64_bit}" = "yes"; then
+  AC_SUBST([CPU_ARCH],[-x86_64])
+  AC_SUBST([LD_ARCH_LOC],[64])
+  if test "${libdir}" = "\${exec_prefix}/lib" ; then
+    libdir="${libdir}64"
+  fi
 fi
 
 # Checks for programs.
@@ -169,12 +177,26 @@ AS_BOX(Processing required libraries!)
 ##
 ## Library: libconfig
 ##
-AC_SEARCH_LIBS([config_init], [config], [], 
-  [AC_MSG_ERROR([
+have_libconfig=yes
+AC_SEARCH_LIBS([config_init], [config], [], [have_libconfig=no])
+if test "${have_libconfig}" = "no"; then
+  AC_MSG_ERROR([
 	--------------------------------------------------
 	The library 'libconfig' is required to build 
 	srx_server.
-	--------------------------------------------------])])
+	--------------------------------------------------])
+else
+  # Now specify which int type to use which depends on the library type.
+  AC_MSG_CHECKING(for libconfig int type)
+  ldconfig -v 2>/dev/null | grep libconfig.so.8 > /dev/null
+  if test "$?" = "0"; then      
+    LCONFIG_INT=long
+  else
+    LCONFIG_INT=int
+  fi
+  CFLAGS="$CFLAGS -DLCONFIG_INT=$LCONFIG_INT"
+  AC_MSG_RESULT($LCONFIG_INT)
+fi
 
 ##
 ## Library: dl
@@ -214,6 +236,38 @@ AC_SEARCH_LIBS([pthread_create], [pthread],
 	--------------------------------------------------
 	The library 'pthread' is required to build srx_server.
 	--------------------------------------------------])])
+
+##
+## CHECK FOR config library
+##
+have_config=no
+AC_SEARCH_LIBS([config_init], [config], [have_config=yes])
+if test "${have_config}" = no; then
+  AC_MSG_ERROR([
+	--------------------------------------------------
+	The config library required to build srx_server.
+	For Fedora/CentOS please install "libconfig"
+	--------------------------------------------------])
+else  
+  AC_CHECK_HEADERS([libconfig.h], [have_headers=yes], [have_headers=no])
+  if test "${have_headers}" = no; then
+    AC_MSG_ERROR([
+    --------------------------------------------------
+    libconfig.h is missing, install the libconfig 
+    header. For fedora/CentOS install libconfig-devel.
+    --------------------------------------------------])
+  fi
+  # Now specify which int type to use which depends on the library type.
+  AC_MSG_CHECKING(for libconfig int type)
+  /sbin/ldconfig -v 2>/dev/null | grep libconfig.so.8 > /dev/null
+  if test "$?" = "0"; then      
+    LCONFIG_INT=long
+  else
+    LCONFIG_INT=int
+  fi
+  CFLAGS="$CFLAGS -DLCONFIG_INT=$LCONFIG_INT"
+  AC_MSG_RESULT($LCONFIG_INT)
+fi
 
 ##
 ## Library: SRxCryptoAPI - Starting with version >= 0.4.0
@@ -361,6 +415,18 @@ fi
 AC_SUBST(LIB_PATRICIA)
 AS_BOX([LIB_PATRICIA: '$LIB_PATRICIA'])
 
+AC_MSG_CHECKING([whether test tools have to be generated])
+AC_ARG_WITH([buildtest], 
+            [  --with-builtest         build test tools],
+              [case "${withval}" in
+                yes) buildtest=true ;;
+                no) buildtest=false ;;
+                *) AC_MSG_ERROR([bad value ${withval} for --width-buildtest]) 
+                   ;;
+              esac], [buildtest=false])
+AC_MSG_RESULT([${withval}])
+AM_CONDITIONAL([BUILD_TEST], [test x$buildtest = xtrue])
+
 AS_BOX(Processing required headers)
 # Checks for header files.
 #                  winsock.h \
@@ -371,7 +437,6 @@ AC_CHECK_HEADERS([ \
                   errno.h \
                   fcntl.h \
                   getopt.h \
-                  libconfig.h \
                   malloc.h \
                   netdb.h \
                   patricia.h \
@@ -425,16 +490,17 @@ AC_SUBST(MAJOR_VER)
 AC_SUBST(MINOR_VER)
 AC_SUBST(UPD_VER)
 AC_SUBST(PACKAGE_VERSION)
+AC_SUBST(LCONFIG_INT)
 
 # Checks for library functions.
 AS_BOX(Processing library functions)
 #AC_FUNC_MALLOC
 #AC_FUNC_REALLOC
-AC_CHECK_FUNCS([bzero gethostbyname memset socket strchr strrchr strdup strerror strtol strtoul], 
-               [], [AC_MSG_ERROR([
-	--------------------------------------------------
-	Not all required system functions are available.
-	--------------------------------------------------])])
+#AC_CHECK_FUNCS([gethostbyname memset socket strchr strrchr strdup strerror strtol strtoul], 
+#               [], [AC_MSG_ERROR([
+#	--------------------------------------------------
+#	Not all required system functions are available.
+#	--------------------------------------------------])])
 
 AS_BOX(Processing additional configuration settings)
 AC_SUBST([CFG_PREFIX], [${prefix}])
@@ -463,5 +529,6 @@ echo "Patricia Trie..: $LIB_PATRICIA"
 echo "Doxygen........: ${DOXYGEN:-NONE}"
 echo "CPU Type.......: $CPU_ARCH"
 echo "Library........: $VER_INFO ($LIB_VER_INFO)"
+echo "LCONFIG_INT....: $LCONFIG_INT"
 echo "RPM Incl. la...: ${incl_la_lib}"
-
+echo "Build Test.....: ${buildtest}"

@@ -21,10 +21,23 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.2.0.5
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/03/23 - oborchert 
+ *            * Removed DEBUG_SIGN and added CREATE_TESTVECTOR.
+ *          - 2017/03/22 - oborchert
+ *            * PRINT_CRYPTO used in incorrect hash length of 28 bytes rather than
+ *              the correct length of 32 bytes.
+ *            * Added function CRYPTO_k_to_string.
+ *            * BIO-K1 used the wrong 'k'. I replaced it.
+ *            * Specified K in the header but still initialized in the code.
+ *          - 2017/02/28 - oborchert
+ *            * Removed comma after '#endif' statement
+ *          - 2017/02/17 - oborchert
+ *            * BZ1117 Added define block PRINT_CRYPTO that allows to print the 
+ *              generated digest and the resulting signature.
  *  0.2.0.5 - 2016/12/28 - oborchert
  *            * Modified newly added code to use newly added configuration 
  *              settings
@@ -63,6 +76,13 @@
 #include <netdb.h>
 #include <srx/srxcryptoapi.h>
 #include "bgpsec/Crypto.h"
+#include "bgp/printer/BGPHeaderPrinter.h"
+
+// CREATE_TESTVECT is a compiler setting that allows to generate a test vector
+// print as it is done for Apendix a of draft-ietf-sidr-bgpsec-algs-17
+#ifdef CREATE_TESTVECTOR
+#define PRINT_CRYPTO
+#endif
 
 /**
  * This function will load the OpenSSL version EC_KEY of the DER encoded key.
@@ -141,26 +161,7 @@ int fixed_k_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
   EC_POINT *tmp_point = NULL;
   const EC_GROUP *group;
   int ret = 0;
-
-  //fixed k
-//  unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_sample[] = {
-//    0xA6, 0xE3, 0xC5, 0x7D, 0xD0, 0x1A, 0xBE, 0x90, 
-//    0x08, 0x65, 0x38, 0x39, 0x83, 0x55, 0xDD, 0x4C, 
-//    0x3B, 0x17, 0xAA, 0x87, 0x33, 0x82, 0xB0, 0xF2, 
-//    0x4D, 0x61, 0x29, 0x49, 0x3D, 0x8A, 0xAD, 0x60};
-
-  unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_test[] = {
-    0xD1, 0x6B, 0x6A, 0xE8, 0x27, 0xF1, 0x71, 0x75, 
-    0xE0, 0x40, 0x87, 0x1A, 0x1C, 0x7E, 0xC3, 0x50, 
-    0x01, 0x92, 0xC4, 0xC9, 0x26, 0x77, 0x33, 0x6E, 
-    0xC2, 0x53, 0x7A, 0xCA, 0xEE, 0x00, 0x08, 0xE0};
-
-  unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_sample[] = {
-    0x58, 0x0e, 0xc0, 0x0d, 0x85, 0x64, 0x34, 0x33,
-    0x4c, 0xef, 0x3f, 0x71, 0xec, 0xae, 0xd4, 0x96,
-    0x5b, 0x12, 0xae, 0x37, 0xfa, 0x47, 0x05, 0x5b,
-    0x19, 0x65, 0xc7, 0xb1, 0x34, 0xee, 0x45, 0xd0};
-  
+    
   unsigned char* nist_p256_testvec_k = NULL;
   
   switch (k_mode)
@@ -362,30 +363,6 @@ err:
   return (ret);
 }
 
-#ifdef DEBUG_SIGN
-/**
- * performs openssl sign action
- *
- * @param digest char string in which message digest contained
- * @param digest_len message digest length
- * @param eckey_key is ECDSA key used for signing
- * @param signatureBuff The buffer where the signature is stored in
- * @param verifyToo verify after signing.
- * @param k_mode Specifies if a random k (preferred) or a specified k has to be 
- *        used.
- *
- * @return signature length or 0
- */
-static int _signECDSA (u_int8_t* digest, int digest_len, EC_KEY* ecdsa_key, 
-                      u_int8_t* signatureBuff, bool verifyToo, 
-                      SignatureGenMode k_mode)
-{
-  int len = sprintf((char*)signatureBuff, "Hello");
-  return len;
-}
-
-#else
-
 /**
  * performs openssl sign action
  *
@@ -488,8 +465,6 @@ static int _signECDSA (u_int8_t* digest, int digest_len, EC_KEY* ecdsa_key,
   return sig_len;
 }
 
-#endif // DEBUG_SIGN
-
 /**
  * Create the signature from the given hash for the ASN. The given signature 
  * must be NULL. The return value is the signature in a memory allocated into 
@@ -560,9 +535,13 @@ int CRYPTO_createSignature(TASList* asList, tPSegList* segElem,
     // Generate the hash (messageDigest that will be signed.)
     _createSha256Digest (message, len, (u_int8_t*)&messageDigest);
     // Sign the data
-/*    printf ("Digest: ");
-    printHex(messageDigest, SHA224_DIGEST_LENGTH, "        ");
-    printf ("k-mode: ");
+#ifdef PRINT_CRYPTO
+    printf ("\nSignature:\n");
+    printf ("----------");
+    printf ("\nk-mode: ");
+    char k_str[STR_MAX];
+    memset (k_str, '\0', STR_MAX);
+    CRYPTO_k_to_string(k_str, STR_MAX, k_mode);
     switch (k_mode)
     {
       case SM_CAPI:
@@ -572,15 +551,17 @@ int CRYPTO_createSignature(TASList* asList, tPSegList* segElem,
         printf("BIO\n");
         break;
       case SM_BIO_K1:
-        printf("BIO-K1\n");
+        printf("BIO-K1 k=%s\n", k_str);
         break;
       case SM_BIO_K2:
-        printf("BIO-K2\n");
+        printf("BIO-K2 k=%s\n", k_str);
         break;
       default:
         printf ("???\n");            
     }
-*/
+    printf ("Digest:    ");
+    printHex(messageDigest, SHA256_DIGEST_LENGTH, "           ");
+#endif
     sigLen = _signECDSA ((u_int8_t*)&messageDigest, SHA256_DIGEST_LENGTH, 
                         ecdsa_key, (u_int8_t*)&sigBuff, testSig, k_mode);
     if (sigLen > 0)
@@ -589,9 +570,11 @@ int CRYPTO_createSignature(TASList* asList, tPSegList* segElem,
       segElem->signature = malloc(sigLen);
       memset(segElem->signature, 0, sigLen);
       memcpy(segElem->signature, sigBuff, sigLen);
-      
-//      printf("Signature: ");      
-//      printHex(segElem->signature, sigLen, "           ");
+#ifdef PRINT_CRYPTO       
+      printf("Signature: ");      
+      printHex(segElem->signature, sigLen, "           ");
+      printf("\n");
+#endif
     }           
   }
     
@@ -749,4 +732,51 @@ TASList* preloadKeys(char* fileName, char* keyRoot, bool addEC_KEY,
   }
   
   return asList;
+}
+
+/**
+ * Print the K as hex strin ginto the given hex buffer.
+ * this function returns false if the hex buffer was not large enough or if the 
+ * given k type was invalid.
+ * 
+ * @param str_buff The buffer where k will be written into as string
+ * @param buff_size The size of the buffer
+ * @param k_mode the k that is selected
+ * 
+ * @return true if the selected k could be printed into the string.
+ */
+bool CRYPTO_k_to_string(char* str_buff, int buff_size, SignatureGenMode k_mode)
+{
+  bool retVal = false;
+  int  maxStrLen = ( CRYPTO_K_SIZE * 2 ) + 1;
+  unsigned char* k;
+  
+  if ((str_buff != NULL) && (buff_size > maxStrLen))
+  {
+    switch (k_mode)
+    {
+      case SM_BIO_K1:
+        k = nist_p256_rfc6979_A_2_5_SHA256_k_sample;
+        break;
+      case SM_BIO_K2:
+        k = nist_p256_rfc6979_A_2_5_SHA256_k_test;
+        break;
+      default:
+        break;
+    }
+    
+    if ( k != NULL)
+    {
+      char* ptr = str_buff;
+      memset (str_buff, '\0', buff_size);
+      int idx = 0;
+      for (idx = 0; (idx < CRYPTO_K_SIZE) && (maxStrLen > 0); idx++, k++)
+      {
+        ptr += snprintf(ptr, maxStrLen, "%02X", *k);
+        maxStrLen -= 2;        
+      }
+    }
+  }
+    
+  return retVal;
 }

@@ -24,10 +24,18 @@
  * send BGP updates. It keeps the session open as long as the program is running 
  * or for a pre-determined time after the last update is send.
  * 
- * @version 0.2.0.5
+ * @version 0.2.0.7
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/04/27 - oborchert
+ *            * Fixed BUG in BGP-4 AS_PATH with more than 255 AS numbers in the
+ *              path. (BZ1154)
+ *          - 2017/02/16 - oborchert
+ *            * Fixed bug in next hop IPv6.
+ *          - 2017/02/10 - oborchert
+ *            * Updated code to reflect modification of bgp identifier stored in
+ *              network rather than host format.
  *  0.2.0.5 - 2016/11/15 - oborchert
  *            * Fixed BZ1053 - always use 4 bytes for IPv4 next hop in MPNLRI.
  *          - 2016/10/21 - oborchert
@@ -136,7 +144,7 @@ int createOpenMessage(u_int8_t* buff, int buffSize, BGP_SessionConf* config)
     openMsg->my_as         = htons(23456);
   }
   openMsg->hold_time       = htons(config->holdTime);
-  openMsg->bgp_identifier  = htonl(config->bgpIdentifier);
+  openMsg->bgp_identifier  = config->bgpIdentifier;
   openMsg->opt_param_len   = paramLength;
   buff += sizeof(BGP_OpenMessage);
 
@@ -430,11 +438,12 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP,
   }
   asntok_reset_th(&tok);
 
-  // calculate  the length required for storing the AS numbers alone.
+  // calculate  the length required for storing only the AS numbers.
   int length = pLength * 4;
-  // calculate the number of segments
-  int segments = (length > 0) ? (int)(length / 255) + 1 : 0;
-
+  // calculate the number of segments needed to store the AS numbers
+  int segments = (pLength > 0) ? (int)(pLength / 255) + 1 : 0;
+  // calculate the total byte size needed to store the AS numbers including
+  // the required header size for each needed AS_PathSegment
   int attrLength = segments * sizeof(BGP_Upd_AS_PathSegment) + length;
 
   if (attrLength > buffSize)
@@ -481,8 +490,11 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP,
       }
     }
   }
-  
-  free(longPath);
+  if (longPath != NULL)
+  {
+    memset(longPath, '\0', strlen(longPath));
+    free(longPath);
+  }
   longPath = NULL;
   
   return asPath;
@@ -495,24 +507,25 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP,
  * The parameter useMPNLRI will be internally set to true for all IPv6
  * prefixes.
  * 
- * @param buff The  pre-allocated memory of sufficient size
- * @param buffSize  The size of the buffer
- * @param pathAttr  The buffer containing either the BGPSec path attribute or the
- *                  BGP4 ASpath attribute. (wire format)
- * @param origin    The origin of the prefix.
- * @param localPref USe local pref attribute if > 0
- * @param nextHop   The next hop IP address. (HOST FORMAT)
- * @param nlri The  NLRI to be used. Depending on the AFI value it will be 
- *                  typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
- * @param useMPNLRI Encode IPv4 prefixes as MPNLRI within the path attribute, 
- *                  otherwise V4 addresses will be added at the end as NLRI
+ * @param buff The   pre-allocated memory of sufficient size
+ * @param buffSize   The size of the buffer
+ * @param pathAttr   The buffer containing either the BGPSec path attribute or
+ *                   the BGP4 ASpath attribute. (wire format)
+ * @param origin     The origin of the prefix.
+ * @param localPref  USe local pref attribute if > 0
+ * @param nextHop    Pointer to nextHop address; Must be either a 
+ *                   (struct sockaddr_in*) or (struct sockaddr_in6*) pointer.
+ * @param nlri       The NLRI to be used. Depending on the AFI value it will be 
+ *                   typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
+ * @param useMPNLRI  Encode IPv4 prefixes as MPNLRI within the path attribute, 
+ *                   otherwise V4 addresses will be added at the end as NLRI
  *                  
  * 
  * @return the number of bytes used or if less than 0 the number of bytes missed
  */
 int createUpdateMessage(u_int8_t* buff, int buffSize, 
                         BGP_PathAttribute* pathAttr, u_int8_t origin,
-                        u_int32_t localPref, u_int64_t nextHop, 
+                        u_int32_t localPref, void* nextHop, 
                         BGPSEC_PrefixHdr* nlri, bool useMPNLRI)
 {
   int idx = 0; 
@@ -577,17 +590,6 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
   attrOrigin->origin = origin;
   buff += sizeOrigin;
          
-  if (!useMPNLRI)
-  {
-    // Set the next hop
-    BGP_Upd_Attr_NextHop* attrNextHop    = (BGP_Upd_Attr_NextHop*)buff;
-    attrNextHop->pathattr.attr_flags     = BGP_UPD_A_FLAGS_TRANSITIVE;
-    attrNextHop->pathattr.attr_type_code = BGP_UPD_A_TYPE_NEXT_HOP;
-    attrNextHop->length  = sizeof(attrNextHop->nextHop); //4;
-    attrNextHop->nextHop = htonl(nextHop); // must be send in network format.
-    buff += sizeNextHop;
-  }
-  
   // Set MED (Optional)
   BGP_Upd_Attr_MED* attrMED = (BGP_Upd_Attr_MED*)buff;
   attrMED->pathattr.attr_flags     = BGP_UPD_A_FLAGS_OPTIONAL;
@@ -607,9 +609,21 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     buff += sizeLocPref;
   }
   
-  // If MPNLRI set it here
-  if (useMPNLRI)
+  if (!useMPNLRI)
   {
+    // Set the next hop
+    BGP_Upd_Attr_NextHop* attrNextHop    = (BGP_Upd_Attr_NextHop*)buff;
+    attrNextHop->pathattr.attr_flags     = BGP_UPD_A_FLAGS_TRANSITIVE;
+    attrNextHop->pathattr.attr_type_code = BGP_UPD_A_TYPE_NEXT_HOP;
+    attrNextHop->length  = sizeof(attrNextHop->nextHop); //4;
+    
+    struct sockaddr_in* nh = (struct sockaddr_in*)nextHop;
+    attrNextHop->nextHop = nh->sin_addr.s_addr; 
+    buff += sizeNextHop;
+  }
+  else
+  {
+    // If MPNLRI set it here
     BGP_Upd_Attr_MPNLRI_1* attrMPNLRI_1 = (BGP_Upd_Attr_MPNLRI_1*)buff;
     attrMPNLRI_1->pathattr.attr_flags     = BGP_UPD_A_FLAGS_OPTIONAL;
     attrMPNLRI_1->pathattr.attr_type_code = BGP_UPD_A_TYPE_MP_REACH_NLRI;
@@ -617,26 +631,29 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     
     attrMPNLRI_1->afi  = nlri->afi;
     attrMPNLRI_1->safi = nlri->safi;
-    // Fix BZ1053: for IPV4 always use all 4 bytes.
+    
+    // move the buffer to the next hop IP
+    buff += sizeof(BGP_Upd_Attr_MPNLRI_1);
+
     if (ntohs(nlri->afi) == AFI_V4)
     {
       // if V4 don't use padding for the next hop
       attrMPNLRI_1->nextHopLen = 4;
+      struct sockaddr_in* nh = (struct sockaddr_in*)nextHop;
+      u_int32_t nextHopV4 = nh->sin_addr.s_addr;
+      memcpy(buff, &nextHopV4, 4);
+      buff += 4;    
     }
     else
     {
-        attrMPNLRI_1->nextHopLen = numBytesForIP(nextHop);    
+      // Use all 16 bytes. the address is already in network format, so 
+      // just copy the array intot he buffer.
+      attrMPNLRI_1->nextHopLen = 16;    
+      struct sockaddr_in6* nh = (struct sockaddr_in6*)nextHop;
+      memcpy (buff, nh->sin6_addr.__in6_u.__u6_addr8, 16);
+      buff += 16;
     }
-    
-    // move the buffer to the next hop IP
-    buff += sizeof(BGP_Upd_Attr_MPNLRI_1);
-    
-    // now store the next hop (this moved the buffer as well)
-    for (idx = (attrMPNLRI_1->nextHopLen-1); idx >= 0; idx--)
-    {
-      *buff = ((nextHop >> (idx * 8)) & 0xFF);
-      buff++;
-    }
+        
     
     // Now take care of the MPNLRI
     BGP_Upd_Attr_MPNLRI_2* attrMPNLRI_2 = (BGP_Upd_Attr_MPNLRI_2*)buff;

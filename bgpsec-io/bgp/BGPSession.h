@@ -22,10 +22,15 @@
  *
  * This header provides the function headers for the BGPSocket loop.
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/01/20 - oborchert
+ *            * BZ1043: Added defines for socket flow control.
+ *          - 2017/03/09 - oborchert
+ *            * BZ1133: Removed function checkMessageHeader, it is now static 
+ *              within BGPSession.c and not accessible from outside.
  *  0.2.0.0 - 2016/05/10 - oborchert
  *            * Fixed compiler warnings BZ950
  *            * Renamed function _shutDownTCPSession into shutdownTCPSession an
@@ -55,6 +60,12 @@
 
 /** Buffer mostly used for Open, KeepAlive, Notification */
 #define SESS_MIN_SEND_BUFF 1024
+
+/** Time in seconds the receiver thread sleeps when a socket timeout occured. */
+#define SESS_FLOW_CONTROL_SLEEP 10
+
+/** Continuous attempts to resend an update not send due to socket timeout. */
+#define SESS_FLOW_CONTROL_REPEAT 10
 
 /** The default sleep time in the receiver loop */
 #define SESS_DEV_RCV_SLEEP 1
@@ -165,30 +176,34 @@ int readNextBGPMessage(BGPSession* session, int timeout);
 bool sendOpenMessage(BGPSession* session);
 
 /**
- * Send a keepalive to the peer. The FSM must be in ESTABLISHED
+ * Send a keepalive to the peer. The FSM must be in ESTABLISHED.
+ * This function allows retying to send in case the socket experienced a 
+ * timeout. This can happen is the peer cannot keep up with the speed of the 
+ * sending.
  * 
  * @param session the session where to send to
+ * @param retryCounter The number of times the sending should be retried prior 
+ *                     return returning false.
  * 
- * @return true if the mesage could be sent otherwise false.
+ * @return true if the message could be sent otherwise false.
  */
-bool sendKeepAlive(BGPSession* session);
+bool sendKeepAlive(BGPSession* session, int retryCounter);
 
 /**
- * Send a notification to the peer. This function will update the 
- * session.lastSent value.
+ * Send a notification to the peer, closes the connection and moved the
+ * FSM to IDLE
  * 
  * @param session The session to send the notification to.
  * @param error_code The error code of the notification.
  * @param subcode the subcode of the error.
  * @param dataLength The length of the attached data (can be zero)
  * @param data the data to attach.
- * 
- * @param type the type of the notification.
+ * @param retryCounter The number of retries in case the socket timed out.
  * 
  * @return true if successful, otherwise false.
  */
 bool sendNotification(BGPSession* session, int error_code, int subcode, 
-                      u_int16_t dataLength, u_int8_t* data);
+                      u_int16_t dataLength, u_int8_t* data, int retryCounter);
 
 /**
  * Send the given BGP update. This function will modify the session.lastSent
@@ -197,10 +212,13 @@ bool sendNotification(BGPSession* session, int error_code, int subcode,
  * @param session The session where to send the update to.
  * 
  * @param update The update to be send.
+ * @param retryCounter Allows to retry sending in case the socket experienced a 
+ *                     timeout.
  * 
  * @return true if the update could be send.
  */
-bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update);
+bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update, 
+                int retryCounter);
 
 
 /**
@@ -211,14 +229,6 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update);
  * @return true if a TCP session could be established.
  */
 bool establishTCPSession(BGPSession* session);
-
-/**
- * Check the message header for correctness. If not correct and a notification 
- * needs to be send, it will do so.
- * 
- * @param session The bgp session.
- */
-bool checkMessageHeader(BGPSession* session);
 
 /**
  * Process the open message while FSM is in FSM_STATE_OpenSent. This function 

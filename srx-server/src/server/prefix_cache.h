@@ -22,10 +22,14 @@
  *
  * Prefix Cache.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/06 - oborchert
+ *            * Added parameter suppressNotification to many internal functions
+ *              to allow to suppress calling the update modification callback 
+ *              and instead adding a RQ_ROA event to the RPKI QUEUE.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  *            * Moved outputPrefixCacheAsXML from c file to header.
@@ -61,7 +65,10 @@
 #include "util/rwlock.h"
 #include "util/slist.h"
 
-
+/** Do call the update change callback */
+#define PC_DONT_SUPPRESS false
+/** Do not call the update change callback */
+#define PC_DO_SUPPRESS   true
 
 /**
  * A single Prefix Cache.
@@ -199,37 +206,43 @@ bool removeUpdate(PrefixCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
  * Add the given ROA white-list entry provided by the specified validation cache
  * with the given session id.
  * ROA white-list entries for ASNs specified in rfc5398 are ignored!
- * 
+ *
  * @param self The prefix cache
  * @param originAS The origin AS of the ROA white-list entry.
  * @param prefix The prefix of the ROA white-list entry to be added
  * @param maxLen The max length of the ROA white-list entry
  * @param session_id The session_id of the validation cache session 
  * @param valCacheID The validation cache ID
- * 
+ * @param suppressNotification Allow to suppress calling the update modification 
+ *                callback
+ *
  * @return true if the ROA white-list entry could be added - false most likely 
  *         indicates a memory problem.
  */
-bool addROAwl(PrefixCache* self, uint32_t originAS, IPPrefix* prefix, 
-              uint8_t maxLen, uint32_t session_id, uint32_t valCacheID);
+bool addROAwl(PrefixCache* self, uint32_t originAS, IPPrefix* prefix,
+              uint8_t maxLen, uint32_t session_id, uint32_t valCacheID,
+              bool suppressNotification);
 
 /**
  * Add the given ROA white-list entry provided by the specified validation cache
  * with the given session id.
  * ROA white-list entries for ASNs specified in rfc5398 are ignored!
- * 
+ *
  * @param self The prefix cache
  * @param originAS The origin AS of the ROA white-list entry.
  * @param prefix The prefix of the ROA white-list entry to be added
  * @param maxLen The max length of the ROA white-list entry
- * @param session_id The session id of the validation cache session 
+ * @param session_id The session id of the validation cache session
  * @param valCacheID The validation cache ID
- * 
+ * @param suppressNotification Allows to suppress calling the update 
+ *                        modification callback function. 
+ *
  * @return true if the ROA white-list entry could be removed. False indicates the
  *         entry was not found at all.
  */
-bool delROAwl(PrefixCache* self, uint32_t originAS, IPPrefix* prefix, 
-              uint8_t maxLen, uint32_t session_id, uint32_t valCacheID);
+bool delROAwl(PrefixCache* self, uint32_t originAS, IPPrefix* prefix,
+              uint8_t maxLen, uint32_t session_id, uint32_t valCacheID,
+              bool suppressNotification);
 
 /**
  * Remove all ROA whitelist entries from the given validation cache with the 

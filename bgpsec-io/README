@@ -32,4 +32,11 @@ to pre-load all keys for processing. For more info on keys see the SRxCryptoAPI
 For all different settings, please call "bgpsec-io -?" or check the 
 configuration file.
 
+Updates are loaded in the following manner:
+  1: Session Updates
+  2: Global Updates
+  3: binary File Updates
+  4: STDIO Updates
+  5: Piped Updates.
+
 For Questions and/or BUG reports please email to bgpsec-dev@nist.gov

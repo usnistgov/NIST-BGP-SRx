@@ -22,10 +22,17 @@
  *
  * Provides functions to print the BGP header in detail.
  * 
+ * @version 0.2.0.7
+ * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.0 - August 19, 2015 - oborchert
- *           * Created File.
+ *  0.2.0.7 - 2017/03/09 - oborchert
+ *            * Removed individual printXXX_Message function with XXX equals the 
+ *              message type.
+ *            * Removed parameters 'title' and 'onlyHeader' from function 
+ *              PrintBGP_Message
+ *  0.0.1.0 - 2015/08/19 - oborchert
+ *            * Created File.
  */
 #ifndef BGPHEADERPRINTER_H
 #define	BGPHEADERPRINTER_H
@@ -48,39 +55,8 @@
  * information or also the following information as hex byte stream
  * 
  * @param hdr The header to be printed
- * @param title a possible title, if NULL a generic title will be generated.
- * @param headerOnly indicates if just the generic header should be printed or
- *        the complete header.
  */
-void printBGP_Message(BGP_MessageHeader* hdr, char* title, bool headerOnly);
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the OpenMessage header.
- */
-void printBGP_Open(BGP_OpenMessage* hdr);
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the OKeepAliveMessage header.
- */
-void printBGP_KeepAlive(BGP_KeepAliveMessage* hdr);
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the NotificationMessage header.
- */
-void printBGP_Notification(BGP_NotificationMessage* hdr);
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the UpdateMessage header.
- */
-void printBGP_Update(BGP_UpdateMessage_1* hdr);
+void printBGP_Message(BGP_MessageHeader* hdr);
 
 #endif	/* BGPHEADERPRINTER_H */
 

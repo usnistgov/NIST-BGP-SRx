@@ -4,38 +4,60 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * The update cache holds the updates in two separate structures, one is the 
- * update cache, a hash table with the update id as key and the update as 
- * value. The other is a list, that allows to scan through all updates. Both 
+ * The update cache holds the updates in two separate structures, one is the
+ * update cache, a hash table with the update id as key and the update as
+ * value. The other is a list, that allows to scan through all updates. Both
  * MUST be maintained the same.
- * 
- * @version 0.4.0.1
+ *
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/11 - kyehwanl
+ *            * Fixed BZ1190 - added missing initialization for cEntry->pathData
+ *          - 2017/07/08 - oborchert
+ *            * Fixed issue with BGPsec results in modifyUpdateResult.
+ *          - 2017/07/07 - oborchert
+ *            * Renamed getUpdateData into getUpdateStats
+ *            * Replaced the CacheEntry::blob and CacheEntry::blob_length with
+ *              CacheEntry::pathData which contains both representations of
+ *              AS list and BGPsec_PATH attribute.
+ *          - 2017/07/06 - oborchert
+ *            * Modified function modifyUpdateResult and added parameter
+ *              suppressNotification which allows to suppress sending update
+ *              notifications being send when the update value changes.
+ *            * Used VRT_... values where appropriate
+ *          - 2017/07/05 - oborchert
+ *            * Function createUpdateCache had a wrong parameter which was also
+ *              replaced inside the function with a define value. Fixed that.
+ *              Correct parameter name 'minNumberOfClients'
+ *          - 2017/06/30 - oborchert
+ *            * Added ski_cache registration if the given update contains the
+ *              BGPSEC portion. - Added code to functions storeUpdate and
+ *              deleteUpdateFromCache
  * 0.4.0.1  - 2016/07/02 - oborchert
  *            * Removed misleading error message. The system generated an error
- *              for each update that could not be stored a second time. 
+ *              for each update that could not be stored a second time.
  *              Duplicates will not be stored - correct behavior and therefore I
  *              removed the misleading message.
  * 0.4.0.0  - 2016/06/19 - oborchert
- *            * Updated the collisionDetection method to conform with the 
+ *            * Updated the collisionDetection method to conform with the
  *              algorithm within the id generation.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
@@ -44,7 +66,7 @@
  *            * Added XML print function
  *          - 2012/12/17 - oborchert
  *            * Changed the logic of function getUpdateResult's signature. Both,
- *              result and default value are out parameters now. 
+ *              result and default value are out parameters now.
  * 0.2.0    - 2011/11/01 - oborchert
  *            * mostly rewritten
  * 0.1.0    - 2010/04/15 - pgleichm
@@ -56,15 +78,18 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <time.h>
+#include <srx/srxcryptoapi.h>
 #include "server/update_cache.h"
 #include "server/server_connection_handler.h"
 #include "server/prefix_cache.h"
+#include "server/ski_cache.h"
 #include "shared/srx_defs.h"
 #include "shared/srx_packets.h"
 #include "util/log.h"
 #include "util/prefix.h"
 #include "util/xml_out.h"
 #include "util/mutex.h"
+#include "main.h"
 
 /* Number of preallocated result slots */
 //#define NUM_PREALLOC  20
@@ -77,31 +102,52 @@
  */
 typedef struct {
   uint8_t* clients;           // clients with value 0 are unused.
-  uint8_t  noPossibleClients; // maximum number of clients in list without 
+  uint8_t  noPossibleClients; // maximum number of clients in list without
                               // extending
-  
+
   SRxUpdateID      updateID;  // the unique update ID.
-  
-  UT_hash_handle   hh;            // The hash table where this entry is stored 
+
+  UT_hash_handle   hh;            // The hash table where this entry is stored
                                   // in
   uint32_t         asn;           // The Origin AS of this update
   IPPrefix         prefix;        // The prefix of this update
   SRxResult        srxResult;     // The result generated by SRx
-  SRxDefaultResult defaultResult; // The result provided by verification 
+  SRxDefaultResult defaultResult; // The result provided by verification
                                   // request.
   uint32_t         roaRefCount;   // the number of ROA's that cover this update
 
   uint16_t         gcFlag;        // Indicates when this entry can be deleted
                                   // by the garbage collector.
-  
-  uint32_t         blobLength;    // The length of the update blob
-  uint8_t*         blob;          // The update blob itself.
+
+  UC_UpdateData    pathData;      // This element replaces the blob.
 } CacheEntry;
 
 // Forward declarations
-bool _addClientReference(UpdateCache* self, CacheEntry* cEntry, 
+bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
                          uint8_t clientID, ProxyClientMapping* clientMapping);
 uint16_t getGCTime(uint16_t keepTime);
+
+/**
+ * Clean up the cache data element.
+ *
+ * @param data The cache data element.
+ *
+ * @since 0.5.0.0
+ */
+static void _cleanCachPathData(CacheEntry* cEntry)
+{
+  UC_UpdateData* data = &cEntry->pathData;
+
+  if (data->asn_path != NULL)
+  {
+    free(data->asn_path);
+  }
+  if (data->bgpsec_path != NULL)
+  {
+    free(data->bgpsec_path);
+  }
+  memset(data, 0, sizeof(UC_UpdateData));
+}
 
 /**
  * This function selects the data from bgpsecData that is used for ID generation
@@ -110,44 +156,70 @@ uint16_t getGCTime(uint16_t keepTime);
  * ID finding are given.
  * This method copies the data from bgpsecData into the cache entry. Therefore
  * the memory allocated in bgpsecData can safely be deallocated.
- * 
+ *
  * @param cEntry The cache entry where the blob data will be stored in.
- * @param bgpsecData The bgpsec (and bgp4) data that has to be stored.
- * 
+ * @param bgpData The BGPsec / BGP4 data that has to be stored.
+ * @param prefix The prefix of the update (in network order)
+ *               (MUST NOT BE NULL FOR BGPSEC)
+ *
  * @return false if the cache entry already contains data,otherwise true.
- * 
- * @since 0.4.0.0 
- * 
+ *
+ * @since 0.4.0.0
+ *
  * @see srx_identifier.h::generateIdentifier
  */
-bool storeCacheEntryBlob(CacheEntry* cEntry, BGPSecData* bgpsecData)
+bool storeCacheEntryBlob(CacheEntry* cEntry, BGPSecData* bgpData,
+                         IPPrefix* prefix)
 {
-  bool retVal = false;
-  
-  if (cEntry->blob == NULL)
+  bool retVal  = false;
+  int  dataLen = 0;
+  if (cEntry != NULL)
   {
-    if (bgpsecData->attr_length != 0)
+    UC_UpdateData* data = &cEntry->pathData;
+    // First check if cEntry is ready for new data
+    if ((data->asn_path == NULL) && (data->bgpsec_path == NULL))
     {
-      cEntry->blobLength = bgpsecData->attr_length;
-      cEntry->blob = malloc(cEntry->blobLength);
-      if (cEntry->blob != NULL)
-      {
-        memcpy(cEntry->blob, bgpsecData->bgpsec_path_attr, cEntry->blobLength);
-        retVal = true;
+      retVal = true;
+      memset (&data->nlri, 0, sizeof(SCA_Prefix));
+
+      data->myAS = bgpData->local_as;
+      if (prefix != NULL)
+      { // Needed for BGPsec
+        data->nlri.afi    = bgpData->afi;
+        data->nlri.safi   = bgpData->safi;
+        data->nlri.length = prefix->length;
+        if (prefix->ip.version == 4)
+        {
+          int size = sizeof(struct in_addr);
+          memcpy(&data->nlri.addr.ipV4, &prefix->ip.addr.v4.in_addr, size);
+        }
+        else
+        {
+          int size = sizeof(struct in6_addr);
+          memcpy(&data->nlri.addr.ipV6, &prefix->ip.addr.v6.in_addr, size);
+        }
       }
-    }
-    else
-    {
-      cEntry->blobLength = bgpsecData->numberHops * 4;
-      cEntry->blob = malloc(cEntry->blobLength);
-      if (cEntry->blob != NULL)
+
+      // Copy AS path (list of AS numbers)
+      if (bgpData->numberHops > 0)
       {
-        memcpy(cEntry->blob, bgpsecData->asPath, cEntry->blobLength);
-        retVal = true;
+        data->hops = bgpData->numberHops;
+        dataLen = bgpData->numberHops * 4;
+        data->asn_path = malloc(dataLen);
+        memcpy(data->asn_path, bgpData->asPath, dataLen);
+      }
+
+      // Copy BGPsec path (BGPsec_PATH attribute)
+      if (bgpData->attr_length != 0)
+      {
+        data->length      = bgpData->attr_length;
+        data->bgpsec_path = malloc(bgpData->attr_length);
+        memcpy(data->bgpsec_path, bgpData->bgpsec_path_attr,
+               bgpData->attr_length);
       }
     }
   }
-  
+
   return retVal;
 }
 
@@ -159,17 +231,17 @@ bool storeCacheEntryBlob(CacheEntry* cEntry, BGPSecData* bgpsecData)
 /**
  * This method searches the cache for the update with the given update id.
  * if found the result is written into the out pointer.
- * 
+ *
  * @param self The reference for the update cache
  * @param updateID The update ID to search for.
  * @param out the cache entry containing the update in case it was found.
- * 
+ *
  * @return true if the update was found, otherwise false.
  */
-static bool tableFind(UpdateCache* self, SRxUpdateID updateID, CacheEntry** out) 
+static bool tableFind(UpdateCache* self, SRxUpdateID updateID, CacheEntry** out)
 {
   acquireReadLock(&self->tableLock);
-  HASH_FIND(hh, (CacheEntry*)self->table, &updateID, sizeof(SRxUpdateID), 
+  HASH_FIND(hh, (CacheEntry*)self->table, &updateID, sizeof(SRxUpdateID),
             (*out));
   unlockReadLock(&self->tableLock);
 
@@ -177,17 +249,17 @@ static bool tableFind(UpdateCache* self, SRxUpdateID updateID, CacheEntry** out)
 }
 
 /**
- * Add the update encapsulated in the cache entry element into the cache. The 
- * key is the updateID and the value is the cache entry containing the update 
+ * Add the update encapsulated in the cache entry element into the cache. The
+ * key is the updateID and the value is the cache entry containing the update
  * information.
- * 
+ *
  * @param self the update cache.
  * @param cEntry the update to be stored.
  */
-static void tableAdd(UpdateCache* self, CacheEntry* cEntry) 
+static void tableAdd(UpdateCache* self, CacheEntry* cEntry)
 {
   acquireWriteLock(&self->tableLock);
-  HASH_ADD(hh, *((CacheEntry**)&self->table), updateID, sizeof(SRxUpdateID), 
+  HASH_ADD(hh, *((CacheEntry**)&self->table), updateID, sizeof(SRxUpdateID),
            cEntry);
   unlockWriteLock(&self->tableLock);
 }
@@ -195,16 +267,16 @@ static void tableAdd(UpdateCache* self, CacheEntry* cEntry)
 /**
  * Remove the update entry from the update cache. This method does NOT release
  * the memory attached to the cache entry!!!
- * 
+ *
  * @param self The update cache.
  * @param cEntry the entry containing the update information.
  */
-static void tableDel(UpdateCache* self, CacheEntry* cEntry) 
+static void tableDel(UpdateCache* self, CacheEntry* cEntry)
 {
   acquireWriteLock(&self->tableLock);
   HASH_DEL(*((CacheEntry**)&self->table), cEntry);
   unlockWriteLock(&self->tableLock);
-}  
+}
 
 /*--------
  * Exports
@@ -213,23 +285,23 @@ static void tableDel(UpdateCache* self, CacheEntry* cEntry)
 /**
  * Initialized the update cache. The memory for the cache MUST be allocated
  * by the caller of this method.
- * 
+ *
  * @param self The update cache
  * @param chCallback The callback method executed for changes within the cache
- * @param minNumberOfUpdates the minimum number of expected clients. Must be
+ * @param minNumberOfClients the minimum number of expected clients. Must be
  *                           greater then 0;
- * 
- * @return 
+ *
+ * @return true = successfully initialized, false = an error occurred
  */
-bool createUpdateCache(UpdateCache* self, UpdateResultChanged chCallback, 
-                       uint8_t minNumberOfUpdates, Configuration* sysConfig) 
+bool createUpdateCache(UpdateCache* self, UpdateResultChanged chCallback,
+                       uint8_t minNumberOfClients, Configuration* sysConfig)
 {
-  if (!initMutex(&self->itemMutex)) 
+  if (!initMutex(&self->itemMutex))
   {
     RAISE_ERROR("Unable to setup the item Mutex");
     return false;
   }
-  if (!createRWLock(&self->tableLock)) 
+  if (!createRWLock(&self->tableLock))
   {
     RAISE_ERROR("Unable to setup the hash table r/w lock");
     releaseMutex(&self->itemMutex);
@@ -237,26 +309,26 @@ bool createUpdateCache(UpdateCache* self, UpdateResultChanged chCallback,
   }
 
   self->resChangedCallback = chCallback;
-  // By default keep the hashtable null, it will be initialized with the first 
+  // By default keep the hashtable null, it will be initialized with the first
   // element that will be added.
   self->table = NULL;
   self->itemsUsed = NUM_PREALLOC;
-  self->minNumberOfClients = DEFAULT_NUMBER_CLIENTS;
+  self->minNumberOfClients = minNumberOfClients;
   self->lockedClients = malloc(MAX_PROXY_CLIENT_ELEMENTS);
   memset(self->lockedClients, false, MAX_PROXY_CLIENT_ELEMENTS);
-  
+
   self->sysConfig = sysConfig;
-    
+
   initSList(&self->allItems);
 
   return true;
 }
 
 //TODO: Documentation
-void releaseUpdateCache(UpdateCache* self) 
+void releaseUpdateCache(UpdateCache* self)
 {
   RAISE_ERROR("Release Update Cache also should empty the cache first!");
-  if (self != NULL) 
+  if (self != NULL)
   {
     releaseRWLock(&self->tableLock);
     releaseMutex(&self->itemMutex);
@@ -279,31 +351,31 @@ void releaseUpdateCache(UpdateCache* self)
  * @param updId The update ID whose result is queried
  * @param clientID The id of the client that requests the update result.
  *                 in case the ID is greater than zero "> 0" the client will be
- *                 registered with the update, Otherwise it will not be 
+ *                 registered with the update, Otherwise it will not be
  *                 registered.
  * @param client   The proxy client. MUST be NULL if clientID == 0.
  * @param srxRes The current result associated with the update This is an OUT
- *               parameter. 
+ *               parameter.
  * @param defResult The default result provided by proxy during verification
  *                  call. This is an OUT parameter.
  *
  * @return true if the update was found, false if not.
  */
-bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID, 
-                     uint8_t clientID, void* clientMapping, 
+bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
+                     uint8_t clientID, void* clientMapping,
                      SRxResult* srxRes, SRxDefaultResult* defaultRes)
 {
   // The cache entry also need the addition of source and predefined result.
   CacheEntry* cEntry = NULL;
   // By default declare the update as not found
   bool retVal = false;
-  // This seems to be silly at this point but it might be that the id will 
+  // This seems to be silly at this point but it might be that the id will
   // become MD5 or even more. For this we accept a pointer to the structure
   // but store it as value only. See documentation for SRxUpdateID for more info
   SRxUpdateID updID = *updateID;
 
   // Look for the update
-  if (tableFind(self, updID, &cEntry)) 
+  if (tableFind(self, updID, &cEntry))
   {
     // Prefix Origin values
     srxRes->roaResult               = cEntry->srxResult.roaResult;
@@ -314,14 +386,14 @@ bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
     srxRes->bgpsecResult            = cEntry->srxResult.bgpsecResult;
     defaultRes->resSourceBGPSEC     = cEntry->defaultResult.resSourceBGPSEC;
     defaultRes->result.bgpsecResult = cEntry->defaultResult.result.bgpsecResult;
-    
+
     if (clientID > 0)
     {
       // Register the update with the client!
-      _addClientReference(self, cEntry, clientID, 
+      _addClientReference(self, cEntry, clientID,
                           (ProxyClientMapping*)clientMapping);
     }
-    
+
     retVal = true;
   }
   else
@@ -342,30 +414,30 @@ bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
 /**
  * Assign the given client to the cache entry. This method extends the memory
  * if needed.
- * 
+ *
  * @param cEntry The cache entry containing the update
  * @param clientID The client assigned to the update.
- * 
+ *
  * @return true if the client is attached!
  */
-bool _addClientReference(UpdateCache* self, CacheEntry* cEntry, 
+bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
                          uint8_t clientID, ProxyClientMapping* clientMapping)
 {
   bool added = false;
   int idx;
-  
+
   if (clientID == 0)
   {
     RAISE_SYS_ERROR("Invalid client ID %d added to the Update Cache for Update"
                     "[0x%08X]!!!", clientID, cEntry->updateID);
   }
-  
+
   // Try to find then ext empty spot.
   for (idx = 0; idx < cEntry->noPossibleClients; idx++)
   {
     if (cEntry->clients[idx]==0)
     {
-      cEntry->clients[idx] = clientID;      
+      cEntry->clients[idx] = clientID;
       //TODO: depending on the final GC implementation if the GC uses a delete
       //      list, remove this cEntry from there in case gcFlag > 0
       // Increase the update count of this client
@@ -376,10 +448,10 @@ bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
     else if (cEntry->clients[idx]==clientID)
     {
       added = true;
-      break;      
+      break;
     }
   }
-    
+
   if (added)
   {
     cEntry->gcFlag       = 0; // Reset the GC flag
@@ -390,10 +462,10 @@ bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
     // could be used to automatically increase the minimum number of clients
     // by 2 or the default value for future updates. A minimum threshold could
     // be 1000 extensions or even configured?
-    
+
     int newSize = cEntry->noPossibleClients + self->minNumberOfClients;
     cEntry->clients = realloc(cEntry->clients, newSize);
-    
+
     if (cEntry->clients)
     {
       for (idx = cEntry->noPossibleClients; idx < newSize; idx++)
@@ -411,28 +483,30 @@ bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
                       cEntry->updateID);
     }
   }
-  
+
   return added;
 }
 
 /**
- * Stores an update in the update cache. This method returns 0 in case the 
- * update already exists in the update cache. In this case depending on the 
+ * Stores an update in the update cache. This method returns 0 in case the
+ * update already exists in the update cache. In this case depending on the
  * operational flow the stored update should be re-queried. This might happen
- * if two clients request the same update information at the exact same time 
+ * if two clients request the same update information at the exact same time
  * and both will receive information that the update is not stored yet. In this
- * case both might attempt to store the update. Here it is important to notice 
+ * case both might attempt to store the update. Here it is important to notice
  * that the default value might differ. The caller where the result is 0 should
  * re-query the result to assure the returned validation result is same.
  * In case the result value is 1 the provided update was stored successfully.
  * for internal errors the result value is -1. For the update result the value
- * SRX_RESULT_UNDEFINED is used to indicate that the validation was not 
+ * SRX_RESULT_UNDEFINED is used to indicate that the validation was not
  * performed yet. As long as the value is UNDEFINED the command handler accepts
  * a validation request for this particular update. Once the value is other than
  * "UNDEFINED" a validation attempt will be stopped. From this moment the RPKI-
  * Handler and BGPSEC-handler are the only two instances that can start a new
  * validation.
- * 
+ * If the Update includes a BGPsec blob, this function will register the update
+ * with the SKI cache.
+ *
  *
  * @param self The instance of the update cache.
  * @param clientID The ID of the srx-server client. This is NOT the proxyID,
@@ -444,30 +518,29 @@ bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
  * @param defRes The default result info. This will only be taken when stored
  *               the very first time. In case the value is NULL for a first time
  *               storage, the internal UNDEFINED and UNKNOWN will be used.
- * @param bgpSec Contains BGPSEC data. This parameter as well as defRes is only
- *               used during initial storing of an update. The value can be 
- *               NULL.
- * 
+ * @param bgpData Contains BGP / BGPsec data. This parameter as well as defRes
+ *               is only used during initial storing of an update. (CAN BE NULL)
  *
- * @return 1 the result stored, 0 the update is already stored, 
+ *
+ * @return 1 the result stored, 0 the update is already stored,
  *         -1 indicates an internal error
  */
 int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
-                SRxUpdateID* updateID, IPPrefix* prefix, uint32_t asn, 
-                SRxDefaultResult* defRes, BGPSecData* bgpSec)
+                SRxUpdateID* updateID, IPPrefix* prefix, uint32_t asn,
+                SRxDefaultResult* defRes, BGPSecData* bgpData)
 {
   CacheEntry* cEntry;
-  
+
   int retVal = 1; // by default report it worked
-  
-  // This seems to be silly at this point but it might be that the id will 
+
+  // This seems to be silly at this point but it might be that the id will
   // become MD5 or even more. For this we accept a pointer to the structure
   // but store it as value only. See documentation for SRxUpdateID for more info
   SRxUpdateID updID = *updateID;
 
-  LOG(LEVEL_DEBUG, HDR "Store update [ID:0x%08X] in update cache.", 
+  LOG(LEVEL_DEBUG, HDR "Store update [ID:0x%08X] in update cache.",
                    pthread_self(), updID);
-  
+
   // Existing entry then only update the result values.
   if (tableFind(self, updID, &cEntry))
   {
@@ -477,20 +550,20 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
   }
   else
   {
-    // The update will be stored in two phases, first it will be stored in the 
-    // update list that is accessible from outside. The the update information 
-    // will be stored in the hash table.    
-    
+    // The update will be stored in two phases, first it will be stored in the
+    // update list that is accessible from outside. The the update information
+    // will be stored in the hash table.
+
     // Store a brand new update in the list
     // New entry
     lockMutex(&self->itemMutex);
 
-    if (self->itemsUsed == NUM_PREALLOC) 
+    if (self->itemsUsed == NUM_PREALLOC)
     {
-      // In case the pre-allocated empty space is used up, create more. 
-      self->availItems = appendToSList(&self->allItems, 
+      // In case the pre-allocated empty space is used up, create more.
+      self->availItems = appendToSList(&self->allItems,
                                        sizeof(CacheEntry) * NUM_PREALLOC);
-      if (self->availItems == NULL) 
+      if (self->availItems == NULL)
       {
         return -1;
       }
@@ -498,19 +571,19 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
     }
 
     // now get the new accessible space.
-    cEntry = (CacheEntry*)(self->availItems 
+    cEntry = (CacheEntry*)(self->availItems
                            + (self->itemsUsed * sizeof(CacheEntry)));
     // mark the entry as used for now.
-    self->itemsUsed++; 
-    
+    self->itemsUsed++;
+
   //    unlockMutex(&self->itemMutex);
-    
+
     cEntry->updateID      = updID;
     cEntry->asn           = asn;
     cpyPrefix(&cEntry->prefix, prefix);
     cEntry->srxResult.bgpsecResult = SRx_RESULT_UNDEFINED;
     cEntry->srxResult.roaResult    = SRx_RESULT_UNDEFINED;
-    
+
     if (defRes != NULL)
     {
       cEntry->defaultResult.result.roaResult    = defRes->result.roaResult;
@@ -523,37 +596,55 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
       cEntry->defaultResult.result.roaResult    = SRx_RESULT_UNDEFINED;
       cEntry->defaultResult.result.bgpsecResult = SRx_RESULT_UNDEFINED;
       cEntry->defaultResult.resSourceROA        = SRxRS_UNKNOWN;
-      cEntry->defaultResult.resSourceBGPSEC     = SRxRS_UNKNOWN;      
+      cEntry->defaultResult.resSourceBGPSEC     = SRxRS_UNKNOWN;
     }
-    // Other Update relates data        
+    // Other Update relates data
     // BGPSEC
-    if (bgpSec != NULL)
+    if (bgpData != NULL)
     {
-      //TODO: see BZ197 - this cases once a while a SEGDEV
-      if (!storeCacheEntryBlob(cEntry, bgpSec))
+      memset(&cEntry->pathData, 0x00,  sizeof(UC_UpdateData));
+      //TODO: see BZ197 - this causes once a while a SEGDEV
+      // Maybe not anymore, completely rewritten in 0.5.0.0
+      if (storeCacheEntryBlob(cEntry, bgpData, prefix))
       {
-        // Actually we end up here when the element exists already in the cache.
-        // It is not an error. BZ 1010
+        // Now register the update and SKIs with the SKI CACHE
+        SKI_CACHE* sCache = getSKICache();
+        ski_registerUpdate(sCache, &cEntry->updateID,
+                           (SCA_BGP_PathAttribute*)bgpData->bgpsec_path_attr);
       }
+      // else the element exists already in the cache.
+      // It is not an error. BZ 1010
+      // in this case we do not need to register the update with the ski cache.
+      // it is already in
     }
     else
     {
-      cEntry->blobLength = 0;
-      cEntry->blob = NULL;
-    }    
+      // If this here throws a SEGDEV then it is time to replace the SList
+      // implementation
+      UC_UpdateData* data = &cEntry->pathData;
+      if (data->bgpsec_path != NULL)
+      {
+        free(data->bgpsec_path);
+      }
+      if (data->asn_path != NULL)
+      {
+        free(data->asn_path);
+      }
+      memset(data, 0, sizeof(UC_UpdateData));
+    }
 
     // Add the client ID to the update
     int memsize = sizeof(uint8_t) * self->minNumberOfClients;
     cEntry->clients = malloc(memsize);
     memset(cEntry->clients, 0, memsize);
     cEntry->noPossibleClients = self->minNumberOfClients;
-    
+
     // ClientID might be zero "0" is the request is store only - This should not
-    // be the norm. updates with zero clients will be subject to garbage 
+    // be the norm. updates with zero clients will be subject to garbage
     // collection after a while.
     if (clientID > 0)
     {
-      if (!_addClientReference(self, cEntry, 
+      if (!_addClientReference(self, cEntry,
                                clientID, (ProxyClientMapping*)clientMapping))
       {
         retVal = -1;
@@ -567,38 +658,47 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
       uint16_t keepWindow = (uint16_t)self->sysConfig->defaultKeepWindow;
       cEntry->gcFlag = getGCTime(keepWindow);
     }
-    
+
     // Finally add the entry to cache.
     tableAdd(self, cEntry);
 
-    unlockMutex(&self->itemMutex);  
+    unlockMutex(&self->itemMutex);
   }
   return retVal;
 }
 
 /**
- * Stores a result for in the update cache for later retrieval.
- * If this overwrites an existing update result, then the registered 
- * UpdateResultChanged callback is called. The update MUST exist! Only result
- * values other than SRx_RESULT_DONOTUSE are used. This allows to change only 
- * one value, not necessary both.
+ * Stores a result for in the update cache for later retrieval. If this
+ * overwrites an existing update result, then the registered
+ * UpdateResultChanged callback is called. The update MUST exist!
+ * Only result values other than SRx_RESULT_DONOTUSE are used. This allows to
+ * change a single value only.
+ *
+ * Since Version 0.5.0.0: The parameter dontNotify allows to suppress calling
+ * the UpdateResultChanged callback function. This is used during cache updates
+ * when ROAS are added and removed. In this case the update might change its
+ * validation status multiple times and can cause unnecessary churn in the
+ * system. Processing the EndOfData PDU or the router to cache protocol will
+ * take care of sending the notification to the routers.
  *
  * @param self The instance of the update cache.
  * @param updateID The ID of the Update.
  * @param result the result the current update has to be updated with. In case
- *               the result differs from the stored update result, a 
- *               notification will be send to the client. to indicate which 
+ *               the result differs from the stored update result, a
+ *               notification will be send to the client. to indicate which
  *               result MUST NOT be modified use SRx_RESULT_DONOTUSE.
+ * @param suppressNotification in case this flag is 'true' do not send a
+ *               notification to the clients (routers).
  *
  * @return true the result stored, false indicates an internal error such as the
  *              update does not exist.
  */
-bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID, 
-                        SRxResult* result)
+bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
+                        SRxResult* result, bool suppressNotification)
 {
   CacheEntry* cEntry;
   bool retVal = true;
-  // This seems to be silly at this point but it might be that the id will 
+  // This seems to be silly at this point but it might be that the id will
   // become MD5 or even more. For this we accept a pointer to the structure
   // but store it as value only. See documentation for SRxUpdateID for more info
   SRxUpdateID updID = *updateID;
@@ -607,48 +707,48 @@ bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
   if (!tableFind(self, updID, &cEntry))
   {
     RAISE_SYS_ERROR("Does not exist in update cache, can not modify it!");
-    retVal = false;    
+    retVal = false;
   }
   else
   {
-    lockMutex(&self->itemMutex);    
-    
+    lockMutex(&self->itemMutex);
+
     SRxValidationResult valRes;
     valRes.updateID = updID;
-    valRes.valType  = 0;
+    valRes.valType  = VRT_NONE;
     valRes.valResult.roaResult    = cEntry->srxResult.roaResult;
     valRes.valResult.bgpsecResult = cEntry->srxResult.bgpsecResult;
     //valRes.clientID		  = cEntry->clientID;
-    
+
     // Check if ROA results can be used.
     if (result->roaResult != SRx_RESULT_DONOTUSE)
     { // // Do ROA results differ ?
       if (result->roaResult != cEntry->srxResult.roaResult)
       {
-        valRes.valType |= SRX_FLAG_ROA;        
+        valRes.valType |= VRT_ROA;
         cEntry->srxResult.roaResult = result->roaResult;
         valRes.valResult.roaResult = result->roaResult;
       }
     }
-    
+
     // Check if BGPSEC results can be used.
     if (result->bgpsecResult != SRx_RESULT_DONOTUSE)
     { // Check for changes in bgpsec result
-      if (result->bgpsecResult != cEntry->srxResult.roaResult)
+      if (result->bgpsecResult != cEntry->srxResult.bgpsecResult)
       {
-        valRes.valType |= SRX_FLAG_BGPSEC;        
+        valRes.valType |= VRT_BGPSEC;
         cEntry->srxResult.bgpsecResult = result->bgpsecResult;
         valRes.valResult.bgpsecResult = result->bgpsecResult;
-      }      
+      }
     }
 
     // check if a validation result changed.
-    if (valRes.valType != 0)
+    if (!suppressNotification && (valRes.valType != VRT_NONE))
     {
       if (self->resChangedCallback != NULL)
       {
         // Notify of the change of validation result.
-        self->resChangedCallback(&valRes);     
+        self->resChangedCallback(&valRes);
       }
       else
       {
@@ -657,41 +757,41 @@ bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
         retVal = false;
       }
     }
-    
+
     unlockMutex(&self->itemMutex);
   }
-  
+
   return retVal;
 }
 
 /**
  * Try to finally delete the update.
- * 
+ *
  * @param self The Update cache
  * @param cEntry The cache entry (update)
  * @param pCache The prefix cache.
  * @param force  Force the deletion of the update. This ignores if the update is
  *               still referenced by clients.
- * 
+ *
  * @return true if the update was deleted, otherwise false/
- * 
+ *
  * @since 0.3.0
  */
-bool gcTestAndDeleteUpdate(UpdateCache* self, CacheEntry* cEntry, 
+bool gcTestAndDeleteUpdate(UpdateCache* self, CacheEntry* cEntry,
                            void* pCache, bool force)
 {
   //TODO: Test one last time if the update can be deleted. If so then delete it.
   // This method MUST be called by the garbage collector.
   LOG(LEVEL_INFO,"IMPLEMENTATION CAN BE EXPECTED WITH VERSION 0.4");
   bool delete = !force;
-  
+
   if (!force)
   {
     // 1. CHECK IF GC TIME IS READY
 
     // 2. CHECK ONE MORE TIME IF NO REFERENCE EXISTS
   }
-  
+
   if (delete)
   {
     if (!removeUpdate((PrefixCache*)pCache, &cEntry->updateID, &cEntry->prefix,
@@ -709,7 +809,7 @@ bool gcTestAndDeleteUpdate(UpdateCache* self, CacheEntry* cEntry,
     deleteFromSList(&self->allItems, cEntry);
 
     // Free the memory of the bgpsec blob;
-    free(cEntry->blob);
+    _cleanCachPathData(cEntry);
     // Free the cache entry.
     free(cEntry);
   }
@@ -717,9 +817,9 @@ bool gcTestAndDeleteUpdate(UpdateCache* self, CacheEntry* cEntry,
   return delete;
 }
 
-/** 
+/**
  * Set the flag when the update can be garbage collected.
- * 
+ *
  * @param cEntry The cache entry - update
  * @param timeOfDeletion The GC time when the update can be deleted.
  */
@@ -732,9 +832,9 @@ void setGCFlag(CacheEntry* cEntry, uint16_t timeOfDeletion)
  * Calculates a new GC time when to run.
  *
  * @param keepTime The proposed time to wait
- * 
+ *
  * @return the next time the GC can run. Notice that this timestamp is a 16 bit,
- *         NOT 32 bit number. The Garbage collector knows how to deal with 
+ *         NOT 32 bit number. The Garbage collector knows how to deal with
  *         overflows
  */
 uint16_t getGCTime(uint16_t keepTime)
@@ -745,13 +845,13 @@ uint16_t getGCTime(uint16_t keepTime)
 
 /**
  * Removes the given client update reference. This method DOES NOT delete
- * the physical instance of the update, it sets the deletion flag for the 
+ * the physical instance of the update, it sets the deletion flag for the
  * garbage collector if no further reference exists.
- * 
+ *
  * @param entry the update entry within the update cache
  * @param the client that has to be removed
- * 
- * @return 0 if no further references exist, 1 for one or more existing 
+ *
+ * @return 0 if no further references exist, 1 for one or more existing
  *         references, -1 no reference between client and update found!
  */
 int _deleteUpdateFromCache_clientMgmt(CacheEntry* entry, uint8_t clientID)
@@ -759,7 +859,7 @@ int _deleteUpdateFromCache_clientMgmt(CacheEntry* entry, uint8_t clientID)
   int idx;
   bool found  = false;
   bool others = false;
-  
+
   for (idx = 0; idx < entry->noPossibleClients; idx++)
   {
     if (entry->clients[idx] == clientID)
@@ -786,38 +886,38 @@ int _deleteUpdateFromCache_clientMgmt(CacheEntry* entry, uint8_t clientID)
       }
     }
   }
-  
+
   return !found ? -1 : others ? 1 : 0;
-}  
- 
+}
+
 /**
- * Removes the update data from the list and releases all memory associated to 
+ * Removes the update data from the list and releases all memory associated to
  * it.
- * 
- * @note This method ONLY deletes the update from the update cache. It is 
+ *
+ * @note This method ONLY deletes the update from the update cache. It is
  *       important to assure that other references such as the prefix_cache
  *       might be affected by this.
- *       
- * @param self The instance of the update cache 
+ *
+ * @param self The instance of the update cache
  * @param clientID The ID of the srx-server client. This is NOT the proxyID,
  *                 it is a one byte client ID that is mapped to the proxyID.
- *                 If this id is zero all mappings and the update itself will be 
+ *                 If this id is zero all mappings and the update itself will be
  *                 removed!
  * @param cEntry   The update itself.
  * @param timeOfDeletion A proposed real-time in seconds until the update should
- *                 be kept before final deletion. The cache might remove the 
+ *                 be kept before final deletion. The cache might remove the
  *                 update at any other time though.
- * 
- * @return true If the update / association could be removed, false if the 
- *              update was not either found in the cache or no association to 
+ *
+ * @return true If the update / association could be removed, false if the
+ *              update was not either found in the cache or no association to
  *              the client was found.
  */
-int _deleteUpdateFromCache(UpdateCache* self, uint8_t clientID, 
+int _deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
                            CacheEntry*  cEntry, uint16_t timeOfDeletion)
 {
   bool retVal = false;
-  
-  // Check if the entry is associated with the client that requests the 
+
+  // Check if the entry is associated with the client that requests the
   // deletion.
   switch (_deleteUpdateFromCache_clientMgmt(cEntry, clientID))
   {
@@ -837,33 +937,34 @@ int _deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
 }
 
 /**
- * Removes the update data from the list and releases all memory associated to 
- * it.
- * 
- * @note This method ONLY deletes the update from the update cache. It is 
+ * Removes the update data from the list and releases all memory associated to
+ * it. Also, if this update contains bgpsec blob, it will remove this
+ * update from the SKI Cache.
+ *
+ * @note This method ONLY deletes the update from the update cache. It is
  *       important to assure that other references such as the prefix_cache
  *       might be affected by this.
- *       
- * @param self The instance of the update cache 
+ *
+ * @param self The instance of the update cache
  * @param clientID The ID of the srx-server client. This is NOT the proxyID,
  *                 it is a one byte client ID that is mapped to the proxyID.
- *                 If this id is zero all mappings and the update itself will be 
+ *                 If this id is zero all mappings and the update itself will be
  *                 removed!
  * @param updateID The ID of the update that has to be removed.
- * @param keepTime A proposed time in seconds the update should still be kept 
- *                 before final deletion. The cache might remove the update at 
+ * @param keepTime A proposed time in seconds the update should still be kept
+ *                 before final deletion. The cache might remove the update at
  *                 any time though.
- * 
- * @return true If the update / association could be removed, false if the 
- *              update was not either found in the cache or no association to 
+ *
+ * @return true If the update / association could be removed, false if the
+ *              update was not either found in the cache or no association to
  *              the client was found.
  */
-bool deleteUpdateFromCache(UpdateCache* self, uint8_t clientID, 
+bool deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
                            SRxUpdateID* updateID, uint16_t keepTime)
 {
   CacheEntry* cEntry;
   bool retVal = false;
-  // This seems to be silly at this point but it might be that the id will 
+  // This seems to be silly at this point but it might be that the id will
   // become MD5 or even more. For this we accept a pointer to the structure
   // but store it as value only. See documentation for SRxUpdateID for more info
   SRxUpdateID updID = *updateID;
@@ -874,15 +975,26 @@ bool deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
   uint16_t timeToBeDeleted = getGCTime(keepTime);
 
   // Get the update cache entry from the update cache.
-  if (tableFind(self, updID, &cEntry)) 
+  if (tableFind(self, updID, &cEntry))
   {
     retVal = _deleteUpdateFromCache(self, clientID, cEntry, timeToBeDeleted);
+    if (retVal && (cEntry->pathData.bgpsec_path != NULL))
+    {
+      // Unregister the update from the SKI CACHE.
+      SKI_CACHE* sCache = getSKICache();
+      UC_UpdateData* data = &cEntry->pathData;
+      if (!ski_unregisterUpdate(sCache, updateID, data->bgpsec_path))
+      {
+        LOG(LEVEL_WARNING, "Could not unregister update [0x%08X] from the ski "
+                           "cache!", updID);
+      }
+    }
   }
   else
   {
     LOG(LEVEL_INFO, "Delete aborted, update [0x%08X] not found!", updID);
   }
-  
+
   return retVal;
 }
 
@@ -901,18 +1013,18 @@ bool deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
  * @return The signature block.
  */
 UpdSigResult* getUpdateSignature(UpdateCache* self, UpdSigResult* result,
-                                 SRxUpdateID* updateID, uint32_t prependCount, 
+                                 SRxUpdateID* updateID, uint32_t prependCount,
                                  uint32_t peerAS, uint16_t algorithm,
                                  bool complete)
 {
   ////////////////////////////////////////////////////////////////////////////// TOUCHED( ); OK ( ); NOT YET (x)
   CacheEntry* cEntry;
-  // This seems to be silly at this point but it might be that the id will 
+  // This seems to be silly at this point but it might be that the id will
   // become MD5 or even more. For this we accept a pointer to the structure
   // but store it as value only. See documentation for SRxUpdateID for more info
   SRxUpdateID updID = *updateID;
-  
-  
+
+
   // Currently we do NOT support any algorithm!
   RAISE_ERROR("UPDATE SIGNATURES ARE CURRENTLY NOT SUPPORTED!");
 
@@ -935,20 +1047,20 @@ UpdSigResult* getUpdateSignature(UpdateCache* self, UpdSigResult* result,
 }
 
 /**
- * This method is not for usage within the update cache management. It is 
+ * This method is not for usage within the update cache management. It is
  * mainly to allow the server console to query for update information.
- * 
- * @param self The update cache 
- * @param statistics The statistics information to be filles. The value 
+ *
+ * @param self The update cache
+ * @param statistics The statistics information to be filles. The value
  *                   updateID MUST be set and will be used to locate the update.
- * 
+ *
  * @return true if the update was found, otherwise false
  */
-bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics)
-{ 
+bool getUpdateStats(UpdateCache* self, UC_UpdateStatistics* statistics)
+{
   CacheEntry* cEntry;
   bool retVal = false;
-  
+
   if (statistics == NULL)
   {
     RAISE_SYS_ERROR("The given statistics block is NULL!");
@@ -958,7 +1070,7 @@ bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics)
     RAISE_SYS_ERROR("The given updaetID is 0 (INVALID ID)!");
   }
   // Look for the update
-  else if (tableFind(self, *statistics->updateID, &cEntry)) 
+  else if (tableFind(self, *statistics->updateID, &cEntry))
   {
     retVal = true;
     statistics->asn                           = cEntry->asn;
@@ -967,27 +1079,61 @@ bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics)
     statistics->bgpsecResult.errorCode        = 0;
     statistics->bgpsecResult.signatureBlock   = NULL;
     statistics->bgpsecResult.signatureLength  = 0;
-    statistics->defResult.resSourceROA   =cEntry->defaultResult.resSourceROA;    
+    statistics->defResult.resSourceROA   =cEntry->defaultResult.resSourceROA;
     statistics->defResult.resSourceBGPSEC=cEntry->defaultResult.resSourceBGPSEC;
     statistics->defResult.result.roaResult =
                                          cEntry->defaultResult.result.roaResult;
-    statistics->defResult.result.bgpsecResult = 
+    statistics->defResult.result.bgpsecResult =
                                       cEntry->defaultResult.result.bgpsecResult;
     statistics->result.roaResult    = cEntry->srxResult.roaResult;
     statistics->result.bgpsecResult = cEntry->srxResult.bgpsecResult;
     statistics->roa_count           = cEntry->roaRefCount;
-  }  
+  }
   return retVal;
 }
 
-
-void emptyUpdateCache(UpdateCache* self) 
+/**
+ * Return the cache internal copy of the update data.
+ *
+ * @param self The update cache
+ * @param updateID The ID of the update
+ *
+ * @return the pointer to the internal stored bgp update data
+ *
+ * @since 0.5.0.0
+ */
+UC_UpdateData* getUpdateData(UpdateCache* self, SRxUpdateID* updateID)
 {
-  ////////////////////////////////////////////////////////////////////////////// TOUCHED( ); OK ( ); NOT YET (x); Tested ( )
+  CacheEntry* cEntry = NULL;
+  UC_UpdateData* data = NULL;
+  SCA_BGP_PathAttribute* bgpsec_path = NULL;
+
+  // Look for the update
+  if (tableFind(self, *updateID, &cEntry))
+  {
+    data = &cEntry->pathData;
+    bgpsec_path = data->bgpsec_path;
+  }
+
+  return data;
+}
+
+/**
+ * Empties a cache and releases all memory attached to each of the elements.
+ *
+ * @note Primarily for development purposes or program shutdown.
+ *
+ * @param self Instance of the update cache.
+ */
+void emptyUpdateCache(UpdateCache* self)
+{
+  ////////////////////////////////////////////////////////////////////////////// TOUCHED(X); OK ( ); NOT YET ( ); Tested ( )
   acquireWriteLock(&self->tableLock);
   lockMutex(&self->itemMutex);
-  
   emptySList(&self->allItems);
+  SKI_CACHE* sCache = getSKICache();
+  // clean all updates from the update cache.
+  ski_clean(sCache, SKI_CLEAN_UPDATES);
   unlockMutex(&self->itemMutex);
 
   self->table     = NULL;
@@ -998,12 +1144,12 @@ void emptyUpdateCache(UpdateCache* self)
 
 
 /**
- * This method is used to configure the update cache in such that the minimum 
- * number of clients expected per update can be configured. the value MUST not 
- * be zero, zero values are reset to be one. This function does not change 
+ * This method is used to configure the update cache in such that the minimum
+ * number of clients expected per update can be configured. the value MUST not
+ * be zero, zero values are reset to be one. This function does not change
  * already created updates in the cache. They will be extended on an as needed
  * basis.
- * 
+ *
  * @param self the UpdateCache instance.
  * @param noClients The minimum number of clients expected per update.
  */
@@ -1014,34 +1160,34 @@ void setMinClients(UpdateCache* self, uint8_t noClients)
 
 /**
  * Fill the given array "clientIDs" with the number clientID's associated to the
- * update with the "updateID". This method will NOT initialize the given array 
+ * update with the "updateID". This method will NOT initialize the given array
  * with zero's but will fill the array without "holes". The return value is the
  * number of clientIDs filles in the array or -1 if the array is to small!
- * 
+ *
  * @param self The updateCache.
  * @param updateID pointer to the update ID.
  * @param clientIDs an initialized array of uint8_t elements.
  * @param size Size of the provided array in bytes.
- * 
- * @return the number of arrays filled in the array, -1 if the array is to 
+ *
+ * @return the number of arrays filled in the array, -1 if the array is to
  *         small.
- * 
+ *
  * @since 0.3.0
  */
-int getClientIDsOfUpdate(UpdateCache* self, SRxUpdateID* updateID, 
+int getClientIDsOfUpdate(UpdateCache* self, SRxUpdateID* updateID,
                          uint8_t* clientIDs, uint8_t size)
 {
   // The cache entry also need the addition of source and predefined result.
   CacheEntry* cEntry = NULL;
   int retVal = 0;
   int idx = 0;
-  
+
   // Look for the update
-  if (tableFind(self, *updateID, &cEntry)) 
+  if (tableFind(self, *updateID, &cEntry))
   {
     if (cEntry->noPossibleClients <= size)
     {
-      // Run through the list of clients and fill them in the provided 
+      // Run through the list of clients and fill them in the provided
       // array
       for (idx = 0; idx < cEntry->noPossibleClients; idx++)
       {
@@ -1054,22 +1200,22 @@ int getClientIDsOfUpdate(UpdateCache* self, SRxUpdateID* updateID,
     else
     {
       retVal = -1;
-    }    
+    }
   }
-  
-  return retVal;    
+
+  return retVal;
 }
 
 /**
  * Removed the association of the client to all updates within the cache.
- * 
+ *
  * @param self The update cache
  * @param clientID The client ID
  * @param clientMapping must be NULL for clientID == 0, otherwise not.
  * @param keepTime the keep time.
- * 
+ *
  * @return the number of update associations removed, -1 if an error occured.
- * 
+ *
  * @since 0.3.0
  */
 int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
@@ -1079,14 +1225,14 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
   SListNode*  lNode;
   CacheEntry* cEntry;
   ProxyClientMapping* mapping = (ProxyClientMapping*)clientMapping;
-  
+
   acquireWriteLock(&self->tableLock);
   lockMutex(&self->itemMutex);
   if (!self->lockedClients[clientID])
   {
     idsRemoved = 0;
     self->lockedClients[clientID]=true;
-    FOREACH_SLIST(&self->allItems, lNode) 
+    FOREACH_SLIST(&self->allItems, lNode)
     {
       cEntry = (CacheEntry*)lNode->data;
       if (cEntry != NULL)
@@ -1100,7 +1246,7 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
       if (mapping->updateCount == 0)
       {
         break;
-      }      
+      }
     }
     self->lockedClients[clientID]=false;
   }
@@ -1108,11 +1254,11 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
   {
     LOG(LEVEL_ERROR, "Attempt to unregister clocked client[0x%02X] from update "
                      "cache!", clientID);
-    
+
   }
   unlockMutex(&self->itemMutex);
-  unlockWriteLock(&self->tableLock);  
-  
+  unlockWriteLock(&self->tableLock);
+
   return idsRemoved;
 }
 
@@ -1120,45 +1266,37 @@ int unregisterClientID(UpdateCache* self, uint8_t clientID, void* clientMapping,
  * This method determines if an update with the given ID already exist. If so,
  * a collision is detected. A collision is detected if an update with the same
  * updateID already exist but the data is different.
- * 
+ *
  * @param self The Update cache
  * @param updateID Update ID to be checked!
  * @param prefix the prefix of the update
  * @param asn the Origin AS of the update
  * @param dataLength The length of the bgpsec blob
  * @param data The bgpsec data blob.
- * 
+ *
  * @return true if a collision could be detected!
  */
-bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix, 
+bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
                      uint32_t asn, BGPSecData* bgpsecData)
 {
   CacheEntry* cEntry;
+  UC_UpdateData* data;
   bool collision = false;
 
-  uint32_t dataLength = 0;
-  uint8_t* data       = NULL;
-  
-  if (bgpsecData->attr_length != 0)
-  {
-    dataLength = bgpsecData->attr_length;
-    data       = bgpsecData->bgpsec_path_attr;
-  }
-  else
-  {
-    dataLength = bgpsecData->numberHops * 4;
-    data       = (uint8_t*)bgpsecData->asPath;
-  }
-    
+  // Generic usage for all data buffers
+  int length = 0;
+
   // Try to find the update itself.
-  if (tableFind(self, *updateID, &cEntry)) 
+  if (tableFind(self, *updateID, &cEntry))
   {
-    // An update was found, now declare collision until it is determined that 
+    data = &cEntry->pathData;
+
+    // An update was found, now declare collision until it is determined that
     // the update found is the same as the update requested.
     collision = true;
     if (cEntry->asn == asn)
     {
-      if (cEntry->blobLength == dataLength)
+      if (data->hops == bgpsecData->numberHops)
       {
         // Now check the ip prefix first, then the data blob
         int  idx = 0;
@@ -1174,16 +1312,23 @@ bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
         }
 
         idx = 0;
-        // Now check the data blob - only if  not already collided
-        while (!collision && idx < dataLength)
+        // Now check the BGP4 path - only if  not already collided
+        length = data->hops * 4;
+        u_int8_t* d1 = (u_int8_t*)data->asn_path;
+        u_int8_t* d2 = (u_int8_t*)bgpsecData->asPath;
+        collision = memcmp(d1, d2, length);
+
+        // Now check the BGPsec_PATH
+        if (!collision)
         {
-          collision = (data[idx] != cEntry->blob[idx]);
-          idx++;
+          u_int8_t* d1 = (u_int8_t*)data->bgpsec_path;
+          u_int8_t* d2 = bgpsecData->bgpsec_path_attr;
+          collision = memcmp(d1, d2, data->length);
         }
       }
     }
   }
-  
+
   return collision;
 }
 
@@ -1194,7 +1339,7 @@ bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
 /**
  * Returns a textual representation of a given IPPrefix.
  * @param prefix The IPPrefix.
- * 
+ *
  * @return The text (human readable) version of the prefix.
  *
  * @note Local, static buffer - i.e. not thread-safe!
@@ -1204,7 +1349,7 @@ const char* ipToStr(IPAddress* ip)
   #define BUF_SIZE  MAX_IP_V6_STR_LEN
   static const char buf[BUF_SIZE];
 
-  return (ip->version == 4) 
+  return (ip->version == 4)
            ? ipV4AddressToStr((IPv4Address*)&ip->addr.v4, (char*)buf, BUF_SIZE)
            : ipV6AddressToStr((IPv6Address*)&ip->addr.v6, (char*)buf, BUF_SIZE);
 }
@@ -1215,24 +1360,24 @@ const char* ipToStr(IPAddress* ip)
 
 /**
  * print the srx validation result for the particular attribute.
- * 
+ *
  * @param out The xml stream
  * @param attrName the attribute name.
  * @param result The validation result of type SRxValidationResultVal
  * @param hasNotFound the validation state NOTFOUND is accepted!
- * 
+ *
  * @return true if the validation state was accepted, otherwise false.
- * 
+ *
  * @since 0.3.0
- * 
+ *
  */
-bool printXMLValResult(XMLOut* out, const char* attrName, 
+bool printXMLValResult(XMLOut* out, const char* attrName,
                        SRxValidationResultVal result, bool hasNotFound)
 {
   bool retVal = true;
   switch (result)
   {
-    case SRx_RESULT_DONOTUSE : 
+    case SRx_RESULT_DONOTUSE :
               addStrAttrib(out, attrName, "DO NOT USE!");
               break;
     case SRx_RESULT_UNDEFINED :
@@ -1255,20 +1400,20 @@ bool printXMLValResult(XMLOut* out, const char* attrName,
               retVal = false;
               break;
   }
-  
+
   return retVal;
 }
 
 /**
  * Print the content of the update cache to the given file.
- * 
+ *
  * @param self the update cache
  * @param stream The file to be written into.
- * @param maxBlob The maximum number of blob bytes printed. (-1 all, 0 none, 
+ * @param maxBlob The maximum number of blob bytes printed. (-1 all, 0 none,
  *                >0 the specified number or the blob length if less.)
- * 
+ *
  * @since 0.3.0
- * 
+ *
  */
 void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
 {
@@ -1285,8 +1430,8 @@ void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
   openTag(&out, "update-cache");
 
   // Add the current gc time
-  addU32Attrib(&out, "current-gc-time", getGCTime(0));          
-  
+  addU32Attrib(&out, "current-gc-time", getGCTime(0));
+
   // Updates
   if (sizeOfSList(&self->allItems))
   {
@@ -1297,7 +1442,7 @@ void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
       openTag(&out, "update");
         addH32Attrib(&out, "update-id", update->updateID);
         // noClients contains the number of clients used during the last run.
-        // the multiplicator "4" is used for the maximum space used for any 
+        // the multiplicator "4" is used for the maximum space used for any
         // client ID (3 char + comma)
         memset(clientString, '\0', noClients*4);
         noClients = 0;
@@ -1322,39 +1467,40 @@ void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
         {
           addStrAttrib(&out, "client-list", clientString);
         }
-        addU32Attrib(&out, "gc", update->gcFlag);          
+        addU32Attrib(&out, "gc", update->gcFlag);
         addU32Attrib(&out, "origin-as", update->asn);
         addAttrib(&out, "prefix", "%s/%u",
-                  ipToStr(&update->prefix.ip), 
+                  ipToStr(&update->prefix.ip),
                   update->prefix.length);
         addIntAttrib(&out, "roa-count", update->roaRefCount);
-        if (!printXMLValResult(&out, "origin-val", 
+        if (!printXMLValResult(&out, "origin-val",
                                update->srxResult.roaResult, true))
         {
-          RAISE_ERROR("Update[0%x08X] with invalid origin validation state %d", 
+          RAISE_ERROR("Update[0%x08X] with invalid origin validation state %d",
                       update->updateID, update->srxResult.roaResult);
         }
-        if (!printXMLValResult(&out, "path-val", update->srxResult.bgpsecResult, 
+        if (!printXMLValResult(&out, "path-val", update->srxResult.bgpsecResult,
                                false))
         {
-          RAISE_ERROR("Update[0%x08X] with invalid path validation state %d", 
+          RAISE_ERROR("Update[0%x08X] with invalid path validation state %d",
                       update->updateID, update->srxResult.bgpsecResult);
-        }        
-        if (!printXMLValResult(&out, "def-origin-val", 
+        }
+        if (!printXMLValResult(&out, "def-origin-val",
                                update->defaultResult.result.roaResult, true))
         {
           RAISE_ERROR("Update[0%x08X] with invalid default origin validation "
-                      "state %d", update->updateID, 
-                      update->defaultResult.result.roaResult);          
+                      "state %d", update->updateID,
+                      update->defaultResult.result.roaResult);
         }
-        if (!printXMLValResult(&out, "def-path-val", 
+        if (!printXMLValResult(&out, "def-path-val",
                                update->defaultResult.result.bgpsecResult, true))
         {
           RAISE_ERROR("Update[0%x08X] with invalid default path validation "
-                      "state %d", update->updateID, 
-                      update->defaultResult.result.bgpsecResult);          
-        }        
-        addIntAttrib(&out, "blob-length", update->blobLength);        
+                      "state %d", update->updateID,
+                      update->defaultResult.result.bgpsecResult);
+        }
+        addIntAttrib(&out, "hops", update->pathData.hops);
+        addIntAttrib(&out, "bgpsec-len", update->pathData.length);
       closeTag(&out);
     }
     closeTag(&out);

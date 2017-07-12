@@ -23,14 +23,34 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.6
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/04/28 - oborchert
+ *            * BZ1153: Updated error that GEN-C generated updates could not be 
+ *              used by peer, missing next hop information.
+ *            * Modified create Session by removing configuration setup that 
+ *              belongs into the configuration.
+ *          - 2017/03/23 - oborchert
+ *            * Added CREATE_TESTVECTOR
+ *          - 2017/03/20 - oborchert
+ *            * BZ1043: Added flow control to socket handling.
+ *          - 2017/03/10 - oborchert
+ *            * Fixed incorrect unsupported capability processing.
+ *          - 2017/03/09 - oborchert
+ *            * BZ1134: Moved printing of received bgp messages into 
+ *              readNextBGPMessage to have it more centralized and to capture
+ *              all received messages.
+ *            * BZ1133: Renamed function checkMessageHeader into 
+ *              _checkMessageHeader and declared visibility to static. 
+ *              It is only called from within readNextBGPMessage.
+ *          - 2017/02/14 - oborchert (branch 2017/02/07)
+ *            * Added IPv6 processing
  *  0.2.0.6 - 2017/02/15 - oborchert
  *            * Added switch to force sending extended messages regardless if
  *              capability is negotiated. This is a TEST setting only.
- *          - 2018/02/14 - oborchert
+ *          - 2017/02/14 - oborchert
  *            * BZ1111: Added switch for liberal extended message processing.
  *            * BZ1110: Added check for message size on receive.
  *  0.2.0.5 - 2017/02/01 - oborchert
@@ -104,10 +124,16 @@
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPHeaderPrinter.h"
 #include "bgp/printer/BGPUpdatePrinter.h"
+#include "printer/BGPPrinterUtil.h"
 
 #define POLL_TIMEOUT_MS 100
 
+#define SOCKET_ERR      -1
+#define SOCKET_TIMEOUT   0
+#define SOCKET_ALIVE     1
+
 static void _processPacket(void* session);
+static bool _checkMessageHeader(BGPSession* session);
 
 /**
  * Allocates the memory for the session and configures soem of its values.
@@ -118,7 +144,8 @@ static void _processPacket(void* session);
  * @param config   The session configuration 
  * @param process  The method to process received packages.
  * 
- * @return the allocated memory of the session. 
+ * @return the allocated memory of the session or NULL if the session could not
+ *         be generated
  */
 BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
                              process_packet process)
@@ -127,8 +154,6 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
   BGP_SessionConf* sessConfig = NULL;
   AlgoParam*       sessAlgo   = NULL;
   AlgoParam*       configAlgo = NULL;
-  
-  int idx;
   
   if (config->peer_addr.sin_port > 0)
   {
@@ -145,11 +170,16 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
     sessConfig->capConf.extMsgSupp    = config->capConf.extMsgSupp;
     sessConfig->capConf.extMsgLiberal = config->capConf.extMsgLiberal;
     sessConfig->capConf.extMsgForce   = config->capConf.extMsgForce;
+    int idx;
     for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
     {
       sessConfig->printOnReceive[idx] = config->printOnReceive[idx];
       sessConfig->printOnSend[idx]    = config->printOnSend[idx];
     }
+    
+    memcpy(&sessConfig->nextHopV4, &config->nextHopV4, sizeof(struct sockaddr_in));    
+    memcpy(&sessConfig->nextHopV6, &config->nextHopV6, sizeof(struct sockaddr_in6));
+    
     sessConfig->printPollLoop  = config->printPollLoop;
                 
     session->lastSent  = 0;
@@ -176,30 +206,26 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
     sessAlgo   = &sessConfig->algoParam;
     configAlgo = &config->algoParam;
 
-    // Configure the algorithms - Do the loop (currently only 1)
-    while (configAlgo != NULL && sessAlgo != NULL)
+    sessAlgo->addPubKeys     = configAlgo->addPubKeys;
+    sessAlgo->algoID         = configAlgo->algoID;
+    sessAlgo->asList         = configAlgo->asList;
+    // the danger in the memory copy below is that it also copies the position
+    // if a key pointer. This pointer MUST not be free'd from within the 
+    // session - it will be maintained from the within the configuration 
+    // parameter which must exist until this session is removed.      
+    memcpy(&sessAlgo->fake_key, &configAlgo->fake_key, sizeof(BGPSecKey));
+
+    sessAlgo->fake_sigLen    = configAlgo->fake_sigLen;
+    memcpy(&sessAlgo->fake_signature, &configAlgo->fake_signature, 
+           configAlgo->fake_sigLen);
+    sessAlgo->pubKeysStored  = 0;
+    sessAlgo->ns_mode        = configAlgo->ns_mode;
+    sessAlgo->sigGenMode     = configAlgo->sigGenMode;
+    configAlgo = configAlgo->next;
+    if (configAlgo != NULL)
     {
-      sessAlgo->addPubKeys     = configAlgo->addPubKeys;
-      sessAlgo->algoID         = configAlgo->algoID;
-      sessAlgo->asList         = configAlgo->asList;
-      // the danger in the memory copy below is that it also copies the position
-      // if a key pointer. This pointer MUST not be free'd from within the 
-      // session - it will be maintained from the within the configuration 
-      // parameter which must exist until this session is removed.      
-      memcpy(&sessAlgo->fake_key, &configAlgo->fake_key, sizeof(BGPSecKey));
-      
-      sessAlgo->fake_sigLen    = configAlgo->fake_sigLen;
-      memcpy(&sessAlgo->fake_signature, &configAlgo->fake_signature, 
-             configAlgo->fake_sigLen);
-      sessAlgo->pubKeysStored  = 0;
-      sessAlgo->ns_mode        = configAlgo->ns_mode;
-      sessAlgo->sigGenMode     = configAlgo->sigGenMode;
-      configAlgo = configAlgo->next;
-      if (configAlgo != NULL)
-      {
-        sessAlgo = malloc(sizeof(AlgoParam));
-        memset(sessAlgo, 0, sizeof(AlgoParam));
-      }
+      sessAlgo = malloc(sizeof(AlgoParam));
+      memset(sessAlgo, 0, sizeof(AlgoParam));
     }
     
     // Now set the capabilities for this session
@@ -231,6 +257,7 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
 void shutDownTCPSession(BGPSession* session, bool reportError)
 {
   int retVal = close(session->sessionFD);
+  printf("INFO: Shutdown TCP session\n");
   if (retVal != 0 && reportError)
   {
     printf("ERROR: Shutdown not successful code [%i]\n", retVal);
@@ -279,11 +306,12 @@ void freeBGPSession (BGPSession* session)
  *                 data that can be read. There if revents contains POLLIN it 
  *                 returns true if readOnly is selected.
  * 
- * @return true if it can be used, otherwise false. 
+ * @return SOCKET_ALIVE if it is alive, SOCKET_ERROR on an error, 
+ *         and SOCKET_TIMEOUT on a timeout
  */
-static bool _isSocketAlive(BGPSession* session, int timeout, bool readOnly)
+static int _isSocketAlive(BGPSession* session, int timeout, bool readOnly)
 {
-  bool retVal = true;
+  bool retVal = SOCKET_ALIVE;
   
   short int errmask  = POLLERR | POLLHUP | POLLNVAL;
 #ifdef __USE_GNU
@@ -306,21 +334,16 @@ static bool _isSocketAlive(BGPSession* session, int timeout, bool readOnly)
   {
     // Lets do it differently!
     if (!readOnly)
-    {
-      retVal = (pfd.revents & errmask) == 0;
+    { // REQUEST FOR SENDING TOO
+      // Return error or timeout.
+      retVal = (pollVal == 0) ? SOCKET_TIMEOUT : SOCKET_ERR;
+      //retVal = (pfd.revents & errmask) == 0;
     }
     else
-    {
-      retVal = (pfd.revents & POLLIN) != 0;      
+    { // REQUEST FOR READ ONLY
+      // If still data is waiting on the in buffer anounce socekt to be ready.
+      retVal = ((pfd.revents & POLLIN) != 0) ? SOCKET_ALIVE : SOCKET_ERR;
     }
-// The lower portion does not work correctly in centos 7
-//    char buff[32];
-//    int rec = recv(pfd.fd, buff, sizeof(buff), MSG_PEEK | MSG_DONTWAIT); 
-//    if (rec == 0)
-//    {
-//      // zero => connection has been closed
-//      retVal = false;
-//    }
   }
 
   if (session->bgpConf.printPollLoop)
@@ -345,63 +368,88 @@ static void* _rcvBGP(void* bgpSession)
   BGPSession* session = (BGPSession*)bgpSession;
   int bytesReady = 0;
   int bytesRead  = 0;
+  int socketState = SOCKET_ALIVE;
+  int attempt = 1;
 
   while (session->fsm.state == FSM_STATE_ESTABLISHED) 
   {
-    if (!_isSocketAlive(session, POLL_TIMEOUT_MS, true))
+    switch (_isSocketAlive(session, POLL_TIMEOUT_MS, true))
     {
-      printf("ERROR: Socket to AS %u broke!\n", session->bgpConf.peerAS);
-      fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
-      continue;
-    }
-    bytesReady = 0;
-    ioctl(session->sessionFD, FIONREAD, &bytesReady);
-    if (bytesReady > 0)
-    {
-      bytesRead = readNextBGPMessage(session, SESS_DEF_RCV_TIMEOUT);
-      switch (bytesRead)
-      {
-        case 0:
-          // EOF, nothing came in.
+      case SOCKET_ERR:
+        printf("ERROR: Socket to AS %u broke!\n", session->bgpConf.peerAS);
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+        break;
+        
+      case SOCKET_TIMEOUT:
+        printf("WARNING: Socket to AS %u timed out (%u. attempt)!\n", 
+               session->bgpConf.peerAS, attempt);
+        if (attempt++ <= SESS_FLOW_CONTROL_REPEAT)
+        {
+          sleep(SESS_FLOW_CONTROL_SLEEP);
           break;
-        case -1:
-          // Error
-          // Session is not established or closed.
-          break;
-        case -2:
-          // Larger 64K Notification already send and session is closed
-          break;
-        default:
-          // Check if message is of acceptable length
-          if (bytesRead < BGP_MAX_MESSAGE_SIZE) // 4K boundary
+        }
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+        break;
+        
+      case SOCKET_ALIVE:
+        attempt = 1; // reset the attempt pointer.
+        bytesReady = 0;
+        ioctl(session->sessionFD, FIONREAD, &bytesReady);
+        if (bytesReady > 0)
+        {
+          bytesRead = readNextBGPMessage(session, SESS_DEF_RCV_TIMEOUT);
+          switch (bytesRead)
           {
-            // This is most likely the case
-            _processPacket(session);
+            case 0:
+              // EOF, nothing came in.
+              break;
+            case -1:
+              // Error
+              // Session is not established or closed.
+              break;
+            case -2:
+              // Larger 64K Notification already send and session is closed
+              break;
+            default:
+              // Check if message is of acceptable length
+              if (bytesRead < BGP_MAX_MESSAGE_SIZE) // 4K boundary
+              {
+                // This is most likely the case
+                _processPacket(session);
+              }
+              else
+              {
+                if (session->bgpConf.capConf.extMsgLiberal 
+                    || (session->bgpConf.capConf.extMsgSupp 
+                        && session->bgpConf.peerCap.extMsgSupp))
+                {
+                  _processPacket(session);              
+                }
+                else
+                {
+                  // Send notification of invalid message size
+                  sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
+                                   BGP_ERR1_SUB_BAD_LENGTH, 0, NULL, 
+                                   SESS_FLOW_CONTROL_REPEAT);
+                }
+              }
           }
-          else
+        }
+        else
+        {
+          if (session->bgpConf.printPollLoop)
           {
-            if (session->bgpConf.capConf.extMsgLiberal 
-                || (session->bgpConf.capConf.extMsgSupp 
-                    && session->bgpConf.peerCap.extMsgSupp))
-            {
-              _processPacket(session);              
-            }
-            else
-            {
-              // Send notification of invalid message size
-              sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
-                               BGP_ERR1_SUB_BAD_LENGTH, 0, NULL);
-            }
+            printf("Wait for receive!\n");
           }
-      }
-    }
-    else
-    {
-      if (session->bgpConf.printPollLoop)
-      {
-        printf("Wait for receive!\n");
-      }
-      sleep(SESS_DEV_RCV_SLEEP);
+          sleep(SESS_DEV_RCV_SLEEP);
+        }
+        break;
+        
+      default:
+        printf("ERROR: Socket to AS %u in undefined state!\n", 
+               session->bgpConf.peerAS);
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+        break;
     }
   }
   
@@ -459,7 +507,8 @@ void* runBGP(void* bgp)
           { // The hold time loop was stopped. session is still established,
             // send notification
             sendNotification(session, BGP_ERR6_CEASE, 
-                             BGP_ERR6_SUB_PEER_DE_CONFIGURED, 0, NULL);
+                             BGP_ERR6_SUB_PEER_DE_CONFIGURED, 0, NULL, 
+                             SESS_FLOW_CONTROL_REPEAT);
           }
           else
           {
@@ -472,7 +521,8 @@ void* runBGP(void* bgp)
                          + session->bgpConf.disconnectTime))
               {
                 sendNotification(session, BGP_ERR6_CEASE, 
-                                 BGP_ERR6_SUB_PEER_DE_CONFIGURED, 0, NULL);        
+                                 BGP_ERR6_SUB_PEER_DE_CONFIGURED, 0, NULL, 
+                                 SESS_FLOW_CONTROL_REPEAT);        
               }
             }
           }
@@ -498,7 +548,8 @@ void* runBGP(void* bgp)
     
     if (session->fsm.state != FSM_STATE_IDLE)
     {
-      sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL);
+      sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL,
+                       SESS_FLOW_CONTROL_REPEAT);
     }
           
     // Now shutdown the session.
@@ -586,8 +637,9 @@ bool establishTCPSession(BGPSession* session)
     return false;
   }
     
-  // Check if the socket is alive
-  session->tcpConnected = _isSocketAlive(session, POLL_TIMEOUT_MS, false);
+  // Check if the socket is alive (don't accept error or timeout here)
+  session->tcpConnected = (_isSocketAlive(session, POLL_TIMEOUT_MS, false) 
+                           == SOCKET_ALIVE);
   if (!session->tcpConnected)
   {
     shutDownTCPSession(session, false);
@@ -613,12 +665,18 @@ static bool _canReceiveBGPMessage(BGPFinalStateMachine fsm)
  * Read the next BGP message and writes it into the sessions buffer. This method
  * will only read as long as FSM is in ESTABLISHED or OpenSent mode. This 
  * message ONLY returns an error if the socket was broken.
- * 
+ * This message performs two checks on each received BGP message, 
+ * (1) it does not read messages larger than 64 K (ext message maximum)
+ * (2) after the message is read it performs a basic check on the message 
+ *     header only by calling checkMessageHeader prior loading the remaining 
+ *     message.
  * @param session the session to read from.
  * @param timeout timeout in seconds. No timeout if 0;
  * 
- * @return 0 = EOF / timeout, &gt; 0 number bytes read, -1 Error, -2 Message 
- * larger than 64 K (notification send)
+ * @return 0 = EOF / timeout, &gt; 0 number bytes read, -1 Error (no session), 
+ *         -2 Message to large
+ * 
+ * @see checkMessageHEader
  */
 int readNextBGPMessage(BGPSession* session, int timeout)
 {
@@ -660,45 +718,38 @@ int readNextBGPMessage(BGPSession* session, int timeout)
       totalBytesRead = readBytes;
       if (readBytes != hdrSize)
       {
+        // This might actually result in a FSM event code.
         hdr->length = 0;
         memset(session->recvBuff, '0', maxLen);
         return readBytes;
       }
       buff += readBytes;
 
+      // Check the message header
+      if (!_checkMessageHeader(session))
+      {
+        // Message header error
+        return -2;
+      }
+      
       // now check if the message fits into the buffer - for this don't adjust the
       // length yet, do it later.
       length = ntohs(hdr->length);
+      // maxLen here is the total size of the read buffer.
       if (length > maxLen)
       {
-        // increase the header buffer only if it is less than the maximum 
-        // allowed size.
-        if (length < BGP_EXTMAX_MESSAGE_SIZE)
+        void* new = NULL;
+        new = realloc(session->recvBuff, length+1);
+        if (new != NULL)
         {
-          void* new = NULL;
-          new = realloc(session->recvBuff, length+1);
-          if (new != NULL)
-          {
-            session->recvBuff = new;
-            session->buffSize = length+1;
-          }
-        }
-        else
-        {
-          printf("BGP header to large %u - Max allowed size id %i\n", 
-                 hdr->length, BGP_EXTMAX_MESSAGE_SIZE);
-          hdr->length = 0;
-          memset(session->recvBuff, '0', maxLen);
-          printf ("ERROR - Received Message > 64K - Move to IDLE");
-          sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
-                           BGP_ERR1_SUB_BAD_LENGTH, 0, NULL);
-          return -2;
+          session->recvBuff = new;
+          session->buffSize = length+1;
         }
       }
       // now adjust the length and subtract the number of already read bytes.
       length -= readBytes;
 
-      bool error = false;
+      // continue reading until the complete message is read.
       while (length > 0)
       {
         readBytes = read(session->sessionFD, buff, length);
@@ -710,53 +761,112 @@ int readNextBGPMessage(BGPSession* session, int timeout)
         }
         else
         {
-          // store the error in totalBytesRead
-          totalBytesRead = readBytes;
-          error = true;
-          break;
+          // error reading
+          // @TODO: Send Notification - maybe count error and don't immediately 
+          //        close connection - look into it further.
+          printf ("ERROR[%i] - close socket - Move to IDLE!", readBytes);
+          session->tcpConnected = false;
+          shutDownTCPSession(session, true);
+          return -1;
         }
-      }                  
-      if (error)
-      {
-        // @TODO: Send Notification - maybe count error and don't immediately 
-        //        close connection - look into it further.
-        printf ("ERROR - close socket - Move to IDLE!");
-        session->tcpConnected = false;
-        shutDownTCPSession(session, true);
-        return -1;
       }
+      
+      // Now determine if we print on receipt
+      bool prnHdr = false;
+      switch (hdr->type)
+      {
+        case BGP_T_KEEPALIVE:
+          prnHdr = session->bgpConf.printOnReceive[PRNT_MSG_KEEPALIVE]; break;
+        case BGP_T_UPDATE:
+          prnHdr = session->bgpConf.printOnReceive[PRNT_MSG_UPDATE]; break;
+        case BGP_T_OPEN:
+          prnHdr = session->bgpConf.printOnReceive[PRNT_MSG_OPEN]; break;
+        case BGP_T_NOTIFICATION:
+          prnHdr = session->bgpConf.printOnReceive[PRNT_MSG_NOTIFICATION]; break;
+        default:
+          prnHdr = session->bgpConf.printOnReceive[PRNT_MSG_UNKNOWN]; break;
+      }
+      if (prnHdr)
+      {
+        printf ("Received ");
+        printBGP_Message(hdr);
+      }
+    }    
+    // Moved inside the if section - count the message only if the FSM is
+    // ready to receive messages
+    if (session->fsm.state != FSM_STATE_IDLE && totalBytesRead > 0)
+    {
+      session->lastReceived = time(0);
     }
   }
-  if (session->fsm.state != FSM_STATE_IDLE && totalBytesRead > 0)
+  else
   {
-    session->lastReceived = time(0);
+    printf ("WARNING - FSM not ready to receive messages!\n");   
   }
   
   return totalBytesRead;
 }
 
 /**
- * Check the message header for correctness. If not correct and a notification 
- * needs to be send, it will do so.
+ * Check the BGP message header for correctness. If not correct and a 
+ * notification message needs to be send, it will do so.
+ * 
+ * This function will perform the extended message processing on the receiver
+ * side.
  * 
  * @param session The bgp session.
+ * 
+ * @return true if the message header is correct, otherwise false. If false a 
+ *              notification with the appropriate error was send.
  */
-bool checkMessageHeader(BGPSession* session)
+static bool _checkMessageHeader(BGPSession* session)
 {
   BGP_MessageHeader* hdr = (BGP_MessageHeader*)session->recvBuff;
-  
+  u_int16_t length = ntohs(hdr->length);
+ 
   int idx;
   for (idx = 0; idx < BGP_MARKER_SIZE; idx++)
   {
     if (hdr->marker[idx] != 0xff)
     {
-      u_int16_t length = ntohs(hdr->length);
       sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR_SUB_UNDEFINED,
-                       length, (u_int8_t*)session->recvBuff);
+                       length, (u_int8_t*)session->recvBuff,
+                       SESS_FLOW_CONTROL_REPEAT);
       return false;
     }
   }
   
+  // Moved processing here to facilitate the length processing
+  bool allowExtendedMsg = false;
+  switch (hdr->type)
+  {
+    case BGP_T_UPDATE:
+      allowExtendedMsg = session->bgpConf.capConf.extMsgSupp 
+                         || session->bgpConf.capConf.extMsgLiberal;
+      break;
+    case BGP_T_OPEN:
+    case BGP_T_KEEPALIVE:
+    case BGP_T_NOTIFICATION:
+      break;
+    default:
+      sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_TYPE,
+                       length, (u_int8_t*)session->recvBuff, 
+                       SESS_FLOW_CONTROL_REPEAT);
+      return false;
+      break;
+  }
+
+  if (length > BGP_MAX_MESSAGE_SIZE)
+  {
+    // We received an extended message
+    if ( (!allowExtendedMsg) || (length > BGP_EXTMAX_MESSAGE_SIZE))
+    {
+      sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_LENGTH,
+                       length, (u_int8_t*)session->recvBuff, 
+                       SESS_FLOW_CONTROL_REPEAT);
+      return false;
+    }
+  }
   return true;
 }
 
@@ -787,8 +897,11 @@ void processOpenMessage(BGPSession* session)
         {
           printf("WARNING: Received NOTIFICATION with other error code than"
                  "cease (%d)!\n", BGP_ERR6_CEASE);
-          printBGP_Message((BGP_MessageHeader*)hdr, "Notification Message", 
-                            false);
+          // Only print if not already printed
+          if (!session->bgpConf.printOnReceive[PRNT_MSG_NOTIFICATION])
+          {
+            printBGP_Message((BGP_MessageHeader*)hdr);
+          }
         }
         
         if (!fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
@@ -811,10 +924,9 @@ void processOpenMessage(BGPSession* session)
 
     if (isERROR)
     {
-      printf("ERROR: Open message expected but %s message received! "
-              "Abort message processing for open!\n", type);    
-      printBGP_Message((BGP_MessageHeader*)hdr, "Received Unexpected Message", 
-                       false);
+      printf("ERROR: Open message expected but '%s' [%i] message received! "
+              "Abort message processing for open!\n", 
+              type, hdr->messageHeader.type);    
     }
     else
     {
@@ -830,7 +942,8 @@ void processOpenMessage(BGPSession* session)
   if (session->fsm.state != FSM_STATE_OpenSent)
   {
     printf ("ERROR: FSM not in OpenSent - close session and go to IDLE!\n");
-    sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL);
+    sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL, 
+                     SESS_FLOW_CONTROL_REPEAT);
     return;
   }
 
@@ -841,7 +954,7 @@ void processOpenMessage(BGPSession* session)
     printf ("ERROR: Open Messages MUST be at least %u bytes of length!\n", 
             BGP_MIN_OPEN_LENGTH);
     sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_LENGTH,
-                     length, (u_int8_t*)hdr);
+                     length, (u_int8_t*)hdr, SESS_FLOW_CONTROL_REPEAT);
     return;
   }
     
@@ -850,7 +963,7 @@ void processOpenMessage(BGPSession* session)
   {
     printf ("ERROR: Wrong BGP Version - close session and go to IDLE!\n");
     sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR2_SUB_VERSION, 
-                     0, NULL);
+                     0, NULL, SESS_FLOW_CONTROL_REPEAT);
     return;
   }
 
@@ -936,7 +1049,8 @@ void processOpenMessage(BGPSession* session)
               {
                 printf ("ERROR: Wrong BGPSEC version %u!\n", bgpsecVer);
                 sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                                 BGP_ERR3_SUB_UNSUPPORTED_BGPSEC_VER, 0, NULL);
+                                  BGP_ERR2_SUB_UNSUPPORTED_BGPSEC_VER, 0, NULL,
+                                  SESS_FLOW_CONTROL_REPEAT);
                 return;
               }
               switch (ntohs(bgpsec->afi))
@@ -995,7 +1109,8 @@ void processOpenMessage(BGPSession* session)
           // Unsupported optional Parameter
           printf ("WARNING: Unsupported parameter[%u]!\n", param->param_type);
           sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                           BGP_ERR2_SUB_UNSUPP_OPT_PARAM, 0, NULL);
+                           BGP_ERR2_SUB_UNSUPP_OPT_PARAM, 0, NULL,
+                           SESS_FLOW_CONTROL_REPEAT);
           return;        
           break;
       }
@@ -1008,7 +1123,7 @@ void processOpenMessage(BGPSession* session)
     printf ("ERROR: Peer reports AS %u but expected is AS %u!\n",
             peerASN, session->bgpConf.peerAS);
     sendNotification(session, BGP_ERR2_OPEN_MESSAGE, BGP_ERR2_SUB_BAD_PEERAS,
-                     0, NULL);
+                     0, NULL, SESS_FLOW_CONTROL_REPEAT);
     return;
   }
     
@@ -1023,59 +1138,79 @@ void processOpenMessage(BGPSession* session)
   //                   0, NULL);
   //  return;    
   //}
-
+  
+  // This specifies the required capabilities
+  bool mp_reach_nlri_ipv4_available = true;
+  bool mp_reach_nlri_ipv6_available = true;
+  
   // 1st. Check MPNLRI capability for peer where required
   // Verify that the peer can to mpnlri V4 if it can receive or send bgpsec V4
   if (   (peerCap->bgpsec_rcv_v4 || peerCap->bgpsec_snd_v4)
       && !peerCap->mpnlri_v4)
   {
+    mp_reach_nlri_ipv4_available = false;
     printf ("ERROR: Peer does not support MPNLRI for IPv4\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
-    return;        
   }
 
   if (   (peerCap->bgpsec_rcv_v6 || peerCap->bgpsec_snd_v6)
       && !peerCap->mpnlri_v6)
   {
+    mp_reach_nlri_ipv6_available = false;
     printf ("ERROR: Peer does not support MPNLRI for IPv6\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
-    return;        
   }
-
-  // If "we" want to send V6 BGPSEC the peer MUST be able to receive it  
-  if (session->bgpConf.capConf.bgpsec_snd_v4 && !peerCap->bgpsec_rcv_v4)
-  {
-    printf ("ERROR: Peer does not support BGPSEC for IPv4\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
-    return;    
-  }
-  
-  // If "we" want to send V6 BGPSEC the peer MUST be able to receive it  
-  if (session->bgpConf.capConf.bgpsec_snd_v6 && !peerCap->bgpsec_rcv_v6)
-  {
-    printf ("ERROR: Peer does not support BGPSEC for IPv6\n");
-    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
-                     BGP_ERR_SUB_UNSUPPORTED_CAPABILITY, 0, NULL);
-    return;    
-  }
-  
+    
   // OK, we reached here, change FSM
   if (!fsmSwitchState(&session->fsm, FSM_STATE_OpenConfirm))
   {
     printf("ERROR: Could not update FSM!\n");
-    sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL);
+    sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 0, NULL, 
+                     SESS_FLOW_CONTROL_REPEAT);
     return;
   }
   
+  if (!(mp_reach_nlri_ipv4_available & mp_reach_nlri_ipv6_available))
+  {
+    // one or both of the required MP_REACH_NLRI is missing.
+    int multiplier = 0;
+    if (!mp_reach_nlri_ipv4_available) multiplier++;
+    if (!mp_reach_nlri_ipv6_available) multiplier++;
+    int size = sizeof(BGP_Cap_MPNLRI) * multiplier;
+    u_int8_t* data = malloc(size);
+    memset (data, 0, size);
+    
+    BGP_Cap_MPNLRI* mpData = (BGP_Cap_MPNLRI*)data;
+    if (!mp_reach_nlri_ipv4_available)
+    {
+      mpData->capHdr.cap_code   = BGP_CAP_T_MPNLRI;
+      mpData->capHdr.cap_length = 4;
+      mpData->afi = htons(AFI_V4);
+      mpData->reserved = 0;
+      mpData->safi = SAFI_UNICAST;
+      mpData = (BGP_Cap_MPNLRI*)(data + sizeof(BGP_Cap_MPNLRI));
+    }
+    if (!mp_reach_nlri_ipv6_available)
+    {
+      mpData->capHdr.cap_code   = BGP_CAP_T_MPNLRI;
+      mpData->capHdr.cap_length = 4;
+      mpData->afi = htons(AFI_V6);
+      mpData->reserved = 0;
+      mpData->safi = SAFI_UNICAST;
+      mpData += 1;
+    }
+    sendNotification(session, BGP_ERR2_OPEN_MESSAGE, 
+                     BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY, size, data, 
+                     SESS_FLOW_CONTROL_REPEAT);
+    free (data);
+    data = NULL;
+    mpData = NULL;
+  }
+    
   // clean the buffer again
   memset(session->recvBuff, 0, ntohs(hdr->messageHeader.length));
 }
 
 /**
- * Process the provided message.
+ * Process the provided bgp message.
  * 
  * @param session the bgpsession that received the packet. 
  */
@@ -1088,7 +1223,7 @@ static void _processPacket(void* self)
   {
     printf("ERROR: Received message with invalid message header!\n");
     sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_LENGTH,
-                     0, NULL);
+                     0, NULL, SESS_FLOW_CONTROL_REPEAT);
     return;
   }
   int idx = 0;
@@ -1098,67 +1233,64 @@ static void _processPacket(void* self)
     {
       // @TODO: Check RFC again and see the correct subcode
       sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_NOT_SYNC,
-                       0, NULL);
+                       0, NULL, SESS_FLOW_CONTROL_REPEAT);
       return;
     }
   }
           
-  if (checkMessageHeader(session))
-  {  
-    switch (hdr->type)
-    {
-      case BGP_T_OPEN:
-        printf("ERROR: Received unexpected Open message!\n");
-        if (session->bgpConf.printOnReceive[PRNT_MSG_OPEN])
-        {
-          printBGP_Message((BGP_MessageHeader*)hdr, 
-                           "Received Open Message", false);
-        }
-        sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 
-                         ntohs(hdr->length), (u_int8_t*)session->recvBuff);
-        break;
-      case BGP_T_KEEPALIVE:
-        if (session->bgpConf.printOnReceive[PRNT_MSG_KEEPALIVE])
-        {
-          printBGP_Message((BGP_MessageHeader*)hdr, 
-                           "Received KeepAlive Message", false);
-        }
-        if (length != sizeof(BGP_KeepAliveMessage))
-        {
-          sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
-                           BGP_ERR1_SUB_BAD_LENGTH, ntohs(hdr->length), 
-                           (u_int8_t*)session->recvBuff);        
-        }
-        session->lastReceived = time(0);
-        break;
-      case BGP_T_NOTIFICATION:        
-        session->fsm.state = FSM_STATE_IDLE;
-        if (session->bgpConf.printOnReceive[PRNT_MSG_NOTIFICATION])
-        {
-          printBGP_Message((BGP_MessageHeader*)hdr, 
-                           "Received Notification Message", false);
-        }
-        if (session->sessHoldTimerSem != NULL)
-        {
-          // Notify the hold timer
-          sem_post(session->sessHoldTimerSem);
-        }
-        //shutDownTCPSession(session);
-        break;
-      case BGP_T_UPDATE:
-        session->lastReceived = time(0);
-        if (session->bgpConf.printOnReceive[PRNT_MSG_UPDATE])
-        {
-          printBGP_Message((BGP_MessageHeader*)hdr, 
-                           "Received Update Message", false);
-        }
-        break;
-      default:
-        printf("ERROR: Received unknown message[%u]!\n", hdr->type);
-        sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_TYPE, 
-                         ntohs(hdr->length), (u_int8_t*)session->recvBuff);
-        break;
-    }
+  switch (hdr->type)
+  {
+    case BGP_T_OPEN:
+      printf("ERROR: Received unexpected Open message!\n");
+      sendNotification(session, BGP_ERR5_FSM, BGP_ERR_SUB_UNDEFINED, 
+                       ntohs(hdr->length), (u_int8_t*)session->recvBuff,
+                       SESS_FLOW_CONTROL_REPEAT);
+      break;
+    case BGP_T_KEEPALIVE:
+      if (length != sizeof(BGP_KeepAliveMessage))
+      {
+        sendNotification(session, BGP_ERR1_MESSAGE_HEADER, 
+                         BGP_ERR1_SUB_BAD_LENGTH, ntohs(hdr->length), 
+                         (u_int8_t*)session->recvBuff, 
+                         SESS_FLOW_CONTROL_REPEAT);        
+      }
+      session->lastReceived = time(0);
+      break;
+    case BGP_T_NOTIFICATION:        
+      session->fsm.state = FSM_STATE_IDLE;
+      if (session->sessHoldTimerSem != NULL)
+      {
+        // Notify the hold timer
+        sem_post(session->sessHoldTimerSem);
+      }
+      //shutDownTCPSession(session);
+      break;
+    case BGP_T_UPDATE:
+      session->lastReceived = time(0);
+      break;
+    default:
+      printf("ERROR: Received unknown message type [%u]!\n", hdr->type);
+      sendNotification(session, BGP_ERR1_MESSAGE_HEADER, BGP_ERR1_SUB_BAD_TYPE, 
+                       ntohs(hdr->length), (u_int8_t*)session->recvBuff, 
+                       SESS_FLOW_CONTROL_REPEAT);
+      break;
+  }
+}
+
+/** 
+ * Check and possibly adjust the retry counter to accepted values.
+ * 
+ * @param session Allows to have a session configuration for the retry counter
+ * @param retryCounter Pointer to the retry counter.
+ */
+static void _checkRetryCounter(BGPSession* session, int* retryCounter)
+{
+  if (*retryCounter < 0)
+  {
+    *retryCounter = 0;
+  } else if (*retryCounter > SESS_FLOW_CONTROL_REPEAT)
+  {
+    *retryCounter = SESS_FLOW_CONTROL_REPEAT;
   }
 }
 
@@ -1189,92 +1321,133 @@ static int _writeData(BGPSession* session, u_int8_t* data, int size)
  */
 bool sendOpenMessage(BGPSession* session)
 {
-  if (!_isSocketAlive(session, POLL_TIMEOUT_MS, false))
+  bool retVal  = false;
+  int  written = 0;
+  
+  switch (_isSocketAlive(session, POLL_TIMEOUT_MS, false))          
   {
-    // The file descriptor is broken, don't attempt to send.
-    if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
-    {
-      fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
-    }
-    printf ("ERROR: Cannot send Open, socket is broken!\n");
-    return false;
+    case SOCKET_ERR:
+      // The file descriptor is broken, don't attempt to send.
+      if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
+      {
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+      }
+      printf ("ERROR: Cannot send Open, socket is broken!\n");
+      break;
+      
+    case SOCKET_TIMEOUT:      
+      printf ("WARNING: Socket timed out!\n");
+      break;
+      
+    case SOCKET_ALIVE:
+      if (session->fsm.state != FSM_STATE_OpenSent)
+      {
+        printf ("FSM is not in OpenSent state!\n");
+        return false;
+      }
+      unsigned char sendBuff[SESS_MIN_SEND_BUFF];
+      memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
+      int size = createOpenMessage(sendBuff, sizeof(sendBuff), &(session->bgpConf));
+      if (size < 0)
+      {
+        // @TODO: resize the sending buffer
+        printf ("%i bytes missing!", size * (-1));
+        return false;
+      }
+      if (size > 0 && size <= sizeof(sendBuff))
+      {
+        written = _writeData(session, sendBuff, size);
+        if (session->bgpConf.printOnSend[PRNT_MSG_OPEN])
+        {
+          printf ("Send ");
+          printBGP_Message((BGP_MessageHeader*)sendBuff);
+        }
+      }
+      retVal = written == size;
+      break;
+      
+    default:
+      printf ("ERROR: Undefined socket state!\n");
+      break;
   }
   
-  if (session->fsm.state != FSM_STATE_OpenSent)
-  {
-    printf ("FSM is not in OpenSent state!\n");
-    return false;
-  }
-  unsigned char sendBuff[SESS_MIN_SEND_BUFF];
-  memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
-  int size = createOpenMessage(sendBuff, sizeof(sendBuff), &(session->bgpConf));
-  if (size < 0)
-  {
-    // @TODO: resize the sending buffer
-    printf ("%i bytes missing!", size * (-1));
-    return false;
-  }
-  int written = 0;
-  if (size > 0 && size <= sizeof(sendBuff))
-  {
-    written = _writeData(session, sendBuff, size);
-    if (session->bgpConf.printOnSend[PRNT_MSG_OPEN])
-    {
-      printBGP_Message((BGP_MessageHeader*)sendBuff, 
-                       "Send Open Message", false);
-    }
-  }
-  
-  return written == size;
+  return retVal;
 }
 
 /**
- * Send a keepalive to the peer. The FSM must be in ESTABLISHED
+ * Send a keepalive to the peer. The FSM must be in ESTABLISHED.
+ * This function allows retying to send in case the socket experienced a 
+ * timeout. This can happen is the peer cannot keep up with the speed of the 
+ * sending.
  * 
  * @param session the session where to send to
+ * @param retryCounter The number of times the sending should be retried prior 
+ *                     return returning false.
  * 
- * @return true if the mesage could be sent otherwise false.
+ * @return true if the message could be sent otherwise false.
  */
-bool sendKeepAlive(BGPSession* session)
+bool sendKeepAlive(BGPSession* session, int retryCounter)
 {
-  if (!_isSocketAlive(session, POLL_TIMEOUT_MS, false))
-  {
-    // The file descriptor is broken, don't attempt to send.
-    if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
-    {
-      fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
-    }
-    printf ("ERROR: Cannot send KeepAlive, socket is broken!\n");
-    return false;
-  }
+  bool retVal = false;
   
-  if (session->fsm.state != FSM_STATE_ESTABLISHED)
+  _checkRetryCounter(session, &retryCounter);
+  
+  switch (_isSocketAlive(session, POLL_TIMEOUT_MS, false))
   {
-    printf ("FSM is not in ESTABLISHED state!\n");
-    return false;
-  }
+    case SOCKET_ERR:
+      // The file descriptor is broken, don't attempt to send.
+      if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
+      {
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+      }
+      printf ("ERROR: Cannot send KEEPALIVE message, socket is broken!\n");
+      break;
+      
+    case SOCKET_TIMEOUT:      
+      printf ("WARNING: Cannot send KEEPALIVE message, socket timed out!\n");
+      if (retryCounter-- > 0)
+      {
+        printf ("INFO: Retry sending KEEPALIVE message in %u seconds.\n", 
+                SESS_FLOW_CONTROL_SLEEP);
+        sleep (SESS_FLOW_CONTROL_SLEEP);
+        retVal = sendKeepAlive(session, retryCounter);
+      }
+      break;
+      
+    case SOCKET_ALIVE:
+      if (session->fsm.state != FSM_STATE_ESTABLISHED)
+      {
+        printf ("FSM is not in ESTABLISHED state!\n");
+        break;
+      }
 
-  unsigned char sendBuff[SESS_MIN_SEND_BUFF];
-  memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
-  int size = createKeepAliveMessge(sendBuff, sizeof(sendBuff));
-  if (size < 0)
-  {
-    // @TODO: resize the sending buffer
-    printf ("%i bytes missing!", size * (-1));
-    return false;
-  }
-  int written = 0;
-  if (size > 0 && size <= sizeof(sendBuff))
-  {
-    written = _writeData(session, sendBuff, size);
-    if (session->bgpConf.printOnSend[PRNT_MSG_KEEPALIVE])
-    {
-      printBGP_Message((BGP_MessageHeader*)sendBuff, 
-                       "Send KeepAlive Message", false);
-    }
+      unsigned char sendBuff[SESS_MIN_SEND_BUFF];
+      memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
+      int size = createKeepAliveMessge(sendBuff, sizeof(sendBuff));
+      if (size < 0)
+      {
+        // @TODO: resize the sending buffer
+        printf ("%i bytes missing!", size * (-1));
+        break;
+      }
+      int written = 0;
+      if (size > 0 && size <= sizeof(sendBuff))
+      {
+        written = _writeData(session, sendBuff, size);
+        if (session->bgpConf.printOnSend[PRNT_MSG_KEEPALIVE])
+        {
+          printf ("Send ");
+          printBGP_Message((BGP_MessageHeader*)sendBuff);
+        }
+      }
+      retVal = (written == size);
+      break;
+    default:
+      printf ("WARNING: Undefined socket state!\n");
+      break;
   }
   
-  return (written == size);
+  return retVal;
 }
 
 /**
@@ -1286,57 +1459,80 @@ bool sendKeepAlive(BGPSession* session)
  * @param subcode the subcode of the error.
  * @param dataLength The length of the attached data (can be zero)
  * @param data the data to attach.
- * 
- * @param type the type of the notification.
+ * @param retryCounter The number of retries in case the socket timed out.
  * 
  * @return true if successful, otherwise false.
  */
 bool sendNotification(BGPSession* session, int error_code, int subcode, 
-                      u_int16_t dataLength, u_int8_t* data)
+                      u_int16_t dataLength, u_int8_t* data, int retryCounter)
 {
-  if (!_isSocketAlive(session, POLL_TIMEOUT_MS, false))
-  {
-    // The file descriptor is broken, don't attempt to send.
-    if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
-    {
-      fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
-    }
-    printf ("ERROR: Cannot send Notification, socket is broken!\n");
-    return false;
-  }
-  
+  bool retVal = false;
   unsigned char sendBuff[SESS_MIN_SEND_BUFF];
-  memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
-  int size = createNotificationMessage(sendBuff, sizeof(sendBuff), error_code,
-                                       subcode, dataLength, data);
-  if (size < 0)
+  
+  _checkRetryCounter(session, &retryCounter);
+  
+  switch (_isSocketAlive(session, POLL_TIMEOUT_MS, false))
   {
-    // @TODO: resize the sending buffer
-    printf ("%i bytes missing!", size * (-1));
-    return false;
-  }
-  int written = 0;
-  if (size > 0 && size <= sizeof(sendBuff))
-  {
-    written = _writeData(session, sendBuff, size);
-    if (session->bgpConf.printOnSend[PRNT_MSG_NOTIFICATION])
-    {
-      printBGP_Message((BGP_MessageHeader*)sendBuff, 
-                       "Send Notification Message", false);
-    }
+    case SOCKET_ERR:
+      // The file descriptor is broken, don't attempt to send.
+      if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
+      {
+        fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
+      }
+      printf ("ERROR: Cannot send NOTIFICATION message, socket is broken!\n");
+      break;
+      
+    case SOCKET_TIMEOUT:
+      printf ("WARNING: Cannot send NOTIFICATION message, socket timed out!\n");
+      if (retryCounter-- > 0)
+      {
+        printf ("INFO: Retry sending NOTIFICATION message in %u seconds.\n", 
+                SESS_FLOW_CONTROL_SLEEP);
+        sleep (SESS_FLOW_CONTROL_SLEEP);
+        retVal = sendNotification(session, error_code, subcode, dataLength, 
+                                  data, retryCounter);
+      }
+      break;
+      
+    case SOCKET_ALIVE:
+      memset(sendBuff, 0, SESS_MIN_SEND_BUFF);
+      int size = createNotificationMessage(sendBuff, sizeof(sendBuff), error_code,
+                                           subcode, dataLength, data);
+      if (size < 0)
+      {
+        // @TODO: resize the sending buffer
+        printf ("%i bytes missing!", size * (-1));
+        return false;
+      }
+      int written = 0;
+      if (size > 0 && size <= sizeof(sendBuff))
+      {
+        written = _writeData(session, sendBuff, size);
+        if (session->bgpConf.printOnSend[PRNT_MSG_NOTIFICATION])
+        {
+          printf ("Send ");
+          printBGP_Message((BGP_MessageHeader*)sendBuff);
+        }
+      }
+
+      retVal = written == size;
+      if (retVal)
+      {
+        //session->shutdownSess(session);
+        if (!fsmSwitchState(&session->fsm, FSM_STATE_IDLE))
+        {
+          printf("ERROR: Cannot move FSM to IDLE state!\n");
+          retVal = session->fsm.state == FSM_STATE_IDLE;
+          // @TODO: Throw an error, this is definitely a BUG
+        }
+      }
+      break;
+      
+    default:
+      printf("ERROR: Undefined socket state!\n");
+      break;
   }
   
-  bool retVal = written == size;
-  if (retVal)
-  {
-    //session->shutdownSess(session);
-    if (!fsmSwitchState(&session->fsm, FSM_STATE_IDLE))
-    {
-      printf("ERROR: Cannot move FSM to IDLE state!");
-      retVal = session->fsm.state == FSM_STATE_IDLE;
-      // @TODO: Throw an error, this is definitely a BUG
-    }
-  } 
   return retVal;
 }
 
@@ -1347,30 +1543,30 @@ bool sendNotification(BGPSession* session, int error_code, int subcode,
  * @param session The session where to send the update to.
  * 
  * @param update The update to be send.
+ * @param retryCounter Allows to retry sending in case the socket experienced a 
+ *                     timeout.
  * 
  * @return true if the update could be send.
  */
-bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update)
+bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update, 
+                int retryCounter)
 {
   bool retVal = false;
+  int written = 0;
+  u_int16_t size = ntohs(update->messageHeader.length);
+  
+  _checkRetryCounter(session, &retryCounter);
   
   if (session->fsm.state != FSM_STATE_ESTABLISHED)
   {
-    printf ("NOTICE: Cannot send Update, FSM is not in ESTABLISHED state!\n");
+    printf ("NOTICE: Cannot send UPDATE message, FSM is not in ESTABLISHED state!\n");
     return retVal;
   }
-  
-  if (!_isSocketAlive(session, POLL_TIMEOUT_MS, false))
+ 
+  switch (_isSocketAlive(session, POLL_TIMEOUT_MS, false))
   {
-    // To determine if this is an error condition or if the session is in limbo
-    // check the socket again.
-    if (_isSocketAlive(session, POLL_TIMEOUT_MS, true)) // check for data
-    {
-      printf ("WARNING: Cannot send Update, socket is in read only!\n");    
-    }
-    else
-    {
-      printf ("ERROR: Cannot send Update, socket is broken - move to IDLE!\n");
+    case SOCKET_ERR:
+      printf ("ERROR: Cannot send UPDATE message, socket is broken - move to IDLE!\n");
       if (fsmCanSwitchTo(&session->fsm, FSM_STATE_IDLE))
       {
         fsmSwitchState(&session->fsm, FSM_STATE_IDLE);
@@ -1379,59 +1575,87 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update)
       {
         printf ("ERROR: Cannot switch to IDLE!\n");        
       }
-    }
-    return retVal;
-  }
-    
-  int written = 0;
-  u_int16_t size = ntohs(update->messageHeader.length);
-  
-  // Check if we can send the message!
-  if (size > BGP_MAX_MESSAGE_SIZE)
-  {
-    // We can only send the message if extended message was negotiated!
-    // Or if forced - Only to allow testing the peer
-    bool doSend = (    session->bgpConf.peerCap.extMsgSupp 
-                    && session->bgpConf.capConf.extMsgSupp)
-                  || session->bgpConf.capConf.extMsgForce;
-    if (!doSend)
-    {
-      printf ("WARNING: Cannot send message due to message size > %d\n", 
-              BGP_MAX_MESSAGE_SIZE);
-      if (!session->bgpConf.capConf.extMsgSupp)
+      break;
+      
+    case SOCKET_TIMEOUT:
+      printf ("WARNING: Cannot send UPDATE message, socket timed out!\n");
+      if (retryCounter-- > 0)
       {
-        printf ("         * To send this messages, enable the extended message"
-                " size capability!\n");
+        printf ("INFO: Retry sending UPDATE message in %u seconds.\n", 
+                SESS_FLOW_CONTROL_SLEEP);
+        sleep (SESS_FLOW_CONTROL_SLEEP);
+        retVal = sendUpdate(session, update, retryCounter);
       }
-      if (!session->bgpConf.peerCap.extMsgSupp)
+      break;
+      
+    case SOCKET_ALIVE:
+      // Check if we can send the message!
+      if (size > BGP_MAX_MESSAGE_SIZE)
       {
-        printf ("         * Peer did not announce the extended message"
-                " size capability!\n");
+        // We can only send the message if extended message was negotiated!
+        // Or if forced - Only to allow testing the peer
+        bool doSend = (    session->bgpConf.peerCap.extMsgSupp 
+                        && session->bgpConf.capConf.extMsgSupp)
+                      || session->bgpConf.capConf.extMsgForce;
+        if (!doSend)
+        {
+          printf ("WARNING: Cannot send message due to message size > %d\n", 
+                  BGP_MAX_MESSAGE_SIZE);
+          if (!session->bgpConf.capConf.extMsgSupp)
+          {
+            printf ("         * To send this messages, enable the extended message"
+                    " size capability!\n");
+          }
+          if (!session->bgpConf.peerCap.extMsgSupp)
+          {
+            printf ("         * Peer did not announce the extended message"
+                    " size capability!\n");
+          }
+          break;
+        }
+        
+        if (size > BGP_EXTMAX_MESSAGE_SIZE)
+        {
+          printf ("ERROR: Cannot send message due to message size > %d\n", 
+                  BGP_EXTMAX_MESSAGE_SIZE);
+          break;      
+        }
       }
-      return retVal;
-    }
-    if (size > BGP_EXTMAX_MESSAGE_SIZE)
-    {
-      printf ("ERROR: Cannot send message due to message size > %d\n", 
-              BGP_EXTMAX_MESSAGE_SIZE);
-      return retVal;      
-    }
-  }
-  
-  written = _writeData(session, (u_int8_t*)update, size);
-  if (session->bgpConf.printOnSend[PRNT_MSG_UPDATE])
-  {
-    printBGP_Message((BGP_MessageHeader*)update, "Send Update Message", false);
-    //printUpdateData((BGP_UpdateMessage_1*)update);
-  }
-  
-  retVal = (written == size);
-  
-  if (retVal)
-  {
-    session->lastSentUpdate = session->lastSent;
+
+      written = _writeData(session, (u_int8_t*)update, size);
+#ifdef CREATE_TESTVECTOR
+      // This mode is to print a detailed version of the update, incl. byte dump      
+      printf ("\nUpdate from AS(%u) to AS(%u):\n", 
+              session->bgpConf.asn, session->bgpConf.peerAS);
+      printf ("===================================\n");
+      printf ("Binary Form of BGP/BGPsec Update (TCP-DUMP):\n\n");
+      
+      printHex((u_int8_t*)update, size, "");
+      printf ("\n");
+      printf ("The human readable output is produced using bgpsec-io, a bgpsec");
+      printf ("\ntraffic generator that uses a wireshark like printout.\n\n");
+      bool prnOnUpdate = session->bgpConf.printOnSend[PRNT_MSG_UPDATE];
+      // Enable update printer in this mode.
+      session->bgpConf.printOnSend[PRNT_MSG_UPDATE] = true;
+#endif            
+      if (session->bgpConf.printOnSend[PRNT_MSG_UPDATE])
+      {
+        printf ("Send ");
+        printBGP_Message((BGP_MessageHeader*)update);
+        //printUpdateData((BGP_UpdateMessage_1*)update);
+      }
+      
+      retVal = (written == size);
+
+      if (retVal)
+      {
+        session->lastSentUpdate = session->lastSent;
+      }      
+      break;
+      
+    default:
+      break;
   }
   
   return retVal;
 }
-

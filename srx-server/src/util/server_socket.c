@@ -22,28 +22,34 @@
  *
  * Provides functionality to handle the SRx server socket.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0.10- 2013/01/25 - oborchert
- *             * Removed un-used include glib.h 
- *   0.3.0.0 - 2013/01/25 - oborchert
- *             * Removed error output if an attempt of removing an already removed
- *               client thread from the client list.
- *             * Removed dead code.
- *             * Re-formated some documentation and code.
- *           - 2013/01/04 - oborchert
- *             * Added parameter goodByeReceived to ClientThread structure.
- *           - 2012/12/13 - oborchert
- *             * //TODO Make SVN compare
- *   0.2.0.0 - 2011/01/07 - oborchert
- *             * Changelog added with version 0.2.0 and date 2011/01/07
- *             * Version tag added
- *   0.1.0.0 - 2009/12/23 - pgleichm
- *             * Code Created
+ *  0.5.0.0 - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *          - 2016/10/26 - oborchert
+ *            * BZ1037: Replaces legacy calls to bzero with memset
+ *          - 2016/08/19 - oborchert
+ *            * Moved socket connection error strings to the header file.
+ *            * Modified connection error message for ports in system space
+ *  0.3.0.10- 2013/01/25 - oborchert
+ *            * Removed un-used include glib.h 
+ *  0.3.0.0 - 2013/01/25 - oborchert
+ *           * Removed error output if an attempt of removing an already removed
+ *             client thread from the client list.
+ *           * Removed dead code.
+ *            * Re-formated some documentation and code.
+ *          - 2013/01/04 - oborchert
+ *            * Added parameter goodByeReceived to ClientThread structure.
+ *          - 2012/12/13 - oborchert
+ *            * //TODO Make SVN compare
+ *  0.2.0.0 - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *  0.1.0.0 - 2009/12/23 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
- *
  */
 #include <stdio.h>
 #include <string.h>
@@ -544,7 +550,7 @@ bool createServerSocket(ServerSocket* self, int port, bool verbose)
   }
 
   // Bind to a server-address
-  bzero(&addr, sizeof (struct sockaddr_in));
+  memset(&addr, 0, sizeof (struct sockaddr_in));
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY; // inet_pton
   addr.sin_port = htons(port);
@@ -556,77 +562,95 @@ bool createServerSocket(ServerSocket* self, int port, bool verbose)
   if (bind(self->serverFD, (struct sockaddr*)&addr, 
            sizeof (struct sockaddr_in)) < 0)
   {
+    char* errStr = NULL;
     switch (errno)
     {
       case EADDRINUSE:
-        RAISE_ERROR("The specified address is already in use.");
+        errStr = SOC_ERR_EADDRINUSE;                
+        RAISE_ERROR("%s", errStr);
         break;
       case EADDRNOTAVAIL:
-        RAISE_ERROR("The specified address is not available from the local "
-          "machine.");
+        errStr = SOC_ERR_EADDRNOTAVAIL;
+        RAISE_ERROR("%s", errStr);
         break;
       case EAFNOSUPPORT:
-        RAISE_ERROR("The specified address is not a valid address for the "
-          "address family of the specified socket.");
+        errStr = SOC_ERR_EAFNOSUPPORT;
+        RAISE_ERROR("%s", errStr);
         break;
       case EBADF:
-        RAISE_ERROR("The socket argument is not a valid file descriptor.");
+        errStr = SOC_ERR_EBADF;
+        RAISE_ERROR("%s", errStr);
         break;
       case EINVAL:
-        RAISE_ERROR("The socket is already bound to an address, and the "
-          "protocol does not support binding to a new address; or the socket "
-          "has been shut down.");
+        errStr = SOC_ERR_EINVAL;
+        RAISE_ERROR("%s", errStr);
         break;
       case ENOTSOCK:
-        RAISE_ERROR("The socket argument does not refer to a socket.");
+        errStr = SOC_ERR_ENOTSOCK;
+        RAISE_ERROR("%s", errStr);
         break;
       case EOPNOTSUPP:
-        RAISE_ERROR("The socket type of the specified socket does not support "
-          "binding to an address.");
+        errStr = SOC_ERR_EOPNOTSUPP;
+        RAISE_ERROR("%s", errStr);
         break;
       case EACCES:
-        RAISE_ERROR("A component of the path prefix denies search permission, "
-          "or the requested name requires writing in a directory with a mode "
-          "that denies write permission.");
+        errStr = SOC_ERR_EACCES;
+        RAISE_ERROR("%s", errStr);
         break;
       case EDESTADDRREQ:
+        errStr = SOC_ERR_EDESTADDRREQ;
+        RAISE_ERROR("%s", errStr);
+        break;
       case EISDIR:
-        RAISE_ERROR("The address argument is a null pointer.");
+        errStr = SOC_ERR_EISDIR;
+        RAISE_ERROR("%s", errStr);
         break;
       case EIO:
-        RAISE_ERROR("An I/O error occurred.");
+        errStr = SOC_ERR_EIO;
+        RAISE_ERROR("%s", errStr);
         break;
       case ELOOP:
-        RAISE_ERROR("A loop exists in symbolic links encountered during "
-          "resolution of the pathname in address.");
+        errStr = SOC_ERR_ELOOP;
+        RAISE_ERROR("%s", errStr);
         break;
       case ENAMETOOLONG:
-        RAISE_ERROR("A component of a pathname exceeded {NAME_MAX} characters, "
-          "or an entire pathname exceeded {PATH_MAX} characters.");
+        errStr = SOC_ERR_ENAMETOOLONG;
+        RAISE_ERROR("%s", errStr);
         break;
       case ENOENT:
-        RAISE_ERROR("A component of the pathname does not name an existing "
-          "file or the pathname is an empty string.");
+        errStr = SOC_ERR_ENOENT;
+        RAISE_ERROR("%s", errStr);
         break;
       case ENOTDIR:
-        RAISE_ERROR("A component of the path prefix of the pathname in address "
-          "is not a directory.");
+        errStr = SOC_ERR_ENOTDIR;
+        RAISE_ERROR("%s", errStr);
         break;
       case EROFS:
-        RAISE_ERROR("The name would reside on a read-only file system.");
+        errStr = SOC_ERR_EROFS;
+        RAISE_ERROR("%s", errStr);
         break;
       case EISCONN:
-        RAISE_ERROR("The socket is already connected.");
+        errStr = SOC_ERR_EISCONN;
+        RAISE_ERROR("%s", errStr);
         break;
       case ENOBUFS:
-        RAISE_ERROR("Insufficient resources were available to complete the "
-          "call.");
+        errStr = SOC_ERR_ENOBUFS;
+        RAISE_ERROR("%s", errStr);
         break;
       default:
-        RAISE_ERROR("Unknown Error.");
-    }    
-    LOG(LEVEL_INFO, "Failed to bind the socket to the address, check if "
-      "another process locks the port \'fuser -n tcp %u\'", port);
+        errStr = SOC_ERR_UNKOWN;
+        RAISE_ERROR("%s", errStr);
+    }
+    if (port < 1024)
+    {
+      LOG(LEVEL_ERROR, "Failed to bind the socket to the address, check if "
+        "user has permission to bind system ports (<1024)\n");      
+    }
+    else
+    {
+      LOG(LEVEL_INFO, "Failed to bind the socket to the address, check if "
+        "another process locks the port \'fuser -n tcp %u\'\n", port);
+    }
     close(self->serverFD);
     return false;
   }

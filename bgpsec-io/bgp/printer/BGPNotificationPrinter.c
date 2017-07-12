@@ -22,10 +22,14 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.5
+ * @version 0.2.0.7
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/03/10 - oborchert
+ *            * Fixed wrong printout in ERR2.
+ *            * Enhanced Notification printer by printing the capabilities data
+ *              for 'Unsupported Capability' notification.
  *  0.2.0.5 - 2017/01/31 - oborchert
  *            * Added text for "Bad Message Length" notification.
  *            * Fixed data printout in Notification printer. (BZ1095)
@@ -45,6 +49,7 @@
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPHeaderPrinter.h"
 #include "bgp/printer/BGPPrinterUtil.h"
+#include "BGPOpenPrinter.h"
 
 
 /**
@@ -83,6 +88,8 @@ void printNotificationData(BGP_NotificationMessage* notification)
       errStr = "OPEN Message Error\0"; 
       switch (notification->sub_code)
       {
+        case BGP_ERR2_SUB_UNSUPPORTED_BGPSEC_VER:
+          subCodeStr = "Unsupported BGPSec Version Number\0"; break;
         case BGP_ERR2_SUB_VERSION:
           subCodeStr = "Unsupported Version Number\0"; break;
         case BGP_ERR2_SUB_BAD_PEERAS   :
@@ -93,8 +100,10 @@ void printNotificationData(BGP_NotificationMessage* notification)
           subCodeStr = "Unsupported Optional Parameter\0"; break;
         case BGP_ERR2_SUB_DEPRECATED:
           subCodeStr = "Deprecated (See RFC4271 - Appendix A)\0"; break;
-        case BGP_ERR2_SUB_UNACCEPTED_HOLDTIME   :
+        case BGP_ERR2_SUB_UNACCEPTED_HOLDTIME:
           subCodeStr = "Unacceptable Hold Time\0"; break;
+        case BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY:
+          subCodeStr = "Unsupported Capability\0"; break;
         default:
           subCodeStr = "UNKNOWN\0";    
       }
@@ -177,9 +186,36 @@ void printNotificationData(BGP_NotificationMessage* notification)
       errStr = "UNKNOWN\0";
       subCodeStr = "UNKNOWN\0";
   }
-  printf("%s+--Error code:    %u (%s)\n", TAB_2, notification->error_code, errStr);
+  printf("%s+--Error code: %u (%s)\n", TAB_2, notification->error_code, errStr);
   printf("%s+--Error subcode: %u (%s)\n", TAB_2, notification->sub_code, 
          subCodeStr);
+  
+  char useTab[STR_MAX];
+  snprintf(useTab, STR_MAX, "%s", TAB_2);
+  
+  // If the notification contains Capabilities in the data block, print them.
+  if (notification->sub_code == BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY)
+  {
+    BGP_Capabilities* cap = (BGP_Capabilities*)data;
+    int minSize   = sizeof(BGP_Capabilities);    
+    int remainder = end - data;
+    int length    = minSize + cap->cap_length;
+    
+    printf("%s+--Unsupported Capabilities\n", useTab);
+    snprintf(useTab, STR_MAX, "%s   ", TAB_2);
+    
+    while ((remainder >= minSize) && (length <= remainder))
+    {
+      data += printCapability(cap, useTab, (length < remainder));
+      remainder = end - data;
+      if (remainder >= minSize)
+      {
+        cap = (BGP_Capabilities*)data;
+        length = sizeof(BGP_Capabilities) + cap->cap_length;
+      }
+    }
+  }
+  
   if (data < end)
   {
     int dataLength = (int)(end - data);
@@ -187,16 +223,12 @@ void printNotificationData(BGP_NotificationMessage* notification)
     // write the text first in the variable to see how long it becomes. This 
     // will be the tab for the final print in case data is very large.
     
-    snprintf(dataStr, STR_MAX, "%s+--data:   ", TAB_2);
+    snprintf(dataStr, STR_MAX, "%s+--data: ", useTab);
     // Now print the tree leaf name
     printf("%s", dataStr);
     // Now generate the tab
     memset(dataStr, ' ', strlen(dataStr));
     // Now write the hex data (formatted)
     printHex(data, dataLength, dataStr);
-  }
-  else
-  {
-    printf("%s+--data:   (no data)", TAB_2);    
   }
 }

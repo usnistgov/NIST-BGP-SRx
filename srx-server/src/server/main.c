@@ -25,19 +25,34 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * EXIT Values:
  *
  *   0 OK - System performed just fine!
- *   1 System could not be configures.
+ *   1 System could not be configured.
  *   2 Caches could not be created.
  *   3 Handlers could not be created.
  *   4 Queues could not be created.
+ *   5 Could not create the console thread.
  *
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/08 - oborchert
+ *            * Added getBGPsecHandler
+ *          - 2017/07/05 - oborchert
+ *            * Modified how SETUP_ALL_HANDLERS is calculated
+ *          - 2017/07/03 - oborchert
+ *            * Modified the flow of the main method - added all into a switch/
+ *              case block.
+ *            * Added cleanup of CAPI
+ *          - 2017/06/29 - oborchert
+ *            * Added rpkiQueue and skiCache
+ *          - 2017/06/21 - oborchert
+ *            * Added main.h to resolve compiler warning for getSrxCAPI()
+ *          - 2017/06/16 - kyehwanl
+ *            * Added SRxCryproAPI
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Removed unused static colsoleLoop
  * 0.3.0.7  - 2015/04/21 - oborchert
@@ -71,8 +86,11 @@
 #include "server/console.h"
 #include "server/key_cache.h"
 #include "server/prefix_cache.h"
+#include "server/main.h"
 #include "server/rpki_handler.h"
+#include "server/rpki_queue.h"
 #include "server/server_connection_handler.h"
+#include "server/ski_cache.h"
 #include "server/srx_server.h"
 #include "server/srx_packet_sender.h"
 #include "server/update_cache.h"
@@ -84,12 +102,19 @@
 #define SETUP_BGPSEC_HANDLER       2
 #define SETUP_COMMAND_HANDLER      4
 #define SETUP_CONNECTION_HANDLER   8
-#define SETUP_ALL_HANDLERS        15
+#define SETUP_ALL_HANDLERS         SETUP_RPKI_HANDLER \
+                                   | SETUP_BGPSEC_HANDLER \
+                                   | SETUP_COMMAND_HANDLER \
+                                   | SETUP_CONNECTION_HANDLER
 
 #define SETUP_KEY_CACHE            1
 #define SETUP_PREFIX_CACHE         2
 #define SETUP_UPDATE_CACHE         4
-#define SETUP_ALL_CACHES           8
+#define SETUP_SKI_CACHE            8
+#define SETUP_ALL_CACHES          SETUP_KEY_CACHE \
+                                  | SETUP_PREFIX_CACHE \
+                                  | SETUP_UPDATE_CACHE \
+                                  | SETUP_SKI_CACHE
 
 #define HDR "([0x%08X] Main): "
 
@@ -103,7 +128,16 @@ static Configuration config;
 static UpdateCache   updCache;
 /** The cache that manages roa's. */
 static PrefixCache   prefixCache;
-/** The cache that manages keys for bgpsec. */
+/** The cache that manages bgpsec update and key registrations. 
+ *  @since 0.5.0.0 */
+static SKI_CACHE*    skiCache  = NULL;
+/** The RPKI queue that is used to manage changes in the RPKI.
+ * @since 0.5.0.0 */
+static RPKI_QUEUE*   rpkiQueue = NULL;
+
+/** The cache that manages keys for bgpsec. 
+ * @deprecated  MIGHT BE NOT USED
+ */
 static KeyCache      keyCache;
 /** The server console. */
 static SRXConsole    console;
@@ -131,6 +165,9 @@ static bool cleanupRequired = false;
 // To allow to use it already ;-)
 static void doCleanupHandlers(int handler);
 
+/** Holds the SRxCryptoAPI */
+SRxCryptoAPI* g_capi = NULL;
+
 ////////////////////
 // Server Call backs
 ////////////////////
@@ -156,7 +193,7 @@ static void handleUpdateResultChange (SRxValidationResult* valResult)
  * @param argc Contains the number of arguments passed
  * @param argv The array containing the parameters
  *
- * @return 1 if the configuration is created succesful, 0 if errors occured,
+ * @return 1 if the configuration is created successful, 0 if errors occurred,
  *         -1 if the configuration was manually stopped (example: -h).
  *
  * @see initConfiguration, parseProgramArgs
@@ -228,23 +265,38 @@ static int setupConfiguration (int argc, const char* argv[])
 }
 
 /**
- * Setup the internal caches. The program consists of 3 caches, the update
+ * Setup the internal caches. The program consists of 4 caches, the update
  * cache, the prefix cache (for roa validation) and the key cache (for bgpsec
- * validation).
+ * validation - deprecated) and the skiCache for bgpsec key and update 
+ * management.
+ * 
  * @return true if the caches could be creates, otherwise false.
  */
 static bool setupCaches()
 {
+  rpkiQueue = rq_createQueue();
+  skiCache  = ski_createCache(rpkiQueue);
   if (   !createUpdateCache(&updCache, handleUpdateResultChange,
                             config.expectedProxies, &config)
       || !initializePrefixCache(&prefixCache, &updCache)
-      || !createKeyCache(&keyCache, &updCache, NULL, NULL))
+      || !createKeyCache(&keyCache, &updCache, NULL, NULL)
+      || (skiCache == NULL))
   { ///< TODO Set KeyInvalidated, KeyNotFound
-    RAISE_ERROR("Failed to setup a cache - stopping");
+    if (skiCache != NULL)
+    {
+      ski_releaseCache(skiCache);
+      skiCache = NULL;
+    }
+    if (rpkiQueue != NULL)
+    {
+      rq_releaseQueue(rpkiQueue);
+      rpkiQueue = NULL;
+    }
+    RAISE_ERROR("Failed to setup a cache - stopping");    
     return false;
   }
 
-  LOG(LEVEL_INFO, "- Caches created");
+  LOG(LEVEL_INFO, "- SRx Caches and RPKI Queue created");
   return true;
 }
 
@@ -259,15 +311,15 @@ static bool setupHandlers()
   bool retVal = true;
 
   if (!createRPKIHandler (&rpkiHandler, &prefixCache,
-                          config.rpki_host, config.rpki_port))
+                          config.rpki_host, config.rpki_port, 
+                          config.rpki_router_protocol))
   {
     RAISE_ERROR("Failed to create RPKI Handler.");
   }
   else
   {
     handlers |= SETUP_RPKI_HANDLER;
-    if (!createBGPSecHandler (&bgpsecHandler, &keyCache,
-                              config.bgpsec_host, config.bgpsec_port))
+    if (!createBGPSecHandler (&bgpsecHandler, &keyCache))
     {
       RAISE_ERROR("Failed to create BGPSEC Handler.");
     }
@@ -406,24 +458,29 @@ static void doCleanupHandlers(int handler)
 {
   if ((handler & SETUP_CONNECTION_HANDLER) > 0)
   {
+    LOG(LEVEL_DEBUG, "Release Server Connection Handler");
     releaseServerConnectionHandler(&svrConnHandler);
   }
   if ((handler & SETUP_COMMAND_HANDLER) > 0)
   {
+    LOG(LEVEL_DEBUG, "Release Command Handler");
     releaseCommandHandler(&cmdHandler);
   }
   if ((handler & SETUP_BGPSEC_HANDLER) > 0)
   {
+    LOG(LEVEL_DEBUG, "Release BGPSEC Handler");
     releaseBGPSecHandler(&bgpsecHandler);
   }
   if ((handler & SETUP_RPKI_HANDLER) > 0)
   {
+    LOG(LEVEL_DEBUG, "Release RPKI Handler");
     releaseRPKIHandler(&rpkiHandler);
   }
 }
 
 /**
- * Release all caches specified in the bit coded parameter cache
+ * Release all caches specified in the bit coded parameter cache. The SKI_CACHE 
+ * also cleans up the RPKI QUEUE.
  *
  * @param cache Bit coded value that specifies which caches have to be released.
  */
@@ -441,6 +498,14 @@ static void doCleanupCaches(int cache)
   {
     releaseUpdateCache(&updCache);
   }
+  // Added with 0.5.0.0
+  if ((cache & SETUP_SKI_CACHE) > 0)
+  {
+    ski_releaseCache(skiCache);    
+    skiCache  = NULL;
+    rq_releaseQueue(rpkiQueue);
+    rpkiQueue = NULL;
+  }
 }
 
 /**
@@ -450,7 +515,12 @@ static void doCleanupCaches(int cache)
 static void doCleanup()
 {
   // First disconnects the server console.
-  releaseConsole(&console);
+  // BZ1006: disconnects the server console - Only if this is not the console 
+  //         itself.
+  if (pthread_self() != console.consoleThread)
+  {
+    releaseConsole(&console);  
+  }
 
   // Queues
   releaseCommandQueue(&cmdQueue);
@@ -485,6 +555,8 @@ void shutDown()
   pdu.length = htonl(length);
   broadcastPacket(cmdHandler.svrConnHandler, &pdu, length);
 
+  cleanupRequired = true;
+  
     // First stop the command handler b/c there won't be any socket to send
   // result back
   stopProcessingCommands(&cmdHandler);
@@ -492,11 +564,61 @@ void shutDown()
   // Disconnect all clients
   stopProcessingRequests(&svrConnHandler);
 
-  cleanupRequired = false;
+//  LOG(LEVEL_DEBUG, "HERE I AM - shutdown");
+  
+//  cleanupRequired = false;
 
-  doCleanup();
+//  doCleanup();
   LOG(LEVEL_DEBUG, HDR "Shutdown performed!", pthread_self());
-  raise(15);
+//  raise(15);
+}
+
+/**
+ * Return the pointer to CAPI
+ *
+ * @return the pointer to CAPI
+ * 
+ * @since 0.5.0.0
+ */
+SRxCryptoAPI* getSrxCAPI()
+{
+  return g_capi;
+}
+
+/**
+ * Return the pointer to the SKI CACHE
+ * 
+ * @return the pointer to the SKI CACHE
+ * 
+ * @since 0.5.0.0
+ */
+SKI_CACHE* getSKICache()
+{
+  return skiCache;
+}
+
+/**
+ * Return the pointer to the RPKI Queue
+ * 
+ * @return the pointer to the RPKI Queue
+ * 
+ * @since 0.5.0.0
+ */
+RPKI_QUEUE* getRPKIQueue()
+{
+  return rpkiQueue;
+}
+
+/**
+ * Return the BGPsecHandler instance
+ * 
+ * @return the BGPsecHandler instance
+ * 
+ * @since 0.5.0.0
+ */
+BGPSecHandler* getBGPsecHandler()
+{
+  return &bgpsecHandler;
 }
 
 /**
@@ -514,6 +636,7 @@ int main(int argc, const char* argv[])
   int passedConfig;
   bool printGoodbye = true;
   FILE* fp=NULL;
+  sca_status_t sca_status = API_STATUS_OK;
 
   // By default all messages go to standard error
   setLogMethodToFile(stderr);
@@ -523,86 +646,147 @@ int main(int argc, const char* argv[])
           __TIME__);
   passedConfig = setupConfiguration(argc, argv);
 
-  if(config.msgDestFilename)
+  switch (passedConfig)
   {
-    fp = fopen(config.msgDestFilename, "wt");
-    if(fp)
-      setLogMethodToFile(fp);
-    else
-      LOG(LEVEL_ERROR, "Could not set log file.");
-  }
+    case -1: 
+    case 0: 
+      // Error
+      printGoodbye=false;
+      if (passedConfig == 0)
+      {
+        LOG(LEVEL_ERROR, "Failure loading configuration, exit program (1)");
+        exitCode = 1;
+      }
+      else
+      {
+        // HELP ONLY
+        exitCode = 0;
+      }
+      break;
+    case 1:
+      // All OK
 
-  LOG(LEVEL_DEBUG, "([0x%08X]) > Start Main SRx server thread.", pthread_self());
+      // Try to set a log file.
+      if(config.msgDestFilename)
+      {
+        fp = fopen(config.msgDestFilename, "wt");
+        if(fp)
+          setLogMethodToFile(fp);
+        else
+          LOG(LEVEL_ERROR, "Could not set log file.");
+      }
 
-  if ( passedConfig != 1)
-  {
-    printGoodbye=false;
-    if (passedConfig == 0)
-    {
-      LOG(LEVEL_ERROR, "Failure loading configuration, exit program (1)");
-      exitCode = 1;
-    }
-    else
-    {
-      exitCode = 0;
-    }
-  }
-  // Setup all necessary instances
-  else if ( !setupCaches() )
-  {
-    LOG(LEVEL_ERROR, "Failure setting up caches, exit program (2)");
-    // So far only the Configuration is created .
-    releaseConfiguration(&config);
-    exitCode = 2;
-  }
-  else if ( !setupHandlers() )
-  {
-    LOG(LEVEL_ERROR, "Failure setting up handlers, exit program (3)");
-    // So far Caches and the Configuration are created .
-    doCleanupCaches(SETUP_ALL_CACHES);
-    releaseConfiguration(&config);
-    exitCode = 3;
-  }
-  else if ( !setupQueues() )
-  {
-    LOG(LEVEL_ERROR, "Failure setting up queues, exit program (4)");
-    // So far Handlers, Caches and the Configuration are created .
-    doCleanupHandlers(SETUP_ALL_HANDLERS);
-    doCleanupCaches(SETUP_ALL_CACHES);
-    releaseConfiguration(&config);
-    exitCode = 4;
-  }
-  else if (!createConsole(&console, config.console_port, shutDown,
-                          &config, &rpkiHandler, &cmdHandler))
-  {
-    LOG(LEVEL_ERROR, "Failure setting up the console, exit program (5)");
-    // So far Handlers, Caches and the Configuration are created .
-    releaseCommandQueue(&cmdQueue);
-    doCleanupHandlers(SETUP_ALL_HANDLERS);
-    doCleanupCaches(SETUP_ALL_CACHES);
-    releaseConfiguration(&config);
-    exitCode = 5;
-  }
-  else
-  {
-    // Ready for requests
-    cleanupRequired = true;
-    run();
-  }
+      LOG(LEVEL_DEBUG, "([0x%08X]) > Start Main SRx server thread.", 
+                       pthread_self());
 
-  // End the program
-  if(cleanupRequired)
-  {
-    doCleanup();
-  }
+      // srxcryptoapi INIT
+      g_capi = malloc(sizeof(SRxCryptoAPI));
+      if (g_capi != NULL)
+      {
+        memset (g_capi, 0, sizeof(SRxCryptoAPI));
+        g_capi->configFile = config.sca_configuration;
+      }
+      
+      // split the initialization of SCA into two phases to allow an immediate
+      // setting of the debug level if necessary
+      bool sca_INIT = srxCryptoInit(g_capi, &sca_status) == API_SUCCESS;
+      if (sca_INIT)
+      {
+        // set CAPI log level
+        if (config.sca_sync_logging)
+        {
+          if (g_capi->setDebugLevel(config.loglevel) == -1)
+          {
+            LOG(LEVEL_WARNING, "The loaded srx-crypto-api plug-in does not"
+                    " support remote control of LOGING configuration - Use API"
+                    " configuration to do so!");
+          }
+        }
+      }
+             
+      if (!sca_INIT)
+      {
+        LOG(LEVEL_DEBUG, "[BGPSEC] SRxCryptoAPI not initialized (0x%X)!", 
+                         sca_status);
+        free(g_capi);
+        g_capi = NULL;
+      }
+      else if ( !setupCaches() )
+      {
+        // Setup all necessary instances        
+        LOG(LEVEL_ERROR, "Failure setting up caches, exit program (2)");
+        // So far only the Configuration is created .
+        releaseConfiguration(&config);
+        exitCode = 2;
+      }
+      else if ( !setupHandlers() )
+      {
+        LOG(LEVEL_ERROR, "Failure setting up handlers, exit program (3)");
+        // So far Caches and the Configuration are created .
+        doCleanupCaches(SETUP_ALL_CACHES);
+        releaseConfiguration(&config);
+        exitCode = 3;
+      }
+      else if ( !setupQueues() )
+      {
+        LOG(LEVEL_ERROR, "Failure setting up queues, exit program (4)");
+        // So far Handlers, Caches and the Configuration are created .
+        doCleanupHandlers(SETUP_ALL_HANDLERS);
+        doCleanupCaches(SETUP_ALL_CACHES);
+        releaseConfiguration(&config);
+        exitCode = 4;
+      }
+      else if (!createConsole(&console, config.console_port, shutDown,
+                              &config, &rpkiHandler, &cmdHandler))
+      {
+        LOG(LEVEL_ERROR, "Failure setting up the console, exit program (5)");
+        // So far Handlers, Caches and the Configuration are created .
+        releaseCommandQueue(&cmdQueue);
+        doCleanupHandlers(SETUP_ALL_HANDLERS);
+        doCleanupCaches(SETUP_ALL_CACHES);
+        releaseConfiguration(&config);
+        exitCode = 5;
+      }
+      else
+      {
+        // Ready for requests
+        cleanupRequired = true;
+        run();
+      }
+      
+      // End the program
+      if(cleanupRequired)
+      {
+        doCleanup();
+      }
 
-  if (printGoodbye)
-  {
-    printf ("Goodbye!\n");
-  }
+      if (g_capi != NULL)
+      {
+        // cleanup SCA
+        if (g_capi->release(&sca_status) == API_FAILURE)
+        {
+          LOG(LEVEL_ERROR, "SRx Crypto API reported an error %i during release",
+                            sca_status);
+        }
+        free(g_capi);
+        g_capi = NULL;
+      }      
+      
+      if (printGoodbye)
+      {
+        printf ("Goodbye!\n");
+      }
 
-  LOG(LEVEL_DEBUG, "([0x%08X]) < Stop Main SRx server thread.", pthread_self());
-  if(fp)
-    fclose(fp);
+      LOG(LEVEL_DEBUG, "([0x%08X]) < Stop Main SRx server thread.", 
+                       pthread_self());
+      if (fp)
+      {
+        fclose(fp);
+      }
+      break;
+    default :
+      // Should not have happened!
+      break;
+  }
   return exitCode;
 }

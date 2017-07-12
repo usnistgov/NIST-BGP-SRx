@@ -21,10 +21,12 @@
  * by this software.
  *
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/06/30 - oborchert
+ *            * deprecated.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Added Changelog
  *            * Fixed speller in documentation header
@@ -42,6 +44,8 @@
  * Function that is called when a key was removed or replaced.
  *
  * @param keyId Affected key
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 typedef void (*KeyInvalidated)(SRxKeyID keyId);
 
@@ -49,11 +53,15 @@ typedef void (*KeyInvalidated)(SRxKeyID keyId);
  * Function that is called when a key could not be found.
  * 
  * @param keyId Key
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 typedef void (*KeyNotFound)(SRxKeyID keyId);
 
 /** 
  * A single Key Cache instance.
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 typedef struct {
   UpdateCache*    updateCache;
@@ -69,6 +77,8 @@ typedef struct {
  * @param invCallback A key became invalid
  * @param nfCallback A key couldn't be found
  * @return \c true = initalization was successful, \c false = an error occurred
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 bool createKeyCache(KeyCache* self, UpdateCache* updateCache,
                     KeyInvalidated invCallback, KeyNotFound nfCallback);
@@ -77,6 +87,8 @@ bool createKeyCache(KeyCache* self, UpdateCache* updateCache,
  * Frees all allocated resources.
  *
  * @param self Instance that should be released
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 void releaseKeyCache(KeyCache* self);
 
@@ -89,6 +101,8 @@ void releaseKeyCache(KeyCache* self);
  * @param self Instance
  * @param keyId Key to look-up
  * @return \c true = key was found, \c false = key not found
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 bool getPublicKey(KeyCache* self, SRxKeyID keyId);
 
@@ -102,6 +116,8 @@ bool getPublicKey(KeyCache* self, SRxKeyID keyId);
  * @return \c true = key stored, \c false = failed to store
  *
  * @todo Adjust according to specification
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 bool storePublicKey(KeyCache* self, SRxKeyID keyId);
 
@@ -113,6 +129,8 @@ bool storePublicKey(KeyCache* self, SRxKeyID keyId);
  * @param self Instance
  * @param keyId Key that should be removed
  * @return \c true = key was removed, \c false = unknown key
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 bool deletePublicKey(KeyCache* self, SRxKeyID keyId);
 
@@ -123,6 +141,8 @@ bool deletePublicKey(KeyCache* self, SRxKeyID keyId);
  * @param keyId Key with which to register the update
  * @param updId Update that should be registered with the key
  * @return \c true = registered with the given key, \c false = unknown key
+ * 
+ * @deprecated Somewhat replaced by SKI Cache and SCA
  */
 bool addUpdateToKey(KeyCache* self, SRxKeyID keyId, SRxUpdateID updId);
 

@@ -4,20 +4,20 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * An RPKI/Router Protocol server test harness. This Software simulates an
@@ -27,11 +27,41 @@
  *   (see SERVICE_TIMER_INTERVAL)
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
- *
- * @version 0.4.0.2
+ * 
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/08 - oborchert
+ *            * Fixed some prompt handling in console
+ *            * BZ1185: fixed issue with 'cache' command showing all entries 
+ *              as SKI's
+ *            * Added '*' to allow switching between auto complete and browsing
+ *              the file system.
+ *          - 2017/07/07 - oborchert
+ *            * BZ1183: Fixed issues with history.
+ *            * Added auto completion in command window (use tab) 
+ *          - 2017/06/05 - oborchert
+ *            * Added parameter -D <level> to set debug level. 
+ *              Moved current debug level to LEVEL_ERROR
+ *            * fixed segmentation fault for addKey with missing parameters. 
+ *            * Modified the ley loading aligning it with the command set of
+ *              prefix loading. 
+ *            * Added keyLoc to provide a key location folder
+ *            * Added addKeyNow
+ *          - 2017/06/16 - kyehwanl
+ *            * Updated code to use RFC8210 (former 6810-bis-9)
+ *          - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *          - 2016/08/30 - oborchert
+ *            * Added a proper configuration section.
+ *          - 2016/08/26 - oborchert
+ *            * Changed client list display from using index to file descriptor
+ *              which does not change when another client disconnects.
+ *          - 2016/08/19 - oborchert
+ *            * Modified the CTRL+C handler to use sigaction instead. Added
+ *              a more gracefull stop.
+ *            * Modified old fix M713 to not call trim on NULL. BZ1017
  * 0.4.0.2  - 2016/08/12 - oborchert
  *            * Changed default port from 50000 to 323 as specified by RFC6811
  * 0.3.0.10 - 2015/11/10 - oborchert
@@ -42,16 +72,16 @@
  *              are executed.
  *            * Allows the exit/quit/\q command to be executed from within a
  *              script
- *            * Allowed to end the program when a script is passed and the 
+ *            * Allowed to end the program when a script is passed and the
  *              last command is quit BZ# 351
  *            * Changed all command processing methods to return the proper
  *              command id CMD_ID_<command>
  * 0.3.0    - 2013/01/28 - oborchert
- *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
- *              update does not include the secure protocol section. The 
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This
+ *              update does not include the secure protocol section. The
  *              protocol will still use un-encrypted plain TCP
  * 0.2.2    - 2012/12/28 - oborchert
- *            * Modified update 0.2.1. Fix BZ165 caused no ROA to be 
+ *            * Modified update 0.2.1. Fix BZ165 caused no ROA to be
  *              installed into the cache. Applied new fix.
  * 0.2.1    - 2012/07/25 - kyehwan
  *            * Fixed segmentation fault while adding ROAs.
@@ -82,6 +112,7 @@
 #include <readline/history.h>
 #include <uthash.h>
 #include <unistd.h>
+#include <srx/srxcryptoapi.h>
 #include "server/srx_server.h"
 #include "shared/rpki_router.h"
 #include "util/debug.h"
@@ -97,51 +128,88 @@
 #include "util/timer.h"
 #include "util/prefix.h"
 
+// Max characters per line
+#define LINE_BUF_SIZE 255
+
+/** This structure specified one cache entry. */
 typedef struct {
-  uint32_t  serial;     // Current serial number of the entry
-  uint32_t  prevSerial; // Previous serial number (before being withdrawn)
-  time_t    expires;    // When this entry expires, i.e. should be deleted
-  bool      isV6;       // IPv6 prefix
+  /** Current serial number of the entry */
+  uint32_t  serial;
+  /** Previous serial number (before being withdrawn) */
+  uint32_t  prevSerial;
+  /** When this entry expires, i.e. should be deleted */
+  time_t    expires;
+  /** true if IPv6 prefix */
+  bool      isV6;
+  /* router key indicator */
+  bool      isKey;
 
   /** Prefix (v4, v6) - stored in network Byte order */
   uint8_t   flags;           // Might not be needed.
-  uint8_t   prefixLength;    // Length of the prefix.
-  uint8_t   prefixMaxLength; // Max length of prefix.
-  uint32_t  asNumber;        // AS number.
+  /** Length of the prefix */
+  uint8_t   prefixLength;
+  /** Max length of prefix */
+  uint8_t   prefixMaxLength;
+  /** The AS number for this entry */
+  uint32_t  asNumber;
+  /** The IP Address */
   union {
-    IPv4Address v4;          // V4 address.
-    IPv6Address v6;          // V6 address.
+    /** The IPv4 Address */
+    IPv4Address v4;
+    /** The IPv6 Address */
+    IPv6Address v6;
   } address;
+
+  char* ski;            // Subject Key Identifier
+  char* pPubKeyData;    // Subject Public Key Info
 } ValCacheEntry;
 
 /** Single client */
 typedef struct {
-  int             fd; ///< Socket - but also the hash identifier
-  UT_hash_handle  hh; ///< Hash handle
+  /** Socket - but also the hash identifier */
+  int             fd;
+  /** Hash handle */
+  UT_hash_handle  hh;
+  /** The version used with this client */
+  int             version;
 } CacheClient;
 
-#define CMD_ID_QUIT       0
-#define CMD_ID_UNKNOWN    1
-#define CMD_ID_VERBOSE    2
-#define CMD_ID_CACHE      3
-#define CMD_ID_VERSION    4
-#define CMD_ID_HELP       5
-#define CMD_ID_CREDITS    6
-#define CMD_ID_SESSID     7
-#define CMD_ID_EMPTY      8
-#define CMD_ID_ADD        9
-#define CMD_ID_ADDNOW    10
-#define CMD_ID_REMOVE    11
-#define CMD_ID_REMOVENOW 12
-#define CMD_ID_ERROR     13
-#define CMD_ID_NOTIFY    14
-#define CMD_ID_RESET     15
-#define CMD_ID_CLIENTS   16
-#define CMD_ID_RUN       17
-#define CMD_ID_SLEEP     18
+/**
+ * This configuration structure allows to pass some more configuration settings
+ * to the server.
+ *
+ * @since 0.5.0.0
+ */
+typedef struct {
+  /** The configured port */
+  int   port;
+  /** A script containing cache commands to be executed upon start */
+  char* script;
+} RPKI_SRV_Configuration;
 
-#define DEF_PORT         323
+#define CMD_ID_QUIT          0
+#define CMD_ID_UNKNOWN       1
+#define CMD_ID_VERBOSE       2
+#define CMD_ID_CACHE         3
+#define CMD_ID_VERSION       4
+#define CMD_ID_HELP          5
+#define CMD_ID_CREDITS       6
+#define CMD_ID_SESSID        7
+#define CMD_ID_EMPTY         8
+#define CMD_ID_ADD           9
+#define CMD_ID_ADDNOW       10
+#define CMD_ID_REMOVE       11
+#define CMD_ID_REMOVENOW    12
+#define CMD_ID_ERROR        13
+#define CMD_ID_NOTIFY       14
+#define CMD_ID_RESET        15
+#define CMD_ID_CLIENTS      16
+#define CMD_ID_RUN          17
+#define CMD_ID_SLEEP        18
+#define CMD_ID_KEY_LOC      19
 
+#define DEF_RPKI_PORT    323
+#define UNDEF_VERSION    -1
 /*----------
  * Constants
  */
@@ -156,6 +224,12 @@ const char* USER_PROMPT               = ">> \0";
 const int   SERVICE_TIMER_INTERVAL    = 60;   ///< Service interval (sec)
 const int   CACHE_EXPIRATION_INTERVAL = 3600; ///< Sec. to keep removed entries
 
+#define PUB_KEY_OCTET 91
+#define KEY_BIN_SIZE 91
+#define MAX_CERT_READ_SIZE 260
+#define OFFSET_PUBKEY 170
+#define OFFSET_SKI 130
+#define COMMAND_BUF_SIZE 256
 /*-----------------
  * Global variables
  */
@@ -164,6 +238,7 @@ struct {
   RWLock    lock;
   uint32_t  maxSerial;
   uint32_t  minPSExpired, maxSExpired;
+  uint8_t   version;
 } cache;
 
 struct {
@@ -179,6 +254,9 @@ CacheClient* clients   = NULL;
 bool         verbose   = true;
 /** the current cache session id value */
 uint16_t     sessionID = 0;
+
+/** Location (directory) where the key files are stored. */
+char keyLocation[LINE_BUF_SIZE];
 
 /*---------------
  * Utility macros
@@ -272,20 +350,20 @@ bool dropSession(int* fdPtr)
  *
  * @return
  */
-bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial)
+bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial, uint8_t version)
 {
   uint8_t                pdu[sizeof(RPKISerialQueryHeader)];
   RPKISerialQueryHeader* hdr;
 
   // Create PDU
   hdr = (RPKISerialQueryHeader*)pdu;
-  hdr->version   = RPKI_RTR_PROTOCOL_VERSION;
+  hdr->version   = version;
   hdr->type      = (uint8_t)type;
   hdr->sessionID = htons(sessionID);
   hdr->length    = htonl(sizeof(RPKISerialQueryHeader));
   hdr->serial    = htonl(serial);
   // Send
-  OUTPUTF(true, "Sending an RPKI-RTR 'PDU[%u] with Serial'\n", type);
+  OUTPUTF(false, "Sending an RPKI-RTR 'PDU[%u] with Serial'\n", type);
   return sendNum(fdPtr, &pdu, sizeof(RPKISerialQueryHeader));
 }
 
@@ -318,14 +396,14 @@ bool sendCacheReset(int* fdPtr)
  *
  * @return true id the packet was send successful.
  */
-bool sendCacheResponse(int* fdPtr)
+bool sendCacheResponse(int* fdPtr, int version)
 {
   uint8_t                  pdu[sizeof(RPKICacheResetHeader)];
   RPKICacheResponseHeader* hdr;
 
   // Create PDU
   hdr = (RPKICacheResponseHeader*)pdu;
-  hdr->version   = RPKI_RTR_PROTOCOL_VERSION;
+  hdr->version   = version;
   hdr->type      = (uint8_t)PDU_TYPE_CACHE_RESPONSE;
   hdr->sessionID = htons(sessionID);
   hdr->length    = htonl(sizeof(RPKICacheResetHeader));
@@ -344,7 +422,7 @@ bool sendCacheResponse(int* fdPtr)
  *                ignored.
  */
 void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
-                  bool isReset)
+                  bool isReset, int version)
 {
   // No need to send the notify anymore
   service.notify = false;
@@ -371,7 +449,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
   else
   { // Send the prefix
     // Send 'Cache Response'
-    if (!sendCacheResponse(fdPtr))
+    if (!sendCacheResponse(fdPtr, version))
     {
       ERRORF("Error: Failed to send a 'Cache Response'\n");
     }
@@ -386,17 +464,22 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
         uint8_t               v6pdu[sizeof(RPKIIPv6PrefixHeader)];
         RPKIIPv4PrefixHeader* v4hdr = (RPKIIPv4PrefixHeader*)v4pdu;
         RPKIIPv6PrefixHeader* v6hdr = (RPKIIPv6PrefixHeader*)v6pdu;
+        RPKIRouterKeyHeader   rkhdr;
 
         // Basic initialization of data that does NOT change
-        v4hdr->version  = RPKI_RTR_PROTOCOL_VERSION;
+        v4hdr->version  = version;
         v4hdr->type     = PDU_TYPE_IP_V4_PREFIX;
         v4hdr->reserved = 0;
         v4hdr->length   = htonl(sizeof(RPKIIPv4PrefixHeader));
 
-        v6hdr->version  = RPKI_RTR_PROTOCOL_VERSION;
+        v6hdr->version  = version;
         v6hdr->type     = PDU_TYPE_IP_V6_PREFIX;
         v6hdr->reserved = 0;
         v6hdr->length   = htonl(sizeof(RPKIIPv6PrefixHeader));
+
+        rkhdr.version   = version;
+        rkhdr.type      = PDU_TYPE_ROUTER_KEY;
+        rkhdr.zero      = 0;
 
         // helps to find the next serial number
         SListNode*  currNode;
@@ -435,37 +518,64 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
             continue;
           }
 
-          // Send 'Prefix'
-          if (!cEntry->isV6)
+          // Send 'Router Key'
+          if( cEntry->isKey == true && cEntry->prefixLength == 0 &&
+              cEntry->prefixMaxLength == 0 &&
+              cEntry->ski && cEntry->pPubKeyData)
+
           {
-            v4hdr->flags     = cEntry->flags;
-            v4hdr->prefixLen = cEntry->prefixLength;
-            v4hdr->maxLen    = cEntry->prefixMaxLength;
-            v4hdr->zero      = (uint8_t)0;
-            v4hdr->addr      = cEntry->address.v4;
-            v4hdr->as        = cEntry->asNumber;
-            OUTPUTF(false, "Sending an 'IPv4Prefix' (serial = %u)\n",
-                    cEntry->serial);
-            if (!sendNum(fdPtr, &v4pdu, sizeof(RPKIIPv4PrefixHeader)))
+            if (version == 1)
             {
-              ERRORF("Error: Failed to send a 'Prefix'\n");
-              break;
+              rkhdr.flags     = cEntry->flags;
+              memcpy(&rkhdr.ski, cEntry->ski, SKI_LENGTH);
+              memcpy(&rkhdr.keyInfo, cEntry->pPubKeyData, KEY_BIN_SIZE);
+              rkhdr.as        = cEntry->asNumber;
+              rkhdr.length    = htonl(sizeof(RPKIRouterKeyHeader));
+
+              OUTPUTF(false, "Sending an 'Router Key' (serial = %u)\n",
+                  cEntry->serial);
+              if (!sendNum(fdPtr, &rkhdr, sizeof(RPKIRouterKeyHeader)))
+              {
+                ERRORF("Error: Failed to send a 'RouterKey'\n");
+                break;
+              }
+              continue;
             }
           }
           else
           {
-            v6hdr->flags     = cEntry->flags;
-            v6hdr->prefixLen = cEntry->prefixLength;
-            v6hdr->maxLen    = cEntry->prefixMaxLength;
-            v6hdr->zero      = (uint8_t)0;
-            v6hdr->addr      = cEntry->address.v6;
-            v6hdr->as        = cEntry->asNumber;
-            OUTPUTF(false, "Sending an 'IPv6Prefix' (serial = %u)\n",
-                    cEntry->serial);
-            if (!sendNum(fdPtr, &v6pdu, sizeof(RPKIIPv6PrefixHeader)))
+            // Send 'Prefix'
+            if (!cEntry->isV6)
             {
-              ERRORF("Error: Failed to send a 'Prefix'\n");
-              break;
+              v4hdr->flags     = cEntry->flags;
+              v4hdr->prefixLen = cEntry->prefixLength;
+              v4hdr->maxLen    = cEntry->prefixMaxLength;
+              v4hdr->zero      = (uint8_t)0;
+              v4hdr->addr      = cEntry->address.v4;
+              v4hdr->as        = cEntry->asNumber;
+              OUTPUTF(false, "Sending an 'IPv4Prefix' (serial = %u)\n",
+                  cEntry->serial);
+              if (!sendNum(fdPtr, &v4pdu, sizeof(RPKIIPv4PrefixHeader)))
+              {
+                ERRORF("Error: Failed to send a 'Prefix'\n");
+                break;
+              }
+            }
+            else
+            {
+              v6hdr->flags     = cEntry->flags;
+              v6hdr->prefixLen = cEntry->prefixLength;
+              v6hdr->maxLen    = cEntry->prefixMaxLength;
+              v6hdr->zero      = (uint8_t)0;
+              v6hdr->addr      = cEntry->address.v6;
+              v6hdr->as        = cEntry->asNumber;
+              OUTPUTF(false, "Sending an 'IPv6Prefix' (serial = %u)\n",
+                  cEntry->serial);
+              if (!sendNum(fdPtr, &v6pdu, sizeof(RPKIIPv6PrefixHeader)))
+              {
+                ERRORF("Error: Failed to send a 'Prefix'\n");
+                break;
+              }
             }
           }
         }
@@ -475,7 +585,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
       OUTPUTF(true, "Sending an 'End of Data (max. serial = %u)\n",
               cache.maxSerial);
 
-      if (!sendPDUWithSerial(fdPtr, PDU_TYPE_END_OF_DATA, cache.maxSerial))
+      if (!sendPDUWithSerial(fdPtr, PDU_TYPE_END_OF_DATA, cache.maxSerial, cache.version))
       {
         ERRORF("Error: Failed to send a 'End of Data'\n");
       }
@@ -486,7 +596,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
 
 /**
  * Send a SERIAL NOTIFY to all clients of the test harness
- * 
+ *
  * @return CMD_ID_NOTIFY
  */
 int sendSerialNotifyToAllClients()
@@ -502,7 +612,7 @@ int sendSerialNotifyToAllClients()
     for (client = clients; client; client = client->hh.next)
     {
       if (!sendPDUWithSerial(&client->fd, PDU_TYPE_SERIAL_NOTIFY,
-                             cache.maxSerial))
+                             cache.maxSerial, cache.version))
       {
         ERRORF("Error: Failed to send a 'Serial Notify\n");
       }
@@ -510,13 +620,13 @@ int sendSerialNotifyToAllClients()
 
     unlockReadLock(&cache.lock);
   }
-  
+
   return CMD_ID_NOTIFY;
 }
 
 /**
  * Sends a Cache Reset message to all clients.
- * 
+ *
  * @return CMD_ID_RESET;
  */
 int sendCacheResetToAllClients()
@@ -537,19 +647,47 @@ int sendCacheResetToAllClients()
 
     unlockReadLock(&cache.lock);
   }
-  
+
   return CMD_ID_RESET;
 }
 
 /**
  * Send an error report to all clients.
  *
+ * @param fdPtr the socket connection
  * @param the error number to be send
  * @param data contains the error number followed by the PDU and text. The
  * character - as PDU or text generates a PDU / text length of zero.
  * @return true if it could be send.
  */
-bool sendErrorReportToAllClients(uint16_t errNo, char* data)
+bool sendErrorPDU(int* fdPtr, RPKICommonHeader* pdu, char* reason)
+{
+  printf("ERROR: invalid PDU because of %s\n", reason);
+//  uint8_t                  pdu[sizeof(RPKIErrorReportHeader)];
+//  RPKICacheResponseHeader* hdr;
+//
+//  // Create PDU
+//  hdr = (RPKICacheResponseHeader*)pdu;
+//  hdr->version   = RPKI_RTR_PROTOCOL_VERSION;
+//  hdr->type      = (uint8_t)PDU_TYPE_CACHE_RESPONSE;
+//  hdr->sessionID = htons(sessionID);
+//  hdr->length    = htonl(sizeof(RPKICacheResetHeader));
+
+//  OUTPUTF(true, "Sending a 'Cache Response'\n");
+//  return sendNum(fdPtr, &pdu, sizeof(RPKICacheResetHeader));
+  return false;
+}
+
+/**
+ * Send an error report to all clients.
+ *
+ * @param fdPtr the socket connection
+ * @param the error number to be send
+ * @param data contains the error number followed by the PDU and text. The
+ * character - as PDU or text generates a PDU / text length of zero.
+ * @return true if it could be send.
+ */
+bool sendErrorReport(int* fdPtr, uint16_t errNo, char* data)
 {
   // ERROR CODE
   RPKIErrorReportHeader* hdr;
@@ -661,7 +799,7 @@ bool sendErrorReportToAllClients(uint16_t errNo, char* data)
   // Now add the length of the error pdu.
   length += pduLen;
 
-  // Check if a messgae is provided
+  // Check if a message is provided
   if (*msgTok != '-')
   {
     // increase the packet length by the message itself.
@@ -785,6 +923,15 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
   RPKICommonHeader hdr;
   uint32_t         remainingDataLentgh;
   void*            buf;
+  CacheClient*     ccl = NULL;
+
+  HASH_FIND_INT(clients, &sock, ccl);
+  if (ccl == NULL)
+  {
+    ERRORF("Error: Cannot find client sessoin!\n");
+    close(sock);
+    return;
+  }
 
   // Process client requests, store the current time
   lastReq = time(NULL);
@@ -792,6 +939,25 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
   // read the beginning of the header to see how many bytes are actually needed
   while (recvNum(&sock, &hdr, sizeof(RPKICommonHeader)))
   {
+    switch (ccl->version)
+    {
+      case UNDEF_VERSION:
+        ccl->version = hdr.version;
+        break;
+      case 0:
+      case 1:
+        break;
+      default:
+        sendErrorPDU(&ccl->fd, &hdr, "Unsupported Version");
+        continue;
+    }
+    if (ccl->version != hdr.version)
+    {
+      // Send error.
+      sendErrorPDU(&ccl->fd, &hdr, "Illegal switch of version number!");
+      continue;
+    }
+
     // determine the remaining data that needs to be received - if any
     remainingDataLentgh = ntohl(hdr.length) - sizeof(RPKICommonHeader);
 
@@ -822,7 +988,7 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
     // Time since the last request
     diffReq = lastReq - time(NULL);
 
-    printf ("Received Data From Client...[%i]\n", hdr.type);
+    printf ("Received Data From Client [%x]...\n", sock);
 
     // Action depending on the type
     switch ((RPKIRouterPDUType)hdr.type)
@@ -840,13 +1006,13 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
         {
           serial = ntohl(*((uint32_t*)buf));
           sessionID  = ntohs(hdr.mixed);
-          sendPrefixes(&sock, serial, sessionID, false);
+          sendPrefixes(&sock, serial, sessionID, false, ccl->version);
         }
         break;
 
       case PDU_TYPE_RESET_QUERY:
         OUTPUTF(true, "[+%lds] Received a 'Reset Query'\n", diffReq);
-        sendPrefixes(&sock, 0, sessionID, true);
+        sendPrefixes(&sock, 0, sessionID, true, ccl->version);
         break;
 
       case PDU_TYPE_ERROR_REPORT:
@@ -854,7 +1020,7 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
         break;
 
       case PDU_TYPE_RESERVED:
-        
+
       default:
         ERRORF("Error: Invalid PDU type: %hhu\n", hdr.type);
     }
@@ -866,10 +1032,21 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
   }
 }
 
+/**
+ * Handles client session status
+ *
+ * @param svrSock The server socket that receives the data
+ * @param client NOT USED
+ * @param fd The file descriptor
+ * @param connected Indicates if the connection will be established of shut down
+ * @param user NOT USED
+ *
+ * @return false is an error occured.
+ */
 bool handleStatus(ServerSocket* svrSock, ServerClient* client, int fd,
                   bool connected, void* user)
 {
-  CacheClient* ccl;
+  CacheClient* ccl = NULL;
 
   if (connected)
   {
@@ -879,17 +1056,24 @@ bool handleStatus(ServerSocket* svrSock, ServerClient* client, int fd,
       ERRORF("Error: Out of memory - rejecting client\n");
       return false;
     }
-    ccl->fd = fd;
+    memset(ccl, 0, sizeof(CacheClient));
+    ccl->fd      = fd;
+    ccl->version = UNDEF_VERSION;
     HASH_ADD_INT(clients, fd, ccl);
   }
   else
   {
     HASH_FIND_INT(clients, &fd, ccl);
-    if (ccl == NULL)
+    if (ccl != NULL)
+    {
+      HASH_DEL(clients, ccl);
+      memset(ccl, 0, sizeof(CacheClient));
+      ccl = NULL;
+    }
+    else
     {
       ERRORF("Error: Unknown client\n");
     }
-    HASH_DEL(clients, ccl);
   }
   return true;
 }
@@ -897,13 +1081,13 @@ bool handleStatus(ServerSocket* svrSock, ServerClient* client, int fd,
 
 void* handleServerRunLoop(void* _unused)
 {
-  LOG (LEVEL_DEBUG, "([0x%08X]) > RPKI Server Thread started!", pthread_self());      
-  
+  LOG (LEVEL_DEBUG, "([0x%08X]) > RPKI Server Thread started!", pthread_self());
+
   runServerLoop (&svrSocket, MODE_CUSTOM_CALLBACK,
                  handleClient, handleStatus, NULL);
-  
-  LOG (LEVEL_DEBUG, "([0x%08X]) < RPKI Server Thread stopped!", pthread_self());      
-  
+
+  LOG (LEVEL_DEBUG, "([0x%08X]) < RPKI Server Thread stopped!", pthread_self());
+
   pthread_exit(0);
 }
 
@@ -944,7 +1128,6 @@ int stripLineBreak(char* str)
  */
 bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
 {
-  #define LINE_BUF_SIZE 80
   #define NUM_FIELDS    3  // prefix max_len as
 
   FILE*          fh;
@@ -958,7 +1141,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   uint32_t       oas;
   ValCacheEntry* cEntry;
   bool           goOn=true;
-
+ 
   #define SKIP_IF(COND, MSG, VAR) \
     if (COND)                     \
     {                             \
@@ -983,7 +1166,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
       return false;
     }
   }
-
+  
   // Read line by line
   for (; goOn; lineNo++)
   {
@@ -1007,13 +1190,13 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     // Skip comments
     if (buf[0] == '#')
     {
-      continue;
+        continue;
     }
 
     // Make sure the line is not empty
     if (stripLineBreak(buf) == 0)
     {
-      continue;
+        continue;
     }
 
     // Put into fields for later processing
@@ -1025,7 +1208,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     {
       fields[idx] = strsep(&bptr, " \t");
       fieldIsNull = fields[idx] == NULL;
-      
+
       if (fieldIsNull)
       {
         if (idx < NUM_FIELDS)
@@ -1041,17 +1224,17 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
           }
           return false;
         }
-      } 
+      }
       else if (fields[idx][0] == 0)
       {
         // To the else if block above:
         // It can happen that the buffer contains "      a.b.c.d/d   x   y   "
         // in this case the read field "fields[idx][0]" is zero for each list of
-        // blanks. In this case read the next element in the buffer and don't 
+        // blanks. In this case read the next element in the buffer and don't
         // increase the idx, the field has to be refilled.
         continue;
       }
-      
+
       idx++;
     } while (idx < NUM_FIELDS && !fieldIsNull);
 
@@ -1071,7 +1254,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     cEntry = (ValCacheEntry*)appendToSList(dest, sizeof(ValCacheEntry));
     if (cEntry == NULL)
     {
-      fclose(fh);
+        fclose(fh);
       return false;
     }
     cEntry->serial  = cEntry->prevSerial = serial++;
@@ -1080,6 +1263,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT;
     cEntry->prefixLength    = prefix.length;
     cEntry->prefixMaxLength = (uint8_t)maxLen;
+    cEntry->isKey           = false;
 
     if (prefix.ip.version == 4)
     {
@@ -1095,7 +1279,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
       cEntry->asNumber = htonl(oas);
     }
   }
-
+  
   if (isFile)
   {
     fclose(fh);
@@ -1108,7 +1292,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
  *
  * @param argument if NULL display the current cache session id otherwise use
  *                 value to generate new once.
- * 
+ *
  * @return CMD_ID_SESSID
  */
 int processSessionID(char* argument)
@@ -1142,7 +1326,7 @@ int processSessionID(char* argument)
       }
       else
       {
-        // initiate a serial request from the clients. This will result in a 
+        // initiate a serial request from the clients. This will result in a
         // session id error.
         sessionID = newSessionID;
         processSessionID(NULL);
@@ -1150,7 +1334,7 @@ int processSessionID(char* argument)
       }
     }
   }
-  
+
   return CMD_ID_SESSID;
 }
 
@@ -1160,20 +1344,20 @@ int processSessionID(char* argument)
 
 /**
  * Display the version information.
- * 
+ *
  * @return CMD_ID_VERSION
  */
 int showVersion()
 {
   printf("%s Version %s\n", RPKI_RTR_SRV_NAME, RPKI_RTR_SRV_VER);
-  
+
   return CMD_ID_VERSION;
 }
 
 
 /**
  * Display the command help
- * 
+ *
  * @return CMD_ID_HELP
  */
 int showHelp(char* command)
@@ -1183,46 +1367,64 @@ int showHelp(char* command)
     showVersion();
     printf("\nDisplay Commands:\n"
            "-----------------\n"
-           "  - verbose            : Turns verbose output on or off\n"
-           "  - cache              : Lists the current cache's content\n"
-           "  - version            : Displays the version of this tool!\n"
-           "  - sessionID          : Display the current session id\n"
-           "  - help [command]     : Display this screen or detailed help for\n"
-           "                         the given command!\n"
-           "  - credits            : Display credits information!\n"
+           "  - verbose\n"
+           "                 Turns verbose output on or off\n"
+           "  - cache\n"
+           "                 Lists the current cache's content\n"
+           "  - version\n"
+           "                 Displays the version of this tool!\n"
+           "  - sessionID\n"
+           "                 Display the current session id\n"
+           "  - help [command]\n"
+           "                 Display this screen or detailed help for the\n"
+           "                 given command!\n"
+           "  - credits\n"
+           "                 Display credits information!\n"      
            "\n"
            "Cache Commands:\n"
            "-----------------\n"
-           "  - empty              : Empties the cache\n"
-           "  - sessionID <number> : Generates a new session id.\n"
-           "  - append <filename>  : Appends a prefix file's content to the "
-                                     "cache\n"
-           "  - add <prefix> <maxlen> <as> : \n"
-           "                         Manually add a whitelist entry\n"
-           "  - addNow <prefix> <maxlen> <as> :\n"
-           "                         Manually add a whitelist entry without\n"
-           "                         any delay!\n"
-           "  - remove <index> [end-index] :\n"
-           "                         Remove one or more cache entries\n"
-           "  - removeNow <index> [end-index] :\n"
-           "                         Remove one or more cache entries without\n"
-           "                         any delay!\n"
-           "  - error <code> <pdu|-> <message|-> :\n"
-           "                         Issues an error report. The pdu contains\n"
-           "                         all real fields comma separated.\n"
-           "  - notify               Send a SERIAL NOTIFY to all clients.\n"
-           "  - reset                Send a CACHE RESET to all clients.\n"
+           "  - keyLoc <location>\n"
+           "                 The key volt location.\n"
+           "  - empty\n"
+           "                 Empties the cache\n"
+           "  - sessionID <number>\n"
+           "                 Generates a new session id.\n"
+           "  - append <filename>\n"
+           "                 Appends a prefix file's content to the cache\n"
+           "  - add <prefix> <maxlen> <as>\n"
+           "                 Manually add a whitelist entry\n"
+           "  - addNow <prefix> <maxlen> <as>\n"
+           "                 Manually add a whitelist entry without any \n"
+           "                 delay!\n"
+           "  - addKey <as> <cert file>\n"
+           "                 Manually add a RPKI Router Certificate\n"
+           "  - remove <index> [end-index]\n"
+           "                 Remove one or more cache entries\n"
+           "  - removeNow <index> [end-index]\n"
+           "                 Remove one or more cache entries without any\n"
+           "                 delay!\n"
+           "  - error <code> <pdu|-> <message|->\n"
+           "                 Issues an error report. The pdu contains all\n"
+           "                 real fields comma separated.\n"
+           "  - notify\n"
+           "                 Send a SERIAL NOTIFY to all clients.\n"
+           "  - reset\n"
+           "                 Send a CACHE RESET to all clients.\n"
 
            "\n"
            "Program Commands:\n"
            "-----------------\n"
-           "  - quit, exit, \\q   : Quits the loop and terminates the server\n"
-           "                        This command is allowed within scripts\n"
-           "                        but only as the very last command!\n"
-           "                        Otherwise it will be ignored!\n"
-           "  - clients           : Lists all clients\n"
-           "  - run <filename>    : Executes a file line-by-line\n"
-           "  - sleep <seconds>   : Pauses execution\n"
+           "  - quit, exit, \\q\n"
+           "                 Quits the loop and terminates the server.\n"
+           "                 This command is allowed within scripts but only\n"
+           "                 as the very last command otherwise it will be\n"
+           "                 ignored!\n"
+           "  - clients\n"
+           "                 Lists all clients\n"
+           "  - run <filename>\n"
+           "                 Executes a file line-by-line\n"
+           "  - sleep <seconds>\n"
+           "                 Pauses execution\n"
            "\n\n");
   }
   else
@@ -1293,21 +1495,21 @@ int showHelp(char* command)
 }
 
 /**
- * Display the credits of the program 
- * 
+ * Display the credits of the program
+ *
  * @return CMD_ID_CREDITS
  */
 int showCredits()
 {
   showVersion();
   printf(SRX_CREDITS);
-  
+
   return CMD_ID_CREDITS;
 }
 
 /**
  * Turn Verbose mode on or off.
- * 
+ *
  * @return CMD_ID_VERBOSE
  */
 int toggleVerboseMode()
@@ -1343,7 +1545,8 @@ bool appendPrefixData(char* arg, bool fromFile)
   cache.maxSerial += numAdded;
   unlockReadLock(&cache.lock);
 
-  OUTPUTF(true, "Read %d entr%s\n", (int)numAdded,(fromFile ? "ies" : "y"));
+  OUTPUTF(false, "Read %d Prefix entr%s\n", (int)numAdded,
+          (numAdded != 1 ? "ies" : "y"));
 
   // Send notify at least one entry was added
   if (numAdded > 0)
@@ -1351,6 +1554,165 @@ bool appendPrefixData(char* arg, bool fromFile)
     service.notify = true;
   }
 
+  return succ;
+}
+
+
+#define CHAR_CONV_CONST     0x37
+#define DIGIT_CONV_CONST    0x30
+#define LEN_BYTE_NIBBLE     0x02
+
+unsigned char hex2bin_byte(char* in)
+{
+  unsigned char result=0;
+  int i=0;
+  for(i=0; i < LEN_BYTE_NIBBLE; i++)
+  {
+    if(in[i] > 0x40)
+      result |= ((in[i] - CHAR_CONV_CONST) & 0x0f) << (4-(i*4));
+    else if(in[i] > 0x30 && in[i] < 0x40)
+      result |= (in[i] - DIGIT_CONV_CONST) << (4-(i*4));
+  }
+  return result;
+}
+
+/**
+ * Read the router key certificate file.
+ * 
+ * @param arg the arguments (asn algoid certFile)
+ * @param dest The list where to store it in
+ * @param serial The serial number
+ * 
+ * @return true if the cert could be read or not.s
+ */
+bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
+{
+
+  char  buffKey[KEY_BIN_SIZE];
+  char  buffSKI_asc[SKI_LENGTH * 2];
+  char  buffSKI_bin[SKI_LENGTH];
+  uint16_t keyLength, skiLength;
+  FILE*   fpKey;
+  ValCacheEntry* cEntry;
+
+  char           streamBuf[COMMAND_BUF_SIZE];
+  char*          bptr;
+  
+  if (arg == NULL)
+  {
+    ERRORF("Error: Data missing: <as> <algo-id> <cert file>\n");
+    return false;
+  }
+  strncpy(streamBuf, arg, COMMAND_BUF_SIZE);
+  stripLineBreak(streamBuf);
+  bptr = streamBuf;
+
+  char* asnStr     = strsep(&bptr, " \t");
+  char* _certFile  = strsep(&bptr, " \t");
+  
+  if (_certFile == NULL)
+  {
+    ERRORF("Error: Data missing: <as> <cert file>\n");
+    return false;
+  }
+  
+  char certFile[512];
+  snprintf(certFile, 512, "%s/%s", keyLocation, _certFile);
+
+  // to read certificate file
+  fpKey = fopen (certFile, "rb");
+  if (fpKey == NULL)
+  {
+    ERRORF("Error: Failed to open '%s'\n", certFile);
+    return false;
+  }
+  // to read a certificate and
+  // parsing pubkey part and SKI
+  //
+  fseek(fpKey, OFFSET_PUBKEY, SEEK_SET);
+  keyLength = (u_int16_t)fread (&buffKey, sizeof(char), KEY_BIN_SIZE, fpKey);
+
+  if (keyLength != KEY_BIN_SIZE)
+  {
+    ERRORF("Error: Failed to read, key size mismatch\n");
+    return false;
+  }
+
+  fseek(fpKey, OFFSET_SKI, SEEK_SET);
+  // read two times of SKI_SIZE(20 bytes) because of being written in a way of ASCII
+  skiLength = (u_int16_t)fread(&buffSKI_asc, sizeof(char), SKI_LENGTH * 2, 
+                               fpKey);
+
+  int idx;
+  for(idx = 0; idx < SKI_LENGTH; idx++)
+  {
+    buffSKI_bin[idx] = hex2bin_byte(buffSKI_asc+(idx*2));
+  }
+  
+  // new instance to append
+  cEntry = (ValCacheEntry*)appendToSList(dest, sizeof(ValCacheEntry));
+  
+  if (cEntry == NULL)
+  {
+    fclose(fpKey);
+    return false;
+  }
+  
+  cEntry->serial          = cEntry->prevSerial = serial++;
+  cEntry->expires         = 0;
+  cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT;
+  cEntry->prefixLength    = 0;
+  cEntry->prefixMaxLength = 0;
+  cEntry->isV6            = false;
+  cEntry->isKey           = true;
+  cEntry->address.v4.in_addr.s_addr= 0;
+
+  cEntry->asNumber    = htonl(strtoul(asnStr, NULL, 10));
+  cEntry->ski         = (char*) calloc(1, SKI_LENGTH);
+  cEntry->pPubKeyData = (char*) calloc(1, KEY_BIN_SIZE);
+
+  memcpy(cEntry->ski, buffSKI_bin, SKI_LENGTH);
+  memcpy(cEntry->pPubKeyData, buffKey, KEY_BIN_SIZE);
+
+  fclose(fpKey);
+
+  return true;
+}
+
+/**
+ * Append the given public router key to the cache.
+ *  
+ * @param line the arguments line.
+ * 
+ * @return true if the key could be added.
+ */
+bool appendRouterKeyData(char* line)
+{
+
+  size_t  numBefore, numAdded;
+  bool    succ;
+
+  acquireReadLock(&cache.lock);
+  numBefore = sizeOfSList(&cache.entries);
+
+  changeReadToWriteLock(&cache.lock);
+
+  // function for certificate reading
+  succ = readRouterKeyData(line, &cache.entries, cache.maxSerial+1);
+
+  changeWriteToReadLock(&cache.lock);
+
+  numAdded = succ ? (sizeOfSList(&cache.entries) - numBefore) : 0;
+  cache.maxSerial += numAdded;
+  unlockReadLock(&cache.lock);
+
+  OUTPUTF(false, "Read %d Router Key%s entry\n", (int)numAdded,
+          numAdded != 1 ? "s" : "");
+
+  if (numAdded > 0)
+  {
+    service.notify = true;
+  }
   return succ;
 }
 
@@ -1392,25 +1754,84 @@ int appendPrefixNow(char* line)
 }
 
 /**
+ * Append the key cert to the cache.
+ * 
+ * @param line The command line
+ * 
+ * @return CMD_ID_ADDKEY
+ */
+int appendRouterKey(char* line)
+{
+  if (!appendRouterKeyData(line))
+  {
+    printf ("ERROR: The key cert '%s' could not be added to the "
+            "cache\n", line);
+  }
+
+  return CMD_ID_ADD;
+}
+
+/**
+ * Append the key cert to the cache.
+ * 
+ * @param line The command line
+ * 
+ * @return CMD_ID_ADDKEY
+ */
+int appendRouterKeyNow(char* line)
+{
+  if (!appendRouterKeyData(line))
+  {
+    printf ("ERROR: The key cert '%s' could not be added to the "
+            "cache\n", line);
+  }
+  else
+  {
+    sendSerialNotifyToAllClients();
+  }
+
+  return CMD_ID_ADDNOW;
+}
+
+/**
+ * Set the key location
+ * 
+ * @param line the location where the keys are stored (if null the key location
+ *             will be removed.)
+ * 
+ * @return CMD_ID_KEY_LOC
+ */
+int setKeyLocation(char* line)
+{
+  if (line == NULL)
+  {
+    line = ".\0";
+  }
+  snprintf(keyLocation, LINE_BUF_SIZE, "%s", line);
+    
+  return CMD_ID_KEY_LOC; 
+}
+
+/**
  * Append the given prefix information in the given file.
- * 
+ *
  * @param fileName the filename containing the prefix information
- * 
- * @return CMD_ID_APPEND
+ *
+ * @return CMD_ID_AD
  */
 int appendPrefixFile(char* fileName)
 {
   if (!appendPrefixData(fileName, true))
   {
-    printf("Error appending prefix information of '%s'\n", fileName);    
+    printf("Error appending prefix information of '%s'\n", fileName);
   }
-  
+
   return CMD_ID_ADD;
 }
 
 /**
  * Clear the cache without sending a notify.
- * 
+ *
  * @return CMD_ID_EMPTY
  */
 int emptyCache()
@@ -1420,13 +1841,13 @@ int emptyCache()
   unlockWriteLock(&cache.lock);
 
   OUTPUTF(true, "Emptied the cache\n");
-  
+
   return CMD_ID_EMPTY;
 }
 
 /**
  * Print the content of the cache test harness to the console.
- * 
+ *
  * @return CMD_ID_CACHE
  */
 int printCache()
@@ -1456,7 +1877,14 @@ int printCache()
       printf("%c %4u: ",
              ((cEntry->flags & PREFIX_FLAG_ANNOUNCEMENT) ? ' ' : '*'), pos++);
 
-      if (cEntry->isV6)
+      if (cEntry->isKey)
+      {
+        printf("SKI: %02X%02X%02X%02X, OAS=%u",
+                (unsigned char)cEntry->ski[0], (unsigned char)cEntry->ski[1],
+                (unsigned char)cEntry->ski[2], (unsigned char)cEntry->ski[3],
+                ntohl(cEntry->asNumber));
+      }
+      else if (cEntry->isV6)
       {
         printf("%s/%hhu, OAS=%u",
                ipV6AddressToStr(&cEntry->address.v6, ipBuf, IPBUF_SIZE),
@@ -1480,7 +1908,7 @@ int printCache()
     }
   }
   unlockReadLock(&cache.lock);
-  
+
   return CMD_ID_CACHE;
 }
 
@@ -1578,15 +2006,15 @@ bool processEntryRemoval(char* arg)
   return true;
 }
 
-/** 
+/**
  * This method is a wrapper for processEntryRemoval(char* arg) which does
- * the actual work. This wrapper is necessary to return the correct integer 
+ * the actual work. This wrapper is necessary to return the correct integer
  * value.
- * 
+ *
  * @param arg list of entry-id's to be deleted from the cache.
  *
  * @return CMD_ID_REMOVE
- * 
+ *
  * @since 0.3.0.2
  */
 int removeEntries(char* arg)
@@ -1616,9 +2044,9 @@ int removeEntriesNow(char* arg)
 
 /**
  * Prepare the generation of the error report.
- * 
+ *
  * @param arg <errorNo> <pdu | "-"> <msg | "-">
- * 
+ *
  * @return CMD_ID_ERROR
  */
 int issueErrorReport(char* arg)
@@ -1645,14 +2073,23 @@ int issueErrorReport(char* arg)
   }
 
   // Send
-  sendErrorReportToAllClients(errNo, msg);
+  CacheClient* ccl = NULL;
+  if (HASH_COUNT(clients) > 0)
+  {
+    OUTPUTF(true, "Sending multiple 'Error Report' (Error = %hhu)\n", errNo);
+
+    for (ccl = clients; ccl; ccl = ccl->hh.next)
+    {
+      sendErrorReport(&ccl->fd ,errNo, msg);
+    }
+  }
 
   return CMD_ID_ERROR;
 }
 
 /**
  * Print the list of clients to the console.
- * 
+ *
  * @return CMD_ID_CLIENTS
  */
 int listClients()
@@ -1670,10 +2107,10 @@ int listClients()
   {
     for (cl = clients; cl; cl = cl->hh.next, idx++)
     {
-      printf("%d: %s\n", idx, socketToStr(cl->fd, true, buf, BUF_SIZE));
+      printf("%u: %s\n", cl->fd, socketToStr(cl->fd, true, buf, BUF_SIZE));
     }
   }
-  
+
   return CMD_ID_CLIENTS;
 }
 
@@ -1682,17 +2119,15 @@ int handleLine(char* line);
 
 /**
  * Load the file given and execute line by line.
- * 
+ *
  * @param arg The name of the file
- * 
+ *
  * @return The last comment in the script or CMD_ID_RUN if unknown
  */
 int executeScript(char* fileName)
 {
-  #define MAX_LINE_LEN  128
-
   FILE* fh;
-  char  cbuf[MAX_LINE_LEN];
+  char  cbuf[LINE_BUF_SIZE];
   char* cpos;
   int last_command = CMD_ID_UNKNOWN;
 
@@ -1703,7 +2138,7 @@ int executeScript(char* fileName)
     return CMD_ID_RUN;
   }
 
-  while (fgets(cbuf, MAX_LINE_LEN, fh))
+  while (fgets(cbuf, LINE_BUF_SIZE, fh))
   {
     // Strip comment
     cpos = strchr(cbuf, '#');
@@ -1725,15 +2160,15 @@ int executeScript(char* fileName)
   }
 
   fclose(fh);
-  
+
   return (last_command == CMD_ID_UNKNOWN) ? CMD_ID_RUN : last_command;
 }
 
 /**
  * Pauses the application for a given number of seconds
- * 
+ *
  * @param noSeconds The time in seconds the program has to pause.
- * 
+ *
  * @return CMD_ID_SLEEP.
  */
 int pauseExecution(char* noSeconds)
@@ -1754,9 +2189,9 @@ int pauseExecution(char* noSeconds)
 
 /**
  * Doesn't really do anything
- * 
+ *
  * @return CMD_ID_QUIT
- * 
+ *
  * @since 0.3.0.2
  */
 int processQuit()
@@ -1767,11 +2202,69 @@ int processQuit()
 ////////////////////////////////////////////////////////////////////////////////
 // CONSOLE INPUT
 ////////////////////////////////////////////////////////////////////////////////
+/** List of commands for auto completion. */
+char* commands[] = {
+  "verbose",
+  "cache",
+  "version",
+  "help",
+  "credits",
+  "sessionID",
+  "empty",
+  "append",
+  "add",
+  "addNow",
+  "keyLoc",
+  "addKey",
+  "addKeyNow",
+  "remove",
+  "removeNow",
+  "error",
+  "notify",
+  "reset",
+  "clients",
+  "run",
+  "sleep",
+  "quit",
+  "exit",
+  "*",
+  NULL};
+
+char** command_completion(const char *, int, int);
+char*  command_generator(const char *, int);
+
+char** command_completion(const char *text, int start, int end)
+{
+  rl_attempted_completion_over = 1;
+  return rl_completion_matches(text, command_generator);
+}
+
+char* command_generator(const char *text, int state)
+{
+  static int list_index, len;
+  char *name;
+
+  if (!state) 
+  {
+    list_index = 0;
+    len = strlen(text);
+  }
+
+  while ((name = commands[list_index++])) 
+  {
+    if (strncmp(name, text, len) == 0) 
+    {
+      return strdup(name);
+    }
+  }
+
+  return NULL;
+}
 
 /**
  * This method parses the line by splitting it into command and argument
  * separated by a blank. Depending on the command the appropriate method is
- * called. With version 0.3.0.2 this method will return true if the parser can 
+ * called. With version 0.3.0.2 this method will return true if the parser can
  * continue and false if not. (false does not necessarily mean an error.
  *
  * @param line The line to be parsed
@@ -1779,7 +2272,7 @@ int processQuit()
  * @return the integer value of the executed command.
  */
 int handleLine(char* line)
-{  
+{
   char* cmd, *arg;
   int retVal = CMD_ID_UNKNOWN;
 
@@ -1804,8 +2297,11 @@ int handleLine(char* line)
   CMD_CASE("append",    appendPrefixFile);
   CMD_CASE("add",       appendPrefix);
   CMD_CASE("addNow",    appendPrefixNow);
+  CMD_CASE("keyLoc",    setKeyLocation);
+  CMD_CASE("addKey",    appendRouterKey);    
+  CMD_CASE("addKeyNow", appendRouterKeyNow);
   CMD_CASE("remove",    removeEntries);
-  CMD_CASE("removeNow", removeEntriesNow);
+  CMD_CASE("removeNow", removeEntriesNow);  
   CMD_CASE("error",     issueErrorReport);
   CMD_CASE("notify",    sendSerialNotifyToAllClients);
   CMD_CASE("reset",     sendCacheResetToAllClients);
@@ -1813,7 +2309,7 @@ int handleLine(char* line)
   CMD_CASE("clients",   listClients);
   CMD_CASE("run",       executeScript);
   CMD_CASE("sleep",     pauseExecution);
-  
+
   CMD_CASE("quit",      processQuit);
   CMD_CASE("exit",      processQuit);
   CMD_CASE("\\q",       processQuit);
@@ -1833,33 +2329,59 @@ void handleUserInput()
   using_history();
   read_history(HISTORY_FILENAME);
   int cmd = CMD_ID_UNKNOWN;
+  char cmdLine[255];
+  char historyLine[255];
+  // Add auto completion
+  rl_attempted_completion_function = command_completion;
+  OUTPUTF(false, "Enable command auto completion - switch to file browser "
+                 "using '*'\n");
   // Added trim = M0000713
-  while((line = trim(readline(USER_PROMPT))))
+  while((line = readline(USER_PROMPT)) != NULL)
   {
-    // Empty line - ignore
-    if (*line == '\0')
+    line = trim(line);
+    if (strcmp(line, "*")==0)
     {
+      // Toggle auto completion
+      if (rl_attempted_completion_function != 0)
+      {
+        OUTPUTF(false, "Enable file browser - switch using '*'\n");
+        rl_attempted_completion_function = 0;
+      }
+      else
+      {
+        OUTPUTF(false, "Enable command auto completion - switch using '*'\n");
+        rl_attempted_completion_function = command_completion;
+      }
       free(line);
+      continue;
+    }
+    snprintf(cmdLine, 255, line);
+    snprintf(historyLine, 255, line);
+    free(line);
+    
+    // Empty line - ignore
+    if (strlen(cmdLine) == 0)
+    {
       continue;
     }
 
     // Execute the line
-    
-    cmd = handleLine(line);
+    cmd = handleLine(cmdLine);
     if (cmd == CMD_ID_QUIT)
     {
-      free(line);
       break;
     }
     else if (cmd != CMD_ID_UNKNOWN)
-    {      
+    {
       // Store so that the user does not have to type it again
-      add_history(line);       
+      add_history(historyLine);
     }
-    free(line);        
   }
-
-  write_history(HISTORY_FILENAME);
+  
+  if (write_history(HISTORY_FILENAME) != 0)
+  {
+    printf("Failed writing history file '%'\n", HISTORY_FILENAME);
+  }
 }
 
 /*----------
@@ -1921,8 +2443,14 @@ void printLogMessage(LogLevel level, const char* fmt, va_list args)
   }
 }
 
+/**
+ * This handler deals with SIGINT signals and relaces the old handler.
+ *
+ * @param signal
+ */
 void handleSigInt(int signal)
 {
+  printf ("exit\n");
   // Let 'readline' return 0, i.e. stop the user-input loop
   fclose(stdin);
 }
@@ -1943,6 +2471,7 @@ bool setupCache()
   cache.maxSerial     = 0;
   cache.minPSExpired  = UINT32_MAX;
   cache.maxSExpired   = 0;
+  cache.version       = 1; // cache version
 
   return true;
 }
@@ -1962,35 +2491,169 @@ bool setupService()
 }
 
 /**
+ * Print the program syntax on stdio
+ *
+ * @param prgName The program name.
+ *
+ * @since 0.5.0.0
+ */
+static void syntax(const char* prgName)
+{
+  printf ("Syntax: %s [options] [port [script]]\n", prgName);
+  printf ("  options:\n");
+  printf ("    -f <script>  A script that has to be executed as soon as\n");
+  printf ("                 the server is started.\n");
+  printf ("    -D <level>   Set the logging level ERROR(%i) to DEBUG(%i)\n\n",
+                            LEVEL_ERROR, LEVEL_DEBUG);
+  printf ("  For backwards compatibility a script also can be added after a\n");
+  printf ("  port is specified.! - For future usage, use -f <script> to \n");
+  printf ("  specify a script!\n");
+  printf ("  If No port is specified the default port %u is used.\n",
+          DEF_RPKI_PORT);
+}
+
+/**
+ * Parses the program parameters and set the configuration. This function
+ * returns true if the program can continue and the exit Value.
+ *
+ * @param argc    The argument count
+ * @param argv    The Argument array
+ * @param cfg     The program configuration
+ * @param exitVal The exit value pointer if needed
+ *
+ * @return true if the program can continue, false if it should be ended.
+ *
+ * @since 0.5.0.0
+ */
+static bool parseParams(int argc, const char* argv[],
+                        RPKI_SRV_Configuration* cfg, int* exitVal)
+{
+  bool retVal = true;
+  int  eVal   = 0;
+  bool doHelp = false;
+  char* arg   = NULL;
+  int idx     = 0;
+
+  for (idx = 1; (idx < argc) && !doHelp; idx++)
+  {
+    arg = (char*)argv[idx];
+    if (arg[0] == '-')
+    {
+      arg++;
+      if (strcmp(arg, "-help") == 0)
+      {
+        doHelp = true;
+      }
+      else switch(arg[0])
+      {
+        case 'h':
+        case 'H':
+        case '?':
+          doHelp = true;
+          break;
+        case 'D':
+          idx++;
+          if (idx < argc)
+          {
+            int logLevel = atoi(argv[idx]);
+            if ((logLevel >= LEVEL_ERROR) && (logLevel <= LEVEL_DEBUG))
+            {
+              setLogLevel(logLevel);
+            }
+            else
+            {
+              printf ("ERROR: Invalid log level!\n");
+              printf ("  Accepted values range from ERROR(%i) to DEBUG(%i)\n",
+                      LEVEL_ERROR, LEVEL_DEBUG);
+              retVal = false;
+              eVal   = 1;              
+            }
+          }
+          else
+          {
+            printf ("ERROR: Log level missing!");
+            doHelp = true;
+            retVal = false;
+            eVal   = 1;
+          }
+          break;
+          break;
+        case 'f':
+          idx++;
+          if (idx < argc)
+          {
+            cfg->script = (char*)argv[idx++];
+          }
+          else
+          {
+            printf ("ERROR: filename missing!");
+            doHelp = true;
+            retVal = false;
+            eVal   = 1;
+          }
+          break;
+        default:
+          printf ("ERROR: Invalid parameter '%s'\n", arg);
+          doHelp = true;
+          retVal = false;
+          eVal   = 1;
+          break;
+      }
+    }
+    else if (strcmp(arg, "help") == 0)
+    {
+      doHelp = true;
+    }
+    else if (cfg->port == 0)
+    {
+      cfg->port = strtol(argv[1], NULL, 10);
+    }
+  }
+
+  if (doHelp)
+  {
+    syntax(argv[0]);
+  }
+
+  // Configure the default port if not specified otherwise.
+  if (cfg->port == 0)
+  {
+    cfg->port = DEF_RPKI_PORT;
+  }
+
+  if (exitVal != NULL)
+  {
+    *exitVal = eVal;
+  }
+
+  return retVal;
+}
+
+/**
  * Start the RPKI Test Harness.
- * 
+ *
  * @param argc The number of arguments passed to the program
  * @param argv The arguments passed to the program
- * 
- * @return The program exit level. 
+ *
+ * @return The program exit level.
  */
 int main(int argc, const char* argv[])
 {
-  int       port;
   pthread_t rlthread;
-  int       ret;
+  int       ret = 0;
+  RPKI_SRV_Configuration config;
+  memset(&config, 0, sizeof(RPKI_SRV_Configuration));
+  // Initialize keyLocation
+  setKeyLocation(NULL);
 
-  // Help and port number
-  if (argc < 2)
+  setLogLevel(LEVEL_WARNING);
+  
+  if (!parseParams(argc, argv, &config, &ret))
   {
-    port = DEF_PORT;
-  }
-  else
-  {
-    port = strtol(argv[1], NULL, 10);
-  }
-  if (port == 0)
-  {
-    ERRORF("Error: Unknown port \'%s\'\n", argv[1]);
-    return -1;
+    return ret;
   }
 
-  printf("Start %s using port %u\n", RPKI_RTR_SRV_NAME, port);
+  printf("Start %s using port %u\n", RPKI_RTR_SRV_NAME, config.port);
   // Output all log messages to stderr
   setLogMethodToCallback(printLogMessage);
 
@@ -2001,7 +2664,7 @@ int main(int argc, const char* argv[])
   }
 
   // Bind to the port
-  if (!createServerSocket(&svrSocket, port, true))
+  if (!createServerSocket(&svrSocket, config.port, true))
   {
     releaseRWLock(&cache.lock);
     return -3;
@@ -2021,13 +2684,36 @@ int main(int argc, const char* argv[])
   if (pthread_create(&rlthread, NULL, handleServerRunLoop, NULL) == 0)
   {
     // Handle Ctrl-C
-    signal(SIGINT, handleSigInt);
+    struct sigaction new_sigaction, old_sigaction;
+    new_sigaction.sa_handler = handleSigInt;
+    sigemptyset(&new_sigaction.sa_mask);
+    new_sigaction.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_sigaction);
+    if (old_sigaction.sa_handler != SIG_IGN)
+    {
+      sigaction(SIGINT, &new_sigaction, NULL);
+    }
+    sigaction (SIGHUP, NULL, &old_sigaction);
+
+    if (old_sigaction.sa_handler != SIG_IGN)
+    {
+      sigaction (SIGHUP, &new_sigaction, NULL);
+    }
+    sigaction (SIGTERM, NULL, &old_sigaction);
+
+    if (old_sigaction.sa_handler != SIG_IGN)
+    {
+      sigaction (SIGTERM, &new_sigaction, NULL);
+    }
+
+    //signal(SIGINT, handleSigInt);
 
     ret = 0;
-    bool doContiunue = true; 
-    if (argc >= 3)
+    bool doContiunue = true;
+    if (config.script != NULL)
     {
-      doContiunue = executeScript((char*)argv[2]) != CMD_ID_QUIT;
+      doContiunue = executeScript(config.script) != CMD_ID_QUIT;
     }
     if (doContiunue)
     {
@@ -2049,6 +2735,7 @@ int main(int argc, const char* argv[])
   // Cleanup
   releaseRWLock(&cache.lock);
   releaseSList(&cache.entries);
-
+  memset(keyLocation, 0, LINE_BUF_SIZE);
+  
   return ret;
 }

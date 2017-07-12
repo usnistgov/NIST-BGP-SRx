@@ -25,12 +25,17 @@
  * queue is fed by the srx-proxy communication thread.
  *
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.10 - 2016/01/21 - kyehwanl
- *            * added pthread handler function for unexpected error
+ * 0.5.0.0  - 2017/07/07 - oborchert
+ *            * Moved update path validation into BGPsec handler.
+ *            * Also modified validation request handling. (Cleaned it up a bit)
+ *          - 2017/07/05 - oborchert
+ *            * removed unused functions verifyUpdateViaRPKI and verifyViaBGPSEC
+ *          - 2017/06/.. - kyehwanl
+ *            * Added BGPsec processing
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed unused variables from functions _processHandshake,
  *              handleCommands, _processUpdateValidation, and broadcastResult
@@ -298,47 +303,6 @@ static bool _processHandshake(CommandHandler* cmdHandler,
 }
 
 /**
- * The update did not have any result stored. This means that the update was
- * not yet validates using RPKI. This will be started here.
- *
- * @param rpkiHandler The RPKI validation handler
- * @param updId The update ID
- * @param prefix The prefix of the update
- * @param originAS The origin AS of the update
- * @param srxRes The result container.
- *
- * @return true if the validation could be performed, otherwise false.
- */
-static bool verifyUpdateViaRPKI(RPKIHandler* rpkiHandler, SRxUpdateID* updateID,
-                                IPPrefix* prefix, uint32_t originAS,
-                                SRxResult* srxRes)
-{
-  // @TODO: Might be deleted, not used yet
-  RAISE_ERROR("\n\nCALL DIRECTLY requestPrefixOriginValidation IN RPKI_CACHE!!! ");
-  return true;
-}
-
-/**
- * The update did not have any result stored. This means that the update was
- * not yet validated using BGPSEC. This will be started here.
- *
- * @param rpkiHandler The RPKI validation handler
- * @param updId The update ID
- * @param srxRes The result container.
- *
- * @return true if the validation could be performed.
- */
-static bool verifyViaBGPSEC(void* bgpsecHandler, SRxUpdateID updateID,
-                            SRxResult* srxRes, SRxDefaultResult* defResult)
-{
-  LOG(LEVEL_DEBUG, HDR " " FILE_LINE_INFO "BGPSEC Validation requested for "
-                 "update [0x%08X] can not be performed, implementation for this"
-                 " does not exist yet!", pthread_self(), updateID);
-  srxRes->bgpsecResult = defResult->result.bgpsecResult;
-  return true;
-}
-
-/**
  * Return true if the "bits" are set in the given "bitmask", otherwise false.
  *
  * @param bitmask the bitmask to examine
@@ -375,8 +339,8 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
                                 (SRXRPOXY_BasicHeader_VerifyRequest*)item->data;
 
   // 1. get an idea what validations are requested:
-  bool originVal = _isSet(bhdr->type, SRX_PROXY_FLAGS_VERIFY_PREFIX_ORIGIN);
-  bool pathVal   = _isSet(bhdr->type, SRX_PROXY_FLAGS_VERIFY_PATH);
+  bool originVal = _isSet(bhdr->flags, SRX_PROXY_FLAGS_VERIFY_PREFIX_ORIGIN);
+  bool pathVal   = _isSet(bhdr->flags, SRX_PROXY_FLAGS_VERIFY_PATH);
   SRxUpdateID updateID = (SRxUpdateID)item->dataID;
 
   if (!originVal && !pathVal)
@@ -396,6 +360,30 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
     RAISE_SYS_ERROR("Command handler attempts to start validation for update"
                     "[0x%08X] but it does not exist!", updateID);
     return false;
+  }
+  
+  // By default set both validation values to DONOTUSE. Depending on the 
+  // request, the values will be filled. If either of the values changes,
+  // an update validation change occurred and it will be sent. 
+  SRxResult srxRes_mod;
+  srxRes_mod.bgpsecResult = SRx_RESULT_DONOTUSE;
+  srxRes_mod.roaResult    = SRx_RESULT_DONOTUSE; // Indicates this
+
+    
+  // Only do bgpdsec path validation if not already performed
+  if (pathVal && (srxRes.bgpsecResult == SRx_RESULT_UNDEFINED))
+  {
+    // Get the data needed for BGPsec validation
+    UC_UpdateData* uData = getUpdateData(cmdHandler->updCache, &item->dataID);
+    if (uData == NULL)
+    {  
+      RAISE_ERROR("Update Information for update [0x%08X] are not properly "
+                   "stored in update cache!");
+      return false;
+    }
+    
+    srxRes_mod.bgpsecResult = validateSignature(cmdHandler->bgpsecHandler, 
+                                                uData);
   }
 
   // Only do origin validation if not already performed
@@ -432,19 +420,22 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
     }
     free(prefix);
   }
-
-  // Only do bgpdsec path validation if not already performed
-  if (pathVal && (srxRes.bgpsecResult == SRx_RESULT_UNDEFINED))
+  
+  // Now check if the update changed - In a future version check if bgpsecResult
+  // is not DONOTUSE and  not originVal - in a future version the origin 
+  // validation will get the validation result handed down to store and it will
+  // be send there as well. Not yet though.
+  if (   (srxRes_mod.bgpsecResult != SRx_RESULT_DONOTUSE)
+      || (srxRes_mod.roaResult    != SRx_RESULT_DONOTUSE))
   {
-    // VerifyViaBGPSEC will notify the update cache with the newest result.
-    if (!verifyViaBGPSEC(cmdHandler->rpkiHandler, updateID, &srxRes,
-                         &defRes))
+    if (!modifyUpdateResult(cmdHandler->updCache, &item->dataID, &srxRes_mod, 
+                            false))
     {
-      RAISE_SYS_ERROR("Update could not be validated using BGPSEC");
-      processed = false;
-    }
+      RAISE_SYS_ERROR("A validation result for a non existing update [0x%08X]!",
+                      updateID);
+    }    
   }
-
+  
   return processed;
 }
 
@@ -455,7 +446,7 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
  * @param item The item containing all data needed to sign.
  */
 static void _processUpdateSigning(CommandHandler* cmdHandler,
-                                 CommandQueueItem* item)
+                                  CommandQueueItem* item)
 {
   // TODO Sign the data
   LOG(LEVEL_INFO, "Signing of updates is currently not supported!");

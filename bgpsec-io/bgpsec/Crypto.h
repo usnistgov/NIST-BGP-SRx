@@ -22,10 +22,13 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.2.0.5
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7  -2017/03/22 - oborchert
+ *            * Added K into the header.
+ *            * Added function CRYPTO_k_to_string
  *  0.2.0.5  -2017/01/03 - oborchert
  *            * Added function parameter "k_mode" to CRYPTO_createSignature.
  *  0.1.1.0 - 2016/03/28 - oborchert
@@ -57,6 +60,23 @@ typedef enum T_Key {
   k_public  = 2,
   k_both    = 3  
 } T_Key;
+
+// Size of each k-array
+#define CRYPTO_K_SIZE 32
+
+/** k, RFC 6979 A2.5, SHA-256, message="sample" */
+static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_sample[CRYPTO_K_SIZE] = {
+                0xA6, 0xE3, 0xC5, 0x7D, 0xD0, 0x1A, 0xBE, 0x90,
+                0x08, 0x65, 0x38, 0x39, 0x83, 0x55, 0xDD, 0x4C,
+                0x3B, 0x17, 0xAA, 0x87, 0x33, 0x82, 0xB0, 0xF2,
+                0x4D, 0x61, 0x29, 0x49, 0x3D, 0x8A, 0xAD, 0x60};
+
+/** k, RFC 6979 A2.5, SHA-256, message="test" */
+static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_test[CRYPTO_K_SIZE] = {
+                0xD1, 0x6B, 0x6A, 0xE8, 0x27, 0xF1, 0x71, 0x75,
+                0xE0, 0x40, 0x87, 0x1A, 0x1C, 0x7E, 0xC3, 0x50,
+                0x01, 0x92, 0xC4, 0xC9, 0x26, 0x77, 0x33, 0x6E,
+                0xC2, 0x53, 0x7A, 0xCA, 0xEE, 0x00, 0x08, 0xE0};
 
 /**
  * Create the signature from the given hash for the ASN. The given signature 
@@ -94,5 +114,19 @@ int CRYPTO_createSignature(TASList* asList, tPSegList* segElem,
   */
 TASList* preloadKeys(char* fileName, char* keyRoot, bool addEC_KEY, 
                      u_int8_t algoID, T_Key keytype);
+
+/**
+ * Print the K as hex strin ginto the given hex buffer.
+ * this function returns false if the hex buffer was not large enough or if the 
+ * given k type was invalid.
+ * 
+ * @param str_buff The buffer where k will be written into as string
+ * @param buff_size The size of the buffer
+ * @param k_mode the k that is selected
+ * 
+ * @return true if the selected k could be printed into the string.
+ */
+bool CRYPTO_k_to_string(char* str_buff, int buff_size, SignatureGenMode k_mode);
+
 #endif	/* CRYPTO_H */
 

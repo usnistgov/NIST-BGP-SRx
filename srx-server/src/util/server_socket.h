@@ -23,19 +23,23 @@
  * Function to create a server-socket and to start/stop a server runloop.
  * Provides functionality to handle the SRx server socket.
  *
- * @version 0.3.0
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/01/04 - oborchert
- *           * Added parameter goodByeReceived to ClientThread structure.
- *         - 2012/12/13 - oborchert
- *           * //TODO Make SVN compare
- *   0.2.0 - 2011/01/07 - oborchert
- *           * Changelog added with version 0.2.0 and date 2011/01/07
- *           * Version tag added
- *   0.1.0 - 2009/12/23 - pgleichm
- *           * Code Created
+ *  0.5.0.0 - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *  0.5.0.0 - 2016/08/19 - oborchert
+ *            * Moved socket connection error strings to this header file.
+ *  0.3.0.0 - 2013/01/04 - oborchert
+ *            * Added parameter goodByeReceived to ClientThread structure.
+ *          - 2012/12/13 - oborchert
+ *            * //TODO Make SVN compare
+ *  0.2.0.0 - 2011/01/07 - oborchert
+ *            * Changelog added with version 0.2.0 and date 2011/01/07
+ *            * Version tag added
+ *  0.1.0.0 - 2009/12/23 - pgleichm
+ *            * Code Created
  * -----------------------------------------------------------------------------
  *
  *
@@ -79,6 +83,45 @@
 
 /** Maximum number of clients waiting to be accepted for connection. */
 #define MAX_PENDING_CONNECTIONS 5
+
+////////////////////////////////////////////////////////////////////////////////
+// ERROR STRINGS - Moved from code to here with version 0.5.0.0
+////////////////////////////////////////////////////////////////////////////////
+
+#define SOC_ERR_EADDRINUSE   "The specified address is already in use."
+#define SOC_ERR_EADDRNOTAVAIL "The specified address is not available from " \
+                             "the local machine."
+#define SOC_ERR_EAFNOSUPPORT "The specified address is not a valid address " \
+                             "for the address family of the specified socket."
+#define SOC_ERR_EBADF        "The socket argument is not a valid file " \
+                             "descriptor."
+#define SOC_ERR_EINVAL       "The socket is already bound to an address, and " \
+                             "the protocol does not support binding to a new " \
+                             "address; or the socket has been shut down."
+#define SOC_ERR_ENOTSOCK     "The socket argument does not refer to a socket."
+#define SOC_ERR_EOPNOTSUPP   "The socket type of the specified socket does " \
+                             "not support binding to an address."
+#define SOC_ERR_EACCES       "A component of the path prefix denies search " \
+                             "permission, or the requested name requires  " \
+                             "writing in a directory with a mode that denies " \
+                             "write permission."
+#define SOC_ERR_EDESTADDRREQ "The address argument is a null pointer."
+#define SOC_ERR_EISDIR       SOC_ERR_EDESTADDRREQ
+#define SOC_ERR_EIO          "An I/O error occurred."
+#define SOC_ERR_ELOOP        "A loop exists in symbolic links encountered " \
+                             "during resolution of the pathname in address."
+#define SOC_ERR_ENAMETOOLONG "A component of a pathname exceeded {NAME_MAX} " \
+                             "characters, or an entire pathname exceeded " \
+                             "{PATH_MAX} characters."
+#define SOC_ERR_ENOENT       "A component of the pathname does not name an " \
+                             "existing file or the pathname is an empty string."
+#define SOC_ERR_ENOTDIR      "A component of the path prefix of the pathname " \
+                             "in address is not a directory."
+#define SOC_ERR_EROFS        "The name would reside on a read-only file system."
+#define SOC_ERR_EISCONN      "The socket is already connected."
+#define SOC_ERR_ENOBUFS      "Insufficient resources were available to " \
+                             "complete the call."
+#define SOC_ERR_UNKOWN       "Unknown Error."
 
 /**
  * The Client-modes.

@@ -1,3 +1,16 @@
+Changelog for Version 0.5.0
+- Dampen validation result changes during cache updates to reduce unnecessary
+  churn
+- Added auto completion for commands in RPKI validation cache test harness
+  tool rpkirtr_svr
+- Added SKI cache
+- Included BGPsec path validation (RFC 8205) by using SCA
+- Updated router to cache implementation to follow RFC 8210 (former 6810)
+  This includes ROA and KEY distribution 
+- Modified default port for RPKI-RTR Server to 323 as specified in RFC 6810
+- Replaced calls to legacy function bzero with memset
+Changelog for Version 0.4.0
+- Modified srx-proxy to accept bgpsec path attribute as bgpsec portion.  
 Changelog for Version 0.3.1
 - Added switch --with-la-lib to add static SRx Proxy libraries to distribution 
   rpm.

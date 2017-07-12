@@ -7,6 +7,9 @@ FILES_ROOT=$EXTRA_ROOT/files
 INSTALL_DIR=$EXTRA_ROOT/local
 
 case "$HOSTTYPE" in
+  x86_64-linux)
+    LD_ARCH_LOC="64"
+    ;;
   x86_64) 
     LD_ARCH_LOC="64"
     ;;

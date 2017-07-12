@@ -94,10 +94,9 @@ struct capability_gr
 #define CAPABILITY_CODE_DYNAMIC        66 /* Dynamic Capability */
 #define CAPABILITY_CODE_REFRESH_OLD   128 /* Route Refresh Capability(cisco) */
 #define CAPABILITY_CODE_ORF_OLD       130 /* Cooperative Route Filtering Capability(cisco) */
-#ifdef USE_SRX
-//#define CAPABILITY_CODE_BGPSEC         99 /* BGPSEC capability code in accordance with BRID */
-#define CAPABILITY_CODE_BGPSEC         72 /* BGPSEC capability code in accordance with BRID */
-#endif /* USE_SRX */
+#if defined(USE_SRX) && !defined(CAPABILITY_CODE_BGPSEC)
+#define CAPABILITY_CODE_BGPSEC          7 /* BGPSEC capability code in accordance with BRID */
+#endif /* USE_SRX && !CAPABILITY_CODE_BGPSEC */
 
 /* Capability Length */
 #define CAPABILITY_CODE_MP_LEN          4

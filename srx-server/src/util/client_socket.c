@@ -20,22 +20,30 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2012/12/17 - oborchert
- *   * Added changelog.
- *   * Changed Structure of client socket to allow different handling depending
- *     where this structure is used (proxy / srx-server)
- *   0.2.0 - 2011/11/xx - oborchert
- *   * bug fixes and other changes.
- *   0.1.0 - 2009/12/28 - pgleichm
- *   * Code Created
+ * 0.5.0.0 - 2017/07/03 - oborchert
+ *           * Added include of stdbool.h
+ *         - 2017/06/16 - oborchert
+ *           * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *         - 2016/10/26 - oborchert
+ *           * BZ1037: Replaces legacy calls to bzero with memset
+ *           * Reformated Changelog
+ * 0.3.0.0 - 2012/12/17 - oborchert
+ *           * Added changelog.
+ *           * Changed Structure of client socket to allow different handling 
+ *             depending where this structure is used (proxy / srx-server)
+ * 0.2.0.0 - 2011/11/xx - oborchert
+ *           * bug fixes and other changes.
+ * 0.1.0.0 - 2009/12/28 - pgleichm
+ *           * Code Created
  */
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -95,7 +103,7 @@ bool createClientSocket(ClientSocket* self, const char* host, int port,
   }
 
   // Connect TCP
-  bzero(&self->svrAddr, sizeof (struct sockaddr_in));
+  memset(&self->svrAddr, 0, sizeof (struct sockaddr_in));
   self->svrAddr.sin_family = AF_INET;
   self->svrAddr.sin_port = htons(port);
   memcpy(&(self->svrAddr.sin_addr.s_addr), svr->h_addr, svr->h_length);

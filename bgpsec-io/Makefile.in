@@ -15,6 +15,8 @@
 
 @SET_MAKE@
 
+
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -36,11 +38,11 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = bgpsecio$(EXEEXT)
 subdir = .
-DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in $(srcdir)/bgpsecio.spec.in \
-	$(srcdir)/config.h.in $(top_srcdir)/configure AUTHORS COPYING \
-	ChangeLog INSTALL NEWS config.guess config.sub depcomp \
-	install-sh ltmain.sh missing
+DIST_COMMON = README $(am__configure_deps) $(dist_bin_SCRIPTS) \
+	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(srcdir)/bgpsecio.spec.in $(srcdir)/config.h.in \
+	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
+	config.guess config.sub depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -54,7 +56,7 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)"
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_bgpsecio_OBJECTS = bgpsecio-ASList.$(OBJEXT) \
 	bgpsecio-ASNTokenizer.$(OBJEXT) \
@@ -64,6 +66,7 @@ am_bgpsecio_OBJECTS = bgpsecio-ASList.$(OBJEXT) \
 	bgpsecio-BGPHeader.$(OBJEXT) bgpsecio-BGPPrinterUtil.$(OBJEXT) \
 	bgpsecio-BGPUpdatePrinter.$(OBJEXT) \
 	bgpsecio-BGPNotificationPrinter.$(OBJEXT) \
+	bgpsecio-BGPOpenPrinter.$(OBJEXT) \
 	bgpsecio-BGPHeaderPrinter.$(OBJEXT) \
 	bgpsecio-BGPSession.$(OBJEXT) bgpsecio-configuration.$(OBJEXT) \
 	bgpsecio-cfgFile.$(OBJEXT) bgpsecio-player.$(OBJEXT) \
@@ -73,6 +76,28 @@ bgpsecio_DEPENDENCIES = $(top_srcdir)/antd-util/libantd_util.la
 bgpsecio_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(bgpsecio_CFLAGS) $(CFLAGS) \
 	$(bgpsecio_LDFLAGS) $(LDFLAGS) -o $@
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+SCRIPTS = $(dist_bin_SCRIPTS)
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -95,6 +120,7 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	install-pdf-recursive install-ps-recursive install-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
+HEADERS = $(noinst_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -151,6 +177,7 @@ CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CREATE_TESTVECTOR = @CREATE_TESTVECTOR@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
@@ -200,6 +227,7 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_VER = @PKG_VER@
+PRINT_CRYPTO = @PRINT_CRYPTO@
 RANLIB = @RANLIB@
 SCA_CFLAGS = @SCA_CFLAGS@
 SCA_LDFLAGS = @SCA_LDFLAGS@
@@ -279,6 +307,7 @@ bgpsecio_SOURCES = ASList.c \
                    bgp/printer/BGPPrinterUtil.c \
                    bgp/printer/BGPUpdatePrinter.c \
                    bgp/printer/BGPNotificationPrinter.c \
+                   bgp/printer/BGPOpenPrinter.c \
                    bgp/printer/BGPHeaderPrinter.c \
                    bgp/BGPSession.c \
                    cfg/configuration.c \
@@ -286,6 +315,33 @@ bgpsecio_SOURCES = ASList.c \
                    player/player.c \
                    bgpsecio.c
 
+noinst_HEADERS = \
+		  player/player.h \
+		  updateStackUtil.h \
+		  ASList.h          \
+		  cfg/cfgFile.h     \
+		  cfg/configuration.h  \
+		  ASNTokenizer.h       \
+		  bgpsec/Crypto.h      \
+		  bgpsec/BGPSecPathBin.h  \
+		  bgp/BGPHeader.h         \
+		  bgp/printer/BGPNotificationPrinter.h \
+		  bgp/printer/BGPHeaderPrinter.h       \
+		  bgp/printer/BGPPrinterUtil.h         \
+		  bgp/printer/BGPOpenPrinter.h         \
+		  bgp/printer/BGPUpdatePrinter.h       \
+		  bgp/BGPSession.h                     \
+		  bgp/BGPFinalStateMachine.h           \
+		  config.h                             \
+		  antd-util/printer.h                  \
+		  antd-util/prefix.h                   \
+		  antd-util/linked_list.h              \
+		  antd-util/log.h                      \
+		  antd-util/stack.h
+
+
+# Crypto Key generation tools
+dist_bin_SCRIPTS = tools/bio-traffic.sh
 AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 bgpsecio_LDADD = $(top_srcdir)/antd-util/libantd_util.la
 bgpsecio_CFLAGS = $(CFLAGS) $(OPENSSL_CFLAGS) $(SCA_CFLAGS)
@@ -417,6 +473,40 @@ clean-binPROGRAMS:
 bgpsecio$(EXEEXT): $(bgpsecio_OBJECTS) $(bgpsecio_DEPENDENCIES) 
 	@rm -f bgpsecio$(EXEEXT)
 	$(bgpsecio_LINK) $(bgpsecio_OBJECTS) $(bgpsecio_LDADD) $(LIBS)
+install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
+	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n' \
+	    -e 'h;s|.*|.|' \
+	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
+	      if (++n[d] == $(am__install_max)) { \
+		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
+	    else { print "f", d "/" $$4, $$1 } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	     test -z "$$files" || { \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	     } \
+	; done
+
+uninstall-dist_binSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	       sed -e 's,.*/,,;$(transform)'`; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(bindir)" && rm -f $$files
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -430,6 +520,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPHeader.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPHeaderPrinter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPNotificationPrinter.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPOpenPrinter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPPrinterUtil.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPSecPathBin.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsecio-BGPSession.Po@am__quote@
@@ -601,6 +692,20 @@ bgpsecio-BGPNotificationPrinter.obj: bgp/printer/BGPNotificationPrinter.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='bgp/printer/BGPNotificationPrinter.c' object='bgpsecio-BGPNotificationPrinter.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -c -o bgpsecio-BGPNotificationPrinter.obj `if test -f 'bgp/printer/BGPNotificationPrinter.c'; then $(CYGPATH_W) 'bgp/printer/BGPNotificationPrinter.c'; else $(CYGPATH_W) '$(srcdir)/bgp/printer/BGPNotificationPrinter.c'; fi`
+
+bgpsecio-BGPOpenPrinter.o: bgp/printer/BGPOpenPrinter.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -MT bgpsecio-BGPOpenPrinter.o -MD -MP -MF $(DEPDIR)/bgpsecio-BGPOpenPrinter.Tpo -c -o bgpsecio-BGPOpenPrinter.o `test -f 'bgp/printer/BGPOpenPrinter.c' || echo '$(srcdir)/'`bgp/printer/BGPOpenPrinter.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/bgpsecio-BGPOpenPrinter.Tpo $(DEPDIR)/bgpsecio-BGPOpenPrinter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='bgp/printer/BGPOpenPrinter.c' object='bgpsecio-BGPOpenPrinter.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -c -o bgpsecio-BGPOpenPrinter.o `test -f 'bgp/printer/BGPOpenPrinter.c' || echo '$(srcdir)/'`bgp/printer/BGPOpenPrinter.c
+
+bgpsecio-BGPOpenPrinter.obj: bgp/printer/BGPOpenPrinter.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -MT bgpsecio-BGPOpenPrinter.obj -MD -MP -MF $(DEPDIR)/bgpsecio-BGPOpenPrinter.Tpo -c -o bgpsecio-BGPOpenPrinter.obj `if test -f 'bgp/printer/BGPOpenPrinter.c'; then $(CYGPATH_W) 'bgp/printer/BGPOpenPrinter.c'; else $(CYGPATH_W) '$(srcdir)/bgp/printer/BGPOpenPrinter.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/bgpsecio-BGPOpenPrinter.Tpo $(DEPDIR)/bgpsecio-BGPOpenPrinter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='bgp/printer/BGPOpenPrinter.c' object='bgpsecio-BGPOpenPrinter.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -c -o bgpsecio-BGPOpenPrinter.obj `if test -f 'bgp/printer/BGPOpenPrinter.c'; then $(CYGPATH_W) 'bgp/printer/BGPOpenPrinter.c'; else $(CYGPATH_W) '$(srcdir)/bgp/printer/BGPOpenPrinter.c'; fi`
 
 bgpsecio-BGPHeaderPrinter.o: bgp/printer/BGPHeaderPrinter.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bgpsecio_CFLAGS) $(CFLAGS) -MT bgpsecio-BGPHeaderPrinter.o -MD -MP -MF $(DEPDIR)/bgpsecio-BGPHeaderPrinter.Tpo -c -o bgpsecio-BGPHeaderPrinter.o `test -f 'bgp/printer/BGPHeaderPrinter.c' || echo '$(srcdir)/'`bgp/printer/BGPHeaderPrinter.c
@@ -1010,10 +1115,10 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(PROGRAMS) config.h
+all-am: Makefile $(PROGRAMS) $(SCRIPTS) $(HEADERS) config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -1070,7 +1175,7 @@ install-dvi: install-dvi-recursive
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-binPROGRAMS install-dist_binSCRIPTS
 
 install-html: install-html-recursive
 
@@ -1112,7 +1217,7 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
+uninstall-am: uninstall-binPROGRAMS uninstall-dist_binSCRIPTS
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all \
 	ctags-recursive install-am install-strip tags-recursive
@@ -1126,15 +1231,16 @@ uninstall-am: uninstall-binPROGRAMS
 	distclean-libtool distclean-local distclean-tags \
 	distcleancheck distdir distuninstallcheck dvi dvi-am html \
 	html-am info info-am install install-am install-binPROGRAMS \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
-	uninstall-binPROGRAMS
+	install-data install-data-am install-dist_binSCRIPTS \
+	install-dvi install-dvi-am install-exec install-exec-am \
+	install-html install-html-am install-info install-info-am \
+	install-man install-pdf install-pdf-am install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-recursive uninstall uninstall-am \
+	uninstall-binPROGRAMS uninstall-dist_binSCRIPTS
 
 
 .PHONY: distclean-local rpms srcrpm

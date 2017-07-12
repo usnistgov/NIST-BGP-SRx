@@ -4,32 +4,44 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * RPKI/Router definitions.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/09 - oborchert
+ *            * Added include <srx/srxcryptoapi.h> and replaced hard coded 
+ *              values with the appropriate defines
+ *            * Removed documentation text " - always '0'" from protocol PDU
+ *              version fields. For KEY PDU added "1 or greater"
+ *          - 2017/06/16 - kyehwanl
+ *            * Updated to follow RFC8210 (former 6810-bis-9)
+ *          - 2017/06/16 - oborchert
+ *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
+ *          - 2016/08/26 - oborchert
+ *            * Replaced global pragma statement with __attribute__((packed))
+ *              statement for types that need it.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.3.0    - 2013/01/28 - oborchert
- *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This 
+ *            * Update to be compliant to draft-ietf-sidr-rpki-rtr.26. This
  *              update does not include the secure protocol section. The protocol
  *              will still use un-encrypted plain TCP
  *            * Removed invalid PDU type: PDU_TYPE_UNKNOWN.
@@ -43,10 +55,11 @@
 #ifndef __RPKI_ROUTER_H__
 #define __RPKI_ROUTER_H__
 
+#include <srx/srxcryptoapi.h>
 #include "util/prefix.h"
 
-/** 
- * PDU Types 
+/**
+ * PDU Types
  */
 typedef enum {
   PDU_TYPE_SERIAL_NOTIFY  = 0,  // 5.2
@@ -57,7 +70,8 @@ typedef enum {
   PDU_TYPE_IP_V6_PREFIX   = 6,  // 5.7
   PDU_TYPE_END_OF_DATA    = 7,  // 5.8
   PDU_TYPE_CACHE_RESET    = 8,  // 5.9
-  PDU_TYPE_ERROR_REPORT   = 10, // 5.10
+  PDU_TYPE_ROUTER_KEY     = 9,  // 5.10
+  PDU_TYPE_ERROR_REPORT   = 10, // 5.11
   PDU_TYPE_RESERVED       = 255
 } RPKIRouterPDUType;
 
@@ -82,8 +96,6 @@ typedef enum {
 /** The current protocol implementation. */
 #define RPKI_RTR_PROTOCOL_VERSION 0;
 
-#pragma pack(1)
-
 //
 // The following types could be optimized but
 //
@@ -92,65 +104,65 @@ typedef enum {
  * PDU SerialNotify
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_SERIAL_NOTIFY
   uint16_t    sessionID;   // Session ID, former session id
   uint32_t    length;      // 12 Bytes
   uint32_t    serial;      // Serial number
-} RPKISerialNotifyHeader;
+} __attribute__((packed)) RPKISerialNotifyHeader;
 
 /**
  * PDU SerialQuery
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_SERIAL_QUERY
   uint16_t    sessionID;   // Session ID, former session id
   uint32_t    length;      // 12 Bytes
   uint32_t    serial;      // Serial number
-} RPKISerialQueryHeader;
+} __attribute__((packed)) RPKISerialQueryHeader;
 
 /**
  * PDU ResetQuery
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_RESET_QUERY
   uint16_t    reserved;    // zero
   uint32_t    length;      // 8 Bytes
-} RPKIResetQueryHeader;
+} __attribute__((packed)) RPKIResetQueryHeader;
 
 /**
  * PDU Cache Response
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_CACHE_RESPONSE
   uint16_t    sessionID;   // Session ID, former session id
   uint32_t    length;      // 8 Bytes
-} RPKICacheResponseHeader;
+} __attribute__((packed)) RPKICacheResponseHeader;
 
 /**
  * Defines a PDU for IPv4 Prefix.
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_IP_V4_PREFIX
   uint16_t    reserved;    // Reserved
   uint32_t    length;      // 20 bytes
-  uint8_t     flags;      
+  uint8_t     flags;
   uint8_t     prefixLen;   // 0..32
   uint8_t     maxLen;      // 0..32
   uint8_t     zero;        // zero
   IPv4Address addr;
   uint32_t    as;
-} RPKIIPv4PrefixHeader;
+} __attribute__((packed)) RPKIIPv4PrefixHeader;
 
 /**
  * Defines a PDU for IPv6 Prefix
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_IP_V6_PREFIX
   uint16_t    reserved;    // Reserved
   uint32_t    length;      // 32 bytes
@@ -160,34 +172,52 @@ typedef struct {
   uint8_t     zero;        // zero
   IPv6Address addr;
   uint32_t    as;
-} RPKIIPv6PrefixHeader;
+} __attribute__((packed)) RPKIIPv6PrefixHeader;
+
+
+/**
+ * Defines a PDU for Router Key
+ */
+typedef struct {
+  uint8_t     version;     // Version - must '1' or greater
+  uint8_t     type;        // TYPE_ROUTER_KEY
+  uint8_t     flags;        //
+  uint8_t     zero;        // zero
+  uint32_t    length;      // 32 bytes
+  uint8_t     ski[SKI_LENGTH];     // Subject Key Identifier 20 octets
+  uint32_t    as;          // 4 bytes AS number
+  uint8_t     keyInfo[ECDSA_PUB_KEY_DER_LENGTH]; // Subject Public Key Info 91 
+                                                 // bytes DER
+} __attribute__((packed)) RPKIRouterKeyHeader;
+
+
 
 /**
  * PDU EndOfData
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_END_OF_DATA
   uint16_t    sessionID;   // Session ID, former session id
   uint32_t    length;      // 12 Bytes
   uint32_t    serial;      // Serial number
-} RPKIEndOfDataHeader;
+} __attribute__((packed)) RPKIEndOfDataHeader;
 
 /**
  * PDU Cache Reset
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // TYPE_CACHE_RESET
   uint16_t    reserved;    // zero
   uint32_t    length;      // 8 Bytes
-} RPKICacheResetHeader;
+} __attribute__((packed)) RPKICacheResetHeader;
 
 /**
  * PDU Error Report
  */
 typedef struct {
-  uint8_t     version;      // Version - always '0'
+  uint8_t     version;      // Version
   uint8_t     type;         // TYPE_ERROR_REPORT
   uint16_t    error_number; // Error Code
   uint32_t    length;       // 16 + Bytes
@@ -195,19 +225,17 @@ typedef struct {
   // pdu
   // message size
   // message
-} RPKIErrorReportHeader;
+} __attribute__((packed)) RPKIErrorReportHeader;
 
 /**
  * A common structure used to determine the packet size and type while sending
  * and receiving.
  */
 typedef struct {
-  uint8_t     version;     // Version - always '0'
+  uint8_t     version;     // Version
   uint8_t     type;        // type version
-  uint16_t    mixed;       // some mixed useage field.
+  uint16_t    mixed;       // some mixed usage field.
   uint32_t    length;      // 8 Bytes of length
-} RPKICommonHeader;
-
-#pragma pack()
+} __attribute__((packed)) RPKICommonHeader;
 
 #endif // !__RPKI_ROUTER_H__

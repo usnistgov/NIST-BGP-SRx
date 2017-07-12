@@ -22,10 +22,20 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.0.6
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/05/03 - oborchert
+ *            * Moved include of config.h into this  file rather then 
+ *              configuration.c.
+ *          - 2017/03/15 - oborchert
+ *            * Changed values of print filter defines.
+ *          - 2017/03/10 - oborchert
+ *            * Added print filter
+ *          - 2017/02/14 - oborchert (branch 2017/02/07) 
+ *            * Added missing configuration for IPv6 next hop.
+ *            * Added alternative configuration for IPv4 next hop.
  *  0.2.0.6 - 2017/02/15 - oborchert
  *            * Added switch to force sending extended messages regardless if
  *              capability is negotiated. This is a TEST setting only.
@@ -70,6 +80,9 @@
 #define	CONFIGURATION_H
 
 #include <stdbool.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "antd-util/stack.h"
 #include "bgpsec/BGPSecPathBin.h"
 
@@ -181,11 +194,25 @@
 // -i <IPv4 address> - My BGP Identifier
 #define P_C_BGP_IDENT   'i'
 
-// hold_timer=<time_in_seconds> - The requested BGP hold time
+// next_hop_ipv4="<IPv4 address>" - Alternative IPv4 next hop address
+#define P_CFG_NEXT_HOP_IPV4 "next_hop_ipv4"
+// --next_hop_ipv4 <IPv4 address> - IPv6 next hop address
+#define P_NEXT_HOP_IPV4     "--" P_CFG_NEXT_HOP_IPV4
+// -4 <IPv4 address> - IPv6 next hop address
+#define P_C_NEXT_HOP_IPV4   '4'
+
+// next_hop_ipv6="<IPv6 address>" - IPv6 next hop address
+#define P_CFG_NEXT_HOP_IPV6 "next_hop_ipv6"
+// --next_hop_ipv6 <IPv6 address> - IPv6 next hop address
+#define P_NEXT_HOP_IPV6     "--"
+// -6 <IPv6 address> - IPv6 next hop address
+#define P_C_NEXT_HOP_IPV6   '6'
+
+// hold_timer=<time_in_seconds>   - The requested BGP hold time
 #define P_CFG_HOLD_TIME "hold_timer"
 // --hold_timer=<time_in_seconds> - The requested BGP hold time
 #define P_HOLD_TIME     "--" P_CFG_HOLD_TIME
-// -x <time_in_seconds> - The requested BGP hold time
+// -t <time_in_seconds> - The requested BGP hold time
 #define P_C_HOLD_TIME   't'
 
 // peer_asn=<asn> - The peer ASN
@@ -326,6 +353,17 @@
 // Enable and disable BGPSEC IPv6 Send
 #define P_CFG_BGPSEC_V6_S          "bgpsec_v6_snd"
 
+// Enable / disable printing of OPEN message
+#define P_CFG_PRNFLTR_OPEN         "open"
+// Enable / disable printing of UPDATE message
+#define P_CFG_PRNFLTR_UPDATE       "update"
+// Enable / disable printing of NOTIFICATION message
+#define P_CFG_PRNFLTR_NOTIFICATION "notification"
+// Enable / disable printing of KEEPALIVE message
+#define P_CFG_PRNFLTR_KEEPALIVE    "keepalive"
+// Enable / disable printing of unknown (future) message
+#define P_CFG_PRNFLTR_UNKNOWN      "unknown"
+
 // Max size for the error message buffer
 #define PARAM_ERRBUF_SIZE 255
 // Max size for file names 
@@ -352,7 +390,7 @@ typedef enum OP_Mode
  *  main method. */
 typedef struct 
 {
-  BGPSEC_V6Prefix prefixTpl; // can be typecase to v4 and v6
+  BGPSEC_V6Prefix prefixTpl; // can be typecast to v4 and v6
   char*           pathStr;
   // @TODO: Maybe here we can add the binary data as well?????
 } UpdateData;

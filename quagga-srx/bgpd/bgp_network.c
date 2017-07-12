@@ -196,6 +196,7 @@ bgp_accept (struct thread *thread)
     peer->v_holdtime = peer1->v_holdtime;
     peer->v_keepalive = peer1->v_keepalive;
 
+#ifdef USE_SRX
     if (CHECK_FLAG (peer1->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
     {
       if(stream_get_size (peer1->ibuf) > BGP_MAX_PACKET_SIZE)
@@ -209,8 +210,8 @@ bgp_accept (struct thread *thread)
         if (CHECK_FLAG (peer1->flags, PEER_FLAG_EXTENDED_MESSAGE_LIBERAL))
           if(stream_get_size (peer1->ibuf) > BGP_MAX_PACKET_SIZE)
             stream_resize (peer->ibuf, BGP_MAX_PACKET_SIZE_EXTENDED);
-
     }
+#endif
 
     /* Make peer's address string. */
     sockunion2str (&su, buf, SU_ADDRSTRLEN);

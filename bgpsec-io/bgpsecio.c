@@ -20,10 +20,28 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.0.5
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.7 - 2017/05/03 - oborchert
+ *           * Next hop for IPv4 prefixes was not generated due to incorrect
+ *             reading of the afi value. 
+ *         - 2017/04/28 - oborchert
+ *           * Fixed BUG where sending IPv6 BGPsec updates was incorrectly 
+ *             decided depending on IPv4 negotiation rather than IPv6.
+ *         - 2017/04/27 - oborchert
+ *           * BZ1153 Fixed storing of bgpsec path attribute in GEN-C mode.
+ *         - 2017/03/22 - oborchert
+ *           * Modified the display of the used K to not use a string but to 
+ *             use the real byte stream.
+ *         - 2017/03/20 - oborchert
+ *           * BZ1043: Added DEBUG section for flow control.
+ *         - 2017/03/17 - oborchert
+ *           * Added code to generate BGP4 updates if bgpsec is not negotiated
+ *             for the particular update type (IPv4/IPv6).
+ *             This only applies to updates that are generated "on the fly". 
+ *             Pre-stored updates still are send regardless of the negotiation.
  * 0.2.0.5 - 2017/02/01 - oborchert
  *           * Moved session configuration (capabilities) to the session 
  *             creation.
@@ -215,6 +233,8 @@ static int _runBGPRouterSession(PrgParams* params)
       hasBinTraffic = !feof(dataFile);
     }
   }
+  
+  int updatesSend = 0;
         
   while (session->run)
   {
@@ -225,6 +245,12 @@ static int _runBGPRouterSession(PrgParams* params)
       continue;
     }    
                 
+    bool bgpsec_v4_negotiated =   session->bgpConf.capConf.bgpsec_snd_v4 
+                                & session->bgpConf.peerCap.bgpsec_rcv_v4;
+    bool bgpsec_v6_negotiated =   session->bgpConf.capConf.bgpsec_snd_v6 
+                                & session->bgpConf.peerCap.bgpsec_rcv_v6;
+    bool doBGPSEC = true;
+    
     // Now session is established, first send all updates in the stack then
     // all stdin data followed by binary in data
     while (session->fsm.state == FSM_STATE_ESTABLISHED && sendData)
@@ -249,10 +275,28 @@ static int _runBGPRouterSession(PrgParams* params)
           // the following pointer points into globally managed memory and
           // therefore does not need to be freed
           prefix = (BGPSEC_PrefixHdr*)&update->prefixTpl;
-          bgpPathAttr = (BGP_PathAttribute*)generateBGPSecAttr(NULL,
-                         useGlobalMemory, update->pathStr, NULL, 
-                         &session->bgpConf, prefix, 
-                         asList, params->onlyExtLength);
+          
+          // Let us figure out if we can generate bgpsec at all (configuration)
+          // 1: figure out if we are V4 or V6
+          // 2: is bgpsec negotiated?
+          switch (ntohs(prefix->afi))
+          {
+            case AFI_V4:
+              doBGPSEC = bgpsec_v4_negotiated;
+              break;
+            case AFI_V6:
+              doBGPSEC = bgpsec_v6_negotiated;
+              break;
+            default:
+              doBGPSEC = false;
+              break;
+          }
+          
+          bgpPathAttr = doBGPSEC ? (BGP_PathAttribute*)generateBGPSecAttr(NULL,
+                                   useGlobalMemory, update->pathStr, NULL, 
+                                   &session->bgpConf, prefix, 
+                                   asList, params->onlyExtLength)
+                                 : NULL;
           // if bgpsec attribute could not be generated use AS_PATH and no 
           // MPNLRI encoding for V4 prefixes
           useMPNLRI = useMPNLRI & (bgpPathAttr != NULL);
@@ -265,6 +309,7 @@ static int _runBGPRouterSession(PrgParams* params)
             //     In the case it is an iBGP session and no origin announcement
             //     then the bgpsec attribute was generated up to this router
             //     and we do not end up here.
+            // (3) BGPsec is not negotiated.
             bool iBGP_Announcement = false;
             if ((strlen(update->pathStr) == 0) && iBGP)
             {
@@ -273,7 +318,8 @@ static int _runBGPRouterSession(PrgParams* params)
               iBGP_Announcement = true;
             }
             if (   iBGP_Announcement
-                || (session->bgpConf.algoParam.ns_mode == NS_BGP4))
+                || (session->bgpConf.algoParam.ns_mode == NS_BGP4)
+                || !doBGPSEC)
             {            
               // Use the buffer normally used for the binary stream, it will
               // be fine.
@@ -320,16 +366,33 @@ static int _runBGPRouterSession(PrgParams* params)
       {
         // Set no mpnlri if iBGP session. Will be overwritten for V6
         u_int32_t locPref = iBGP ? BGP_UPD_A_FLAGS_LOC_PREV_DEFAULT : 0;
-        createUpdateMessage(msgBuff, sizeof(msgBuff), bgpPathAttr, 
-                            BGP_UPD_A_FLAGS_ORIGIN_INC, locPref,
-                            params->bgpConf.bgpIdentifier, prefix, useMPNLRI);
+        if (ntohs(prefix->afi) == AFI_V4)
+        {
+          createUpdateMessage(msgBuff, sizeof(msgBuff), bgpPathAttr, 
+                              BGP_UPD_A_FLAGS_ORIGIN_INC, locPref,
+                              &(session->bgpConf.nextHopV4), prefix, useMPNLRI);
+          
+        }
+        else
+        {
+          createUpdateMessage(msgBuff, sizeof(msgBuff), bgpPathAttr, 
+                              BGP_UPD_A_FLAGS_ORIGIN_INC, locPref,
+                              &(session->bgpConf.nextHopV6), prefix, useMPNLRI);
+        }
         // Maybe store the update ?????          
         bgp_update = (BGP_UpdateMessage_1*)msgBuff;
       }
       
       if (bgp_update != NULL)
       {
-        sendUpdate(session, bgp_update);        
+        sendUpdate(session, bgp_update, SESS_FLOW_CONTROL_REPEAT);
+        updatesSend++;
+#ifdef DEBUG
+        if (updatesSend % 1000 == 0)
+        {
+          printf("Updates send: %'d\n", updatesSend);
+        }
+#endif
       }
       
       // Free the update information if it still exists. Don't do it earlier
@@ -782,8 +845,9 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
  * Generate the data and store it into a file.
  * 
  * @param params The program parameters.
- * @param type the type of traffic to be generated, BGP Updates or just the
- *        attribute
+ * @param type the type of traffic to be generated, BGP Updates 
+ *             (BGPSEC_IO_TYPE_BGP_UPDATE) or just the attribute
+ *             (BGPSEC_IO_TYPE_BGPSEC_ATTR).
  * 
  * @return The exit code.
  */
@@ -804,7 +868,6 @@ static int _runGEN(PrgParams* params, u_int8_t type)
       BGP_PathAttribute* bgpsecPathAttr = NULL;
       BGPSEC_PrefixHdr* prefix = NULL;
       BGPSEC_IO_StoreData store;
-      u_int16_t attrSize = 0;
       int msgLen         = 0;
       
       while (!isUpdateStackEmpty(params, true) && (params->maxUpdates != 0))
@@ -831,26 +894,17 @@ static int _runGEN(PrgParams* params, u_int8_t type)
         if (bgpsecPathAttr != NULL)
         {
           // Include the attribute header information.
-          u_int8_t* attrLen = ((u_int8_t*)bgpsecPathAttr) + sizeof(BGP_PathAttribute);
-          if (bgpsecPathAttr->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH > 0)
-          {
-            attrSize = ntohs(*((u_int16_t*)attrLen)) + sizeof(BGP_PathAttribute) 
-                       + 2; // 2 byte for length field in header.
-          }
-          else
-          {
-            attrSize = *attrLen + sizeof(BGP_PathAttribute) + 1; // one byte
-          }
           store.prefix       = prefix;
           store.usesFake     = params->bgpConf.algoParam.fakeUsed;
           store.numKeys      = params->bgpConf.algoParam.pubKeysStored;
           store.keys         =  store.numKeys != 0 
                                 ? params->bgpConf.algoParam.pubKey : NULL;
           store.segmentCount = segmentCount;
+          void* nextHop = NULL;
           switch (type)
           {            
             case BGPSEC_IO_TYPE_BGPSEC_ATTR:
-              store.dataLength   = attrSize;
+              store.dataLength   = getPathAttributeSize(bgpsecPathAttr);
               store.data         = (u_int8_t*)bgpsecPathAttr;
               if (!storeData(outFile, BGPSEC_IO_TYPE_BGPSEC_ATTR, 
                              params->bgpConf.asn, params->bgpConf.peerAS, 
@@ -861,10 +915,13 @@ static int _runGEN(PrgParams* params, u_int8_t type)
               break;
               
             case BGPSEC_IO_TYPE_BGP_UPDATE:
+              nextHop = (ntohs(prefix->afi) == AFI_V4)
+                        ? (void*)&params->bgpConf.nextHopV4
+                        : (void*)&params->bgpConf.nextHopV6;
               msgLen = createUpdateMessage(msgBuff, sizeof(msgBuff), 
                                  (BGP_PathAttribute*)bgpsecPathAttr, 
                                  BGP_UPD_A_FLAGS_ORIGIN_INC,
-                                 locPref, params->bgpConf.bgpIdentifier, prefix, 
+                                 locPref, nextHop, prefix, 
                                  params->bgpConf.useMPNLRI);
               store.dataLength = msgLen;
               store.data       = (u_int8_t*)msgBuff;
@@ -955,7 +1012,7 @@ static bool _checkSettings(PrgParams* params, int* exitVal)
  */
 int main(int argc, char** argv) 
 {
-  // First load parametrers  
+  // First load parameters  
   PrgParams params;
   initParams(&params);
   
@@ -964,6 +1021,8 @@ int main(int argc, char** argv)
   int  retVal = parseParams(&params, argc, argv);
   bool keepGoing = true;
   bool printDone = true;
+  
+  int idx=0;
   
   switch (retVal)
   {
@@ -983,26 +1042,21 @@ int main(int argc, char** argv)
   {
     printf ("Starting %s...\n", PACKAGE_STRING);
     
-  switch (params.bgpConf.algoParam.sigGenMode)
-  {
-    case SM_BIO_K1:
-      printf ("WARNING: Signatures will be generated using constant %s!\n",
-              SM_BIO_K1_STR);
-      break;
-    case SM_BIO_K2:
-      printf ("WARNING: Signatures will be generated using constant %s!\n",
-              SM_BIO_K2_STR);
-      break;
-    default:
-      break;
-  }
- 
+    if ( (params.bgpConf.algoParam.sigGenMode == SM_BIO_K1)
+         || (params.bgpConf.algoParam.sigGenMode == SM_BIO_K2) )
+    {
+      char str[STR_MAX];
+      memset(str, '\0', STR_MAX);
+      CRYPTO_k_to_string(str, STR_MAX, params.bgpConf.algoParam.sigGenMode);
+      printf ("WARNING: Signatures will be generated using constant k=%s\n", 
+              str);
+    }
     // initialize the main memory;
     initData();
 
     // @TODO: line below can be deleted once srxcrytpoapi is configured correctly   
     params.bgpConf.algoParam.addPubKeys = false;
-
+        
     switch (params.type)
     {
       case OPM_BGP:

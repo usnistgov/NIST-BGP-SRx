@@ -25,12 +25,22 @@
  * generation.
  * 
  * Known Issue:
- *   At this time only pem formated private keys can be loaded.
+ *   At this time only PEM formated private keys can be loaded.
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.3
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.3 - 2017/07/09 - oborchert
+ *            * BZ1186: Fixed problem while unregistering keys.
+ *            * Modified return value documentation of function ks_getKey which
+ *              mentioned DER key but did not mention it encapsulated in the 
+ *              BGPsecKey data structure.
+ *          - 2017/04/20 - oborchert
+ *            * Added documentation that describes how memory is allocated.
+ *            * Fixed bugs in _ks_clone, _ks_del_key, and _ks_freeKS_Elem,
+ *              and _ks_createKS_Element
+ *            * Modified _ks_freeKey.
  *  0.2.0.0 - 2016/06/30 - oborchert
  *            * Cleaned up unused code and removed compiler warnings
  *  0.2.0.0 - 2016/06/20 - oborchert
@@ -88,7 +98,6 @@ static BGPSecKey* _ks_clone(BGPSecKey* key)
       if (clone->keyData != NULL)
       {
         memcpy(clone->keyData, key->keyData, key->keyLength);      
-        memcpy(clone->ski, key->ski, SKI_LENGTH);
       }
       else
       {
@@ -169,8 +178,8 @@ static EC_KEY* _ks_convertKey(u_int8_t* keyData, u_int16_t keyLength,
  *        API_STATUS_INFO_USER1 is used to indicate that additional keys are
  *        available at a higher position
  * 
- * @return the array of EC_Keys/DER_Keys or NULL of not found. if NULL check 
- *         status value.
+ * @return the array of EC_Keys/BGPsecKeys(DER_Keys) or NULL of not found. If 
+ *         NULL check status value.
  */
 void** ks_getKey(KeyStorage* storage, u_int8_t* ski, u_int32_t asn, 
                  u_int16_t* noKeys, KS_Key_Type kType, sca_status_t* status)
@@ -271,15 +280,17 @@ static void _ks_freeKey(BGPSecKey* key)
   if (key != NULL)
   {
     free(key->keyData);
+    memset (key, 0, sizeof(BGPSecKey));
     free(key);
   }
 }
 
 /** 
- * Generate a KeyStorage element.
+ * Generate a KeyStorage element. All internal memory is allocated using malloc!
  * 
  * @param key The key to be added. Here a copy of the Key will be stored!
  * @param status The status of the generation.
+ *              API_STATUS_ERR_NO_DATA if the conversion would not be performed.
  * 
  * @return a new key storage element or NULL if an error occurred - see status.
  */
@@ -291,42 +302,58 @@ static KS_Key_Element* _ks_createKS_Element(BGPSecKey* key, bool convert,
   
   if (elem != NULL)
   {
-    memset(elem, 0, sizeof(KS_Key_Element));
+    memset(elem, 0, sizeof(KS_Key_Element));    
     // Store the minimal information.
     elem->asn = key->asn;
     memcpy(elem->ski, key->ski, SKI_LENGTH);
     
-    elem->derKey = malloc(sizeof(BGPSecKey*));
+    //Currently the key array only will contain one single element.
+    elem->noKeys = 1;
+    
+    elem->derKey = malloc(sizeof(BGPSecKey*) * elem->noKeys);
+    memset(elem->derKey, 0, sizeof(BGPSecKey*) * elem->noKeys);
     if (elem->derKey != NULL)
     {
       // Now copy the key into it.
       elem->derKey[0] = _ks_clone(key);
       if (elem->derKey[0] != NULL)
       {
-        elem->noKeys = 1;
         // create the array space for the ec_key
-        elem->ec_key = malloc(sizeof(EC_KEY*));
+        elem->ec_key = malloc(sizeof(EC_KEY*) * elem->noKeys);
+        memset(elem->ec_key, 0, sizeof(EC_KEY*) * elem->noKeys);
         if (elem->ec_key != NULL)
         {
-          elem->ec_key[0] = NULL;
           if (convert)
           {
-            if (elem->derKey[0]->keyData != NULL)
+            // Check if the der Key is already loaded and if not, load it!.
+            if (elem->derKey[0]->keyData == NULL)
             {
-              if (sca_loadKey(elem->derKey[0], isPrivate, &myStatus) == API_SUCCESS)
-              {  
-                elem->ec_key[0] = _ks_convertKey(elem->derKey[0]->keyData, 
-                                                 elem->derKey[0]->keyLength, 
-                                                 isPrivate, &myStatus);
-              }
+              sca_loadKey(elem->derKey[0], isPrivate, &myStatus);
+            }
+            
+            if (elem->derKey[0]->keyData != NULL)
+            {              
+              // This is now expected!!
+              elem->ec_key[0] = _ks_convertKey(elem->derKey[0]->keyData, 
+                                               elem->derKey[0]->keyLength, 
+                                               isPrivate, &myStatus);
               if (elem->ec_key[0] == NULL)
               {
                 _ks_freeKey(elem->derKey[0]);
+                elem->derKey[0] = NULL;
+                // Now free the malloc'ed arrays
                 free(elem->derKey);
                 free(elem->ec_key);
-                free(elem);
+                elem->derKey = NULL;
+                elem->ec_key = NULL;
+                free(elem);                
                 elem = NULL;
+                myStatus |= API_STATUS_ERR_NO_DATA;             
               }
+            }
+            else
+            {
+              myStatus |= API_STATUS_ERR_NO_DATA;             
             }
           }
           else
@@ -381,23 +408,26 @@ static KS_Key_Element* _ks_createKS_Element(BGPSecKey* key, bool convert,
  */
 static void _ks_freeKS_Elem(KeyStorage* storage, int head,
                             KS_Key_Element* elem)
-{
+{  
   storage->size -= elem->noKeys;
-  
-  if (elem->prev != NULL) // elem is the head
-  {
-    elem->prev = elem->next;
+ 
+  // Take element out of the element list
+  if (elem->prev != NULL) 
+  {     
+    elem->prev->next = elem->next;
+    elem->prev = NULL;
   }
   else
-  {
+  { // elem MUST be the head, otherwise it would have a previous 'prev' element
     storage->head[head] = elem->next; // move head to the next one
   }
   
-  if (elem->next != NULL) 
+  if (elem->next != NULL)
   {
     elem->next->prev = elem->prev;
+    elem->next = NULL;
   }
- 
+  
   // Now free the allocated memory
   int kIdx = 0;
   for (; kIdx < elem->noKeys; kIdx++)
@@ -410,6 +440,7 @@ static void _ks_freeKS_Elem(KeyStorage* storage, int head,
       elem->ec_key[kIdx] = NULL;
     }
   }
+  // Now free the key arrays
   free(elem->derKey);
   free(elem->ec_key);
   memset(elem, 0, sizeof(KS_Key_Element));
@@ -465,6 +496,7 @@ void ks_release(KeyStorage* storage)
  * the following USER status can be returned:
  * 
  * API_STATUS_ERR_USER1: Key algorithm ID does not match the storage Algorithm ID
+ * API_STATUS_INFO_USER1: Given key was not registered!
  * API_STATUS_ERR_NO_DATA: One of the provided parameter was NULL
  * 
  * @param storage The storage where the key is stored in
@@ -540,6 +572,8 @@ int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status)
           if (deleted)
           {
             // move the current key to the previous emptied position
+            // This results in no empty place within the array and the last
+            // element entry is empty. Good for later rezising
             elem->derKey[idx-1] = elem->derKey[idx];
             elem->ec_key[idx-1] = elem->ec_key[idx];
             elem->derKey[idx] = NULL;
@@ -549,33 +583,36 @@ int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status)
           {  
             if (elem->derKey[idx]->keyLength == key->keyLength)
             {
-              if (memcmp(elem->derKey[idx], key->keyData, key->keyLength))
+              if (memcmp(elem->derKey[idx]->keyData, key->keyData, 
+                         key->keyLength) == 0)
               {
-                // Now delete this version
-                if (elem->ec_key != NULL)
+                // Now delete this version of the ec_key
+                if (elem->ec_key[idx] != NULL)
                 {
-                  // This array is is malloc'ed
-                  free(elem->ec_key);
+                  // This array is is OpenSSL malloc'ed
+                  EC_KEY_free(elem->ec_key[idx]);
+                  elem->ec_key[idx] = NULL;
                 }
+                // Now free the der_key
                 _ks_freeKey(elem->derKey[idx]);
                 elem->derKey[idx] = NULL;
                 deleted = true;
+                elem->noKeys--;
+                storage->size--;
               }
             }
           }
         }
         if (deleted)
         {
-          if (elem->noKeys == 1)
+          if (elem->noKeys == 0)
           {
-            // This was the only key, remove the complete elemnt
+            // This was the only key, remove the complete element
             _ks_freeKS_Elem(storage, bucket, elem);
           }
           else
           {
             // some more duplicate keys exist. 
-            elem->noKeys--;
-            storage->size--;
             // Now resize
             void** dk = realloc(elem->derKey, sizeof(BGPSecKey*) + elem->noKeys);
             if (dk != NULL)
@@ -786,6 +823,7 @@ int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status,
       }
       else
       {
+        // ASN matches but not SKI
         // move to the next or add as last.
         if (elem->next != NULL)
         {
@@ -793,9 +831,13 @@ int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status,
         }
         else
         {
-          storage->size++;
           elem->next = _ks_createKS_Element(key, convert, storage->isPrivate, 
                                             &myStatus);
+          if (elem->next != NULL)
+          {
+            storage->size++;            
+          }
+         // else set some status and return API_FAILURE ?????
           break; // The while (elem != NULL) loop.
         }
       }
@@ -804,9 +846,13 @@ int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status,
   else
   {
     // we have a new head
-    storage->size++;
     storage->head[bucket] = _ks_createKS_Element(key, convert, 
                                                  storage->isPrivate, &myStatus);
+    if (storage->head[bucket] != NULL)
+    {
+      storage->size++;      
+    }
+    // else set some status and return API_FAILURE ?????
   }
   
   if (status != NULL)

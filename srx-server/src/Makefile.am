@@ -10,6 +10,7 @@ SERVER_DIR = server
 SHARED_DIR = shared
 TOOLS_DIR = tools
 UTIL_DIR = util
+TEST_DIR = test
 
 # Read the revision number of the revision file
 # This needs GNU-Make. if this is a problem, replace the 
@@ -39,9 +40,11 @@ libsrx_shared_la_SOURCES = \
 	             $(SHARED_DIR)/crc32.c
 	
 libsrx_util_la_SOURCES = \
+	             $(UTIL_DIR)/bgpsec_util.c \
 	             $(UTIL_DIR)/client_socket.c \
 		     $(UTIL_DIR)/debug.c \
 		     $(UTIL_DIR)/directory.c \
+		     $(UTIL_DIR)/io_util.c \
 		     $(UTIL_DIR)/log.c \
 		     $(UTIL_DIR)/multi_client_socket.c \
 		     $(UTIL_DIR)/mutex.c \
@@ -105,10 +108,12 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/configuration.c \
 		     $(SERVER_DIR)/console.c \
 		     $(SERVER_DIR)/key_cache.c \
+		     $(SERVER_DIR)/ski_cache.c \
 		     $(SERVER_DIR)/main.c \
 		     $(SERVER_DIR)/prefix_cache.c \
 		     $(SERVER_DIR)/rpki_handler.c \
 		     $(SERVER_DIR)/rpki_router_client.c \
+		     $(SERVER_DIR)/rpki_queue.c \
 		     $(SERVER_DIR)/server_connection_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
 		     $(SERVER_DIR)/update_cache.c 
@@ -120,7 +125,8 @@ srx_server_LDFLAGS = $(LIB_SCA_LDFLAGS)
 
 # For the revision
 SRX_VENDOR=antd.nist.gov
-SVN_DIR = .svn
+# Since SVN 1.7 the .svn folder is only located in the projects root.
+SVN_DIR = ../.svn
 SVN_CMD = /usr/bin/svn
 
 ################################################################################
@@ -152,6 +158,34 @@ srxsvr_client_LDADD   = libsrx_util.la libsrx_shared.la libSRxProxy.la
 ##  END SRX TOOLS
 ################################################################################
 
+################################################################################
+##  TEST files
+################################################################################
+if BUILD_TEST
+  testdir=$(bindir)
+
+  test_PROGRAMS= test_ski_cache test_rpki_queue
+
+  ##  test_ski_cache
+  test_ski_cache_SOURCES = $(TEST_DIR)/test_ski_cache.c \
+                           $(SERVER_DIR)/rpki_queue.c \
+                           $(SERVER_DIR)/ski_cache.c
+  test_ski_cache_LDADD   = libsrx_shared.la \
+	                   libsrx_util.la
+	
+  ##  test_rpki_queue
+  test_rpki_queue_SOURCES = $(TEST_DIR)/test_rpki_queue.c \
+                            $(SERVER_DIR)/rpki_queue.c
+  test_rpki_queue_LDADD   = libsrx_shared.la \
+	                    libsrx_util.la
+
+  
+endif
+
+################################################################################
+##  END TEST files
+################################################################################
+
 # Don't install
 noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(CLIENT_DIR)/srx_api.h \
@@ -162,10 +196,13 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SERVER_DIR)/configuration.h \
 		 $(SERVER_DIR)/console.h \
 		 $(SERVER_DIR)/key_cache.h \
+		 $(SERVER_DIR)/main.h \
 		 $(SERVER_DIR)/prefix_cache.h \
+		 $(SERVER_DIR)/rpki_queue.h \
 		 $(SERVER_DIR)/rpki_handler.h \
 		 $(SERVER_DIR)/rpki_router_client.h \
 		 $(SERVER_DIR)/server_connection_handler.h \
+		 $(SERVER_DIR)/ski_cache.h \
 		 $(SERVER_DIR)/srx_packet_sender.h \
 		 $(SERVER_DIR)/srx_server.h \
 		 $(SERVER_DIR)/update_cache.h \
@@ -176,6 +213,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SHARED_DIR)/rpki_router.h \
 		 $(SHARED_DIR)/crc32.h \
 		 \
+		 $(UTIL_DIR)/bgpsec_util.h \
 		 $(UTIL_DIR)/client_socket.h \
 		 $(UTIL_DIR)/debug.h \
 		 $(UTIL_DIR)/directory.h \

@@ -66,9 +66,6 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_info_hash.h"
 #include "bgpd/bgp_validate.h"
 
-#if defined(__TIME_MEASURE__)
-#include "srx/srx_common.h"
-#endif
 
 // Forward Declaration
 bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
@@ -636,6 +633,11 @@ int srx_connect_proxy(struct bgp *bgp)
                                       g_rq, clientFD);
       bgp->srx_proxyID = bgp->srxProxy->proxyID;
       zlog_info ("Connect to SRx server %s:%d", bgp->srx_host, bgp->srx_port);
+
+      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+      {
+        zlog_info ("\033[92m""Enabled Distributed Evaluation on SRx server""\033[0m" );
+      }
     }
     else
     {
@@ -779,15 +781,19 @@ int bgp_srx_evaluation (struct bgp *bgp, int mode)
   switch (mode)
   {
     case 0:
-      srx_config_unset (bgp, SRX_CONFIG_EVALUATE);
+      srx_config_unset (bgp, SRX_CONFIG_EVAL_DISTR);
+      break;
+    case SRX_CONFIG_EVAL_DISTR:
+      srx_config_set   (bgp, SRX_CONFIG_EVAL_DISTR);
       break;
     case SRX_CONFIG_EVALUATE:
     case SRX_CONFIG_EVAL_PATH: // We don't do path alone
-      srx_config_set (bgp, SRX_CONFIG_EVALUATE);
+      srx_config_unset (bgp, SRX_CONFIG_EVAL_DISTR);
+      srx_config_set   (bgp, SRX_CONFIG_EVALUATE);
       break;
     case SRX_CONFIG_EVAL_ORIGIN:
-      srx_config_set (bgp, SRX_CONFIG_EVAL_ORIGIN);
-      srx_config_unset (bgp, SRX_CONFIG_EVAL_PATH);
+      srx_config_unset (bgp, SRX_CONFIG_EVAL_DISTR);
+      srx_config_set   (bgp, SRX_CONFIG_EVAL_ORIGIN);
       break;
     default:
       zlog_err("Invalid srx evaluation flag %u passed, ignore it!", mode);
@@ -2436,6 +2442,8 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
       // in case no srx-server is available.
 
       //------ To be deleted later on-----------
+      if ( !CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+      {
       if (bgp->srxCAPI != NULL && info->attr->bgpsec_validationData != NULL)
       {
         // Now CAPI validation result and the SRx Validation result are different
@@ -2452,6 +2460,8 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
                     updateID, info->attr->bgpsec_validationData->status);
           }
         }
+      }
+        valType |= VRT_BGPSEC;
       }
 
       bgp_info_set_validation_result (info, valType, roaResult, bgpsecResult);
@@ -5621,7 +5631,20 @@ bgp_config_write_peer (struct vty *vty, struct bgp *bgp,
       else if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_SEND))
         vty_out (vty, " neighbor %s bgpsec snd %s", addr, VTY_NEWLINE);
       else if (CHECK_FLAG (peer->flags, PEER_FLAG_BGPSEC_CAPABILITY_RECV))
-	vty_out (vty, " neighbor %s bgpsec rec %s", addr, VTY_NEWLINE);
+	      vty_out (vty, " neighbor %s bgpsec rec %s", addr, VTY_NEWLINE);
+
+      /* Extended message capability liberal processing*/
+      if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_LIBERAL))
+      {
+        vty_out (vty, " neighbor %s capability extended liberal%s", addr,
+                 VTY_NEWLINE);
+      } 
+      else if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+      { /* Extended message capability*/
+        vty_out (vty, " neighbor %s capability extended%s", addr,
+                 VTY_NEWLINE);
+      }
+
 #endif /* USE_SRX */
 
       /* override capability negotiation. */
@@ -5922,7 +5945,15 @@ static int srx_config_write_configuration (struct vty *vty, struct bgp *bgp)
   // EVALUATION MODE
   if (srx_config_check(bgp, SRX_CONFIG_EVAL_PATH))
   { // if this is set the ROA flag is set too -> BGPSEC
-    vty_out (vty, " srx evaluation %s%s", SRX_VTY_EVAL_BGPSEC, VTY_NEWLINE);
+    if (srx_config_check(bgp, SRX_CONFIG_EVAL_DISTR))
+    {
+      vty_out (vty, " srx evaluation %s distributed%s", SRX_VTY_EVAL_BGPSEC, 
+                    VTY_NEWLINE);
+    }
+    else
+    {
+      vty_out (vty, " srx evaluation %s%s", SRX_VTY_EVAL_BGPSEC, VTY_NEWLINE);
+    }
   }
   else if (srx_config_check(bgp, SRX_CONFIG_EVAL_ORIGIN))
   {
@@ -6118,10 +6149,11 @@ bgp_config_write (struct vty *vty)
         }
         if (kIdx == 0)
         {
-          vty_out (vty, "! The following form is deprecated.", VTY_NEWLINE);
+          vty_out (vty, "! The following form is deprecated.%s", VTY_NEWLINE);
           vty_out (vty, "! bgpsec ski %s%s", skiStr, VTY_NEWLINE);
         }
-        vty_out (vty, " srx bgpsec ski%u %s%s", kIdx, skiStr, VTY_NEWLINE);
+        // BZ1055 fixed syntax of command. ...ski1 to ...ski 1
+        vty_out (vty, " srx bgpsec ski %u %s%s", kIdx, skiStr, VTY_NEWLINE);
       }
       vty_out (vty, " srx bgpsec active-ski %u%s", bgp->srx_bgpsec_active_key,
                VTY_NEWLINE);

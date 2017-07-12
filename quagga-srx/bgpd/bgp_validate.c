@@ -40,11 +40,19 @@ static void * bgpsec_path_hash_alloc (void *arg);
 /* If two aspath have same value then return 1 else return 0 */
 int bgpsec_path_attr_cmp (const void *arg1, const void *arg2)
 {
+  if (arg1 == arg2)
+    return 1;
+  if (arg1 == NULL && arg2 == NULL)
+    return 1;
+
   const struct PathSegment *seg1 = ((const struct BgpsecPathAttr *)arg1)->pathSegments;
   const struct PathSegment *seg2 = ((const struct BgpsecPathAttr *)arg2)->pathSegments;
 
   const struct SigBlock *sb1 = ((const struct BgpsecPathAttr *)arg1)->sigBlocks;
   const struct SigBlock *sb2 = ((const struct BgpsecPathAttr *)arg2)->sigBlocks;
+
+  const struct SigSegment *ss1;
+  const struct SigSegment *ss2;
 
   while (seg1 || seg2)
     {
@@ -68,12 +76,25 @@ int bgpsec_path_attr_cmp (const void *arg1, const void *arg2)
         return 0;
       if (sb1->algoSuiteId != sb2->algoSuiteId)
         return 0;
-      /* TODO: need to have more better comparing  using SKI and signature
-       * not only using sigSegments
-       * Because comparing sigSegemts are just address comparing, so it need to compare more
-       * concrete data like sigSegments->ski, ski_leng and signature */
-      if (sb1->sigSegments != sb2->sigSegments)
+
+      ss1 = sb1->sigSegments;
+      ss2 = sb2->sigSegments;
+
+      while(ss1 || ss2)
+      {
+        if ((!ss1  && ss2) || (ss1 && !ss2))
           return 0;
+        if (memcmp(ss1->ski, ss2->ski, BGPSEC_SKI_LENGTH) != 0)
+          return 0;
+        if (ss1->sigLen != ss2->sigLen)
+          return 0;
+        if (memcmp(ss1->signature, ss2->signature, ss1->sigLen) != 0)
+          return 0;
+
+        ss1 = ss1->next;
+        ss2 = ss2->next;
+      }
+
       sb1 = sb1->next;
       sb2 = sb2->next;
     }
@@ -90,11 +111,6 @@ unsigned int bgpsec_path_attr_key_make (void *p)
   struct SigSegment *ss;
   unsigned int key = 0;
 
-  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-  {
-    zlog_debug("[BGPSEC] [%s]: bpa:%p, seg:%p, sb:%p sigSeg:%p AS:%d ", \
-        __FUNCTION__, bpa, seg, sb, sb->sigSegments, seg->as);
-  }
 
   if (sb)
   {
@@ -121,11 +137,6 @@ unsigned int bgpsec_path_attr_key_make (void *p)
     key += jhash(bpa->sigBlocks, 4, 0);
   }
 
-  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-  {
-    zlog_debug("[BGPSEC] [%s]:  - - key = =:%d, index:%d", \
-        __FUNCTION__, key, key % 32767);
-  }
   return key;
 }
 
@@ -146,7 +157,7 @@ void bgpsec_path_attr_init()
   memset (g_capi, 0, sizeof(SRxCryptoAPI));
   sca_status_t sca_status = API_STATUS_OK;
 
-  if(srxCryptoInit(g_capi, &sca_status) == API_FAILURE);
+  if(srxCryptoInit(g_capi, &sca_status) == API_FAILURE)
   {
     zlog_err("[BGPSEC] SRxCryptoAPI not initialized (0x%X)!\n", sca_status);
   }
@@ -455,11 +466,6 @@ struct BgpsecPathAttr *bgpsec_path_intern (struct BgpsecPathAttr *bpa)
   /* Check bgpsec path attr hash. */
   find = hash_get (bgpsechash, bpa, bgpsec_path_hash_alloc);
 
-#ifdef DEBUG_TEST
-  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-    zlog_debug("[BGPSEC]  [%s]: find: %p (refcnt:%ld) Vs bpa: %p",\
-        __FUNCTION__, find, find->refcnt, bpa);
-#endif
 
   if (find != bpa)
     bgpsec_path_free (bpa);
@@ -901,8 +907,16 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
   // Get the hash Message, if it was received and already validated, the
   // hashMessage will not be NULL. If it is null, the signature algorithm
   // assumes it is an origination.
-  scaSignData.hashMessage = attr->bgpsec_validationData->hashMessage[BLOCK_0];
   scaSignData.signature   = NULL;
+  if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+  {
+  /* hash message for Distribution version */
+  if (!tmpData) // in case, only if not origin for now
+    sca_generateHashMessage(attr->bgpsec_validationData,
+        SCA_ECDSA_ALGORITHM, &attr->bgpsec_validationData->status);
+  }
+  scaSignData.hashMessage = attr->bgpsec_validationData->hashMessage[BLOCK_0];
+
 
   // Now do the signing. If it fails, cleanup what needs to be clean up
   // and return 0
@@ -925,6 +939,8 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
     return 0;
   }
 
+  if ( !CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+  {
   if (attr->bgpsec_validationData->hashMessage[BLOCK_0] != scaSignData.hashMessage)
   {
     if (attr->bgpsec_validationData->hashMessage[BLOCK_0] != NULL)
@@ -945,6 +961,7 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
     {
       freeSCA_HashMessage(scaSignData.hashMessage);
     }
+  }
   }
 
   if (tmpData)

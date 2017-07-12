@@ -20,11 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/27 - oborchert
+ * 0.5.0.0 - 2017/07/07 - oborchert
+ *           * Modified some LOGGING levels
+ * 0.3.0.0 - 2013/02/27 - oborchert
  *           * Changed handling of errors by storing errno and not always 
  *             calling it. In certain circumstances of thread handling the errno
  *             value can re overwritten in between calls.
@@ -35,8 +37,8 @@
  *           * Minor changes, mainly formating and spellers in documentation
  *           * Added change log.
  *           * Changed mode of sending data
- *   0.2.0 - SKIPPED
- *   0.1.0 - 2009/12/29 - pgleichm
+ * 0.2.0.0 - SKIPPED
+ * 0.1.0.0 - 2009/12/29 - pgleichm
  *           * Code Created
  */
 #include <stdio.h>
@@ -89,12 +91,12 @@ bool recvNum(int* fd, void* buffer, size_t num)
   // Loop until all data is received.
   while (num > 0)
   {
-    LOG(LEVEL_COMM, HDR "Wait to read (%u) bytes from Socket (status:%u).",
+    LOG(LEVEL_DEBUG, HDR "Wait to read (%u) bytes from Socket (status:%u).",
                      pthread_self(), *fd, num, errno);
     //rbytes = recv(*fd, buffer, num, MSG_WAITALL);
     _setLastError(0, false);
     rbytes = recv(*fd, buffer, num, MSG_NOSIGNAL | MSG_WAITALL);
-    LOG(LEVEL_COMM, HDR "Read %u of %u bytes from Socket (status: %u).",
+    LOG(LEVEL_DEBUG, HDR "Read %u of %u bytes from Socket (status: %u).",
                      pthread_self(), *fd, rbytes, num, errno);
     // An error occurred
     if (rbytes == -1)
@@ -111,7 +113,7 @@ bool recvNum(int* fd, void* buffer, size_t num)
         }
         else
         {
-          LOG(LEVEL_DEBUG, HDR "Socket error 0x%X (%u) while receiving data - "
+          LOG(LEVEL_WARNING, HDR "Socket error 0x%X (%u) while receiving data - "
                            "Close socket!", pthread_self(), ioError, ioError);
           //close(*fd);
         }
@@ -157,7 +159,7 @@ bool sendNum(int* fd, void* buffer, size_t num)
   
   if (*fd == -1)
   {
-    LOG(LEVEL_DEBUG, FILE_LINE_INFO " File descriptor is invalid!");
+    LOG(LEVEL_WARNING, FILE_LINE_INFO " File descriptor is invalid!");
     _setLastError(EBADF, SOCK_OP_SEND);
     return false;
   }
@@ -261,8 +263,8 @@ const char* sockAddrToStr(const struct sockaddr* sa, char* dest, size_t size)
  *
  * @param fd The file descriptor.
  * @param isPeer
- * @param dest
- * @param size
+ * @param dest The destination string pointer
+ * @param size the size of the destination.
  *
  * @return the address of the given socket as string.
  */
@@ -283,8 +285,8 @@ const char* socketToStr(int fd, bool isPeer, char* dest, size_t size)
  * Set the internal const variable of the error code. This function handles 
  * both, sending and receiving.
  * 
- * @param errorCode The error code in case an error occured.
- * @param operation Specifies if the error occured during sending or receiving 
+ * @param errorCode The error code in case an error occurred.
+ * @param operation Specifies if the error occurred during sending or receiving 
  *                  data.
  * 
  * @since 0.3.0
@@ -306,9 +308,9 @@ void _setLastError(int errorCode, SockOperation operation)
 
 /**
  * Return the last produced error code while sending. Zero "0" if no error 
- * occured.
+ * occurred.
  * 
- * @return the error that occured during the last send operation or zero "0"
+ * @return the error that occurred during the last send operation or zero "0"
  * 
  * @since 0.3.0
  */
@@ -319,9 +321,9 @@ int getLastSendError()
 
 /**
  * Return the last produced error code while receiving. Zero "0" if no error 
- * occured.
+ * occurred.
  * 
- * @return the error that occured during the last receive operation or zero "0"
+ * @return the error that occurred during the last receive operation or zero "0"
  * 
  * @since 0.3.0
  */

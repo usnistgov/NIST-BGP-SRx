@@ -25,10 +25,22 @@
  * value. The other is a list, that allows to scan through all updates. Both 
  * MUST be maintained the same.
  * 
- * @version 0.4.0.0
+ * @version 0.5.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/06 - oborchert
+ *            * Renamed getUpdateData into getUpdateStats
+ *            * Modified function modifyUpdateResult and added parameter
+ *              suppressNotification which allows to suppress sending update 
+ *              notifications being send when the update value changes.
+ *          - 2017/07/05 - oborchert
+ *            * Function createUpdateCache had a wrong parameter which was also 
+ *              replaced inside the function with a define value. Fixed that.
+ *              Correct parameter name 'minNumberOfClients'
+ *          - 2017/06/30 - oborchert
+ *            * Modified behavior of the functions storeUpdate and 
+ *              deleteUpdateFromCache by adding SKI Cache management.
  * 0.4.0.0  - 2016/06/19 - oborchert
  *            * added function storeCacheEntryBlob
  * 0.3.0.10 - 2015/11/09 - oborchert
@@ -116,6 +128,26 @@ typedef struct {
   UpdSigResult     bgpsecResult;
 } UC_UpdateStatistics;
 
+/** This structure contains the BGPsec path information for both, BGP4 and 
+ * BGPsec*/
+typedef struct {
+  // BGP4 - Origin Validation
+  /** Number of as numbers in the as path in host format*/
+  u_int16_t              hops;
+  /** The BGP4 as path - list of as numbers */
+  u_int32_t*             asn_path;
+  
+  // BGPsec usage only (All fields can be null / 0 if no BGPsec is used)
+  /** The own AS number - required for validation. NETWORK FORMAT*/
+  u_int32_t              myAS;
+  /** The announced prefix of this update. NETWROK FORMAT*/
+  SCA_Prefix             nlri;    
+  /** Length in bytes of the BGPsec_PATH attribute in host format. */
+  int                    length;
+  /** The BGPsec_PATH attribute. */
+  SCA_BGP_PathAttribute* bgpsec_path;  
+} UC_UpdateData;
+
 #define DEFAULT_NUMBER_CLIENTS 2; 
 
 /**
@@ -124,13 +156,13 @@ typedef struct {
  * 
  * @param self The update cache
  * @param chCallback The callback method called for changes within the cache
- * @param minNumberOfUpdates the minimum number of expected clients. Must be
+ * @param minNumberOfClients the minimum number of expected clients. Must be
  *                           greater then 0;
  * 
  * @return true = successfully initialized, false = an error occurred
  */
 bool createUpdateCache(UpdateCache* self, UpdateResultChanged chCallback, 
-                       uint8_t minNumberOfUpdates, Configuration* sysConfig);
+                       uint8_t minNumberOfClients, Configuration* sysConfig);
 
 /**
  * Frees all allocated resources.
@@ -191,7 +223,19 @@ UpdSigResult* getUpdateSignature(UpdateCache* self, UpdSigResult* result,
  * 
  * @return true if the update was found, otherwise false
  */
-bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics);
+bool getUpdateStats(UpdateCache* self, UC_UpdateStatistics* statistics);
+
+/**
+ * Return the cache internal copy of the update data.
+ * 
+ * @param self The update cache
+ * @param updateID The ID of the update
+ * 
+ * @return the pointer to the internal stored bgp update data
+ * 
+ * @since 0.5.0.0
+ */
+UC_UpdateData* getUpdateData(UpdateCache* self, SRxUpdateID* updateID);
 
 /**
  * Stores an update in the update cache. This method returns 0 in case the 
@@ -210,6 +254,8 @@ bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics);
  * "UNDEFINED" a validation attempt will be stopped. From this moment the RPKI-
  * Handler and BGPSEC-handler are the only two instances that can start a new
  * validation.
+ * If the Update includes a BGPsec blob, this function will register the update
+ * with the SKI cache.
  * 
  *
  * @param self The instance of the update cache.
@@ -222,9 +268,8 @@ bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics);
  * @param defRes The default result info. This will only be taken when stored
  *               the very first time. In case the value is NULL for a first time
  *               storage, the internal UNDEFINED and UNKNOWN will be used.
- * @param bgpSec Contains BGPSEC data. This parameter as well as defRes is only
- *               used during initial storing of an update. The value can be 
- *               NULL.
+ * @param bgpData Contains BGP / BGPsec data. This parameter as well as defRes 
+ *               is only used during initial storing of an update. (CAN BE NULL)
  * 
  *
  * @return 1 the result stored, 0 the update is already stored, 
@@ -233,11 +278,12 @@ bool getUpdateData(UpdateCache* self, UC_UpdateStatistics* statistics);
 int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
                 SRxUpdateID* updateID, IPPrefix* prefix, 
                 uint32_t asn, SRxDefaultResult* defRes,
-                BGPSecData* bgpSec);
+                BGPSecData* bgpData);
 
 /**
  * Removes the update data from the list and releases all memory associated to 
- * it.
+ * it. Also, if this update contains bgpsec blob, it will remove this
+ * update from the SKI Cache.
  *
  * @param self The instance of the update cache 
  * @param clientID The ID of the srx-server client. This is NOT the proxyID,
@@ -258,6 +304,8 @@ bool deleteUpdateFromCache(UpdateCache* self, uint8_t clientID,
 
 /**
  * Empties a cache and releases all memory attached to each of the elements.
+ * For each update that contains BGPsec data it calls the unregister update
+ * function.
  *
  * @note Primarily for development purposes or program shutdown.
  *
@@ -297,24 +345,33 @@ int getClientIDsOfUpdate(UpdateCache* self, SRxUpdateID* updateID,
                          uint8_t* clientIDs, uint8_t size);
 
 /**
- * Stores a result for in the update cache for later retrieval.
- * If this overwrites an existing update result, then the registered 
- * UpdateResultChanged callback is called. The update MUST exist! Only result
- * values other than SRx_RESULT_DONOTUSE are used. This allows to change only 
- * one value, not necessary both.
- *
+ * Stores a result for in the update cache for later retrieval. If this 
+ * overwrites an existing update result, then the registered 
+ * UpdateResultChanged callback is called. The update MUST exist! 
+ * Only result values other than SRx_RESULT_DONOTUSE are used. This allows to 
+ * change a single value only.
+ * 
+ * Since Version 0.5.0.0: The parameter dontNotify allows to suppress calling
+ * the UpdateResultChanged callback function. This is used during cache updates
+ * when ROAS are added and removed. In this case the update might change its 
+ * validation status multiple times and can cause unnecessary churn in the 
+ * system. Processing the EndOfData PDU or the router to cache protocol will
+ * take care of sending the notification to the routers.
+ *   
  * @param self The instance of the update cache.
  * @param updateID The ID of the Update.
  * @param result the result the current update has to be updated with. In case
  *               the result differs from the stored update result, a 
  *               notification will be send to the client. to indicate which 
  *               result MUST NOT be modified use SRx_RESULT_DONOTUSE.
+ * @param suppressNotification in case this flag is 'true' do not send a 
+ *               notification to the clients (routers).
  *
  * @return true the result stored, false indicates an internal error such as the
  *              update does not exist.
  */
 bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID, 
-                        SRxResult* result);
+                        SRxResult* result, bool suppressNotification);
 
 /**
  * Removed the association of the client to all updates within the cache.

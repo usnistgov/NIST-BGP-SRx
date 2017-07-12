@@ -330,18 +330,6 @@ bgp_attr_dup (struct attr *new, struct attr *orig)
 
   *new = *orig;
 
-#ifdef USE_SRX
-  if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-    if(orig->bgpsecPathAttr)
-    {
-      zlog_debug("[BGPSEC] [%s] orig[%p]->bgpsecPathAttr:%p seg:%p AS:%d", \
-          __FUNCTION__, orig, orig->bgpsecPathAttr, \
-          orig->bgpsecPathAttr->pathSegments, orig->bgpsecPathAttr->pathSegments->as);
-      zlog_debug("[BGPSEC] [%s] new[%p]->bgpsecPathAttr:%p seg:%p",\
-          __FUNCTION__, new, new->bgpsecPathAttr, \
-          new->bgpsecPathAttr?new->bgpsecPathAttr->pathSegments:0);
-    }
-#endif
 
   /* if caller provided attr_extra space, use it in any case.
    *
@@ -425,13 +413,7 @@ attrhash_key_make (void *p)
     }
 
 #ifdef USE_SRX
-  struct BgpsecPathAttr *bpa = attr->bgpsecPathAttr;
-  /* only if bgpsec enabled case */
-  if (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_BGPSEC))
-  {
-    if(bpa && bpa->pathSegments && bpa->sigBlocks && bpa->sigBlocks->sigSegments)
-      MIX(bgpsec_path_attr_key_make(bpa));
-  }
+  MIX(attr->bgpsecPathAttr);
 #endif /* USE_SRX */
 
   return key;
@@ -450,7 +432,7 @@ attrhash_cmp (const void *p1, const void *p2)
       && attr1->community == attr2->community
       && attr1->med == attr2->med
 #ifdef USE_SRX
-      && attr1->bgpsecPathAttr == attr2->bgpsecPathAttr
+      && (bgpsec_path_attr_cmp (attr1->bgpsecPathAttr, attr2->bgpsecPathAttr))
 #endif
       && attr1->local_pref == attr2->local_pref)
     {
@@ -576,29 +558,10 @@ bgp_attr_intern (struct attr *attr)
             attre->transit->refcnt++;
         }
     }
-#ifdef USE_SRX
-  if (attr->bgpsecPathAttr && (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_BGPSEC)) )
-  {
-    if (! attr->bgpsecPathAttr->refcnt)
-      attr->bgpsecPathAttr = bgpsec_path_intern(attr->bgpsecPathAttr);
-    else
-      attr->bgpsecPathAttr->refcnt++;
-
-    if (BGP_DEBUG (bgpsec, BGPSEC_DETAIL))
-      zlog_debug("[BGPSEC] changed or dereferenced attr[%p]->bgpsecPath_Attr:%p AS:%d", \
-          attr, attr->bgpsecPathAttr, attr->bgpsecPathAttr->pathSegments->as);
-  }
-#endif
 
   find = (struct attr *) hash_get (attrhash, attr, bgp_attr_hash_alloc);
   find->refcnt++;
 
-#ifdef USE_SRX
-  if (BGP_DEBUG (bgpsec, BGPSEC))
-    if (find->bgpsecPathAttr) \
-      zlog_debug("[BGPSEC] AFTER find(attrhash...): attr[%p]->bgpsecPath_Attr:%p PathSeg:%p AS:%d",\
-          find, find->bgpsecPathAttr, find->bgpsecPathAttr->pathSegments, find->bgpsecPathAttr->pathSegments->as );
-#endif
     return find;
 }
 
@@ -718,18 +681,6 @@ bgp_attr_unintern_sub (struct attr *attr)
       if (attr->extra->transit)
         transit_unintern (attr->extra->transit);
     }
-#ifdef USE_SRX__
-  if (attr->bgpsecPathAttr && (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_BGPSEC)) )
-  {
-    struct BgpsecPathAttr *bpa = attr->bgpsecPathAttr;
-    if(bpa)
-    {
-      if(bpa->pathSegments && bpa->sigBlocks)
-        if(bpa->sigBlocks->sigSegments)
-          bgpsec_path_unintern(&bpa);
-    }
-  }
-#endif
 
 }
 
@@ -2028,6 +1979,9 @@ static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args)
   /* Add the aspath attribute flag. */
   attr->flag |= ATTR_FLAG_BIT (BGP_ATTR_AS_PATH);
 
+  // set bgpsec Attribute flag
+  attr->flag |= ATTR_FLAG_BIT (BGP_ATTR_BGPSEC);
+
   return BGP_ATTR_PARSE_PROCEED;
 }
 
@@ -3065,7 +3019,11 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
     stream_putc (s, BGP_ATTR_AS_PATH);
     aspath_sizep = stream_get_endp (s);
     stream_putw (s, 0);
+#ifdef USE_SRX
     stream_putw_at (s, aspath_sizep, aspath_put (s, aspath_bgpsec, use32bit));
+#else
+    stream_putw_at (s, aspath_sizep, aspath_put (s, aspath, use32bit));
+#endif
 
 #ifdef USE_SRX
   }

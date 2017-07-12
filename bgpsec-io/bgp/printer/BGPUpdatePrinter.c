@@ -22,10 +22,15 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.5
+ * @version 0.2.0.7
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/02/16 - oborchert
+ *            * Replaced hard coded value with defined value in function 
+ *              __printMP_REACH_NLRI
+ *          - 2017/02/07 - oborchert
+ *            * Added complete printout of MP_REACH_NLRI
  *  0.2.0.5 - 2017/01/11 - oborchert
  *            * Added the correct label MP_REACH_NLRI to the printout of 
  *              attributes of that type (BZ1065).
@@ -275,6 +280,134 @@ static bool __printNEXT_HOP(BGP_Upd_Attr_NextHop* nh, char* tab, bool more)
   printf ("%s+--Next hop: %d.%d.%d.%d (%08X)\n", myTab, bytes[3], bytes[2], 
                                                bytes[1], bytes[0], nh->nextHop);
     
+  return true;  
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Path Attribute: ORIGIN
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Print the MP_REACH_NLRI information
+ * 
+ * @param mpnlri The BGP Path Attribute MP_REACH_NLRI
+ * @param attrLen The complete length of the attribute
+ * @param tab The tabulator of this attribute. (if NULL then it will be replaced 
+ *            with TAB_2
+ * @param more Indicates if more attributes are being printed. This is needed 
+ *             for the formating
+ * 
+ * @return true if the attributes data was included in the print.
+ */
+static bool __printMP_REACH_NLRI(BGP_Upd_Attr_MPNLRI_1* mpnlri, int attrLen,
+                                 char* tab, bool more)
+{
+  char* tName   = "MP_REACH_NLRI\0";
+  char* code    = NULL;
+  u_int16_t afi = 0;
+  int idx       = 0;
+
+  if (tab == NULL)
+  {
+    tab = TAB_2;
+  }
+  char myTab[TAB_MAX];
+  memset (myTab, '\0', TAB_MAX);
+  if (more)
+  {
+    snprintf (myTab, TAB_MAX, "%s|%s", tab, TAB_2);
+  }
+  else
+  {
+    snprintf (myTab, TAB_MAX, "%s %s", tab, TAB_2);
+  }
+
+  // here pass tab rather than myTab because the additional tabs will be 
+  // added in __printDef...  
+  __printDefaultPAttrHdr((BGP_PathAttribute*)mpnlri, tName, attrLen, 
+                         mpnlri->length, NULL, tab, more);
+  
+  afi = ntohs(mpnlri->afi);
+  char string[STR_MAX];
+  memset(string, 0, STR_MAX);
+  snprintf (string, STR_MAX, (afi == AFI_V4) ? "IPv4" : "IPv6");
+  printf ("%s+--Address family: %s (%d)\n", myTab, string, afi);
+  switch (mpnlri->safi)
+  {
+    case SAFI_UNICAST: 
+      snprintf (string, STR_MAX, "Unicast");
+      break;
+    default:
+      snprintf (string, STR_MAX, "???");
+      break;
+  }
+  printf ("%s+--Subsequent address family identifier: %s (%d)\n", myTab, string, 
+          mpnlri->safi);
+  printf ("%s+--Next hop network address: (%d bytes)\n", myTab, 
+          mpnlri->nextHopLen);
+  printf ("%s|  +--Next hop: ", myTab);
+  
+  u_int8_t* buff = (u_int8_t*)mpnlri;
+  // Now move the buffer to the next hop IP
+  buff += sizeof(BGP_Upd_Attr_MPNLRI_1);
+  // Use this for both, IPv4 as well as IPv6
+  u_int8_t ipNum[4] = { 0, 0, 0, 0 };
+  
+  switch (mpnlri->nextHopLen)
+  {
+    case 4:
+      ipNum[0] = *(buff++);
+      ipNum[1] = *(buff++);
+      ipNum[2] = *(buff++);
+      ipNum[3] = *(buff++);
+      printf("%u.%u.%u.%u\n", ipNum[0], ipNum[1], ipNum[2], ipNum[3]);
+      break;
+    case 16:
+      for (idx = 0; idx < 8; idx ++)
+      {
+        ipNum[0] = *(buff++);
+        ipNum[1] = *(buff++);
+        if (idx != 0)
+        {
+          printf(":");
+        }
+        printf("%02x%02x", ipNum[0], ipNum[1]);
+      }
+      printf ("\n");
+      break;
+    default:
+      printHex(buff, mpnlri->nextHopLen, NULL);
+      buff += mpnlri->nextHopLen;
+  }
+    
+  BGP_Upd_Attr_MPNLRI_2* mpnlri2 = (BGP_Upd_Attr_MPNLRI_2*)buff;
+  buff += sizeof(BGP_Upd_Attr_MPNLRI_2);
+  printf ("%s+--Subnetwork points of attachment: %u\n", myTab, 
+          mpnlri2->reserved);
+  
+  u_int8_t octets = numBytes(mpnlri2->nlri.length);
+  printf ("%s+--Network layer reachability information: (%u bytes)\n", myTab, 
+          octets+1);
+  
+  // Re-initialize the string
+  u_int8_t bytes[16];
+  memset (bytes, 0, 16);
+  // Copy the prefix into the byte buffer. (inet_ntop does not workwith buffer)
+  for (idx = 0; idx < octets; idx++)
+  {
+    bytes[idx] = *(buff++);
+  }
+  int family   = (afi==AFI_V4) ? AF_INET : AF_INET6;
+  memset (string, 0, STR_MAX);
+  if (!inet_ntop(family, bytes, string, STR_MAX))
+  {
+    snprintf(string, STR_MAX, "ERROR in %s prefix address\n", string);
+  }
+  printf ("%s   +--%s/%u\n", myTab, string, mpnlri2->nlri.length);
+  printf ("%s   +--MP Reach NLRI prefix length: %u\n", myTab, mpnlri2->nlri.length);
+  printf ("%s   +--MP Reach NLRI %s prefix: %s\n", myTab, 
+          (afi == AFI_V4) ? "IPv4" : "IPv6", string);
+  
   return true;  
 }
 
@@ -561,8 +694,8 @@ static int _printPathAttr(u_int8_t* data, int buffSize, char* tab)
                              NULL, myTab, buffSize > 0);
       break;
     case BGP_UPD_A_TYPE_MP_REACH_NLRI:
-      __printDefaultPAttrHdr(pa, "MP_REACH_NLRI\0", attrLen, length, NULL,
-                             myTab, buffSize > 0);          
+      printData = !__printMP_REACH_NLRI((BGP_Upd_Attr_MPNLRI_1*)pa, attrLen, 
+                                        myTab, buffSize > 0);          
       break;      
     case BGP_UPD_A_TYPE_BGPSEC:
       printData = !printBGPSEC_PathAttr(pa, myTab, buffSize > 0);

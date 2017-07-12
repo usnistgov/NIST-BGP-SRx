@@ -1,4 +1,4 @@
-# This file is used to load the public keys
+# This file is used to load the private keys
 32-SKI: 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
 
 # Now Another key for the same AS - different SKI

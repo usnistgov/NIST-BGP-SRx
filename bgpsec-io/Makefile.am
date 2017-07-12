@@ -24,6 +24,7 @@ bgpsecio_SOURCES = ASList.c \
                    bgp/printer/BGPPrinterUtil.c \
                    bgp/printer/BGPUpdatePrinter.c \
                    bgp/printer/BGPNotificationPrinter.c \
+                   bgp/printer/BGPOpenPrinter.c \
                    bgp/printer/BGPHeaderPrinter.c \
                    bgp/BGPSession.c \
                    cfg/configuration.c \
@@ -31,6 +32,32 @@ bgpsecio_SOURCES = ASList.c \
                    player/player.c \
                    bgpsecio.c
 
+noinst_HEADERS = \
+		  player/player.h \
+		  updateStackUtil.h \
+		  ASList.h          \
+		  cfg/cfgFile.h     \
+		  cfg/configuration.h  \
+		  ASNTokenizer.h       \
+		  bgpsec/Crypto.h      \
+		  bgpsec/BGPSecPathBin.h  \
+		  bgp/BGPHeader.h         \
+		  bgp/printer/BGPNotificationPrinter.h \
+		  bgp/printer/BGPHeaderPrinter.h       \
+		  bgp/printer/BGPPrinterUtil.h         \
+		  bgp/printer/BGPOpenPrinter.h         \
+		  bgp/printer/BGPUpdatePrinter.h       \
+		  bgp/BGPSession.h                     \
+		  bgp/BGPFinalStateMachine.h           \
+		  config.h                             \
+		  antd-util/printer.h                  \
+		  antd-util/prefix.h                   \
+		  antd-util/linked_list.h              \
+		  antd-util/log.h                      \
+		  antd-util/stack.h
+
+# Crypto Key generation tools
+dist_bin_SCRIPTS = tools/bio-traffic.sh
 
 AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 

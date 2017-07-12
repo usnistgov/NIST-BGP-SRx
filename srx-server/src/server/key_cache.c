@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/06/30 - oborchert
+ *            * deprecated.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.1.0    - 2010/04/08
@@ -32,6 +34,9 @@
 #include "server/key_cache.h"
 #include "util/log.h"
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 bool createKeyCache(KeyCache* self, UpdateCache* updateCache,
                     KeyInvalidated invCallback, KeyNotFound nfCallback) {
   if (updateCache == NULL) {
@@ -45,9 +50,15 @@ bool createKeyCache(KeyCache* self, UpdateCache* updateCache,
   return true;
 }
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 void releaseKeyCache(KeyCache* self) {
 }
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 bool getPublicKey(KeyCache* self, SRxKeyID keyId) {
   if (self->notFoundCallback != NULL) {
     self->notFoundCallback(keyId);
@@ -55,15 +66,23 @@ bool getPublicKey(KeyCache* self, SRxKeyID keyId) {
   return false;
 }
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 bool storePublicKey(KeyCache* self, SRxKeyID keyId) {
   return true;
 }
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 bool deletePublicKey(KeyCache* self, SRxKeyID keyId) {
   return true;
 }
 
+/**
+ * @deprecated Somewhat replaced by SKI Cache and SCA
+ */
 bool addUpdateToKey(KeyCache* self, SRxKeyID keyId, SRxUpdateID updId) {
   return true;
 }
-

@@ -4,42 +4,44 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Some data definitions are moved into shared/srx_defs.h This makes it easier
- * for integrating into quagga. 
- *   
+ * for integrating into quagga.
+ *
  * Packet types and constants.
- * 
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
- * 
- * @version 0.4.0.0
+ *
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/06/16 - kyehwanl
+ *            * added local as to BGPSEC_DATA_PTR
  * 0.4.0.0  - 2016/06/19 - oborchert
  *            * Moved the proxy-srx-server protocol to version 2.
- *            * Split BGPSecValData into BGPSecValReqData and BGPSecValResData. 
+ *            * Split BGPSecValData into BGPSecValReqData and BGPSecValResData.
  *            * Added structure to BGPSECValResData.
- *            * Removed pragma packed and replaced it with 
+ *            * Removed pragma packed and replaced it with
  *              __attribute__((packed)) for the package structure.
  * 0.3.0.10 - 2015/11/06 - oborchert
  *            * Removed types.h
  *            * Added Changelog
  * 0.1.0.0  - 2010/04/09 - pgleichm
  *            * Created code.
- * 
+ *
  * @note All structures are packed
  */
 #ifndef __SRX_PACKETS_H__
@@ -120,7 +122,7 @@ typedef struct {
 
 // Just an empty struct that contains to the correct address within the data
 // array
-typedef struct {  
+typedef struct {
 } __attribute__((packed)) PeerASList;
 
 /**
@@ -159,6 +161,7 @@ typedef struct {
 } __attribute__((packed)) SRXPROXY_GOODBYE;
 
 typedef struct {
+  uint32_t  local_as;
 } BGPSEC_DATA_PTR;
 
 /**
@@ -192,7 +195,7 @@ typedef struct {
 } __attribute__((packed)) BGPSECValResData;
 
 // @TODO V6 and V4 request can be combined once we use the SCA_PRefix instead
-// of the IPPrefix structure. Maybe within the srx server we can move from 
+// of the IPPrefix structure. Maybe within the srx server we can move from
 // SCA_Prefix to IP-Prefix. This can be decided later.
 
 /**

@@ -28,10 +28,12 @@
  * 
  * The reverse mode might be possible in future updates.
  * 
- * @version 0.2.0.1
+ * @version 0.2.0.2
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.7 - 2017/05/03 - borchert
+ *            * BZ1122: Fixed problems with piped updates.
  *  0.2.0.1 - 2016/06/24 - oborchert
  *            * Assured that function convertAsnPath does return a zero 
  *              terminated string and not NULL.
@@ -50,7 +52,8 @@
 #define WAIT_FOR_STDIN_MSEC 1
 
 /** A precaution to prevent segmentation faults. */
-#define MAX_DATABUF 10000
+#define MAX_DATABUF  10002
+#define MAX_LINE_LEN 10000
 
 /**
  * This method checks if the given stack is empty. In case it is empty it checks

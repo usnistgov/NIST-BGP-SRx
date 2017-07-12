@@ -1407,7 +1407,6 @@ DEFUN (srx_show_config,
   bgp      = vty->index;
   doPolicy = 0;
 
-
   vty_out (vty, "SRx-Server configuration settings:%s", VTY_NEWLINE);
   vty_out (vty, "  srx-server.....: %s%s", bgp->srx_host, VTY_NEWLINE);
   vty_out (vty, "  port...........: %d%s", bgp->srx_port, VTY_NEWLINE);
@@ -1449,7 +1448,16 @@ DEFUN (srx_show_config,
   vty_out (vty, "  evaluation.....: ");
   if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH))
   {
-    vty_out (vty, "bgpsec (prefix-origin and path processing)%s", VTY_NEWLINE);
+    if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+    {
+      vty_out (vty, "bgpsec (prefix-origin and path processing) using "
+                    "srx-server%s", VTY_NEWLINE);      
+    }
+    else
+    {
+      vty_out (vty, "bgpsec (prefix-origin and path processing) locally%s", 
+               VTY_NEWLINE);
+    }
   }
   else if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_ORIGIN))
   {
@@ -1985,6 +1993,17 @@ DEFUN (srx_evaluation,
 
   bgp_srx_evaluation(bgp, mode);
   return CMD_SUCCESS;
+}
+
+// Enable srx evaluation using srx-server instead of local
+DEFUN (srx_evaluation_bgpsec_distribute,
+       srx_evaluation_bgpsec_distribute_cmd,
+       SRX_VTY_CMD_EVAL_WITHSRX,
+       SRX_VTY_HLP_EVAL_WITHSRX)
+{
+  struct bgp* bgp;
+  bgp = vty->index;
+  bgp_srx_evaluation(bgp, SRX_CONFIG_EVAL_DISTR);
 }
 
 // Configuration of default validation results
@@ -3033,6 +3052,138 @@ DEFUN (neighbor_bgpsec_mpnlri_ipv4,
   return CMD_WARNING;
 }
 
+/**
+ * Resize the buffer for this peer according to the current needs
+ *
+ * @param peer The peer structure
+ * @param newsize The new bugffer size.
+ */
+static void __resizeBuffer(struct peer *peer, size_t newsize)
+{
+  size_t oldsize;
+  if(peer->ibuf)
+  {
+    oldsize = stream_get_size (peer->ibuf);
+    if (oldsize != newsize)
+    {
+      newsize = stream_resize (peer->ibuf, newsize);
+    }
+  }
+  if(peer->work)
+  {
+    oldsize = stream_get_size (peer->work);
+    if (oldsize != newsize)
+    {
+      newsize = stream_resize (peer->work, newsize);
+    }
+  }
+}
+
+/**
+ * Set/unset the extended message support flag (Only if not connected!)
+ */
+static int _setExtendedMessageSupport(struct vty *vty, const char* ip, bool enable)
+{
+  struct peer *peer = peer_and_group_lookup_vty (vty, ip);
+  char* msg1 = NULL;
+  int retVal = CMD_WARNING;
+
+  if (peer)
+  {
+    if (!peer->established)
+    {
+      __resizeBuffer(peer, enable ? BGP_MAX_PACKET_SIZE_EXTENDED
+                                    : BGP_MAX_PACKET_SIZE);
+      if (enable)
+      {
+        retVal = peer_flag_set_vty (vty, ip, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+      }
+      else
+      {
+        retVal = peer_flag_unset_vty (vty, ip, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+      }
+      if (retVal == CMD_SUCCESS)
+      {
+        msg1 = enable ? "Enabled extended message capability"
+                      : "Disabled extended message capability";
+      }
+      else
+      {
+        msg1 = "Error modifying extended message capability";
+      }
+    }
+    else
+    {
+      msg1 = "Cannot modify extended message capability while session is established!\0";
+    }
+  }
+
+  if (msg1 != NULL)
+  {
+    //zlog_info ("%s %s", msg1, VTY_NEWLINE);
+    vty_out (vty, "%s %s", msg1, VTY_NEWLINE);
+  }
+
+  return retVal;
+}
+
+/**
+ * Enable or disable the extended message liberal behavior. This can be done
+ * in live operation.
+ */
+static int _setExtendedMessageLiberal(struct vty *vty, const char* ip, bool enable)
+{
+  int retVal = CMD_WARNING;
+  char* msg1 = NULL;
+  char* msg2 = NULL;
+  struct peer *peer = peer_and_group_lookup_vty (vty, ip);
+
+  if (peer)
+  {
+    retVal = peer_flag_set_vty(vty, ip, PEER_FLAG_EXTENDED_MESSAGE_LIBERAL);
+
+    if (retVal == CMD_SUCCESS)
+    {
+      if (!enable)
+      {
+        // Check if the buffer can be resized back again.
+        msg1 = "Disabled extended message liberal policy";
+
+        if (!CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
+        {
+          __resizeBuffer(peer, BGP_MAX_PACKET_SIZE);
+        }
+        else
+        {
+          msg2 = "Extended message capability still active";
+        }
+      }
+      else
+      {
+        msg1 = "Enabled extended message liberal policy";
+        __resizeBuffer(peer, BGP_MAX_PACKET_SIZE_EXTENDED);
+      }
+    }
+    else
+    {
+      msg1 = "Error modifying liberal policy flag!";
+    }
+
+  }
+
+  if (msg1 != NULL)
+  {
+    //zlog_info ("%s %s", msg1, VTY_NEWLINE);
+    vty_out (vty, "%s %s", msg1, VTY_NEWLINE);
+  }
+  if (msg2 != NULL)
+  {
+    //zlog_info ("%s %s", msg2, VTY_NEWLINE);
+    vty_out (vty, "%s %s", msg2, VTY_NEWLINE);
+  }
+
+  return retVal;
+}
 
 /* BGP Extended Message Support */
 DEFUN (neighbor_capability_extended_message_support,
@@ -3041,28 +3192,9 @@ DEFUN (neighbor_capability_extended_message_support,
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
        "Advertise capability to the peer\n"
-       "Advertise extended message support for bgp to the neighbor\n")
+       "Advertise extended message support to the neighbor\n")
 {
-
-  struct peer *peer;
-  size_t oldsize, newsize = BGP_MAX_PACKET_SIZE_EXTENDED;
-
-  peer = peer_and_group_lookup_vty (vty, argv[0]);
-  if (peer)
-  {
-    if(peer->ibuf)
-    {
-      oldsize = stream_get_size (peer->ibuf);
-      newsize = stream_resize (peer->ibuf, newsize);
-    }
-    if(peer->work)
-    {
-      oldsize = stream_get_size (peer->work);
-      newsize = stream_resize (peer->work, newsize);
-    }
-  }
-
-  return peer_flag_set_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+  return _setExtendedMessageSupport(vty, argv[0], true);
 }
 
 DEFUN (no_neighbor_capability_extended_message_support,
@@ -3071,59 +3203,24 @@ DEFUN (no_neighbor_capability_extended_message_support,
        NO_STR
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
-       "Advertise capability to the peer\n"
-       "Advertise extended message support for bgp to the neighbor\n")
+       "Do not advertise capability to the peer\n"
+       "Disable extended message support to the neighbor\n")
 {
-
-  struct peer *peer;
-  size_t oldsize, newsize = BGP_MAX_PACKET_SIZE;
-
-  peer = peer_and_group_lookup_vty (vty, argv[0]);
-  if (peer)
-  {
-    if(peer->ibuf)
-    {
-      oldsize = stream_get_size (peer->ibuf);
-      if( oldsize > newsize )
-        newsize = stream_resize (peer->ibuf, newsize);
-    }
-    if(peer->work)
-    {
-      oldsize = stream_get_size (peer->work);
-      if( oldsize > newsize )
-        newsize = stream_resize (peer->work, newsize);
-    }
-  }
-
-  return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_SUPPORT);
+  return _setExtendedMessageSupport(vty, argv[0], false);
 }
 
 
 /* extended message support for bgp (optional) */
 DEFUN (neighbor_capability_extended_message_support_liberal,
        neighbor_capability_extended_message_support_liberal_cmd,
-       NEIGHBOR_CMD2 "capability extended (liberal)",
+       NEIGHBOR_CMD2 "capability extended liberal",
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
        "Advertise capability to the peer\n"
        "Advertise extended message support for bgp to the neighbor\n"
-       "Accept extended message even if peer did not advertise capability\n")
+       "Accept extended message even if not negotiated\n")
 {
-
-  struct peer *peer;
-  peer = peer_and_group_lookup_vty (vty, argv[0]);
-
-  if (peer)
-  {
-    if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
-    {
-      vty_out (vty, "extended liberal policy selected %s", VTY_NEWLINE);
-      return peer_flag_set_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_LIBERAL);
-    }
-    else
-      return CMD_WARNING;
-  }
-
+  return _setExtendedMessageLiberal(vty, argv[0], true);
 }
 
 
@@ -3133,28 +3230,12 @@ DEFUN (no_neighbor_capability_extended_message_support_liberal,
        NO_STR
        NEIGHBOR_STR
        NEIGHBOR_ADDR_STR2
-       "Advertise capability to the peer\n"
-       "Advertise extended message support for bgp to the neighbor\n"
-       "Accept extended message even if peer did not advertise capability\n")
+       "Configure capability to the peer\n"
+       "Disable extended message support for bgp to the neighbor\n"
+       "Disable libaral policy only.\n")
 {
-
-  struct peer *peer;
-  peer = peer_and_group_lookup_vty (vty, argv[0]);
-
-  if (peer)
-  {
-    if (CHECK_FLAG (peer->flags, PEER_FLAG_EXTENDED_MESSAGE_SUPPORT))
-    {
-      vty_out (vty, "extended liberal policy de-selected %s", VTY_NEWLINE);
-      return peer_flag_unset_vty(vty, argv[0], PEER_FLAG_EXTENDED_MESSAGE_LIBERAL);
-    }
-    else
-      return CMD_WARNING;
-  }
-
+  return _setExtendedMessageLiberal(vty, argv[0], false);
 }
-
-
 
 #endif /* USE_SRX */
 
@@ -10412,6 +10493,9 @@ bgp_vty_init (void)
 
   install_element (BGP_NODE, &srx_evaluation_cmd);
   install_element (BGP_NODE, &no_srx_evaluation_cmd);
+  install_element (BGP_NODE, &srx_evaluation_bgpsec_distribute_cmd);
+  //install_element (BGP_NODE, &no_srx_evaluation_bgpsec_distribute_cmd);
+
 
 // NOT IN THIS VERSION
 //  install_element (BGP_NODE, &srx_apply_policy_cmd);

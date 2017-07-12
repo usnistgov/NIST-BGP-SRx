@@ -4,28 +4,30 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0.10
- *
- *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/07/07 - oborchert
+ *            * Moved validation into this handler (renamed validateSignature 
+ *              into validateUpdate)
+ *          - 2017/07/05 - oborchert
+ *            * Updated cache creation function - removed unused parameters
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Added Changelog
  *            * Fixed speller in documentation header
@@ -36,14 +38,17 @@
 #ifndef __BGPSEC_HANDLER_H__
 #define __BGPSEC_HANDLER_H__
 
+#include <srx/srxcryptoapi.h>
 #include "server/key_cache.h"
+#include "server/update_cache.h"
 #include "shared/srx_defs.h"
 
-/** 
+/**
  * A single BGPSec Handler.
  */
 typedef struct {
   KeyCache* keyCache;
+  SRxCryptoAPI* srxCAPI;
 } BGPSecHandler;
 
 /**
@@ -51,22 +56,19 @@ typedef struct {
  *
  * @param self Variable that should be initialized
  * @param keyCache Existing Key Cache
- * @param serverHost BGPSec/Router protocol server host name
- * @param serverPort BGPSec/Router protocol server port number
  * @return \c true = successful, \c false = an error occurred
  */
-bool createBGPSecHandler(BGPSecHandler* self, KeyCache* keyCache,
-                         const char* serverHost, int serverPort);
+bool createBGPSecHandler(BGPSecHandler* self, KeyCache* keyCache);
 
 /**
  * Frees all allocated resources.
- * 
+ *
  * @param self Instance
  */
 void releaseBGPSecHandler(BGPSecHandler* self);
 
 /**
- * Loads a private key. 
+ * Loads a private key.
  * At least one call is necessary before createSignature can be used.
  *
  * @todo Adjust parameter if necessary
@@ -78,17 +80,16 @@ void releaseBGPSecHandler(BGPSecHandler* self);
 bool loadPrivateKey(BGPSecHandler* self, const char* filename);
 
 /**
- * Validates the signature of a given Byte-stream. 
- * The keys are fetched from the registered Key Cache.
+ * Validates the given bgpsec update data.
  *
- * The return value is one of SRX_RES_BGPSEC_* - \ref result_values.
+ * The return value is SRx_RES_VALID or SRx_RES_INVALID
  *
- * @todo Adjust parameters once the specification has been finalized
- *
- * @param self Instance
- * @return \c 0 = valid (SRX_RES_VALID), or SRX_RES_BGPSEC_*
+ * @param self The BGPsec Handler itself
+ * @param update the given update to be validated
+ * 
+ * @return SRx_RES_VALID or SRx_RES_INVALID
  */
-uint8_t validateSignature(BGPSecHandler* self);
+uint8_t validateSignature(BGPSecHandler* self, UC_UpdateData* update);
 
 /**
  * Creates a signature for a given Byte-stream.

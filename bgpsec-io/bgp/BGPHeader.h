@@ -22,10 +22,33 @@
  *
  * This API contains a the headers and function to generate proper BGP messages.
  *
- * @version 0.2.0.6
+ * @version 0.2.0.8
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.8 - 2017/07/10 - oborchert
+ *            * Modified the BGPsec Capability code from 72 to IANA registered
+ *              value 7.
+ *            * Modified the BGPsec_PATH attribute value vrom 30 to IANA
+ *              registered value 33
+ *  0.2.0.7 - 2017/03/22 - oborchert
+ *            * Removed the string defines BIO_K1_STR and BIO_K2_STR and added
+ *              Crypto.h which provides the correct values.
+ *          - 2017/03/10 - oborchert
+ *            * Changed BGP_ERR3_SUB_UNSUPPORTED_BGPSEC_VER into
+ *              BGP_ERR2_SUB_UNSUPPORTED_BGPSEC_VER
+ *            * Changed BGP_ERR_SUB_UNSUPPORTED_CAPABILITYinto 
+ *              BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY
+ *          - 2017/03/09 - oborchert
+ *            * Increased PRNT_MSG_COUNT by one and added PRNT_MSG_UNKNOWN
+ *          - 2017/03/08 - oborchert
+ *            * BZ1132: Fixed incorrect values for direction bit in BGPsec 
+ *              capability
+ *            * Added defines for SAFI values            
+ *          - 2017/02/17 - oborchert
+ *            * BZ1116 Added ifndef switch around the defines BGP_CAP_T_BGPSEC 
+ *              and BGP_UPD_A_TYPE_BGPSEC to allow setting the IANA assigned 
+ *              values during configuration time.
  *  0.2.0.6 - 2017/02/15 - oborchert
  *            * Added switch to force sending extended messages regardless if
  *              capability is negotiated. This is a TEST setting only.
@@ -89,11 +112,12 @@
 #define IPSTR_LEN           255
 
 // USED FOR DEBUGGING / PRINTING BGP MESSAGES
-#define PRNT_MSG_COUNT 4
+#define PRNT_MSG_COUNT 5
 #define PRNT_MSG_OPEN          0
 #define PRNT_MSG_UPDATE        1
 #define PRNT_MSG_NOTIFICATION  2
 #define PRNT_MSG_KEEPALIVE     3
+#define PRNT_MSG_UNKNOWN       4
 
 // The default maximum size of BGP packets RFC 4271 Section 4. Message Formats
 #define BGP_MAX_MESSAGE_SIZE 4096
@@ -127,7 +151,10 @@
 #define BGP_CAP_T_MULTI_ROUTES    4
 #define BGP_CAP_T_EXT_NEXTHOPENC  5
 #define BGP_CAP_T_EXT_MSG_SUPPORT 6
-// unassigned 7-63
+#ifndef BGP_CAP_T_BGPSEC
+#define BGP_CAP_T_BGPSEC          7
+#endif
+// unassigned 8-63
 // 64-127 First Come First Served
 #define BGP_CAP_T_GRACE_RESTART  64
 #define BGP_CAP_T_AS4            65
@@ -139,7 +166,6 @@
 #define BGP_CAP_T_LLGR           71
 // 72 - Unassigned
 // http://www.iana.org/assignments/capability-codes/capability-codes.xhtml
-#define BGP_CAP_T_BGPSEC         72
 #define BGP_CAP_T_FQDN           73
 // Unassigned 74-127
 // Private Usage 128-255 - IANA does not assign
@@ -154,11 +180,19 @@
 #define AFI_V4              1
 #define AFI_V6              2  
 #define RESERVED_ZERO       0
+//Network Layer Reachability Information used for unicast forwarding [RFC4760]
 #define SAFI_UNICAST        1
+//Network Layer Reachability Information used for multicast forwarding [RFC4760]
+#define SAFI_MULTICAST      2
+//Reserved	[RFC4760]
+#define SAFI_RESERVED       3
+//Network Layer Reachability Information (NLRI) with MPLS Labels	[RFC3107]
+#define SAFI_MPLS           4
+
 
 #define BGPSEC_VERSION      0
-#define BGPSEC_DIR_SND      0
-#define BGPSEC_DIR_RCV      1
+#define BGPSEC_DIR_SND      1
+#define BGPSEC_DIR_RCV      0
 
 // RFC 4271 - 4.3
 #define BGP_UPD_A_TYPE_ORIGIN   1
@@ -171,7 +205,9 @@
 // RFC 4360 - 2
 #define BGP_UPD_A_TYPE_EXT_COMM 16
 // Will be BGPSEC RFC
-#define BGP_UPD_A_TYPE_BGPSEC   30
+#ifndef BGP_UPD_A_TYPE_BGPSEC
+#define BGP_UPD_A_TYPE_BGPSEC   33
+#endif
 
 // RFC 4760 - 3
 #define BGP_UPD_A_TYPE_MP_REACH_NLRI 14
@@ -203,9 +239,6 @@
 
 #define BGP_ERR_SUB_UNDEFINED   0
 
-// Unsupported Capability RFC 5492
-#define BGP_ERR_SUB_UNSUPPORTED_CAPABILITY 7
-
 #define BGP_ERR1_SUB_NOT_SYNC   1
 #define BGP_ERR1_SUB_BAD_LENGTH 2
 #define BGP_ERR1_SUB_BAD_TYPE   3
@@ -216,6 +249,10 @@
 #define BGP_ERR2_SUB_UNSUPP_OPT_PARAM    4
 #define BGP_ERR2_SUB_DEPRECATED          5
 #define BGP_ERR2_SUB_UNACCEPTED_HOLDTIME 6
+// Unsupported Capability RFC 5492
+#define BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY 7
+// Possible future error codes:
+#define BGP_ERR2_SUB_UNSUPPORTED_BGPSEC_VER  0
 
 #define BGP_ERR3_SUB_MALFORMED_ATTR_LIST    1
 #define BGP_ERR3_SUB_UNRECOG_WELLKNOWN_ATTR 2
@@ -228,8 +265,6 @@
 #define BGP_ERR3_SUB_OPTIONAL_ATTR_ERR      9
 #define BGP_ERR3_SUB_INVALID_NETWORK_FIELD  10
 #define BGP_ERR3_SUB_MALFORMED_AS_PATH      11
-// Possible future error codes:
-#define BGP_ERR3_SUB_UNSUPPORTED_BGPSEC_VER  0
 
 // RFC 4486 Subcodes for BGP Cease Notification Message
 #define BGP_ERR6_SUB_MAX_NUM_PREFIXES       1
@@ -495,9 +530,6 @@ typedef enum SignatureGenMode
   SM_CAPI   = 3
 } SignatureGenMode;
 
-#define SM_BIO_K1_STR "k = A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60"
-#define SM_BIO_K2_STR "k = D16B6AE827F17175E040871A1C7EC3500192C4C92677336EC2537ACAEE0008E0"
-
 typedef struct _AlgoParam {
   /** pointer to next used algorithm. */
   struct _AlgoParam* next;
@@ -569,13 +601,18 @@ typedef struct {
 typedef struct {
   /* ASN number. (host format) */
   u_int32_t asn;
-  /* the BGP identifier */
+  /* the BGP identifier in network format*/
   u_int32_t bgpIdentifier;
   /* The hold timer 0 or at least 3 */
   u_int16_t holdTime;
   /** Time in seconds to keep the session up after the last update is send. 
    * 0 - forever. */
   u_int16_t disconnectTime;
+  
+  /* the next hop IPv4 address. If 0'ed then not defined. */
+  struct sockaddr_in nextHopV4;
+  /* the next hop IPv6 address. If 0'ed then not defined. */
+  struct sockaddr_in6 nextHopV6;
   
   // @TODO: Add V6 support
   /** The peer server address ipv4 and port */
@@ -706,24 +743,24 @@ int createNotificationMessage(u_int8_t* buff, int buffSize,
  * The parameter useMPNLRI will be internally set to true for all IPv6
  * prefixes.
  * 
- * @param buff The  pre-allocated memory of sufficient size
- * @param buffSize  The size of the buffer
- * @param pathAttr  The buffer containing either the BGPSec path attribute or the
- *                  BGP4 ASpath attribute. (wire format)
- * @param origin    The origin of the prefix.
- * @param localPref USe local pref attribute if > 0
- * @param nextHop   The next hop IP address. (HOST FORMAT)
- * @param nlri The  NLRI to be used. Depending on the AFI value it will be 
- *                  typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
- * @param useMPNLRI Encode IPv4 prefixes as MPNLRI within the path attribute, 
- *                  otherwise V4 addresses will be added at the end as NLRI
+ * @param buff The   pre-allocated memory of sufficient size
+ * @param buffSize   The size of the buffer
+ * @param pathAttr   The buffer containing either the BGPSec path attribute or
+ *                   the BGP4 ASpath attribute. (wire format)
+ * @param origin     The origin of the prefix.
+ * @param localPref  USe local pref attribute if > 0
+ * @param nextHop    The nextHop address (same afi as nlri)
+ * @param nlri       The NLRI to be used. Depending on the AFI value it will be 
+ *                   typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
+ * @param useMPNLRI  Encode IPv4 prefixes as MPNLRI within the path attribute, 
+ *                   otherwise V4 addresses will be added at the end as NLRI
  *                  
  * 
  * @return the number of bytes used or if less than 0 the number of bytes missed
  */
 int createUpdateMessage(u_int8_t* buff, int buffSize, 
                         BGP_PathAttribute* pathAttr, u_int8_t origin,
-                        u_int32_t localPref, u_int64_t nextHop, 
+                        u_int32_t localPref, void* nextHop, 
                         BGPSEC_PrefixHdr* nlri, bool useMPNLRI);
 
 /**

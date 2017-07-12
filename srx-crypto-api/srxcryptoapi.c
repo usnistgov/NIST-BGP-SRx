@@ -25,14 +25,22 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @version 0.2.0.2
+ * @version 0.2.0.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.1 - 2016/02/02 - oborchert
- *             * Corrected version number to 0.2.0.2 which was incorrect.
+ *  0.2.0.3 - 2017/06/05 - oborchert
+ *            *  Added missing default mapping to api->setDebugLevel and 
+ *               api->getDebugLevel
+ *          - 2017/04/17 - oborchert
+ *            * Fixed possible memory overflow in sca_SetKeyPath, use snprintf 
+ *              in lieu of sprintf.
+ *            * Fixed some spellers in documentation and fixed errors in version
+ *              control. 
+ *  0.2.0.2 - 2017/02/02 - oborchert
+ *            * Corrected version number to 0.2.0.2 which was incorrect.
  *          - 2016/11/15 - oborchert
- *             * Fixed issue with one byte bgpsec path attribute (BZ1051)
+ *            * Fixed issue with one byte bgpsec path attribute (BZ1051)
  *          - 2016/10/26 - oborchert
  *            * Fixed compiler warning (BZ1035) while retrieving int values from
  *              libconfig. (int for libconfig.so.9/ long for libconfig.so.8)
@@ -303,7 +311,7 @@ bool wrap_freeHashMessage(SCA_HashMessage* hashMessage)
   }
 
   /**
-   * Set the new debug level going forward. This methid returns the previous set 
+   * Set the new debug level going forward. This method returns the previous set 
    * debug level or -1 if not supported.
    * 
    * @param debugLevel The debug level to be set - Follows system debug values.
@@ -660,7 +668,7 @@ static void _loadMapping(config_setting_t *set, SCA_Mappings* mappings)
 
 /**
  * Perform the mapping into the library or to the wrapper implementation. The
- * first attempt is to mapp the configured function, if this fails then the
+ * first attempt is to map the configured function, if this fails then the
  * default function name is tested. If nothing works, no mapping will be
  * performed.
  *
@@ -676,12 +684,12 @@ static void __doMapFunction(void* libHandle, void** apiFkt, const char* cfgName,
   bool  loadDefault = true;
   char* error = NULL;
   // clear any existing errors.
-  dlerror();
+  error = dlerror();
 #if HAVE_LTDL_H
   lt_dlhandle libModule = (lt_dlhandle)libHandle;
 #endif
 
-  // Try to mapp the configured name
+  // Try to map the configured name
   if (cfgName != NULL)
   {
     sca_debugLog(LOG_INFO, "Linking \"%s\" to \"%s\"!\n",
@@ -697,7 +705,7 @@ static void __doMapFunction(void* libHandle, void** apiFkt, const char* cfgName,
     if (loadDefault)
     {
       sca_debugLog(LOG_ERR, "- Could not link \"%s\" to api method \"%s\"!\n", 
-                               defName, cfgName);      
+                               defName, cfgName);
     }
   }
   if (loadDefault)
@@ -790,6 +798,13 @@ static int _mapAPI(SCA_Mappings* mappings, SRxCryptoAPI* api)
     __doMapFunction(api->libHandle, (void**)&api->unregisterPrivateKey,
                     mappings->str_method_unregisterPrivateKey,
                     SCA_DEF_UNREGISTER_PRIVATE_KEY);
+    
+    __doMapFunction(api->libHandle, (void**)&api->setDebugLevel,
+                    mappings->str_method_setDebugLevel,
+                    SCA_DEF_SET_DEBUGLEVEL);
+    __doMapFunction(api->libHandle, (void**)&api->getDebugLevel,
+                    mappings->str_method_getDebugLevel,
+                    SCA_DEF_GET_DEBUGLEVEL);
   }
 
   return retVal;
@@ -864,6 +879,9 @@ int srxCryptoInit(SRxCryptoAPI* api, sca_status_t* status)
 
   api->registerPrivateKey   = wrap_registerPrivateKey;
   api->unregisterPrivateKey = wrap_unregisterPrivateKey;
+  
+  api->setDebugLevel        = wrap_setDebugLevel;
+  api->getDebugLevel        = wrap_getDebugLevel;
 
   // Now initialize mapping names
   mappings = malloc(sizeof(SCA_Mappings));
@@ -894,7 +912,7 @@ int srxCryptoInit(SRxCryptoAPI* api, sca_status_t* status)
       _loadGeneralConfiguration(&cfg, status);
 
 ////////////////////////////////////////////////////////////////////////////////
-// LIBRAQRY MAPPING INFORAMTION
+// LIBRARY MAPPING INFORMATION
 ////////////////////////////////////////////////////////////////////////////////
       // Load the mapping information.
       if (config_lookup_string(&cfg, SCA_LIBRARY_CONF, &str_library_conf))
@@ -1057,7 +1075,7 @@ int sca_SetKeyPath (char* key_path)
   if (strlen(key_path) < (MAX_CMD_LEN-1))
   {
     memset(_keyPath, '\0', MAXPATHLEN);
-    sprintf(_keyPath, "%s%c", key_path, '\0');
+    snprintf(_keyPath, MAXPATHLEN, "%s", key_path);
     retVal = API_SUCCESS;
   }
 

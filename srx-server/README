@@ -27,3 +27,4 @@ bgpsrx-users@nist.gov.
 2. ./configure --prefix=<desired dir> [sca_dir=<alternative SRxCryptoAPI location>]
 3. make; make install  (You might need root permission when you install)
 
+For test file compilation use the option --with-buildtest

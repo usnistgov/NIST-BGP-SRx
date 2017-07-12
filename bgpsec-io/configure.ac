@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bgpsecio], [0.2.0.6], [bgpsrx-dev@antd.nist.gov])
+AC_INIT([bgpsecio], [0.2.0.8], [bgpsrx-dev@antd.nist.gov])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 
 # AC_CONFIG_SRCDIR specifies a file that the configuration checks for existence.
@@ -66,10 +66,43 @@ AC_PROG_CC
 AC_PROG_LIBTOOL
 
 # Add Debugging Memory checking.
+AC_MSG_CHECKING(weather to enable mcheck)
 AC_ARG_ENABLE(mcheck,
               [--enable-mcheck  enable memory check M_CHECK_ACTION 3],
               MCHECK="-DMEM_CHECK", MCHECK="")
-AC_SUBST(MCHECK)
+if test "$MCHECK" == "" ; then
+  AC_MSG_RESULT([no])
+else
+  AC_MSG_RESULT([yes])
+  CFLAGS="$CFLAGS $MCHECK"
+  AC_SUBST(MCHECK)
+fi
+
+# Add Test Vector output
+AC_MSG_CHECKING(weather to enable testvector)
+AC_ARG_ENABLE(testvector,
+              [--enable-testvector  enable test vector output CREATE_TESTVECTOR],
+              CREATE_TESTVECTOR="-DCREATE_TESTVECTOR", CREATE_TESTVECTOR="")
+if test "$CREATE_TESTVECTOR" == "" ; then
+  AC_MSG_RESULT([no])
+else
+  AC_MSG_RESULT([yes])
+  CFLAGS="$CFLAGS $CREATE_TESTVECTOR"
+  AC_SUBST(CREATE_TESTVECTOR)
+fi
+
+# Add Test Vector output
+AC_MSG_CHECKING(weather to enable printcrypto)
+AC_ARG_ENABLE(printcrypto,
+              [--enable-printcrypto  enable crypto debug],
+              PRINT_CRYPTO="-DPRINT_CRYPTO", PRINT_CRYPTO="")
+if test "$PRINT_CRYPTO" == "" ; then
+  AC_MSG_RESULT([no])
+else
+  AC_MSG_RESULT([yes])
+  CFLAGS="$CFLAGS $PRINT_CRYPTO"
+  AC_SUBST(PRINT_CRYPTO)
+fi
 
 # Checks for libraries.
 

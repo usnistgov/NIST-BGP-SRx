@@ -4,20 +4,20 @@
  * their official duties. Pursuant to title 17 Section 105 of the United
  * States Code this software is not subject to copyright protection and
  * is in the public domain.
- * 
+ *
  * NIST assumes no responsibility whatsoever for its use by other parties,
  * and makes no guarantees, expressed or implied, about its quality,
  * reliability, or any other characteristic.
- * 
+ *
  * We would appreciate acknowledgment if the software is used.
- * 
+ *
  * NIST ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
- * 
- * 
+ *
+ *
  * This software might use libraries that are under GNU public license or
- * other licenses. Please refer to the licenses of all libraries required 
+ * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * @version 0.4.0.1
@@ -75,7 +75,7 @@ typedef struct {
   uint8_t* pdu;
   uint32_t size;
   bool     consumed;
-  void* next;   
+  void* next;
 } SCH_ReceiverQueueElement;
 
 /** the receiver queue itself */
@@ -92,9 +92,9 @@ typedef struct {
   bool        running;
   // Mutex and Condition for thread handling
   Mutex       mutex;
-  Cond        condition;  
-  
-  ServerConnectionHandler* svrConnHandler;  
+  Cond        condition;
+
+  ServerConnectionHandler* svrConnHandler;
 } SCH_ReceiverQueue;
 
 // wait until notify or 1 s timeout - this is just to allow a wakeup
@@ -108,12 +108,12 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
 
 /**
  * Create the sender queue including the thread that manages the queue.
- * 
+ *
  * @return the SCH_ReceiverQueue or NULL.
- * 
+ *
  * @since 0.3.0
  */
-SCH_ReceiverQueue* createSCHReceiverQueue(ServerConnectionHandler* 
+SCH_ReceiverQueue* createSCHReceiverQueue(ServerConnectionHandler*
                                                                  srvConnHandler)
 {
   SCH_ReceiverQueue* queue = malloc(sizeof(SCH_ReceiverQueue));
@@ -133,7 +133,7 @@ SCH_ReceiverQueue* createSCHReceiverQueue(ServerConnectionHandler*
       free(queue);
       queue = NULL;
     }
-    
+
     if (queue != NULL)
     {
       queue->head    = NULL;
@@ -143,16 +143,16 @@ SCH_ReceiverQueue* createSCHReceiverQueue(ServerConnectionHandler*
       queue->svrConnHandler = srvConnHandler;
     }
   }
-    
+
   return queue;
 }
 
 /**
- * Stops the queue is not already stopped and frees all memory associated with 
+ * Stops the queue is not already stopped and frees all memory associated with
  * it.
- * 
+ *
  * @param queue The queue itself
- * 
+ *
  * @since 0.3.0
  */
 void releaseSCHReceiverQueue(SCH_ReceiverQueue* queue)
@@ -180,17 +180,17 @@ void releaseSCHReceiverQueue(SCH_ReceiverQueue* queue)
     queue->svrConnHandler = NULL;
     free (queue);
   }
-  
+
   LOG(LEVEL_INFO, ".. Exit release Server Connection Handler Receiver Queue!");
 }
 
-/** 
+/**
  * The thread loop of the queue. To stop the queue call stopSendQueue()
- * 
+ *
  * @param The queue itself
- * 
+ *
  * @return NULL
- * 
+ *
  * @since 0.3.0
  */
 void* schReceiverQueueThreadLoop(void* thisQueue)
@@ -210,7 +210,7 @@ void* schReceiverQueueThreadLoop(void* thisQueue)
       packet = fetchSCHReceiverPacket(queue);
       if (packet != NULL)
       {
-        _handlePacket(packet->svrSock, packet->client, packet->pdu, 
+        _handlePacket(packet->svrSock, packet->client, packet->pdu,
                       packet->size, queue->svrConnHandler);
         free(packet->pdu);
         free(packet);
@@ -218,22 +218,22 @@ void* schReceiverQueueThreadLoop(void* thisQueue)
     }
     LOG(LEVEL_DEBUG, "Exit loop of Server Connection Handler REceiver Queue!");
   }
-  
+
   return NULL;
 }
 
 /**
- * Start the send queue. In case the queue is already started this method does 
+ * Start the send queue. In case the queue is already started this method does
  * not further start it.
- * 
+ *
  * @return true if the Queue is running.
- * 
+ *
  * @since 0.3.0
  */
 bool startSCHReceiverQueue(SCH_ReceiverQueue* queue)
 {
   bool retVal = false;
-  
+
   if (queue == NULL)
   {
     RAISE_SYS_ERROR("Server Connection Handler Receiver Queue is not "
@@ -244,8 +244,8 @@ bool startSCHReceiverQueue(SCH_ReceiverQueue* queue)
     lockMutex(&queue->mutex);
     if (!queue->running)
     {
-      queue->running = true;    
-      if (pthread_create(&queue->handler, NULL, schReceiverQueueThreadLoop, 
+      queue->running = true;
+      if (pthread_create(&queue->handler, NULL, schReceiverQueueThreadLoop,
                          queue) != 0)
       {
         queue->running = false;
@@ -262,7 +262,7 @@ bool startSCHReceiverQueue(SCH_ReceiverQueue* queue)
 
 /**
  * Stop the queue but does not destroy the thread itself.
- * 
+ *
  * @since 0.3.0
  */
 void stopSCHReceiverQueue(SCH_ReceiverQueue* queue)
@@ -279,21 +279,21 @@ void stopSCHReceiverQueue(SCH_ReceiverQueue* queue)
     {
       queue->running = false;
       // Stop the queue by waking it up
-      LOG(LEVEL_INFO, "stopSCHReceiverQueue: send notification...");
+      LOG(LEVEL_DEBUG, "stopSCHReceiverQueue: send notification...");
       signalCond(&queue->condition);
     }
     unlockMutex(&queue->mutex);
     // Give the queue thread a chance to process the notify or run into a
-    // wait timeout.   
-    LOG(LEVEL_INFO, "stopSCHReceiverQueue: sleep for %u ms", 
+    // wait timeout.
+    LOG(LEVEL_DEBUG, "stopSCHReceiverQueue: sleep for %u ms",
                     SCH_RECEIVE_QUEUE_WAIT_MS * 2);
     usleep(SCH_RECEIVE_QUEUE_WAIT_MS * 2);
-    
+
     lockMutex(&queue->mutex);
     // Free the remainder of the queue.
-    LOG(LEVEL_INFO, "stopSCHReceiverQueue: wait for queue thread to join...");
+    LOG(LEVEL_DEBUG, "stopSCHReceiverQueue: wait for queue thread to join...");
     pthread_join(queue->handler, NULL);
-    LOG(LEVEL_INFO, "schReceiverQueueThreadLoop STOPPED. Empty remainder of "
+    LOG(LEVEL_DEBUG, "schReceiverQueueThreadLoop STOPPED. Empty remainder of "
                     "queue!");
     SCH_ReceiverQueueElement* packet = NULL;
     while (queue->head != NULL)
@@ -311,25 +311,25 @@ void stopSCHReceiverQueue(SCH_ReceiverQueue* queue)
 }
 
 /**
- * Retrieve the next packet from the queue as long as the queue is running. 
+ * Retrieve the next packet from the queue as long as the queue is running.
  * in case the queue is not running this method returns NULL.
- * 
+ *
  * @return  the next packet of NULL if the queue is empty.
- * 
+ *
  * @since 0.3.0
  */
 SCH_ReceiverQueueElement* fetchSCHReceiverPacket(SCH_ReceiverQueue* queue)
 {
   SCH_ReceiverQueueElement* packet = NULL;
-  
+
   if (queue != NULL)
   {
     lockMutex(&queue->mutex);
     while (queue->size == 0 && queue->running)
     {
-      // wait until notify is called or after a timeout.      
+      // wait until notify is called or after a timeout.
       waitCond(&queue->condition, &queue->mutex, SCH_RECEIVE_QUEUE_WAIT_MS);
-      if(!queue->running)
+      if(!queue->running) 
       {
         LOG(LEVEL_INFO, "Server Connection Handler Receiver Queue received "
                         "shutdown!");
@@ -342,7 +342,7 @@ SCH_ReceiverQueueElement* fetchSCHReceiverPacket(SCH_ReceiverQueue* queue)
       packet = queue->head;
       queue->size--;
       queue->head = (SCH_ReceiverQueueElement*)packet->next;
-      packet->next = NULL;   
+      packet->next = NULL;
     }
     unlockMutex(&queue->mutex);
   }
@@ -350,27 +350,27 @@ SCH_ReceiverQueueElement* fetchSCHReceiverPacket(SCH_ReceiverQueue* queue)
 }
 
 /**
- * Queue a copy of the the packet and return the size of the queue. The copy of 
+ * Queue a copy of the the packet and return the size of the queue. The copy of
  * the packet will be freed by the queue handler thread itself.
- * 
- * @param pdu The received PDU to be added to the queue. ( A copy will be 
+ *
+ * @param pdu The received PDU to be added to the queue. ( A copy will be
  *            created and stored)
- * @param svrSoc The server socket 
+ * @param svrSoc The server socket
  * @param client The client to received from
  * @param size The size of the PDU
  * @param queue The queue to be added to
- * 
+ *
  * @return true if the packet was queued, otherwise false.
- * 
+ *
  * @since 0.3.0
  */
-bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc, 
-                           ServerClient* client, size_t size, 
+bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc,
+                           ServerClient* client, size_t size,
                            SCH_ReceiverQueue* queue)
 {
   SCH_ReceiverQueueElement* packet = malloc(sizeof(SCH_ReceiverQueueElement));
   bool retVal = false;
-  
+
   lockMutex(&queue->mutex);
   if (packet != NULL)
   {
@@ -387,7 +387,7 @@ bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc,
       packet->client   = client;
       packet->next     = NULL;
       packet->size     = size;
-      memcpy(packet->pdu, pdu, size);  
+      memcpy(packet->pdu, pdu, size);
       if (queue->size == 0)
       {
         queue->head = packet;
@@ -404,12 +404,12 @@ bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc,
     }
   }
   unlockMutex(&queue->mutex);
-  
+
   if (!retVal)
   {
     RAISE_SYS_ERROR("Not enough memory to queue packets in send queue!");
   }
-  
+
   return retVal;
 }
 
@@ -429,14 +429,14 @@ bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc,
  *
  * @return true if the handler could be initialized properly, otherwise false
  */
-bool createServerConnectionHandler(ServerConnectionHandler* self, 
+bool createServerConnectionHandler(ServerConnectionHandler* self,
                                    UpdateCache* updCache,
                                    Configuration* sysConfig)
 {
   bool cont = true;
   self->inShutdown = false;
   self->receiverQueue = NULL; // For now set it to NULL
-  
+
   if (updCache == NULL)
   {
     RAISE_SYS_ERROR("The update cache is NULL!");
@@ -447,11 +447,11 @@ bool createServerConnectionHandler(ServerConnectionHandler* self,
     RAISE_SYS_ERROR("The system configuration is NULL!");
     cont = false;
   }
-  
+
   if (cont)
   {
     initSList(&self->clients);
-    if (createServerSocket(&self->svrSock, sysConfig->server_port, 
+    if (createServerSocket(&self->svrSock, sysConfig->server_port,
                            sysConfig->verbose))
     {
       // initialize and configure the proxyMap
@@ -461,10 +461,10 @@ bool createServerConnectionHandler(ServerConnectionHandler* self,
         LOG(LEVEL_ERROR, "Could not configure the Proxy-Mapping!");
         // Still keep on going. The configuration might have been faulty!
       }
-      
+
       self->updateCache = updCache;
       self->sysConfig = sysConfig;
-      
+
       if (!sysConfig->mode_no_receivequeue)
       {
         // Enable the receiver queue
@@ -484,7 +484,7 @@ bool createServerConnectionHandler(ServerConnectionHandler* self,
           {
             // Free the allocated memory again
             free(queue);
-          }          
+          }
         }
       }
     }
@@ -511,7 +511,7 @@ void releaseServerConnectionHandler(ServerConnectionHandler* self)
     stopSCHReceiverQueue(queue);
     releaseSCHReceiverQueue(queue);
   }
-  
+
   releaseSList(&self->clients);
   memset(self->proxyMap, 0, (sizeof(ProxyClientMapping)*256));
 }
@@ -539,14 +539,14 @@ bool processValidationRequest(ServerConnectionHandler* self,
   bool retVal = true;
 
   // Determine if a receipt is requested and a result packet must be send
-  bool     receipt =    (hdr->flags & SRX_FLAG_REQUEST_RECEIPT) 
+  bool     receipt =    (hdr->flags & SRX_FLAG_REQUEST_RECEIPT)
                       == SRX_FLAG_REQUEST_RECEIPT;
   // prepare already the send flag. Later on, if this is > 0 send a response.
   uint8_t  sendFlags = hdr->flags & SRX_FLAG_REQUEST_RECEIPT;
-  
+
   bool     doOriginVal = (hdr->flags & SRX_FLAG_ROA) == SRX_FLAG_ROA;
   bool     doPathVal   = (hdr->flags & SRX_FLAG_BGPSEC) == SRX_FLAG_BGPSEC;
-  
+
   bool      v4     = hdr->type == PDU_SRXPROXY_VERIFY_V4_REQUEST;
   // Set the BGPsec data
 //  uint16_t bgpsecDataLen = 0;
@@ -554,113 +554,129 @@ bool processValidationRequest(ServerConnectionHandler* self,
 //  bgpsecData.length = 0;
 //  bgpsecData.data   = (uint8_t*)hdr+(v4 ? sizeof(SRXPROXY_VERIFY_V4_REQUEST)
 //                                        : sizeof(SRXPROXY_VERIFY_V6_REQUEST));
-  
-  uint32_t requestToken = receipt ? ntohl(hdr->requestToken) 
+
+  uint32_t requestToken = receipt ? ntohl(hdr->requestToken)
                                   : DONOTUSE_REQUEST_TOKEN;
   uint32_t originAS = 0;
   SRxUpdateID collisionID = 0;
   SRxUpdateID updateID = 0;
-  
+
   bool doStoreUpdate = false;
   IPPrefix* prefix = NULL;
   // Specify the client id as a receiver only when validation is requested.
   uint8_t clientID = (doOriginVal || doPathVal) ? client->routerID : 0;
-    
+
   // 1. Prepare for and generate the ID of the update
-  prefix = malloc(sizeof(IPPrefix));  
+  prefix = malloc(sizeof(IPPrefix));
   memset(prefix, 0, sizeof(IPPrefix));
-  prefix->length     = hdr->prefixLen;  
-  BGPSecData bgpsecData;
-  memset (&bgpsecData, 0, sizeof(BGPSecData));
-  // initialize the val pointer - it will be adjusted within the correct 
+  prefix->length     = hdr->prefixLen;
+  BGPSecData bgpData;
+  memset (&bgpData, 0, sizeof(BGPSecData));
+  // initialize the val pointer - it will be adjusted within the correct
   // request type.
   uint8_t* valPtr = (uint8_t*)hdr;
   if (v4)
   {
     SRXPROXY_VERIFY_V4_REQUEST* v4Hdr = (SRXPROXY_VERIFY_V4_REQUEST*)hdr;
     valPtr += sizeof(SRXPROXY_VERIFY_V4_REQUEST);
-    prefix->ip.version     = 4;
-    prefix->ip.addr.v4     = v4Hdr->prefixAddress;
-    originAS               = ntohl(v4Hdr->originAS);
-    bgpsecData.numberHops  = ntohs(v4Hdr->bgpsecValReqData.numHops);
-    bgpsecData.attr_length = ntohs(v4Hdr->bgpsecValReqData.attrLen);
+    prefix->ip.version  = 4;
+    prefix->ip.addr.v4  = v4Hdr->prefixAddress;
+    originAS            = ntohl(v4Hdr->originAS);
+    // The next two are in host format for convenience
+    bgpData.numberHops  = ntohs(v4Hdr->bgpsecValReqData.numHops);
+    bgpData.attr_length = ntohs(v4Hdr->bgpsecValReqData.attrLen);
+    // Now in network format as required.
+    bgpData.afi         = v4Hdr->bgpsecValReqData.valPrefix.afi;
+    bgpData.safi        = v4Hdr->bgpsecValReqData.valPrefix.safi;
+    bgpData.local_as    = v4Hdr->bgpsecValReqData.valData.local_as;
   }
   else
   {
     SRXPROXY_VERIFY_V6_REQUEST* v6Hdr = (SRXPROXY_VERIFY_V6_REQUEST*)hdr;
     valPtr += sizeof(SRXPROXY_VERIFY_V6_REQUEST);
-    prefix->ip.version = 6;
-    prefix->ip.addr.v6 = v6Hdr->prefixAddress;
-    originAS           = ntohl(v6Hdr->originAS);
+    prefix->ip.version  = 6;
+    prefix->ip.addr.v6  = v6Hdr->prefixAddress;
+    originAS            = ntohl(v6Hdr->originAS);
+    // The next two are in host format for convenience
+    bgpData.numberHops  = ntohs(v6Hdr->bgpsecValReqData.numHops);
+    bgpData.attr_length = ntohs(v6Hdr->bgpsecValReqData.attrLen);
+    // Now in network format as required.
+    bgpData.afi         = v6Hdr->bgpsecValReqData.valPrefix.afi;
+    bgpData.safi        = v6Hdr->bgpsecValReqData.valPrefix.safi;
+    bgpData.local_as    = v6Hdr->bgpsecValReqData.valData.local_as;
+  }
+
+  // Check if AS path exists and if so then set it
+  if (bgpData.numberHops != 0)
+  {
+    bgpData.asPath = (uint32_t*)valPtr;
+  }
+  // Check if BGPsec path exits and if so then set it
+  if (bgpData.attr_length != 0)
+  {
+    // BGPsec attribute comes after the as4 path
+    bgpData.bgpsec_path_attr = valPtr + (bgpData.numberHops * 4);
   }
   
-  if (bgpsecData.numberHops != 0)
-  {
-    bgpsecData.asPath = (uint32_t*)valPtr;
-  }
-  if (bgpsecData.attr_length != 0)
-  {
-    // bgpsec attribute comes after the as4 path
-    bgpsecData.bgpsec_path_attr = valPtr + (bgpsecData.numberHops * 4);
-  }
-  
+
+
   // 2. Generate the CRC based updateID
-  updateID = generateIdentifier(originAS, prefix, &bgpsecData);      
+  updateID = generateIdentifier(originAS, prefix, &bgpData);
   // test for collision and attempt to resolve
-  collisionID = updateID;    
-  while(detectCollision(self->updateCache, &updateID, prefix, originAS,
-                        &bgpsecData))
+  collisionID = updateID;
+  while(detectCollision(self->updateCache, &updateID, prefix, originAS, 
+                        &bgpData))
   {
     updateID++;
-  }  
+  }
   if (collisionID != updateID)
   {
     LOG(LEVEL_NOTICE, "UpdateID collision detected!!. The original update ID"
       " could have been [0x%08X] but was changed to a collision free ID "
       "[0x%08X]!", collisionID, updateID);
   }
-  
+
   //  3. Try to find the update, if it does not exist yet, store it.
   SRxResult        srxRes;
   SRxDefaultResult defResInfo;
-  // The method getUpdateResult will initialize the result parameters and 
+  // The method getUpdateResult will initialize the result parameters and
   // register the client as listener (only if the update already exists)
   ProxyClientMapping* clientMapping = clientID > 0 ? &self->proxyMap[clientID]
                                                    : NULL;
-  doStoreUpdate = !getUpdateResult (self->updateCache, &updateID, 
-                                    clientID, clientMapping, 
+  doStoreUpdate = !getUpdateResult (self->updateCache, &updateID,
+                                    clientID, clientMapping,
                                     &srxRes, &defResInfo);
 
   if (doStoreUpdate)
   {
-    //TODO: Normally an update should be validated all the time. Maybe the 
-    // update registration should be about the validation type. This way 
+    //TODO: Normally an update should be validated all the time. Maybe the
+    // update registration should be about the validation type. This way
     // one can filter for what to listen for.
-    
-    // TODO Check the store only in the spec. It might not make much sense at 
+
+    // TODO Check the store only in the spec. It might not make much sense at
     // all. or if store only, the update will not be registered with the client?
     // This allows a loading of the cache and starting to validate without
     // a client attached. -> Or what about client 0 or 255??
-    
+
     // Copy the information of the default result. Just store them as they are
     // provided with. -- it could be a store only without validation request!
     // In this case check discussion on twiki
     defResInfo.result.roaResult    = hdr->roaDefRes;
     defResInfo.resSourceROA        = hdr->roaResSrc;
-    
+
     defResInfo.result.bgpsecResult = hdr->bgpsecDefRes;
     defResInfo.resSourceBGPSEC     = hdr->bgpsecResSrc;
-    
+
     if (!storeUpdate(self->updateCache, clientID, clientMapping,
-                     &updateID, prefix, originAS, &defResInfo, &bgpsecData))
+                     &updateID, prefix, originAS, &defResInfo, &bgpData))
     {
       RAISE_SYS_ERROR("Could not store update [0x%08X]!!", updateID);
       // Maybe check for ID conflict, if not then get result again - or just
       // quit here!
-      free(prefix);    
+      free(prefix);
       return false;
     }
-    
+
     // Use the default result.
     srxRes.roaResult    = defResInfo.result.roaResult;
     srxRes.bgpsecResult = defResInfo.result.bgpsecResult;
@@ -670,16 +686,16 @@ bool processValidationRequest(ServerConnectionHandler* self,
 
   // Just check if the client has the correct values for the requested results
   if (doOriginVal && (hdr->roaDefRes != srxRes.roaResult))
-  {     
-    sendFlags = sendFlags | SRX_FLAG_ROA;      
-  }  
+  {
+    sendFlags = sendFlags | SRX_FLAG_ROA;
+  }
   if (doPathVal && (hdr->bgpsecDefRes != srxRes.bgpsecResult))
-  {     
-    sendFlags = sendFlags | SRX_FLAG_BGPSEC;      
-  }    
+  {
+    sendFlags = sendFlags | SRX_FLAG_BGPSEC;
+  }
 
   if (sendFlags > 0) // a notification is needed. flags specifies the type
-  {    
+  {
     // TODO: Check specification if we can send a receipt without results, if
     // not the following 6 lines MUST be included, otherwise not.
     if (doOriginVal)
@@ -688,13 +704,13 @@ bool processValidationRequest(ServerConnectionHandler* self,
     }
     if (doPathVal)
     {
-      sendFlags = sendFlags | SRX_FLAG_BGPSEC;      
+      sendFlags = sendFlags | SRX_FLAG_BGPSEC;
     }
-    
-    // Now send the result;
-    if (!sendVerifyNotification(svrSock, client, updateID, sendFlags, 
-                                requestToken, srxRes.roaResult, 
-                                srxRes.bgpsecResult, 
+
+    // Now send the results we know so far;
+    if (!sendVerifyNotification(svrSock, client, updateID, sendFlags,
+                                requestToken, srxRes.roaResult,
+                                srxRes.bgpsecResult,
                                 !self->sysConfig->mode_no_sendqueue))
     {
       RAISE_ERROR("Could not send the initial verify notification for update"
@@ -703,13 +719,18 @@ bool processValidationRequest(ServerConnectionHandler* self,
     }
   }
 
-  if (doOriginVal || doPathVal)
+  // Now check if validation has to be performed again - In the case the 
+  // update was already stored and validated, the appropriate sendFlags does 
+  // not have the flags set and no additional validation has to be performed at 
+  // this point therefore also filter for sendFlags, the command handler will
+  // do it otherwise and we can save this effort.
+  if ((doOriginVal || doPathVal) && (sendFlags & SRX_FLAG_ROA_AND_BGPSEC > 0))
   {
     // Only keep the validation flags.
     hdr->flags = sendFlags & SRX_FLAG_ROA_AND_BGPSEC;
-    
+
     // create the validation command!
-    if (!queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client, 
+    if (!queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client,
                       updateID, ntohl(hdr->length), (uint8_t*)hdr))
     {
       RAISE_ERROR("Could not add validation request to command queue!");
@@ -774,8 +795,8 @@ static bool processSignatureRequest(ServerConnectionHandler* self,
   }
   else // No data was available, add request to command handler for signing
   {
-    if (!queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client, 
-                                      updateID, ntohl(hdr->length), 
+    if (!queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client,
+                                      updateID, ntohl(hdr->length),
                                       (uint8_t*)hdr))
     {
       RAISE_ERROR("Could not add validation request to command queue!");
@@ -787,7 +808,7 @@ static bool processSignatureRequest(ServerConnectionHandler* self,
   LOG(LEVEL_DEBUG, HDR "Exit processSignatureRequest", pthread_self());
   return retVal;
 }
-                                    
+
 /**
  * SRx receives a packet from one of the proxy clients. This method is called
  * before the command handler will see the request. This will be decided in this
@@ -808,7 +829,7 @@ static bool processSignatureRequest(ServerConnectionHandler* self,
  * @param srvConHandler The pointer to the sever connection handler.
  */
 void _handlePacket(ServerSocket* svrSock, ServerClient* client,
-                         void* packet, PacketLength length, 
+                         void* packet, PacketLength length,
                          void* srvConHandler)
 {
   LOG(LEVEL_DEBUG, HDR "Enter handlePacket", pthread_self());
@@ -816,15 +837,15 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
   SRXPROXY_BasicHeader*    bhdr  = NULL;
   SRXPROXY_SIGN_REQUEST*   srHdr  = NULL;
   SRXPROXY_DELETE_UPDATE*  duHdr = NULL;
-  // By default the data id is zero except for packets where the updateID is 
+  // By default the data id is zero except for packets where the updateID is
   // provided such as signature request and delete requests.
-  uint32_t dataID = 0; 
-  
+  uint32_t dataID = 0;
+
   // Check if the client is already initialized - What this means is check if
   // we got a valid client ID. This MUST have happened prior the arrival of any
   // of the following packets.
   ClientThread* clientThread = (ClientThread*)client;
-    
+
   bool addToQueue = false;
 
   // No data?
@@ -833,7 +854,7 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
     RAISE_ERROR("The packet given with %u bytes does not have the minimum "
                 "required length of %u bytes!", length,
                 sizeof(SRXPROXY_BasicHeader));
-  } 
+  }
   else
   {
     bhdr = (SRXPROXY_BasicHeader*)packet;
@@ -848,8 +869,8 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           RAISE_SYS_ERROR("Connection not initialized yet - "
                           "Handshake missing!!!");
           sendError(SRXERR_INTERNAL_ERROR, svrSock, client, false);
-          sendGoodbye(svrSock, client, false);          
-          //TODO: Also close the socket and remove the thread 
+          sendGoodbye(svrSock, client, false);
+          //TODO: Also close the socket and remove the thread
           // - it might be closed in goodbye though
         }
         else
@@ -865,7 +886,7 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           {
             sendError(SRXERR_INTERNAL_ERROR, svrSock, client, false);
             sendGoodbye(svrSock, client, false);
-            //TODO: Also close the socket and remove the thread 
+            //TODO: Also close the socket and remove the thread
             // - it might be closed in goodbye though
           }
         }
@@ -879,8 +900,8 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           RAISE_SYS_ERROR("Connection not initialized yet - "
                           "Handshake missing!!!");
           sendError(SRXERR_INTERNAL_ERROR, svrSock, client, false);
-          sendGoodbye(svrSock, client, false);          
-          //TODO: Also close the socket and remove the thread 
+          sendGoodbye(svrSock, client, false);
+          //TODO: Also close the socket and remove the thread
           // - it might be closed in goodbye though
         }
         else
@@ -888,14 +909,14 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           // the following method will add the command to the queue if
           // necessary
           srHdr = (SRXPROXY_SIGN_REQUEST*)packet;
-          LOG(LEVEL_DEBUG, HDR "Received signature request fore update [0x%08X]", 
+          LOG(LEVEL_DEBUG, HDR "Received signature request fore update [0x%08X]",
                            pthread_self(), ntohl(srHdr->updateIdentifier));
           if (!processSignatureRequest(self, svrSock, client,
                                        ntohl(srHdr->updateIdentifier), srHdr))
           {
             sendError(SRXERR_INTERNAL_ERROR, svrSock, client, false);
             sendGoodbye(svrSock, client, false);
-            //TODO: Also close the socket and remove the thread 
+            //TODO: Also close the socket and remove the thread
             // - it might be closed in goodbye though
           }
         }
@@ -908,17 +929,17 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           RAISE_SYS_ERROR("Connection not initialized yet - "
                           "Handshake missing!!!");
           sendError(SRXERR_INTERNAL_ERROR, svrSock, client, false);
-          sendGoodbye(svrSock, client, false);          
-          //TODO: Also close the socket and remove the thread 
+          sendGoodbye(svrSock, client, false);
+          //TODO: Also close the socket and remove the thread
           // - it might be closed in goodbye though
         }
         else
         {
-          // the following method will add the command to the queue. No 
+          // the following method will add the command to the queue. No
           // pre-processing necessary
           duHdr = (SRXPROXY_DELETE_UPDATE*)packet;
           dataID = ntohl(duHdr->updateIdentifier);
-          LOG(LEVEL_DEBUG, HDR "Received deletion request fore update [0x%08X]", 
+          LOG(LEVEL_DEBUG, HDR "Received deletion request fore update [0x%08X]",
                            pthread_self(), dataID);
           addToQueue = true;
         }
@@ -930,13 +951,13 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           // initialized socket.
           // Send Error and close connection.
           LOG(LEVEL_WARNING, HDR "Received unexpected a Hello packet from "
-                             "proxy [0x%08X], client [0x%02X]", 
+                             "proxy [0x%08X], client [0x%02X]",
                              clientThread->proxyID, clientThread->routerID);
           sendError(SRXERR_INVALID_PACKET, svrSock, client, false);
           sendGoodbye(svrSock, client, false);
-          //TODO: Also close the socket and remove the thread 
+          //TODO: Also close the socket and remove the thread
           // - it might be closed in goodbye though
-          break;          
+          break;
         }
       case PDU_SRXPROXY_GOODBYE:
         // Just prepare for the ordered disconnect
@@ -961,7 +982,7 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
           RAISE_ERROR("Invalid srx pdu [\'%u\'] received", bhdr->type);
           sendError(SRXERR_INVALID_PACKET, svrSock, client, false);
           sendGoodbye(svrSock, client, false);
-          //TODO: Also close the socket and remove the thread 
+          //TODO: Also close the socket and remove the thread
           // - it might be closed in goodbye though
         }
     }
@@ -973,7 +994,7 @@ void _handlePacket(ServerSocket* svrSock, ServerClient* client,
       // be added to the command queue for further processing.
       queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client,
                    dataID, length, (uint8_t*)packet);
-    } 
+    }
   }
   LOG(LEVEL_DEBUG, HDR "Exit handlePacket", pthread_self());
 }
@@ -1014,21 +1035,21 @@ void handlePacket(ServerSocket* svrSock, ServerClient* client,
 }
 
 /**
- * This method is called as soon as a TCP connection is established to the 
+ * This method is called as soon as a TCP connection is established to the
  * SRx client proxy.
- * 
+ *
  * @param svrSock The server socket the connection was accepted on.
- * @param client The thread that deals with this connection or NULL if the 
+ * @param client The thread that deals with this connection or NULL if the
  *               connection is a multi user connection. (later one is currently
  *               not supported!)
  * @param fd The file descriptor if the client socket/
  * @param connected If the session is connected.
  * @param user The server connection handler itself.
- * 
+ *
  * @return false in case an error occurred.
  */
-static bool handleStatusChange(ServerSocket* svrSock, ServerClient* client, 
-                               int fd, bool connected, void* serverConnHandler) 
+static bool handleStatusChange(ServerSocket* svrSock, ServerClient* client,
+                               int fd, bool connected, void* serverConnHandler)
 {
  // LOG(LEVEL_DEBUG, HDR "Enter handleStatusChange", pthread_self());
   ServerConnectionHandler* self = (ServerConnectionHandler*)serverConnHandler;
@@ -1039,7 +1060,7 @@ static bool handleStatusChange(ServerSocket* svrSock, ServerClient* client,
   bool retVal = true;
 
   // A new client arrived
-  if (connected) 
+  if (connected)
   {
     // Add the new client to the client list.
     if (!appendDataToSList(&self->clients, client))
@@ -1057,14 +1078,14 @@ static bool handleStatusChange(ServerSocket* svrSock, ServerClient* client,
     }
 
     deleteFromSList(&self->clients, client);
-    
+
     bool crashed = !(self->inShutdown || clientThread->goodByeReceived);
-    deactivateConnectionMapping(self, clientThread->routerID, crashed, 
+    deactivateConnectionMapping(self, clientThread->routerID, crashed,
                                 self->sysConfig->defaultKeepWindow);
-    
+
     deleteFromSList(&svrSock->cthreads, client);
   }
-  LOG(LEVEL_DEBUG, HDR "Exit handleStatusChange (%s)", pthread_self(), 
+  LOG(LEVEL_DEBUG, HDR "Exit handleStatusChange (%s)", pthread_self(),
                    retVal ? "true" : "false");
   return retVal;
 }
@@ -1079,7 +1100,7 @@ static bool handleStatusChange(ServerSocket* svrSock, ServerClient* client,
  * @see stopProcessingRequests
  */
 void startProcessingRequests(ServerConnectionHandler* self,
-                             CommandQueue* cmdQueue) 
+                             CommandQueue* cmdQueue)
 {
   LOG(LEVEL_DEBUG, HDR "Enter startProcessingRequests", pthread_self());
   self->cmdQueue = cmdQueue;
@@ -1088,15 +1109,17 @@ void startProcessingRequests(ServerConnectionHandler* self,
   LOG(LEVEL_DEBUG, HDR "Exit startProcessingRequests", pthread_self());
 }
 
-/** 
+/**
  * Stops processing client requests.
  * Closes all client connections and the server-socket.
  *
  * @param self The server connection handler.
  */
-void stopProcessingRequests(ServerConnectionHandler* self) 
+void stopProcessingRequests(ServerConnectionHandler* self)
 {
   LOG(LEVEL_DEBUG, HDR "Enter stopProcessingRequests", pthread_self());
+  SCH_ReceiverQueue* receiverQueue = (SCH_ReceiverQueue*)self->receiverQueue;
+  stopSCHReceiverQueue(receiverQueue);
   stopServerLoop(&self->svrSock);
   LOG(LEVEL_DEBUG, HDR "Exit stopProcessingRequests", pthread_self());
 }
@@ -1109,25 +1132,25 @@ void stopProcessingRequests(ServerConnectionHandler* self)
  * @param length Length of \c packet in Bytes
  * @return \c true = sent, \c false = failed
  */
-bool broadcastPacket(ServerConnectionHandler* self, 
-                     void* packet, PacketLength length) 
+bool broadcastPacket(ServerConnectionHandler* self,
+                     void* packet, PacketLength length)
 {
   LOG(LEVEL_DEBUG, HDR "Enter broadcastPacket", pthread_self());
   bool retVal = true;
-  if (sizeOfSList(&self->clients) > 0) 
+  if (sizeOfSList(&self->clients) > 0)
   {
     SListNode*    cnode;
     ServerClient* clientPtr;
 
-    FOREACH_SLIST(&self->clients, cnode) 
+    FOREACH_SLIST(&self->clients, cnode)
     {
       clientPtr = (ServerClient*)getDataOfSListNode(cnode);
-      if (clientPtr != NULL) 
+      if (clientPtr != NULL)
       {
         if (!sendPacketToClient(&self->svrSock, clientPtr,
-                                packet, (size_t)length)) 
+                                packet, (size_t)length))
         {
-          LOG(LEVEL_DEBUG, HDR "Could not send the packet to the client", 
+          LOG(LEVEL_DEBUG, HDR "Could not send the packet to the client",
                            pthread_self());
           retVal = false;
           break;
@@ -1141,24 +1164,24 @@ bool broadcastPacket(ServerConnectionHandler* self,
 }
 
 /**
- * Allows to pre-configure the proxy Map. This function performs all mappings 
+ * Allows to pre-configure the proxy Map. This function performs all mappings
  * or none. A mapping fails if it is already made.
- * 
+ *
  * @param self The server connection handler.
  * @param mappings A mapping array of 256 elements
- * 
- * @return true if the mappings could be performed, otherwise false. In the 
+ *
+ * @return true if the mappings could be performed, otherwise false. In the
  *              later case as many mappings are performed as possible.
- * 
+ *
  * @since 0.3
  */
 bool configureProxyMap(ServerConnectionHandler* self, uint32_t* mappings)
 {
   bool addedAllToMap = true; // added all entries to map
-  int idx;  
-  
+  int idx;
+
   // check for each provided mapping and add it if possible. This takes care of
-  // duplicate configurations as well.  
+  // duplicate configurations as well.
   for (idx = 0; idx < MAX_PROXY_CLIENT_ELEMENTS; idx++)
   {
     // Go through the array and read the configured mappings
@@ -1167,44 +1190,44 @@ bool configureProxyMap(ServerConnectionHandler* self, uint32_t* mappings)
       // activate is false and configured true when passing false while adding
       if (!addMapping(self, mappings[idx], idx, NULL, false))
       {
-        RAISE_ERROR("Mapping [pid:0x%08X] <=> [cid:0x%02X] failed!", 
+        RAISE_ERROR("Mapping [pid:0x%08X] <=> [cid:0x%02X] failed!",
                     mappings[idx], idx);
         addedAllToMap = false;
       }
     }
   }
-  
+
   return addedAllToMap;
 }
 
 /**
  * Search for the internal clientID if the provided proxy ID. This will return
  * either a recently used / pre configured clientID or 0.
- * 
+ *
  * @param self The Server connection handler.
  * @param proxyID The proxy whose mapping is requested.
- * 
+ *
  * @return The id of the proxyClient or zero "0".
- * 
+ *
  * @since 0.3.0
  */
 uint8_t findClientID(ServerConnectionHandler* self, uint32_t proxyID)
 {
   int noMappings = self->noMappings;
   int clientID = 0;
-  
+
   int index = 1; // first element must not be used!!
-  
+
   if (proxyID == 0)
   {
     RAISE_ERROR ("A proxyID other than zero is required!");
   }
   else
   {
-    // Go through the list of clients until one is found that matches the proxy 
+    // Go through the list of clients until one is found that matches the proxy
     // id or no further clients are registered!
-    while ((index < MAX_PROXY_CLIENT_ELEMENTS) && (noMappings > 0))      
-    {            
+    while ((index < MAX_PROXY_CLIENT_ELEMENTS) && (noMappings > 0))
+    {
       if (self->proxyMap[index].proxyID > 0)
       {
         noMappings--;
@@ -1218,17 +1241,17 @@ uint8_t findClientID(ServerConnectionHandler* self, uint32_t proxyID)
       index++;
     }
   }
-  
-  return clientID;    
+
+  return clientID;
 }
 
 /**
  * Create a new client ID and return it.
- * 
+ *
  * @param self The ClienttConnectionHandler instance.
- * 
+ *
  * @return The newly generated clientID or zero "0" if no more are available
- * 
+ *
  * @since 0.3.0
  */
 uint8_t createClientID(ServerConnectionHandler* self)
@@ -1244,7 +1267,7 @@ uint8_t createClientID(ServerConnectionHandler* self)
     }
     index++;
   }
-    
+
   return clientID;
 }
 
@@ -1252,36 +1275,36 @@ uint8_t createClientID(ServerConnectionHandler* self)
  * Attempt to add the provided Mapping. The mapping will fail if either of
  * the provided entries is actively mapped already. Adding a mapping does not
  * alter the attribute "predefined".
- * 
+ *
  * @param self The server connection handler.
  * @param proxyID array containing "mappings" number of proxy ID's
  * @param clientID array containing "mappings" number of client ID's
  * @param cSocket The client socket, can be NULL.
- * @param activate indicates if the mapping will be immediately activated. 
+ * @param activate indicates if the mapping will be immediately activated.
  *        This should not be done for predefining mappings. If activate is false
  *        the mapping will be considered pre-configured by default
- * 
+ *
  * @return true if the mapping could be performed.
- * 
+ *
  * @since 0.3
  */
-bool addMapping(ServerConnectionHandler* self, uint32_t proxyID, 
+bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
                 uint8_t clientID, void* cSocket, bool activate)
 {
   // Assume it is not OK
   bool ok = false;
-  
+
   // first check if a mapping for the proxyID already exist
   uint8_t registeredClientID = findClientID(self, proxyID);
-  
+
   if (registeredClientID == 0)
   {
-    // The proxy is not registered yet, check a client registration        
+    // The proxy is not registered yet, check a client registration
     if (self->proxyMap[clientID].proxyID == 0)
     {
-      if (!self->proxyMap[clientID].isActive) 
-      { 
-        ok = true; 
+      if (!self->proxyMap[clientID].isActive)
+      {
+        ok = true;
       }
       else
       { // Should never occur
@@ -1297,8 +1320,8 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
     else
     {
       LOG(LEVEL_ERROR, "EM3: Attempt to map proxy[0x%08X] to client[0x%02X] "
-                       "that is already mapped to proxy[0x%08X].", proxyID, 
-                       clientID, self->proxyMap[clientID].proxyID);            
+                       "that is already mapped to proxy[0x%08X].", proxyID,
+                       clientID, self->proxyMap[clientID].proxyID);
     }
   }
   else if (registeredClientID == clientID)
@@ -1326,7 +1349,7 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
                          "mapping. Socket is different. This might indicate "
                          "a configuration failure of a proxy or the proxy "
                          "rebooted without the server noticing it.");
-      }        
+      }
     }
   }
   else // proxy is registered to a different client
@@ -1336,11 +1359,11 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
                      "a proxy or the proxy rebooted without the server "
                      "noticing it.");
   }
-  
+
   // Now if still ok, get the map element belonging to the clientID
   if (ok)
   {
-    LOG(LEVEL_INFO,"Register proxyID[0x%08X] as clientID[0x%08X]", 
+    LOG(LEVEL_INFO,"Register proxyID[0x%08X] as clientID[0x%08X]",
         proxyID, clientID);
     if (self->proxyMap[clientID].proxyID == 0)
     {
@@ -1355,12 +1378,12 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
     if (!activate)
     {
       // The mapping gets added. if not active is is considered pre-configured.
-      // If it is configured and active the configuration flag must be set 
+      // If it is configured and active the configuration flag must be set
       // outside.
       self->proxyMap[clientID].preDefined = true;
     }
   }
-  
+
   return ok;
 }
 
@@ -1368,13 +1391,13 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
  * Set the activation flag for the given client. This method returns true only
  * if a mapping for this client exist. This method only manipulates the internal
  * flag but does not alter the connectivity in any way.
- * 
+ *
  * @param self The ServerConnectionhandler instance
  * @param clientID The client id
  * @param value The new value of the active flag
- * 
+ *
  * @return true if a mapping exists.
- * 
+ *
  * @since 0.3.0
  */
 bool setActivationFlag(ServerConnectionHandler* self, uint8_t clientID,
@@ -1385,29 +1408,29 @@ bool setActivationFlag(ServerConnectionHandler* self, uint8_t clientID,
   {
     if (self->proxyMap[clientID].proxyID > 0)
     {
-      self->proxyMap[clientID].isActive = value;      
+      self->proxyMap[clientID].isActive = value;
       retVal = true;
     }
-  }  
-  
+  }
+
   return retVal;
 }
 
 
 /**
- * Attempts to delete an existing mapping. This method requires an inactive 
+ * Attempts to delete an existing mapping. This method requires an inactive
  * mapping. If the mapping is pre-defined, only the socket will be NULL'ed
- * 
+ *
  * @param self The server connection handler
  * @param clientID the client ID whose mapping has to be removed
  * @param keepWindow the keepWindow that shows how long updates are requested
  *                    to be kept in the system.
- * 
+ *
  * @return true if the mapping could be deleted.
- * 
+ *
  * @since 0.3.0
  */
-bool _delMapping(ServerConnectionHandler* self, uint8_t clientID, 
+bool _delMapping(ServerConnectionHandler* self, uint8_t clientID,
                  uint16_t keepWindow)
 {
   bool retVal = false;
@@ -1420,8 +1443,8 @@ bool _delMapping(ServerConnectionHandler* self, uint8_t clientID,
       unregisterClientID(self->updateCache, clientID, &self->proxyMap[clientID],
                          keepWindow);
     }
-        
-    if (    !self->proxyMap[clientID].preDefined 
+
+    if (    !self->proxyMap[clientID].preDefined
          && (self->proxyMap[clientID].crashed == 0))
     {
       // delete and reset this mapping, it is not expected to come back.
@@ -1429,30 +1452,30 @@ bool _delMapping(ServerConnectionHandler* self, uint8_t clientID,
       self->proxyMap[clientID].preDefined = false;
     }
     self->proxyMap[clientID].socket = NULL;
-        
+
     retVal = true;
   }
-  
+
   return retVal;
 }
 
-/** 
- * Mark the this connection as closed. In case the connection closed without a 
- * crash and it was NOT pre-configured, it attempts to delete an existing 
- * mapping. This method requires an inactive mapping.  If the mapping is 
+/**
+ * Mark the this connection as closed. In case the connection closed without a
+ * crash and it was NOT pre-configured, it attempts to delete an existing
+ * mapping. This method requires an inactive mapping.  If the mapping is
  * pre-defined, only the socket will be NULL'ed.
-* 
+*
  * @param self The ServerConnectionhandler instance
  * @param clientID The client id
  * @param crashed indicator if the connection crashed
- * @param keepWindow Indicates how long the update should remain in the system 
+ * @param keepWindow Indicates how long the update should remain in the system
  *                   before the garbage collector removes it.
- * 
+ *
  * @since 0.3.0
  * @see delMapping
  */
-void deactivateConnectionMapping(ServerConnectionHandler* self, 
-                                 uint8_t clientID, bool crashed, 
+void deactivateConnectionMapping(ServerConnectionHandler* self,
+                                 uint8_t clientID, bool crashed,
                                  uint16_t keepWindow)
 {
   struct timespec time;
@@ -1462,7 +1485,7 @@ void deactivateConnectionMapping(ServerConnectionHandler* self,
     // Don't use less than the servers configured keepWindow
     keepWindow = (uint16_t)self->sysConfig->defaultKeepWindow;
   }
-  
+
   self->proxyMap[clientID].isActive = false;
   self->proxyMap[clientID].crashed = crashed ? time.tv_sec : 0;
   _delMapping(self, clientID, keepWindow);
@@ -1470,10 +1493,10 @@ void deactivateConnectionMapping(ServerConnectionHandler* self,
 }
 
 /**
- * Set the shutdown flag. 
- * 
+ * Set the shutdown flag.
+ *
  * @param self The connection handler instance
- * 
+ *
  * @since 0.3.0
  */
 void markConnectionHandlerShutdown(ServerConnectionHandler* self)

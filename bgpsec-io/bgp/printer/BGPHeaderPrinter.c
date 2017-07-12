@@ -22,10 +22,23 @@
  *
  * Print BGP Headers in tree format
  * 
- * @version 0.2.0.0
+ * @version 0.2.0.8
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.8 - 2017/06/21 - oborchert
+ *            * BZ1163: Changed packed names to upper case to conform with 
+ *              RFC 4271
+ *  0.2.0.7 - 2017/03/10 - oborchert
+ *            * Removed '+--data (no data)' printout.
+ *            * Modified tree formating.
+ *          - 2017/03/09 - oborchert
+ *            * Removed individual printXXX_Message function with XXX equals the 
+ *              message type.
+ *            * Removed parameters 'title' and 'headerOnly' from function 
+ *              PrintBGP_Message
+ *          - 2017/03/02 - oborchert
+ *            * Added printing of open messages.
  *  0.2.0.0 - 2016/05/12 - oborchert
  *            * Fixed package printout in case no data is available.
  *  0.1.0.0 - 2015/08/19 - oborchert
@@ -39,6 +52,7 @@
 #include "bgp/printer/BGPHeaderPrinter.h"
 #include "bgp/printer/BGPUpdatePrinter.h"
 #include "bgp/printer/BGPNotificationPrinter.h"
+#include "bgp/printer/BGPOpenPrinter.h"
 #include "BGPPrinterUtil.h"
 
 /**
@@ -46,14 +60,17 @@
  * information or also the following information as hex byte stream
  * 
  * @param hdr The header to be printed
- * @param title a possible title, if NULL a generic title will be generated.
- * @param headerOnly indicates if just the generic header should be printed or
- *        the complete header.
  */
-void printBGP_Message(BGP_MessageHeader* hdr, char* title, bool headerOnly)
+void printBGP_Message(BGP_MessageHeader* hdr)
 {
-  char* myTitle = (title == NULL) ? "BGP Message" : title;
+  char* myTitle = (hdr->type == BGP_T_KEEPALIVE) ? "KEEPALIVE Message"
+                  : (hdr->type == BGP_T_UPDATE) ? "UPDATE Message"
+                  : (hdr->type == BGP_T_OPEN) ? "OPEN Message"
+                  : (hdr->type == BGP_T_NOTIFICATION) ? "NOTIFICATION Message"
+                  : "Unknown BGP Message";
   u_int16_t length = ntohs(hdr->length);
+  // In case no specialized printer exists
+  bool printData = false;
   
   printf("%s\n", myTitle);
   printf("%s+--marker: ", TAB_2);
@@ -64,92 +81,42 @@ void printBGP_Message(BGP_MessageHeader* hdr, char* title, bool headerOnly)
   }
   printf("\n");
   printf("%s+--length: %u\n", TAB_2, length);
-  printf("%s+--type:   %u ", TAB_2, hdr->type);
+  printf("%s+--type: %u ", TAB_2, hdr->type);
   switch (hdr->type)
   {
     case BGP_T_OPEN:
       printf("(OPEN)\n");
+      printOpenData((BGP_OpenMessage*)hdr);
       break;
     case BGP_T_NOTIFICATION:
       printf("(NOTIFICATION)\n");
-      if (!headerOnly)
-      {
-        printNotificationData((BGP_NotificationMessage*)hdr);
-        headerOnly = true;
-      }
+      printNotificationData((BGP_NotificationMessage*)hdr);
       break;
     case BGP_T_KEEPALIVE:
       printf("(KEEPALIVE)\n");
       break;
     case BGP_T_UPDATE:
       printf("(UPDATE)\n");
-      if (!headerOnly)
-      {
-        printUpdateData((BGP_UpdateMessage_1*)hdr);
-        headerOnly = true;
-      }
+      printUpdateData((BGP_UpdateMessage_1*)hdr);
       break;
     default:
       printf("(unknown)\n");   
+      printData = true;
   }
   
-  if (!headerOnly)
+  // In case the payload was not taken care of, add it here
+  if (printData)
   {
-    char dataStr[STR_MAX];
-    snprintf(dataStr, STR_MAX, "%s+--data:   ", TAB_2);
-    printf ("%s", dataStr);
-    memset (dataStr, ' ', strlen(dataStr));
-    
     u_int8_t* data = (u_int8_t*)hdr + sizeof(BGP_MessageHeader);
     length -= sizeof(BGP_MessageHeader);
     if (length != 0)
     {
+      char dataStr[STR_MAX];
+      snprintf(dataStr, STR_MAX, "%s+--data: ", TAB_2);
+      printf ("%s", dataStr);
+      memset (dataStr, ' ', strlen(dataStr));
+    
       printHex(data, length, dataStr);
-    }
-    else
-    {
-      printf("(no data)\n");
     }
   }
 }
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the OpenMessage header.
- */
-void printBGP_Open(BGP_OpenMessage* hdr)
-{
-  printBGP_Message((BGP_MessageHeader*)hdr, "Open Message", false);
-}
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the OKeepAliveMessage header.
- */
-void printBGP_KeepAlive(BGP_KeepAliveMessage* hdr)
-{
-  printBGP_Message((BGP_MessageHeader*)hdr, "KeepAlive Message", false);  
-}
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the NotificationMessage header.
- */
-void printBGP_Notification(BGP_NotificationMessage* hdr)
-{
-  printBGP_Message((BGP_MessageHeader*)hdr, "Notification Message", false);  
-}
-
-/**
- * Print the given header in tree format.
- * 
- * @param hdr the UpdateMessage header.
- */
-void printBGP_Update(BGP_UpdateMessage_1* hdr)
-{
-  printBGP_Message((BGP_MessageHeader*)hdr, "Update Message", false);  
-}
-

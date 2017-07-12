@@ -23,20 +23,22 @@
  * Secure Routing extension (SRx) client API - This API provides a fully
  * functional proxy client to the SRx server.
  *
- * Version: 0.4.0.0
- * 
+ * Version: 0.5.0.0
+ *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0  - 2017/06/16 - kyehwanl
+ *            * Added values to bgpsecValRegData for remote BGPsec processing.
  * 0.4.0.0  - 2016/06/19 - oborchert
- *            * redesigned the BGPSEC data blob and adjusted the code 
+ *            * redesigned the BGPSEC data blob and adjusted the code
  *              accordingly
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Removed unused variables.
  * 0.3.0    - 2013/02/27 - oborchert
  *             * Added #ifdef BZ263 for BZ263 / BZ280 handling.
  *             * Downgraded ERROR to WARNING while attempting to connect.
- *             * Changed the error management to a more broader communication 
- *               management. This resulted also in renaming some defines as well 
+ *             * Changed the error management to a more broader communication
+ *               management. This resulted also in renaming some defines as well
  *               as parameters in the proxy structure to be more meaningful.
  *             * Renamed _setProxyError into _setProxyCommCode
  *           - 2013/02/11 - oborchert
@@ -102,7 +104,7 @@ void pLog(LogLevel level, const char* fmt, va_list args);
  * generation and validation notification..
  *
  * @param vallidationReadyCallback The function the proxy calls to communicate
- *                   the validation result or changes in prior validation 
+ *                   the validation result or changes in prior validation
  *                   results to the proxy user. This can be for instance the
  *                   router or policy module, etc.
  * @param signatureReadyCallback The function, the SRx calls once the requested
@@ -113,7 +115,7 @@ void pLog(LogLevel level, const char* fmt, va_list args);
  *                   guarantee that SRx has a complete view on the validated
  *                   data within the user.
  * @param communicationMgmtCallback This function is used to allow external
- *                   management of proxy management messages and errors by 
+ *                   management of proxy management messages and errors by
  *                   assigning a handler.
  * @param proxyID    The id of the proxy used during the handshake with SRx. If
  *                   SRx is requested to generate the ID this value MUST be "0"
@@ -641,7 +643,7 @@ uint8_t* createV4Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
     numHops      = bgpsec->numberHops;
     attrLength   = bgpsec->attr_length;
   }
-  uint32_t length = sizeof(SRXPROXY_VERIFY_V4_REQUEST) + bgpsecLength; 
+  uint32_t length = sizeof(SRXPROXY_VERIFY_V4_REQUEST) + bgpsecLength;
   SRXPROXY_VERIFY_V4_REQUEST* hdr = (SRXPROXY_VERIFY_V4_REQUEST*)pdu;
 
   hdr->common.type          = PDU_SRXPROXY_VERIFY_V4_REQUEST;
@@ -656,10 +658,14 @@ uint8_t* createV4Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
   hdr->prefixAddress = prefix->ip.addr.v4;
   hdr->originAS      = htonl(as32);
   hdr->bgpsecLength  = htonl(bgpsecLength);
-  
+
   // Now store the number of hops.
   hdr->bgpsecValReqData.numHops = htons(numHops);
   hdr->bgpsecValReqData.attrLen = htons(attrLength);
+  hdr->bgpsecValReqData.valPrefix.afi  = bgpsec->afi;
+  hdr->bgpsecValReqData.valPrefix.safi = bgpsec->safi;
+  hdr->bgpsecValReqData.valData.local_as = htonl(bgpsec->local_as);
+
   if ((numHops + attrLength) != 0)
   {
     uint8_t* pduPtr = pdu + sizeof(SRXPROXY_VERIFY_V4_REQUEST);
@@ -694,8 +700,8 @@ uint8_t* createV6Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
     numHops      = bgpsec->numberHops;
     attrLength   = bgpsec->attr_length;
   }
-  uint32_t length = sizeof(SRXPROXY_VERIFY_V6_REQUEST) + bgpsecLength; 
-  
+  uint32_t length = sizeof(SRXPROXY_VERIFY_V6_REQUEST) + bgpsecLength;
+
   SRXPROXY_VERIFY_V6_REQUEST* hdr = (SRXPROXY_VERIFY_V6_REQUEST*)pdu;
 
   hdr->common.type          = PDU_SRXPROXY_VERIFY_V6_REQUEST;
@@ -710,7 +716,7 @@ uint8_t* createV6Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
   hdr->prefixAddress = prefix->ip.addr.v6;
   hdr->originAS      = htonl(as32);
   hdr->bgpsecLength  = htonl(bgpsecLength);
-  
+
   // Now store the number of hops.
   hdr->bgpsecValReqData.numHops = htons(numHops);
   hdr->bgpsecValReqData.attrLen = htons(attrLength);
@@ -721,7 +727,7 @@ uint8_t* createV6Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
     pduPtr += (numHops*4);
     memcpy(pduPtr, bgpsec->bgpsec_path_attr, attrLength);
   }
-  
+
   return pdu;
 }
 
@@ -872,7 +878,7 @@ void verifyUpdate(SRxProxy* proxy, uint32_t localID,
       }
       else
       {
-        callCMgmtHandler(proxy, COM_ERR_PROXY_COULD_NOT_SEND, 
+        callCMgmtHandler(proxy, COM_ERR_PROXY_COULD_NOT_SEND,
                                 transmissionError);
       }
     }
@@ -1043,7 +1049,7 @@ void processGoodbye(SRXPROXY_GOODBYE* hdr, SRxProxy* proxy)
 }
 
 #ifdef BZ263
-static int ct = 0; 
+static int ct = 0;
 #endif
 
 /**
@@ -1066,11 +1072,11 @@ void processVerifyNotify(SRXPROXY_VERIFY_NOTIFICATION* hdr, SRxProxy* proxy)
     SRxUpdateID updateID = ntohl(hdr->updateID);
 
 #ifdef BZ263
-    ct++;    
-    printf("#%u - uid:0x%08x lid:0x%08X (%u)\n", ct, updateID, localID, 
+    ct++;
+    printf("#%u - uid:0x%08x lid:0x%08X (%u)\n", ct, updateID, localID,
            localID);
 #endif
-    
+
     if (localID > 0 && !hasReceipt)
     {
       printf(" -> ERROR, no receipt flag set.\n");
@@ -1165,7 +1171,7 @@ void _setProxyCommCode(SRxProxy* proxy, SRxProxyCommCode mainCode, int subCode)
  *
  * @param proxy    The proxy the error occurred within.
  * @param mainCode The communication code itself.
- * @param subCode  A sub-code of the main code. This is dependent if it is 
+ * @param subCode  A sub-code of the main code. This is dependent if it is
  *                 used or not.
  *
  * @since 0.3
@@ -1201,7 +1207,7 @@ void processError(SRXPROXY_ERROR* hdr, SRxProxy* proxy)
     case SRXERR_WRONG_VERSION:
       LOG(LEVEL_ERROR, "SRx server reports compatibility issues in the "
                         "communication protocol!");
-      callCMgmtHandler(proxy, COM_ERR_PROXY_COMPATIBILITY, 
+      callCMgmtHandler(proxy, COM_ERR_PROXY_COMPATIBILITY,
                               COM_PROXY_NO_SUBCODE);
       break;
     case SRXERR_DUPLICATE_PROXY_ID:
@@ -1226,7 +1232,7 @@ void processError(SRXPROXY_ERROR* hdr, SRxProxy* proxy)
     case SRXERR_UPDATE_NOT_FOUND:
       LOG(LEVEL_NOTICE, "SRx server reports the last delete/signature request "
                          "was aborted, the update could not be found!");
-      callCMgmtHandler(proxy, COM_ERR_PROXY_UNKNOWN_UPDATE, 
+      callCMgmtHandler(proxy, COM_ERR_PROXY_UNKNOWN_UPDATE,
                               COM_PROXY_NO_SUBCODE);
       break;
     default:
@@ -1348,13 +1354,13 @@ void pLog(LogLevel level, const char* fmt, va_list args)
   }
 }
 
-/** 
+/**
  * Determines if the given code is an error code or not.
- * 
+ *
  * @param mainCode The code to be checked for an error.
- * 
- * @return true if the given code is an error. 
- * 
+ *
+ * @return true if the given code is an error.
+ *
  * @since 0.3.0
  */
 bool isErrorCode(SRxProxyCommCode code)

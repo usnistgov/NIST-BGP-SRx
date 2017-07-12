@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.2.3, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.2.4, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 

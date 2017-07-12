@@ -20,14 +20,20 @@
  * generation.
  * 
  * Known Issue:
- *   At this time only pem formated private keys can be loaded.
+ *   At this time only pem formated private keys can be loaded and the keys must
+ *   fir CURVE_ECDSA_P_256
  *
- * @version 0.2.0.0
+ * @version 0.2.0.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.3 - 2017/04/21 - oborchert
+ *             * Some bug fixes, especially in _new_pub_ecpoint2Der, 
+ *               and _getPublicKey
  *   0.2.0.0 - 2016/06/08 - oborchert
  *             * Fixed memory leak during loading of public key
+ *             * Added check to _getPublicKey to make sure the requested curve
+ *               is ECDSA_P_256
  *   0.1.2.0 - 2016/05/20 - oborchert
  *             * Removed unused defines and structures. 
  *             * cleaned up more code and streamlined implementation.
@@ -74,7 +80,7 @@ int g_loglevel=0; // need to set a certain value for debugging
 
 /**
  * Convert the ecpoint top DER format. The memory is allocated using
- * OPENSSL_malloc.
+ * regular malloc, NOT OpenSSL_malloc!!
  *  
  * @param bin_ecpoint the EC_POINT of the key.
  * 
@@ -90,6 +96,7 @@ static u_int8_t* _new_pub_ecpoint2Der(u_int8_t* bin_ecpoint)
 
   u_int8_t* pubDer = NULL;
   pubDer = malloc(SIZE_DER_PUBKEY);
+  memset(pubDer, SIZE_DER_PUBKEY, 0);
   
   if(pubDer != NULL)
   {
@@ -156,11 +163,12 @@ static bool _loadPrivKey(char* fName, BGPSecKey* key, bool checkKey)
 }
 
 /**
- * Extract the DER key from the given X509 certificate.
+ * Extract the DER key from the given X509 certificate - MUST be of 
+ * CURVE_ECDSA_P_256 only at this point.
  * 
  * @param cert The X509 Cert containing the key information
  * @param ket The BGPSEc key where the DER key will be stored in
- * @param curveID The IF of the key's curve
+ * @param curveID The ID of the key's curve (CURVE_ECDSA_P_256)
  * 
  * @return true if the key could be loaded in DER form. The DER key is stored in
  *              the given BGPSEC-Key
@@ -178,6 +186,15 @@ static bool _getPublicKey(X509* cert, BGPSecKey* key, int curveID)
   int  asn1Len = 0;
   char asn1Buff[ASN1_BUFF_SIZE];
   
+  if (curveID != CURVE_ECDSA_P_256)
+  {
+    // In case other curves will be accepted, this function needs to be 
+    // rewritten.
+    sca_debugLog(LOG_ERR, "+ [libcrypto] Unsupported curve: %i - Abort loading"
+                          " key!\n", curveID);
+    return false;
+  }
+  
   ecGroup = EC_GROUP_new_by_curve_name(curveID);
   if (ecGroup != NULL) 
   {
@@ -188,7 +205,7 @@ static bool _getPublicKey(X509* cert, BGPSecKey* key, int curveID)
       asn1Len = ASN1_STRING_length(cert->cert_info->key->public_key);
       memcpy (asn1Buff, ASN1_STRING_data(cert->cert_info->key->public_key),
               asn1Len);
-      ecdsa_key = EC_KEY_new_by_curve_name(CURVE_ECDSA_P_256);
+      ecdsa_key = EC_KEY_new_by_curve_name(curveID);
       if (ecdsa_key != NULL)
       {
         if (EC_POINT_oct2point(ecGroup, ecPointPublicKey, 
@@ -353,10 +370,12 @@ static bool _loadPubKey(char* fName, BGPSecKey* key)
  * The returned key is in DER format. The parameter fPrivate is used to
  * indicate if the private or public key will be returned. This is of importance
  * in case both keys exist. Both keys will have the same SKI.
+ * All memory in BGPSecKey is allocated using malloc.
  * 
  * This function uses OpenSSL to verify the correctness of the key itself.
  *
- * @param key Pre-allocated memory where the ley will be loaded into.
+ * @param key Pre-allocated memory where the key will be loaded into. The 
+ *            internal keyData MUST be NULL.
  * @param fPrivate indicates if the key is private or public.
  * @param fileExt The extension of the filename containing the key.
  *
@@ -373,47 +392,54 @@ int impl_loadKey(BGPSecKey* key, bool fPrivate, char* fileExt)
   bool   doTestKey = true;
   struct stat statbuf;
 
-  // Initialize memory to prevent security issues
-  memset(&keyFileName, 0, MAXPATHLEN);
-  
-  // PRoceed by determining the key/cert filename and if found, load it.
-  if (sca_FindDirInSKI(keyFileName, MAXPATHLEN, key->ski))
-  {
-    int strLen = strlen(keyFileName);
-    ptr = keyFileName + strLen;
-    if (strLen+strlen(fileExt)+1 < MAXPATHLEN)
+  if (key->keyData == NULL)
+  {  
+    // Initialize memory to prevent security issues
+    memset(&keyFileName, 0, MAXPATHLEN);  
+
+    // PRoceed by determining the key/cert filename and if found, load it.
+    if (sca_FindDirInSKI(keyFileName, MAXPATHLEN, key->ski))
     {
-      sprintf(ptr, ".%s", fileExt);
-      foundFile = (stat(keyFileName, &statbuf) == 0);
-    }
-    
-    if (foundFile)
-    { // Now we can move on loading the key
-      if (fPrivate)
+      int strLen = strlen(keyFileName);
+      ptr = keyFileName + strLen;
+      if (strLen+strlen(fileExt)+1 < MAXPATHLEN)
       {
-        if (_loadPrivKey(keyFileName, key, doTestKey))
+        sprintf(ptr, ".%s", fileExt);
+        foundFile = (stat(keyFileName, &statbuf) == 0);
+      }
+
+      if (foundFile)
+      { // Now we can move on loading the key
+        if (fPrivate)
         {
-          retVal = API_LOADKEY_SUCCESS;
+          if (_loadPrivKey(keyFileName, key, doTestKey))
+          {
+            retVal = API_LOADKEY_SUCCESS;
+          }
+        }
+        else
+        {
+          // Load the public key in DER format.
+          if (_loadPubKey(keyFileName, key))
+          {
+            retVal = API_LOADKEY_SUCCESS;
+          }
         }
       }
       else
       {
-        // Load the public key in DER format.
-        if (_loadPubKey(keyFileName, key))
-        {
-          retVal = API_LOADKEY_SUCCESS;
-        }
+        sca_debugLog(LOG_WARNING, "+ [libcrypto] Key file '%s' not found!\n", 
+                                  keyFileName);
       }
     }
     else
     {
-      sca_debugLog(LOG_WARNING, "+ [libcrypto] Key file '%s' not found!\n", 
-                                keyFileName);
+      sca_debugLog(LOG_ERR, "+ [libcrypto] failed to access a file name from a ski\n");
     }
   }
   else
   {
-    sca_debugLog(LOG_ERR, "+ [libcrypto] failed to access a file name from a ski\n");
+    sca_debugLog(LOG_ERR, "+ [libcrypto] given key instance still contains a previous loaded key!\n");    
   }
   
   return retVal;

@@ -20,10 +20,20 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.3.0.10
+ * @version 0.5.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.0 - 2017/07/05 - oborchert
+ *           * Fixed the default parameter value expected proxies to be 
+ *             initialized with the define specified in server/update_cache.h
+ *           * Fixed configuration settings. Removed bgpsec.host and bgpsec.port
+ *             and added bgpsec.srxcryptoapi_cfg and rpki.router_protocol
+ *           * Revisited the configuration parsing and removed unnecessary code.
+ *         - 2017/06/16 - oborchert
+ *           * BZ1061 fixed issue with platform dependent int type in libconfig.
+ *           * Fixed parsing of log setting and added error message if invalid
+ *             value was passed.
  * 0.3.0.10- 2016-01-08 - oborchert
  *           * Fixed type cast problems in during configuration.
  *         - 2015/11/10 - oborchert
@@ -72,11 +82,17 @@
 #include <pthread.h>
 #include "server/configuration.h"
 #include "server/srx_server.h"  // For server name and version number
+#include "server/update_cache.h"
 #include "shared/srx_defs.h"
 #include "shared/srx_packets.h" // For Protocol Version number
 #include "util/log.h"
 #include "util/prefix.h"
 #include "util/directory.h"
+
+/** Version of the router to cache protocol */
+#define RPKI_2_RTR_6810 0
+/** Version of the router to cache protocol */
+#define RPKI_2_RTR_8210 1
 
 #define CFG_PARAM_CREDITS 1
 
@@ -88,9 +104,9 @@
 
 #define CFG_PARAM_RPKI_HOST 6
 #define CFG_PARAM_RPKI_PORT 7
+#define CFG_PARAM_RPKI_ROUTER_PROTOCOL 8
 
-#define CFG_PARAM_BGPSEC_HOST 8
-#define CFG_PARAM_BGPSEC_PORT 9
+#define CFG_PARAM_SCA_CFG 9
 
 #define CFG_PARAM_MODE_NO_SEND_QUEUE 10
 #define CFG_PARAM_MODE_NO_RCV_QUEUE  11
@@ -138,9 +154,10 @@ static const struct option _LONG_OPTIONS[] = {
 
   { "rpki.host",    required_argument, NULL, CFG_PARAM_RPKI_HOST},
   { "rpki.port",    required_argument, NULL, CFG_PARAM_RPKI_PORT},
+  { "rpki.router_protocol", required_argument, NULL, 
+                                                CFG_PARAM_RPKI_ROUTER_PROTOCOL},
 
-  { "bgpsec.host",  required_argument, NULL, CFG_PARAM_BGPSEC_HOST},
-  { "bgpsec.port",  required_argument, NULL, CFG_PARAM_BGPSEC_PORT},
+  { "bgpsec.srxcryptoapi_cfg",  optional_argument, NULL, CFG_PARAM_SCA_CFG},
 
   { "mode.no-sendqueue", no_argument, NULL, CFG_PARAM_MODE_NO_SEND_QUEUE},
   { "mode.no-receivequeue", no_argument, NULL, CFG_PARAM_MODE_NO_RCV_QUEUE},
@@ -173,8 +190,10 @@ static const char* _USAGE_TEXT =
   "  -P, --console.password <pwd> Password for remote shutdown\n"
   "      --rpki.host <name>       RPKI/Router protocol server host name\n"
   "      --rpki.port <no>         RPKI/Router protocol server port number\n"
-  "      --bgpsec.host <name>     BGPSec/Router protocol server host name\n"
-  "      --bgpsec.port <no>       BGPSec/Router protocol server port number\n\n"
+  "      --rpki.router_protocol <0|1>\n"
+  "                               RPKI  to Router protocol version number\n"
+  "      --bgpsec.srxcryptoapi_cfg <configuration-file>\n"
+  "                               SRxCryptoAPI configuration file.\n\n"
   " Experimental Options:\n=====================\n"
   "      --mode.no-sendqueue      Disable send queue for immediate results.\n"
   "                               This is experimental.\n"
@@ -210,10 +229,12 @@ void initConfiguration(Configuration* self)
 
   self->rpki_host = NULL;
   self->rpki_port = -1;
+  self->rpki_router_protocol = RPKI_2_RTR_8210;
 
-  self->bgpsec_host = NULL;
-  self->bgpsec_port = -1;
-  self->expectedProxies = 1;
+  self->sca_configuration = NULL;
+  self->sca_sync_logging  = true;
+  
+  self->expectedProxies = DEFAULT_NUMBER_CLIENTS;
 
   self->mode_no_sendqueue = false;
   self->mode_no_receivequeue = false;
@@ -244,9 +265,9 @@ void releaseConfiguration(Configuration* self)
     {
       free(self->rpki_host);
     }
-    if (self->bgpsec_host != NULL)
+    if (self->sca_configuration!= NULL)
     {
-      free(self->bgpsec_host);
+      free(self->sca_configuration);
     }
   }
   LOG(LEVEL_DEBUG, HDR "Configuration objects released", pthread_self());
@@ -402,7 +423,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           return 0;
         }
         self->loglevel = strtol(optarg, NULL, 10);
-        if ((self->loglevel < LEVEL_ERROR) || (self->loglevel > LEVEL_DEBUG))
+        if ((self->loglevel < LEVEL_ERROR) || (self->loglevel > LEVEL_COMM))
         {
           RAISE_SYS_ERROR("Invalid log level ('%s')", optarg);
           return 0;
@@ -482,31 +503,19 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
           return 0;
         }
         break;
-      case CFG_PARAM_BGPSEC_HOST:
+      case CFG_PARAM_SCA_CFG:
         if (optarg == NULL)
         {
-          RAISE_ERROR("BGPSEC certificate cache host name missing!");
+          RAISE_ERROR("SRxCryptoAPI configuration file missing!");
           return 0;
         }
-        self->bgpsec_host = _duplicateString(optarg, &self->bgpsec_host,
-                                          "BGPSec certificate cache host name");
-        if (self->bgpsec_host == NULL)
+        self->sca_configuration = _duplicateString(optarg, 
+                                        &self->sca_configuration,
+                                        "SRxCryptoAPI configuration file.");
+        if (self->sca_configuration == NULL)
         {
-          RAISE_ERROR("Could not set the bgpsec host '%s'!", optarg);
-          return 0;
-        }
-        break;
-      case CFG_PARAM_BGPSEC_PORT:
-        if (optarg == NULL)
-        {
-          RAISE_ERROR("BGPSEC certificate cache port number missing!");
-          return 0;
-        }
-        self->bgpsec_port = strtol(optarg, NULL, 10);
-        if (self->bgpsec_port == 0)
-        {
-          RAISE_SYS_ERROR("Invalid BGPSec certificate cache server port "
-                          "(\'%s\')", optarg);
+          RAISE_ERROR("Could not set the SRxCryptoAPI configuration '%s'!", 
+                      optarg);
           return 0;
         }
         break;
@@ -555,24 +564,24 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
 }
 
 /**
- * Configure the provided configuration object by reading the configurartion
+ * Configure the provided configuration object by reading the configuration
  * file. The configuration object MUST be pre-allocated and the filename
  * MUST be \0 terminated.
  *
  * @param self Pointer to the Configuration object.
  * @param filename Null terminated string.
  *
- * @return false in case an error occured, otherwise true.
+ * @return false in case an error occurred, otherwise true.
  */
 bool readConfigFile(Configuration* self, const char* filename)
 {
-  bool ret = false;      // By default something went wrong
-  static config_t   cfg; // BZ647 changed to static.
-  config_setting_t* sett   = NULL;
-  const char*       strtmp = NULL;
-  bool useSyslog = 0;
-  int  boolVal   = 0;
-  long intVal    = 0;
+  bool              ret       = false; // By default something went wrong
+  static config_t   cfg;               // BZ647 changed to static.
+  config_setting_t* sett      = NULL;
+  const char*       strtmp    = NULL;
+  bool              useSyslog = 0;
+  int               boolVal   = 0;
+  LCONFIG_INT       intVal    = 0;     // BZ1061 fixed type
 
   // Added intVal to not have the libconfig library modify the configuration
   // structure. This caused all kinds of memory mess-up. The new procedure is
@@ -592,30 +601,34 @@ bool readConfigFile(Configuration* self, const char* filename)
   }
 
   // Global & server settings
-  config_lookup_bool(&cfg, "verbose", (int*)&boolVal) == CONFIG_TRUE ?
-    (self->verbose = (bool)boolVal):
-    (boolVal = 0);
+  if ( config_lookup_bool(&cfg, "verbose", (int*)&boolVal) == CONFIG_TRUE )
+  {  self->verbose = (bool)boolVal; }
 
-  config_lookup_int(&cfg, "port", &intVal) == CONFIG_TRUE ?
-    (self->server_port = (int)intVal):
-    (intVal = 0);
+  if ( config_lookup_int(&cfg, "port", &intVal) == CONFIG_TRUE )
+  { self->server_port = (int)intVal; }
 
-  config_lookup_bool(&cfg, "sync", (int*)&boolVal) == CONFIG_TRUE ?
-    (self->syncAfterConnEstablished = (bool)boolVal):
-    (boolVal = 0);
+  if ( config_lookup_bool(&cfg, "sync", (int*)&boolVal) == CONFIG_TRUE )
+  { self->syncAfterConnEstablished = (bool)boolVal; }
 
-  config_lookup_int(&cfg, "keep-window", &intVal) == CONFIG_TRUE ?
-    (self->defaultKeepWindow = (int)intVal):
-    (intVal = 0);
-
+  if ( config_lookup_int(&cfg, "keep-window", &intVal) == CONFIG_TRUE )
+  { self->defaultKeepWindow = (int)intVal; }
+  
   // Global - message destination
-  config_lookup_bool(&cfg, "syslog", (int*)&boolVal) == CONFIG_TRUE ?
-    (useSyslog = (bool)boolVal):
-    (boolVal = 0);
+  if ( config_lookup_bool(&cfg, "syslog", (int*)&boolVal) == CONFIG_TRUE )
+  { useSyslog = (bool)boolVal; }
 
-  config_lookup_int(&cfg, "loglevel", &intVal) == CONFIG_TRUE ?
-    (self->loglevel = (int)intVal):
-    (intVal = 0);
+  if (config_lookup_int(&cfg, "loglevel", &intVal) == CONFIG_TRUE)
+  {
+    if ((intVal >= LEVEL_ERROR) && ((intVal <= LEVEL_COMM)))
+    {
+      self->loglevel = (int)intVal;
+    }
+    else
+    {
+      LOG(LEVEL_ERROR, "Invalid log value [%i] specified!", intVal);
+      goto free_config;      
+    }
+  }
 
   if (config_lookup_string(&cfg, "log", &strtmp) == CONFIG_TRUE)
   {
@@ -657,68 +670,94 @@ bool readConfigFile(Configuration* self, const char* filename)
         goto free_config;
       }
     }
-    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
-      (self->console_port = (int)intVal):
-      (intVal = 0);
+    
+    if ( config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE )
+    { self->console_port = (int)intVal ; }
   }
-
-
+  else
+  {
+    LOG(LEVEL_ERROR, "Required console: { ... } settings are missing!");
+    goto free_config;
+  }
+  
   // RPKI
   sett = config_lookup(&cfg, "rpki");
   if (sett != NULL)
   {
     if (config_setting_lookup_string(sett, "host", &strtmp))
     {
-      if (self->rpki_host == NULL)
-      {
-        self->rpki_host = _duplicateString((char*)strtmp, &self->rpki_host,
-                                           "RPKI/Router host name");
-      }
+      self->rpki_host = _duplicateString((char*)strtmp, &self->rpki_host,
+                                         "RPKI Validation Cache host name");
       if (self->rpki_host == NULL)
       {
         goto free_config;
       }
     }
-    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
-      (self->rpki_port = (int)intVal):
-      (intVal = 0);
+    if ( config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE )
+    { self->rpki_port = (int)intVal; }
+
+    if ( config_setting_lookup_int(sett, "router_protocol", &intVal) 
+          == CONFIG_TRUE )
+    { 
+      self->rpki_router_protocol = (int)intVal;
+      switch (self->rpki_router_protocol)
+      {
+        case RPKI_2_RTR_6810:
+          LOG(LEVEL_INFO, "Configure router to cache protocol RFC 6810 "
+                          "(ROA only)!");
+          break;
+        case RPKI_2_RTR_8210:
+          LOG(LEVEL_INFO, "Configure router to cache protocol RFC 8210 "
+                          "(ROA / KEY)!");
+          break;
+        default:
+          LOG(LEVEL_ERROR, "Unsupported router to cache protocol!");
+          goto free_config;
+      }
+    }
+  }
+  else
+  {
+    LOG(LEVEL_ERROR, "Required rpki: { ... } settings are missing!");
+    goto free_config;
   }
 
   // BGPSec
   sett = config_lookup(&cfg, "bgpsec");
   if (sett != NULL)
   {
-    if (config_setting_lookup_string(sett, "host", &strtmp))
+    if (config_setting_lookup_string(sett, "srxcryptoapi_cfg", &strtmp))
     {
-      if (self->bgpsec_host == NULL)
+      if (self->sca_configuration == NULL)
       {
-        self->bgpsec_host = _duplicateString((char*)strtmp, &self->bgpsec_host,
-                                             "BGPSec/Router host name");
-      }
-      if (self->bgpsec_host == NULL)
-      {
-        goto free_config;
+        self->sca_configuration = _duplicateString((char*)strtmp, 
+                &self->sca_configuration, "SRXCryptoAPI configuration file.");
       }
     }
-    config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE ?
-      (self->bgpsec_port = (int)intVal):
-      (intVal = 0);
+    if (config_setting_lookup_bool(sett, "sync_logging", 
+                                   (int*)&boolVal) == CONFIG_TRUE )
+    { self->sca_sync_logging = (bool)boolVal; }
+  }
+  else
+  {
+    LOG(LEVEL_ERROR, "Required bgpsec: { ... } settings are missing!");
+    goto free_config;
   }
 
-  // Experimental
+  // optional experimental
   sett = config_lookup(&cfg, "mode");
   if (sett != NULL)
   {
-    config_setting_lookup_bool(sett, "no-sendqueue", (int*)&boolVal) == CONFIG_TRUE ?
-      (self->mode_no_sendqueue = (bool)boolVal):
-      (boolVal = 0);
+    if ( config_setting_lookup_bool(sett, "no-sendqueue", (int*)&boolVal) 
+         == CONFIG_TRUE)
+    { self->mode_no_sendqueue = (bool)boolVal; }
 
-    config_setting_lookup_bool(sett, "no-receivequeue", (int*)&boolVal) == CONFIG_TRUE ?
-      (self->mode_no_receivequeue = (bool)boolVal):
-      (boolVal = 0);
+    if ( config_setting_lookup_bool(sett, "no-receivequeue", (int*)&boolVal) 
+         == CONFIG_TRUE )
+    { self->mode_no_receivequeue = (bool)boolVal; }
   }
 
-  // mapping configuration
+  // optional mapping configuration
   sett = config_lookup(&cfg, "mapping");
   if (sett != NULL)
   {
@@ -769,11 +808,6 @@ bool isCompleteConfiguration(Configuration* self)
                 "Host name of validation cache is not set!");
   ERROR_IF_TRUE(self->rpki_port <= 0,
                 "Port number of validation cache is not set or invalid!");
-  ERROR_IF_TRUE(self->bgpsec_host == NULL,
-                "Host name of BGPSec certificate cache is not set!");
-  ERROR_IF_TRUE(self->bgpsec_port <= 0,
-                "Port number of BGPSec certificate cache is not set or "
-                "invalid!");
   ERROR_IF_TRUE(self->defaultKeepWindow <= 0,
                 "The keep-window time can not be negative!");
   ERROR_IF_TRUE(self->defaultKeepWindow > 0xFFFF,

@@ -122,6 +122,7 @@ typedef struct {
   Configuration*     sysConfig;
   
   // The internal receiver queue. NULL if not used. since 0.3.0
+  //SCH_ReceiverQueue* receiverQueue;
   void*              receiverQueue;
 } ServerConnectionHandler;
 
