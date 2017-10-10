@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.0
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/08/29 - oborchert
+ *            * BZ1225: Function doShowCount did not use the correct internal 
+ *              commands.
  * 0.5.0.0  - 2017/07/03 - oborchert
  *            * Added some initialization after free.
  *          - 2017/06/16 - oborchert
@@ -1463,20 +1466,18 @@ static void doShowUpdateID(SRXConsole* self, SRxUpdateID* updateID,
  *
  * @param self The console instance
  * @param param The parameter indicating what as to be counted.
- * @param type Determines which cache to examine, update cache or prefix cache.
  */
-static void doShowCount(SRXConsole* self, char* param, ConsoleShowType type)
+static void doShowCount(SRXConsole* self, char* param)
 {
     if (strlen(param) == 0)
     {
-      doNumUpdates(self, "num-updates", "");
-      doNumPrefixes(self, "num-updates", "");
+      doNumUpdates(self, CON_NOUPD_CMD, "");
+      doNumPrefixes(self, CON_NOPREFIX_CMD, "");
     }
     else
     {
       cmdNotSupportedYet(self);
     }
-
 }
 
 /**
@@ -1553,7 +1554,7 @@ static void doShowUpdate(SRXConsole* self, char* cmd, char* param)
   {
     //SRxUpdateID updateID = atoll(showParam);
     SRxUpdateID updateID = hexToInt(showParam);
-    doShowUpdateID(self, &updateID, MAX_ROAS_TO_DIPLAY);
+    doShowCount(self, &updateID);
   }
   else
   {

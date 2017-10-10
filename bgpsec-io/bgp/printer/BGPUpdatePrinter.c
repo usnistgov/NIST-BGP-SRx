@@ -22,10 +22,16 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Removed not used variables.
+ *            * Fixed import of headers.
+ *  0.2.0.9 - 2017/08/24 - oborchert
+ *            * Fixed BZ1192, missing "Non-transitive" for Non-transitive 
+ *              attributes.
  *  0.2.0.7 - 2017/02/16 - oborchert
  *            * Replaced hard coded value with defined value in function 
  *              __printMP_REACH_NLRI
@@ -52,7 +58,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPHeaderPrinter.h"
 #include "bgp/printer/BGPUpdatePrinter.h"
@@ -91,6 +97,10 @@ static void __printPathAttFlags(u_int8_t flags, char* tab)
   if (flags & BGP_UPD_A_FLAGS_TRANSITIVE) 
   { 
     printf(", Transitive" ); 
+  }
+  else
+  {    
+    printf(", Non-transitive" );     
   }
   
   if (flags & BGP_UPD_A_FLAGS_PARTIAL)    
@@ -303,7 +313,6 @@ static bool __printMP_REACH_NLRI(BGP_Upd_Attr_MPNLRI_1* mpnlri, int attrLen,
                                  char* tab, bool more)
 {
   char* tName   = "MP_REACH_NLRI\0";
-  char* code    = NULL;
   u_int16_t afi = 0;
   int idx       = 0;
 

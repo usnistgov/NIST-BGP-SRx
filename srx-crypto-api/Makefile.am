@@ -4,18 +4,17 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = @BGPSEC_OPENSSL@ @CRYPTO_TESTLIB@
 DIST_SUBDIRS = @BGPSEC_OPENSSL@ @CRYPTO_TESTLIB@
 
-EXTRA_DIST = $(PACKAGE_TARNAME).spec.in \
+EXTRA_DIST = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec \
+             $(PACKAGE_TARNAME)-devel-$(PACKAGE_VERSION).spec \
              srxcryptoapi_lib$(CPU_ARCH).conf
 
-.PHONY: distclean-local rpmcheck srcrpm rpms $(SUBDIRS)
+.PHONY: distclean-local rpmcheck srcrpm cleanrpm develrpm rpms $(SUBDIRS)
 
 CLEAN_SUBDIRS	= .libs .deps
 
 # Add the configuration directory as compiler setting to allow finding the 
 # location of the configuration file.
 DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\" @MCHECK@
-AM_CFLAGS = @CFLAGS@  @OPENSSL_CFLAGS@
-AM_LDFLAGS = @LDFLAGS@ @OPENSSL_LDFLAGS@
 
 if LIB_VER_INFO_COND
   LIB_VER = $(LIB_VER_INFO)
@@ -36,6 +35,8 @@ dist_libSRxCryptoAPI_libconfig_DATA = srxcryptoapi_lib$(CPU_ARCH).conf
 libSRxCryptoAPI_la_SOURCES = srxcryptoapi.c \
                              crypto_imple.c
  
+libSRxCryptoAPI_la_CFLAGS = $(OPENSSL_CFLAGS)
+
 libSRxCryptoAPI_la_LDFLAGS = -version-info $(LIB_VER) $(OPENSSL_LDFLAGS)
 
 # this follwing line for Ubuntu x86_64
@@ -56,9 +57,9 @@ dist_sysconf_DATA = srxcryptoapi.conf.sample \
 # SRxCryptoAPI Test program
 sbin_PROGRAMS = srx_crypto_tester
 
-srx_crypto_tester_LDFLAGS = $(L_FLAGS) $(LIBS) -ldl $(OPENSSL_LDFLAGS) @OPENSSL_LIBS@
+srx_crypto_tester_LDFLAGS = $(LD_FLAGS) $(LIBS) $(OPENSSL_LDFLAGS) @OPENSSL_LIBS@
 srx_crypto_tester_SOURCES = srx_api_test.c
-srx_crypto_tester_CFLAGS = @CFLAGS@ $(OPENSSL_CFLAGS)
+srx_crypto_tester_CFLAGS = $(OPENSSL_CFLAGS)
 srx_crypto_tester_LDADD = $(top_srcdir)/libSRxCryptoAPI.la
 
 distclean-local:
@@ -90,7 +91,8 @@ uninstall-local:
 RPM = rpm
 
 # RPM script and macros for SRx
-rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+rpm_spec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
+rpm_devel_spec = $(PACKAGE_TARNAME)-devel-$(PACKAGE_VERSION).spec
 
 rpmmacros =\
  --define="_rpmdir $${PWD}"\
@@ -100,7 +102,8 @@ rpmmacros =\
  --define="_builddir $${PWD}"
 
 RPMBUILD = rpmbuild
-RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+#RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+RPMFLAGS = --buildroot="$${PWD}/_rpm"
 
 rpmcheck:
 	if [ which rpmbuild &> /dev/null ]; then \
@@ -108,12 +111,20 @@ rpmcheck:
 	(exit 1); exit 1; \
 	fi
 
-srcrpm: rpmcheck $(rpmspec)
-	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)
+cleanrpm:
 
-rpms: dist rpmcheck $(rpmspec)
-	($(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)) || exit 1
+srcrpm: rpmcheck $(rpm_spec) $(rpm_devel_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpm_spec)
+	
+develrpm: dist rpmcheck $(rpm_devel_spec)
+	($(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_devel_spec)) || exit 1
 	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
 	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
 	rm -rf $(distdir)
 
+rpms: develrpm dist rpmcheck $(rpm_spec)
+	($(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_spec)) || exit 1
+	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
+	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
+	rm -rf $(distdir)
+ 

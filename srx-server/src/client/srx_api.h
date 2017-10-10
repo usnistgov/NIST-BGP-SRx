@@ -23,10 +23,13 @@
  * Secure Routing extension (SRx) client API - This API provides a fully 
  * functional proxy client to the SRx server.
  *
- * Version 0.4.0.0
+ * Version 0.5.0.2
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.2  - 2017/10/10 - oborchert
+ *            * Removed ifdef __cplusplus.
+ *            * Removed a comma from enum type
  * 0.4.0.0  - 2016/06/19 - oborchert
  *            * Modified the structure for the signaturesReady callback method
  * 0.3.0.10 - 2015/11/09 - oborchert 
@@ -61,10 +64,6 @@
  */
 #ifndef __SRX_API_H__
 #define __SRX_API_H__
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -104,7 +103,7 @@ typedef enum
   COM_PROXY_DISCONNECT=129,
           
   /** No code - needed for initialization - No subcode */
-  COM_PROXY_NONE=255,
+  COM_PROXY_NONE=255
 } SRxProxyCommCode;
 
 // Server internal error
@@ -558,9 +557,6 @@ bool setLogMode(int logMode);
  * @since 0.3.0
  */
 bool isErrorCode(SRxProxyCommCode code);
-#ifdef __cplusplus
-}
-#endif
 
 #endif // !__SRX_API_H__
 

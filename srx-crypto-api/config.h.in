@@ -31,27 +31,6 @@
 /* Define to 1 if you have the `memset' function. */
 #undef HAVE_MEMSET
 
-/* Define to 1 if you have the <openssl/bio.h> header file. */
-#undef HAVE_OPENSSL_BIO_H
-
-/* Define to 1 if you have the <openssl/ecdsa.h> header file. */
-#undef HAVE_OPENSSL_ECDSA_H
-
-/* Define to 1 if you have the <openssl/ec.h> header file. */
-#undef HAVE_OPENSSL_EC_H
-
-/* Define to 1 if you have the <openssl/err.h> header file. */
-#undef HAVE_OPENSSL_ERR_H
-
-/* Define to 1 if you have the <openssl/pem.h> header file. */
-#undef HAVE_OPENSSL_PEM_H
-
-/* Define to 1 if you have the <openssl/sha.h> header file. */
-#undef HAVE_OPENSSL_SHA_H
-
-/* Define to 1 if you have the <openssl/x509.h> header file. */
-#undef HAVE_OPENSSL_X509_H
-
 /* Define to 1 if you have the <stdarg.h> header file. */
 #undef HAVE_STDARG_H
 

@@ -23,10 +23,12 @@
  *   At this time only pem formated private keys can be loaded and the keys must
  *   fir CURVE_ECDSA_P_256
  *
- * @version 0.2.0.3
+ * @version 0.2.0.4
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.4 - 2017/09/13 - oborchert
+ *             * Fixed memset bug in _new_pub_ecpoint2Der.
  *   0.2.0.3 - 2017/04/21 - oborchert
  *             * Some bug fixes, especially in _new_pub_ecpoint2Der, 
  *               and _getPublicKey
@@ -96,7 +98,8 @@ static u_int8_t* _new_pub_ecpoint2Der(u_int8_t* bin_ecpoint)
 
   u_int8_t* pubDer = NULL;
   pubDer = malloc(SIZE_DER_PUBKEY);
-  memset(pubDer, SIZE_DER_PUBKEY, 0);
+  // Fixed memset length. 0 and length where flipped.
+  memset(pubDer, 0, SIZE_DER_PUBKEY);
   
   if(pubDer != NULL)
   {

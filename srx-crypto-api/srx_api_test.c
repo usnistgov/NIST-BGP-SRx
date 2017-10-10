@@ -26,6 +26,10 @@
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.4 - 2017/09/12 - oborchert
+ *             * Moved SCA 0.2.x into branch for further bugfixes. Trunk will
+ *               is different.
+ *             * Added missing integer type in static variable TEST_1
  *   0.2.0.3 - 2017/04/19 - oborchert
  *             * Added test parameter to arguments and restructured defines.
  *           - 2017/04/19 - oborchert
@@ -102,7 +106,7 @@ typedef struct {
 } KeyTester;
 
 static st_list* keyList = NULL;
-static st_test = TEST_1;
+static int st_test = TEST_1;
 
 /**
  * Add the key specification to the list

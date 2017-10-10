@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.2.0.3], [bgpsrx-dev@nist.gov])
+AC_INIT([SRxCryptoAPI], [0.2.0.4], [bgpsrx-dev@nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -50,68 +50,20 @@ dnl echo "current=$current"
 dnl echo "revision=$revision" 
 dnl echo "age=$age" 
 
-#
-# Check for OPENSSL Parameter
-#
-AS_BOX([Process OPENSSL Setup])
-AC_ARG_VAR(openssl_dir, Provide a different openssl directory as the default one)
-
-if test "x${openssl_dir}" = "x"; then
-  echo "Use default OPENSSL Installation"
-  OPENSSL_CFLAGS=""
-  OPENSSL_LDFLAGS=""
-  OPENSSL_CURVE_TEST=$(openssl ecparam -list_curves | grep prime256v1 | sed -e "s/\(prime256v1\):.*/-\1-/g" | sed -e "s/ //g")
-
-  AC_CHECK_HEADERS([ \
-		openssl/bio.h    \
-		openssl/ec.h     \
-		openssl/ecdsa.h  \
-		openssl/err.h    \
-		openssl/pem.h    \
-		openssl/sha.h    \
-		openssl/x509.h], \
-		[have_openssl_headers=yes], [have_openssl_headers=no])
-else
-  echo "Use custom OPENSSL Installation at '${openssl_dir}'"
-  OPENSSL_CFLAGS="-I${openssl_dir}/include"
-  OPENSSL_LDFLAGS="-L${openssl_dir}/lib"
-  OPENSSL_CURVE_TEST=$(${openssl_dir}/bin/openssl ecparam -list_curves | grep prime256v1 | sed -e "s/\(prime256v1\):.*/-\1-/g" | sed -e "s/ //g")
-  AC_CHECK_HEADERS([ \
-		${openssl_dir}/include/openssl/bio.h    \
-		${openssl_dir}/include/openssl/ec.h     \
-		${openssl_dir}/include/openssl/ecdsa.h  \
-		${openssl_dir}/include/openssl/err.h    \
-		${openssl_dir}/include/openssl/pem.h    \
-		${openssl_dir}/include/openssl/sha.h    \
-		${openssl_dir}/include/openssl/x509.h], \
-		[have_openssl_headers=yes], [have_openssl_headers=no])
-fi
-
-if test "${have_openssl_headers}" = no; then
-    AC_MSG_ERROR([
-	--------------------------------------------------
-	OpenSSL header files are missing - install 
-	openssl-devel
-	--------------------------------------------------])
-fi
-
-# Test for OPENSSL Curve availability
-if test "${OPENSSL_CURVE_TEST}" = "-prime256v1-"; then
-  echo "checking for openssl curve prime256v1... yes"
-else
-  echo "checking for openssl curve prime256v1... no"
-  AC_MSG_ERROR([
-	--------------------------------------------------
-	ECDSA curve prime256v1 not found with selected 
-	OpenSSL implementation.
-	--------------------------------------------------])
-fi
-
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
+
+#
+# Check for CPU architecture
+#
+CPU_ARCH_FLAG=
+SRX_M4_CHECK_ARCH([CPU_ARCH], [CPU_ARCH_FLAG], [CPU_])
+if test "${libdir}" = "\${exec_prefix}/lib" ; then
+  libdir="${libdir}$CPU_ARCH"
+fi
 
 #
 # Checks for libraries.
@@ -122,35 +74,13 @@ AC_SEARCH_LIBS([dlopen], [dl])
 ##
 ## CHECK FOR config library
 ##
-have_config=no
-AC_SEARCH_LIBS([config_init], [config], [have_config=yes])
-if test "${have_config}" = no; then
-  AC_MSG_ERROR([
-	--------------------------------------------------
-	The config library required to build srx_server.
-	For Fedora/CentOS please install "libconfig and libconfig-devel"
-	--------------------------------------------------])
-else  
-  AC_CHECK_HEADERS([libconfig.h], [have_headers=yes], [have_headers=no])
-  if test "${have_headers}" = no; then
-    AC_MSG_ERROR([
-	--------------------------------------------------
-	libconfig.h is missing, install the libconfig 
-	header. For fedora/CentOS install libconfig-devel.
-	--------------------------------------------------])
-  else
-    # Now specify which int type to use which depends on the library type.
-    AC_MSG_CHECKING(for libconfig int type)
-    ldconfig -v 2>/dev/null | grep libconfig.so.8 > /dev/null
-    if test "$?" = "0"; then      
-      LCONFIG_INT=long
-    else
-      LCONFIG_INT=int
-   fi
-   CFLAGS="$CFLAGS -DLCONFIG_INT=$LCONFIG_INT"
-  fi
-  AC_MSG_RESULT([$LCONFIG_INT])
-fi
+SRX_M4_CHECK_LIBCONFIG()
+
+#
+# Check for OPENSSL Parameter
+#
+AS_BOX([Process OPENSSL Setup])
+SRX_M4_CHECK_OPENSSL($CPU_ARCH, OPENSSL_LIBS, [OPENSSL_CFLAGS], [OPENSSL_LDFLAGS])
 
 # General checks for header files.
 AS_BOX([Process header files])
@@ -219,7 +149,7 @@ AC_SUBST(incl_la_lib)
 AS_BOX([Process which components to be added])
 
 #
-# BGPSEC-OPENSSL
+# Add Module BGPSEC-OPENSSL
 #
 CONFIG_MODULES=""
 AC_MSG_CHECKING([whether module bgpsec-openssl will be added])
@@ -243,7 +173,7 @@ else
 fi
 
 #
-# TESTLIB
+# Add Module TESTLIB
 #
 AC_MSG_CHECKING([whether module testlib will be added])
 AC_ARG_WITH(testlib,
@@ -256,52 +186,29 @@ else
   CRYPTO_TESTLIB=""
 fi
 
-# Determine if it is 64 or 32 bit architecture
-AS_BOX([Processing system and compiler setup])
-AC_MSG_CHECKING([host architecture information])
-is_64_bit="no"
-case "$HOSTTYPE" in
-  x86_64) 
-     is_64_bit="yes"
-     ;;
-  x86_64-linux) 
-     is_64_bit="yes"
-     ;;
-  *) 
-     CPU_ARCH_FLAG=""
-     CPU_ARCH=""
-     ;;
-esac
-if test "${is_64_bit}" = "yes"; then
-  CPU_ARCH_FLAG="-DCPU_64"
-  CPU_ARCH="64"
-  if test "${libdir}" = "\${exec_prefix}/lib" ; then
-    libdir="${libdir}64"
-  fi
-fi
-AC_MSG_RESULT([$CPU_ARCH bit])
-
 LIB_VER_INFO=$current:$revision:$age
 VER_INFO=$current.$age.$revision
 
-# Check the CFLAGS 
-if test "$CFLAGS" = "-g -O2"; then
- CFLAGS="-g -O0 -Wall $CPU_ARCH_FLAG"
-else
- CFLAGS="$CFLAGS $CPU_ARCH_FLAG"
-fi
+#
+# Check the CFLAGS
+#
+AS_BOX([Processing CFLAGS setting])
+srx_cflags=
+for srx_cflag in $CFLAGS; do
 
-# Check if crypto libraries will be dynamically or statically linked
-AC_MSG_CHECKING([whether to link openssl libraries static or dynamic])
-AC_ARG_ENABLE(static-openssl,
-              [  --enable-static-openssl enable openssl being linked statically])
-if test "${enableval}" = "yes" ; then
-  AC_MSG_RESULT([static])
-  OPENSSL_LIBS="-Wl,-Bstatic -lssl -Wl,-Bstatic -lcrypto"
-else
-  AC_MSG_RESULT([dynamic])
-  OPENSSL_LIBS="-lssl -lcrypto"
-fi
+  if test "x$srx_cflag" = "x-O2"; then
+    AC_MSG_NOTICE([Found CFLAGS -O2 setting, change it to -O0])
+    srx_cflag="-O0"
+  fi
+
+  if test "x$srx_cflags" = "x"; then
+    srx_cflags="$srx_cflag"
+  else
+    srx_cflags="$srx_cflags $srx_cflag"
+  fi
+
+done
+CFLAGS="$srx_cflags $CPU_ARCH_FLAG"
 
 dnl ----------
 dnl Some automake conditions
@@ -433,6 +340,7 @@ AC_SUBST([DOLLAR_SIGN],[$])
 # Use this if one of the 'Makefile.am ' files are modified prior autoreconf -i
 AC_CONFIG_FILES([Makefile bgpsec_openssl/Makefile crypto_testlib/Makefile \
                  srxcryptoapi-$PACKAGE_VERSION.spec:srxcryptoapi.spec.in \
+                 srxcryptoapi-devel-$PACKAGE_VERSION.spec:srxcryptoapi-devel.spec.in \
                  srxcryptoapi_lib$CPU_ARCH.conf:srxcryptoapi_lib.conf.in])
 
 #
@@ -450,6 +358,7 @@ echo "Configured...: AC_PACKAGE_NAME V AC_PACKAGE_VERSION"
 echo "Library......: $VER_INFO ($LIB_VER_INFO)"
 echo "CPU Arch.....: $CPU_ARCH"
 echo "CFLAGS.......: $CFLAGS"
+echo "LIBS.........: $LIBS"
 echo "LDFLAGS......: $LDFLAGS"
 echo "LIBDIR.......: ${libdir}"
 echo "LCONFIG_INT..: $LCONFIG_INT"

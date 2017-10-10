@@ -27,26 +27,28 @@
  *   (see SERVICE_TIMER_INTERVAL)
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
- * 
- * @version 0.5.0.0
+ *
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/09/25 - oborchert
+ *            * Fixed compiler warnings.
  * 0.5.0.0  - 2017/07/08 - oborchert
  *            * Fixed some prompt handling in console
- *            * BZ1185: fixed issue with 'cache' command showing all entries 
+ *            * BZ1185: fixed issue with 'cache' command showing all entries
  *              as SKI's
  *            * Added '*' to allow switching between auto complete and browsing
  *              the file system.
  *          - 2017/07/07 - oborchert
  *            * BZ1183: Fixed issues with history.
- *            * Added auto completion in command window (use tab) 
+ *            * Added auto completion in command window (use tab)
  *          - 2017/06/05 - oborchert
- *            * Added parameter -D <level> to set debug level. 
+ *            * Added parameter -D <level> to set debug level.
  *              Moved current debug level to LEVEL_ERROR
- *            * fixed segmentation fault for addKey with missing parameters. 
+ *            * fixed segmentation fault for addKey with missing parameters.
  *            * Modified the ley loading aligning it with the command set of
- *              prefix loading. 
+ *              prefix loading.
  *            * Added keyLoc to provide a key location folder
  *            * Added addKeyNow
  *          - 2017/06/16 - kyehwanl
@@ -1141,7 +1143,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   uint32_t       oas;
   ValCacheEntry* cEntry;
   bool           goOn=true;
- 
+
   #define SKIP_IF(COND, MSG, VAR) \
     if (COND)                     \
     {                             \
@@ -1166,7 +1168,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
       return false;
     }
   }
-  
+
   // Read line by line
   for (; goOn; lineNo++)
   {
@@ -1279,7 +1281,7 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
       cEntry->asNumber = htonl(oas);
     }
   }
-  
+
   if (isFile)
   {
     fclose(fh);
@@ -1379,7 +1381,7 @@ int showHelp(char* command)
            "                 Display this screen or detailed help for the\n"
            "                 given command!\n"
            "  - credits\n"
-           "                 Display credits information!\n"      
+           "                 Display credits information!\n"
            "\n"
            "Cache Commands:\n"
            "-----------------\n"
@@ -1578,11 +1580,11 @@ unsigned char hex2bin_byte(char* in)
 
 /**
  * Read the router key certificate file.
- * 
+ *
  * @param arg the arguments (asn algoid certFile)
  * @param dest The list where to store it in
  * @param serial The serial number
- * 
+ *
  * @return true if the cert could be read or not.s
  */
 bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
@@ -1597,7 +1599,7 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
 
   char           streamBuf[COMMAND_BUF_SIZE];
   char*          bptr;
-  
+
   if (arg == NULL)
   {
     ERRORF("Error: Data missing: <as> <algo-id> <cert file>\n");
@@ -1609,13 +1611,13 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
 
   char* asnStr     = strsep(&bptr, " \t");
   char* _certFile  = strsep(&bptr, " \t");
-  
+
   if (_certFile == NULL)
   {
     ERRORF("Error: Data missing: <as> <cert file>\n");
     return false;
   }
-  
+
   char certFile[512];
   snprintf(certFile, 512, "%s/%s", keyLocation, _certFile);
 
@@ -1640,7 +1642,7 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
 
   fseek(fpKey, OFFSET_SKI, SEEK_SET);
   // read two times of SKI_SIZE(20 bytes) because of being written in a way of ASCII
-  skiLength = (u_int16_t)fread(&buffSKI_asc, sizeof(char), SKI_LENGTH * 2, 
+  skiLength = (u_int16_t)fread(&buffSKI_asc, sizeof(char), SKI_LENGTH * 2,
                                fpKey);
 
   int idx;
@@ -1648,16 +1650,16 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
   {
     buffSKI_bin[idx] = hex2bin_byte(buffSKI_asc+(idx*2));
   }
-  
+
   // new instance to append
   cEntry = (ValCacheEntry*)appendToSList(dest, sizeof(ValCacheEntry));
-  
+
   if (cEntry == NULL)
   {
     fclose(fpKey);
     return false;
   }
-  
+
   cEntry->serial          = cEntry->prevSerial = serial++;
   cEntry->expires         = 0;
   cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT;
@@ -1681,9 +1683,9 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
 
 /**
  * Append the given public router key to the cache.
- *  
+ *
  * @param line the arguments line.
- * 
+ *
  * @return true if the key could be added.
  */
 bool appendRouterKeyData(char* line)
@@ -1755,9 +1757,9 @@ int appendPrefixNow(char* line)
 
 /**
  * Append the key cert to the cache.
- * 
+ *
  * @param line The command line
- * 
+ *
  * @return CMD_ID_ADDKEY
  */
 int appendRouterKey(char* line)
@@ -1773,9 +1775,9 @@ int appendRouterKey(char* line)
 
 /**
  * Append the key cert to the cache.
- * 
+ *
  * @param line The command line
- * 
+ *
  * @return CMD_ID_ADDKEY
  */
 int appendRouterKeyNow(char* line)
@@ -1795,10 +1797,10 @@ int appendRouterKeyNow(char* line)
 
 /**
  * Set the key location
- * 
+ *
  * @param line the location where the keys are stored (if null the key location
  *             will be removed.)
- * 
+ *
  * @return CMD_ID_KEY_LOC
  */
 int setKeyLocation(char* line)
@@ -1808,8 +1810,8 @@ int setKeyLocation(char* line)
     line = ".\0";
   }
   snprintf(keyLocation, LINE_BUF_SIZE, "%s", line);
-    
-  return CMD_ID_KEY_LOC; 
+
+  return CMD_ID_KEY_LOC;
 }
 
 /**
@@ -2244,15 +2246,15 @@ char* command_generator(const char *text, int state)
   static int list_index, len;
   char *name;
 
-  if (!state) 
+  if (!state)
   {
     list_index = 0;
     len = strlen(text);
   }
 
-  while ((name = commands[list_index++])) 
+  while ((name = commands[list_index++]))
   {
-    if (strncmp(name, text, len) == 0) 
+    if (strncmp(name, text, len) == 0)
     {
       return strdup(name);
     }
@@ -2298,10 +2300,10 @@ int handleLine(char* line)
   CMD_CASE("add",       appendPrefix);
   CMD_CASE("addNow",    appendPrefixNow);
   CMD_CASE("keyLoc",    setKeyLocation);
-  CMD_CASE("addKey",    appendRouterKey);    
+  CMD_CASE("addKey",    appendRouterKey);
   CMD_CASE("addKeyNow", appendRouterKeyNow);
   CMD_CASE("remove",    removeEntries);
-  CMD_CASE("removeNow", removeEntriesNow);  
+  CMD_CASE("removeNow", removeEntriesNow);
   CMD_CASE("error",     issueErrorReport);
   CMD_CASE("notify",    sendSerialNotifyToAllClients);
   CMD_CASE("reset",     sendCacheResetToAllClients);
@@ -2358,7 +2360,7 @@ void handleUserInput()
     snprintf(cmdLine, 255, line);
     snprintf(historyLine, 255, line);
     free(line);
-    
+
     // Empty line - ignore
     if (strlen(cmdLine) == 0)
     {
@@ -2377,10 +2379,10 @@ void handleUserInput()
       add_history(historyLine);
     }
   }
-  
+
   if (write_history(HISTORY_FILENAME) != 0)
   {
-    printf("Failed writing history file '%'\n", HISTORY_FILENAME);
+    printf("Failed writing history file '%s'\n", HISTORY_FILENAME);
   }
 }
 
@@ -2405,6 +2407,21 @@ void deleteExpiredEntriesFromCache(time_t now)
     {
       cache.minPSExpired = MIN(cache.minPSExpired, cEntry->prevSerial);
       cache.maxSExpired  = MAX(cache.maxSExpired, cEntry->serial);
+
+      // free ski and key allocations
+      if(cEntry->isKey)
+      {
+        if (cEntry->ski)
+        {
+          free(cEntry->ski);
+          cEntry->ski = NULL;
+        }
+        if (cEntry->pPubKeyData)
+        {
+          free(cEntry->pPubKeyData);
+          cEntry->pPubKeyData = NULL;
+        }
+      }
 
       deleteFromSList(&cache.entries, cEntry);
       removed++;
@@ -2566,7 +2583,7 @@ static bool parseParams(int argc, const char* argv[],
               printf ("  Accepted values range from ERROR(%i) to DEBUG(%i)\n",
                       LEVEL_ERROR, LEVEL_DEBUG);
               retVal = false;
-              eVal   = 1;              
+              eVal   = 1;
             }
           }
           else
@@ -2647,7 +2664,7 @@ int main(int argc, const char* argv[])
   setKeyLocation(NULL);
 
   setLogLevel(LEVEL_WARNING);
-  
+
   if (!parseParams(argc, argv, &config, &ret))
   {
     return ret;
@@ -2736,6 +2753,6 @@ int main(int argc, const char* argv[])
   releaseRWLock(&cache.lock);
   releaseSList(&cache.entries);
   memset(keyLocation, 0, LINE_BUF_SIZE);
-  
+
   return ret;
 }

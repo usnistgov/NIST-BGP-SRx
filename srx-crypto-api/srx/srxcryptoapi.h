@@ -19,10 +19,12 @@
  * BGPSEC implementations. This library allows to switch the crypto 
  * implementation dynamically.
  *
- * @version 0.2.0.3
+ * @version 0.2.0.4
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.4 - 2017/09/15 - oborchert
+ *             * Added more documentation. 
  *   0.2.0.3 - 2017/07/09 - oborchert
  *             * Added define ECDSA_PUB_KEY_DER_LENGTH
  *           - 2017/04/20 - oborchert
@@ -266,20 +268,80 @@ typedef struct
 } __attribute__((packed)) SCA_Prefix;
 
 /** 
- * This structure is used as a helper to quickly access the data within the 
- * digest for the hash calculation. No parsing through the structure is 
- * necessary anymore.
+ * This structure is used as a helper. It does have pointers into the 
+ * hashMessage to quickly access the data within the digest.
+   if Provided, No parsing through the structure is necessary anymore.
+ * 
+ * The pointers are explained more in detail in the next data structure
  */
 typedef struct 
 {
+  /** Points to the signature of the hash Message. Only the last element must
+   * have a NULL pointer. All others must point to the signature corresponding 
+   * to the hash message pointer. */
   u_int8_t* signaturePtr;
+  /** Points to the hash Message (buffer) which is signed over.*/
   u_int8_t* hashMessagePtr;
+  /** Contains the length of the buffer. */
   u_int16_t hashMessageLength;
 } SCA_HashMessagePtr;
 
 /** This structure will be generated during the digest generation. It can be
  * provided to the validate caller but the API is not required to use the 
- * hash input message (buffer) and can create it's own instead. */
+ * hash input message (buffer) and can create it's own instead.
+ * 
+ * The hash message itself (input for the hash algorithm) has the following 
+ * format (RFC 8205):
+ * 
+ * ------+===================================+
+ *  S    || pCount             ( 1 Octet  ) ||
+ *  e    |+---------------------------------+|
+ *  g    || flags              ( 1 Octet  ) ||
+ *       |+-----------------------------------<>===========(hashMessagePtr[N-1]==buffer)
+ *  N-1  || ASN - target N-1 - ( 4 Octets ) ||           \
+ * ------+===================================+           |
+ *       ...                                             |
+ * ------+===================================+<>===========(signaturePtr[1])
+ *  S    || SKI                (20 octets)  ||           |
+ *  i    |+---------------------------------+|           |
+ *  g    || Sig Length         (2 octets)   ||           |
+ *       |+---------------------------------+|           |
+ *  1 /--|| Signature          (variable)   ||           |
+ * ---|--+===================================+         h |
+ *  S |  || pCount             ( 1 Octet  ) ||         a |
+ *  e |  |+---------------------------------+|         s |
+ *  g |  || flags              ( 1 Octet  ) ||         h |
+ *    \->+------------------------------------<>===========(hashMessagePtr[1]==buffer)
+ *  2    || ASN - target 2 -   ( 4 Octets ) ||       \   |
+ * ------+===================================+<>===========(signaturePtr[0])
+ *  S    || SKI                (20 octets)  ||       | M |
+ *  i    |+---------------------------------+|       | e |
+ *  g    || Sig Length         (2 octets)   ||       | s |
+ *       |+---------------------------------+|       | s |
+ *  0 /--|| Signature          (variable)   ||       | a |
+ * ---|--+===================================+     h | g |
+ *  S |  || pCount             ( 1 Octet  ) ||     a | e |
+ *  e |  |+---------------------------------+|     s |   |
+ *  g |  || flags              ( 1 Octet  ) ||     h | 2 |
+ *    \->+------------------------------------<>===========(hashMessagePtr[0]==buffer)
+ *  1    || ASN - target 1 - ( 4 Octets )   ||   \ M |   |  
+ * ------+===================================+ h | e |   |
+ *  S    || pCount             ( 1 Octet  ) || a | s |   |
+ *  e    |+---------------------------------+| s | s |   |
+ *  g    || flags              ( 1 Octet  ) || h | a |   |
+ *       |+---------------------------------+|   | g |   |
+ *  0    || ASN - origin 0 -   ( 4 Octets ) || M | e |   |
+ * ------+===================================+ e |   |   |
+ *       | Algorithm Suite Identifier        | s | 1 |   |
+ * ------+===================================+ s |   |   |
+ *  N    || AFI                             || a |   |   |
+ *  L    |+---------------------------------+| g |   |   |
+ *  R    || SAFI                            || e |   |   |
+ *  I    |+---------------------------------+|   |   |   |
+ *       || Prefix                          || 0 |   |   |
+ * ------+===================================+---/---/---/
+ *
+ */
 typedef struct 
 {
   /** Indicates if the memory of the signature buffer is maintained by the API. 
@@ -288,22 +350,29 @@ typedef struct
    * instance of SCA_HashMessage must be freed by the user as well.
    */
   bool      ownedByAPI;
-  /** number of segments in this buffer. */
-  u_int16_t segmentCount;
-  /** maximum size of the buffer. */
+  
+  /** Size of the buffer. */
   u_int32_t bufferSize;
-  /** The buffer itself. The first 4 bytes are reserved for the target AS used
-   * for signing. Then followed by the last Signature, followed by 2 reserved 
-   * bytes to be used for this hosts flag and pCount value. Then the digest for 
-   * the signature starts. Therefore the digest of each signature starts at 
-   * signatureLength + 2 bytes. The digestLen is calculated as followed:
+  
+  /** The buffer itself. The first 4 bytes are reserved for the target AS (peer)
+   * where the update will be send to.Then followed by the last Signature, 
+   * followed by 2 reserved bytes to be used for this hosts flag and pCount 
+   * value. Then the digest for the signature starts. Therefore the digest of 
+   * each signature starts at signatureLength + 2 bytes. 
+   * The digestLen is calculated as followed:
    * usedBuffer - (currAddr-bufferAddr) with currAddr the pointer address of
-   * the ASN where the signature is signed to and bufferAdd the buffer pointer 
+   * the ASN where the signature is signed to and bufferAddr the buffer pointer 
    * itself.*/
   u_int8_t* buffer;
+  
+  /** Number of segments in this buffer 
+   * (size of the hashMessageValPtr array below). */
+  u_int16_t segmentCount;
+  
   /** This array contains one element for each segment. The pointers reach into 
    * the buffer for easy access during validation. */
   SCA_HashMessagePtr** hashMessageValPtr;
+  
 } SCA_HashMessage;
 
 /**
@@ -330,10 +399,51 @@ typedef struct
   u_int8_t* sigBuff;
 } SCA_Signature;
 
+/**
+ * This structure is used as input for the sign message. 
+ */
+typedef struct
+{
+  /** The peer to whom to send the data to (network format). */
+  u_int32_t peerAS;
+  /** The information of this host (network format) */
+  SCA_BGPSEC_SecurePathSegment* myHost;
+  /** The prefix information - will only be used if the digest or digest buffer
+   * is empty (NULL) */
+  SCA_Prefix* nlri;
+  /** The SKI for the private key. */
+  u_int8_t* ski;      
+  /** The algorithm ID. */
+  u_int8_t algorithmID;
+  
+  /** The status of the sign operation. */
+  sca_status_t status;
+  
+  /** Must not be null. IN case this data is not provided by a previous validate 
+   * call then this API provides two generation functions 
+   * sca_generateHashMessage for updates received that need to be forwarded or 
+   * sca_generateOriginHashMessage for an update that will be originated. 
+   * Also the pCount, Flags, and Peer MUST be set correctly. 
+   * This DATA is READ ONLY and must not be altered as long as the sign function
+   * has this data.
+   */
+  SCA_HashMessage*  hashMessage;
+  
+  /** OUT only. The signature segment - MUST BE NULL when passed into sign 
+   * function. The memory is allocated within the API. */
+  SCA_Signature* signature;
+} SCA_BGPSecSignData;
+
+
 /** 
- * This structure has to be filled by the user of the API. all fields except 
- * the digest field is an input field. It might be returned to the caller
- * but the API is responsible to removing it.
+ * the memory for this structure must be allocated by the user of the API.
+ * It is the input data into the validation process. The API itself will
+ * create and allocate the HashMessages and assign them to the hashMessage 
+ * array.
+ * All fields except the hashMessage array fields are input fields. 
+ * The array will be filled by the API and returned to the caller. The API is 
+ * responsible to removing it. for this the caller uses the API's 
+ * freeHashMessage function.
  */
 typedef struct
 {
@@ -350,29 +460,6 @@ typedef struct
   SCA_HashMessage*  hashMessage[2];
 } SCA_BGPSecValidationData;
 
-
-typedef struct
-{
-  /** The peer to whom to send the data to (network format). */
-  u_int32_t peerAS;
-  /** The information of this host (network format) */
-  SCA_BGPSEC_SecurePathSegment* myHost;
-  /** The prefix information - will only be used if the digest or digest buffer 
-   * is empty (NULL)*/
-  SCA_Prefix* nlri;
-  /** The SKI for the private key. */
-  u_int8_t* ski;      
-  /** The algorithm ID. */
-  u_int8_t algorithmID;
-  /** The status */
-  sca_status_t status;
-  /** The message digest (IF NULL an internal one will be generated, if not null
-   * it is expected it contains enough space to fill in the peerAS and myHost 
-   * information. */
-  SCA_HashMessage*  hashMessage;
-  /** The signature segment. The memory is allocated within the API. */
-  SCA_Signature* signature;
-} SCA_BGPSecSignData;
 
 #define MAX_CFGFILE_NAME 255
 

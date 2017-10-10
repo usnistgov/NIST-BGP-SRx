@@ -19,7 +19,7 @@ bgpsecio_SOURCES = ASList.c \
                    updateStackUtil.c \
                    bgpsec/Crypto.c \
                    bgpsec/BGPSecPathBin.c \
-		   bgp/BGPFinalStateMachine.c \
+                   bgp/BGPFinalStateMachine.c \
                    bgp/BGPHeader.c \
                    bgp/printer/BGPPrinterUtil.c \
                    bgp/printer/BGPUpdatePrinter.c \
@@ -33,28 +33,28 @@ bgpsecio_SOURCES = ASList.c \
                    bgpsecio.c
 
 noinst_HEADERS = \
-		  player/player.h \
-		  updateStackUtil.h \
-		  ASList.h          \
-		  cfg/cfgFile.h     \
-		  cfg/configuration.h  \
-		  ASNTokenizer.h       \
-		  bgpsec/Crypto.h      \
-		  bgpsec/BGPSecPathBin.h  \
-		  bgp/BGPHeader.h         \
-		  bgp/printer/BGPNotificationPrinter.h \
-		  bgp/printer/BGPHeaderPrinter.h       \
-		  bgp/printer/BGPPrinterUtil.h         \
-		  bgp/printer/BGPOpenPrinter.h         \
-		  bgp/printer/BGPUpdatePrinter.h       \
-		  bgp/BGPSession.h                     \
-		  bgp/BGPFinalStateMachine.h           \
-		  config.h                             \
-		  antd-util/printer.h                  \
-		  antd-util/prefix.h                   \
-		  antd-util/linked_list.h              \
-		  antd-util/log.h                      \
-		  antd-util/stack.h
+                   player/player.h \
+                   updateStackUtil.h \
+                   ASList.h          \
+                   cfg/cfgFile.h     \
+                   cfg/configuration.h  \
+                   ASNTokenizer.h       \
+                   bgpsec/Crypto.h      \
+                   bgpsec/BGPSecPathBin.h  \
+                   bgp/BGPHeader.h         \
+                   bgp/printer/BGPNotificationPrinter.h \
+                   bgp/printer/BGPHeaderPrinter.h       \
+                   bgp/printer/BGPPrinterUtil.h         \
+                   bgp/printer/BGPOpenPrinter.h         \
+                   bgp/printer/BGPUpdatePrinter.h       \
+                   bgp/BGPSession.h                     \
+                   bgp/BGPFinalStateMachine.h           \
+                   config.h                             \
+                   antd-util/printer.h                  \
+                   antd-util/prefix.h                   \
+                   antd-util/linked_list.h              \
+                   antd-util/log.h                      \
+                   antd-util/stack.h
 
 # Crypto Key generation tools
 dist_bin_SCRIPTS = tools/bio-traffic.sh
@@ -63,16 +63,17 @@ AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 
 bgpsecio_LDADD = $(top_srcdir)/antd-util/libantd_util.la
 
-bgpsecio_CFLAGS = $(CFLAGS) $(OPENSSL_CFLAGS) $(SCA_CFLAGS)
+bgpsecio_CFLAGS = $(CFLAGS) $(SCA_CFLAGS) $(OPENSSL_CFLAGS)
 
-bgpsecio_LDFLAGS = $(L_FLAGS) $(LIBS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
+bgpsecio_LDFLAGS = $(LDFLAGS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
                    -ldl \
                    -lm \
                    -lrt \
                    -lconfig \
-                   -lSRxCryptoAPI \
-                   @OPENSSL_LIBS@
-                   
+                   @OPENSSL_LIBS@ \
+                   $(SCA_LIBS) \
+                   $(LIBS)
+
 ################################################################################
 ##  RPM Section
 ################################################################################
@@ -92,7 +93,8 @@ rpmmacros =\
  --define="_builddir $${PWD}"
 
 RPMBUILD = rpmbuild
-RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+#RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+RPMFLAGS = --buildroot="$${PWD}/_rpm"
 
 rpmcheck:
 	if [ which rpmbuild &> /dev/null ]; then \
@@ -104,7 +106,7 @@ srcrpm: rpmcheck $(rpmspec)
 	($(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)) || exit 1
 
 rpms: dist rpmcheck $(rpmspec)
-	($(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)) || exit 1
+	($(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpmspec)) || exit 1
 	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
 	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
 	rm -rf $(distdir)

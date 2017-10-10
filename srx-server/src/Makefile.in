@@ -46,15 +46,18 @@ DIST_COMMON = README $(am__configure_deps) \
 	$(dist_libSRxProxy_libconfig_DATA) $(dist_srx_config_DATA) \
 	$(dist_srx_initd_DATA) $(noinst_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(srcdir)/srx-proxy.spec.in $(srcdir)/srx.spec.in \
-	$(top_srcdir)/client/srxproxy.conf.in $(top_srcdir)/configure \
-	$(top_srcdir)/server/srx_serverd.in AUTHORS COPYING ChangeLog \
-	INSTALL NEWS compile config.guess config.sub depcomp \
-	install-sh ltmain.sh missing
+	$(srcdir)/srx-proxy-devel.spec.in $(srcdir)/srx-proxy.spec.in \
+	$(srcdir)/srx.spec.in $(top_srcdir)/client/srxproxy.conf.in \
+	$(top_srcdir)/configure $(top_srcdir)/server/srx_serverd.in \
+	AUTHORS COPYING ChangeLog INSTALL NEWS compile config.guess \
+	config.sub depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/srx_m4_check_arch.m4 \
+	$(top_srcdir)/m4/srx_m4_check_libconfig.m4 \
+	$(top_srcdir)/m4/srx_m4_check_libraries.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -199,14 +202,10 @@ CCDEPMODE = @CCDEPMODE@
 CFG_PREFIX = @CFG_PREFIX@
 CFG_SYSCONFIG = @CFG_SYSCONFIG@
 CFLAGS = @CFLAGS@
-CONFIG_INT = @CONFIG_INT@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CPU_ARCH = @CPU_ARCH@
-CXX = @CXX@
-CXXCPP = @CXXCPP@
-CXXDEPMODE = @CXXDEPMODE@
-CXXFLAGS = @CXXFLAGS@
+CPU_ARCH_FLAGS = @CPU_ARCH_FLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 DEPDIR = @DEPDIR@
@@ -219,6 +218,8 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GREP = @GREP@
+HAVE_LIBCONFIG = @HAVE_LIBCONFIG@
+HAVE_LIBSRxCryptoAPI = @HAVE_LIBSRxCryptoAPI@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -227,13 +228,10 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LCONFIG_INT = @LCONFIG_INT@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
-LD_ARCH_LOC = @LD_ARCH_LOC@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIB_PATRICIA = @LIB_PATRICIA@
-LIB_SCA = @LIB_SCA@
-LIB_SCA_LDFLAGS = @LIB_SCA_LDFLAGS@
 LIB_VER_INFO = @LIB_VER_INFO@
 LIPO = @LIPO@
 LN_S = @LN_S@
@@ -258,7 +256,10 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PATRICIA_DIR = @PATRICIA_DIR@
 PKG_VER = @PKG_VER@
 RANLIB = @RANLIB@
+SCA_CFLAGS = @SCA_CFLAGS@
 SCA_DIR = @SCA_DIR@
+SCA_LDFLAGS = @SCA_LDFLAGS@
+SCA_LIBS = @SCA_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -273,7 +274,6 @@ abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
-ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -340,7 +340,7 @@ TEST_DIR = test
 # string or the content of the revision file.
 SRX_REVISION = $(shell cat $(SRX_REVISION_FILE))
 AM_CFLAGS = -DSRX_REVISION=$(SRX_REVISION) \
-            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
+            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS)
 
 
 # Used to generate the srx folder for installation - DESTDIR for RPM generation
@@ -422,11 +422,11 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
 		     $(SERVER_DIR)/update_cache.c 
 
-srx_server_LDADD = $(LIB_PATRICIA) $(LIB_SCA) \
+srx_server_LDADD = $(LIB_PATRICIA) $(SCA_LIBS) \
 		   libsrx_shared.la \
 		   libsrx_util.la
 
-srx_server_LDFLAGS = $(LIB_SCA_LDFLAGS)
+srx_server_LDFLAGS = $(SCA_LDFLAGS)
 
 # For the revision
 SRX_VENDOR = antd.nist.gov
@@ -509,6 +509,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(UTIL_DIR)/client_socket.h \
 		 $(UTIL_DIR)/debug.h \
 		 $(UTIL_DIR)/directory.h \
+		 $(UTIL_DIR)/io_util.h \
 		 $(UTIL_DIR)/log.h \
 		 $(UTIL_DIR)/math.h \
 		 $(UTIL_DIR)/multi_client_socket.h \
@@ -532,6 +533,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 # RPM script and macros for SRx
 rpm_spec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 rpm_proxy_spec = $(PACKAGE_TARNAME)-proxy-$(PACKAGE_VERSION).spec
+rpm_proxy_devel_spec = $(PACKAGE_TARNAME)-proxy-devel-$(PACKAGE_VERSION).spec
 rpmmacros = \
  --define="_rpmdir $${PWD}"\
  --define="_srcrpmdir $${PWD}"\
@@ -540,7 +542,7 @@ rpmmacros = \
  --define="_builddir $${PWD}"
 
 RPMBUILD = rpmbuild
-RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+RPMFLAGS = --buildroot="$${PWD}/_rpm"
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -1779,9 +1781,14 @@ rpmcheck:
 srcrpm: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
 	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpm_spec)
 
-rpms: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
-	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpm_spec)
+develrpm: rpmcheck $(rpm_proxy_devel_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_proxy_devel_spec)
+
+proxyrpm: rpmcheck $(rpm_proxy_spec)
 	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_proxy_spec)
+
+rpms: develrpm proxyrpm rpmcheck $(rpm_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_spec)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

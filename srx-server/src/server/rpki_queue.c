@@ -28,10 +28,13 @@
  * file. Therefore no additional checking is needed is some provided values
  * are NULL. entry functions specified in the header file do take cate of that.
  * 
- * @version 0.5.0.0
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/08/25 - oborchert
+ *            * BZ1224: Function __rq_createQueueElem did not return the 
+ *              generated object. (fixed)
  * 0.5.0.0  - 2017/06/22 - oborchert
  *            * File created
  */
@@ -74,7 +77,6 @@ static bool _rq_lock(_RPKI_QUEUE* rQueue)
   if (rQueue != NULL)
   {
     // Maybe use the sem_wait_wrapper which expires after some time
-    int lockVal;
     sem_wait(&rQueue->semaphore);
     // or sem_timedwait(...)
   }
@@ -117,15 +119,20 @@ static bool _rq_unlock(_RPKI_QUEUE* rQueue)
  * 
  * @param reason The reason information
  * @param updateID The SRx Update ID
+ * 
  * @return The instance of the element
  */
 static _RPKI_QUEUE_LIST_ELEM* __rq_createQueueElem(e_RPKI_QUEUE_REASON reason, 
                                                    SRxUpdateID* updateID)
 {
   _RPKI_QUEUE_LIST_ELEM* listElem = malloc(sizeof(_RPKI_QUEUE_LIST_ELEM));
+  memset (listElem, 0, sizeof(_RPKI_QUEUE_LIST_ELEM));
+  
   listElem->elem.reason   = reason;
   memcpy(&listElem->elem.updateID, updateID, LEN_SRxUpdateID);
   listElem->next = NULL;
+  
+  return listElem;
 }
 
 /**

@@ -24,10 +24,12 @@
  * send BGP updates. It keeps the session open as long as the program is running 
  * or for a pre-determined time after the last update is send.
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.10
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Removed not used variables.
  *  0.2.0.7 - 2017/04/27 - oborchert
  *            * Fixed BUG in BGP-4 AS_PATH with more than 255 AS numbers in the
  *              path. (BZ1154)
@@ -527,9 +529,7 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
                         BGP_PathAttribute* pathAttr, u_int8_t origin,
                         u_int32_t localPref, void* nextHop, 
                         BGPSEC_PrefixHdr* nlri, bool useMPNLRI)
-{
-  int idx = 0; 
-  
+{  
   if (ntohs(nlri->afi) == AFI_V6)
   {
     // IPv6 MUST be encoded in MPNLRI

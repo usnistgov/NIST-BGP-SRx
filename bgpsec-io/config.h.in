@@ -18,9 +18,6 @@
 /* Linux IPv6 */
 #undef HAVE_IPV6
 
-/* Define to 1 if you have the <libconfig.h> header file. */
-#undef HAVE_LIBCONFIG_H
-
 /* Define to 1 if you have the `localtime_r' function. */
 #undef HAVE_LOCALTIME_R
 
@@ -46,24 +43,6 @@
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
 
-/* Define to 1 if you have the <openssl/bio.h> header file. */
-#undef HAVE_OPENSSL_BIO_H
-
-/* Define to 1 if you have the <openssl/crypto.h> header file. */
-#undef HAVE_OPENSSL_CRYPTO_H
-
-/* Define to 1 if you have the <openssl/ecdsa.h> header file. */
-#undef HAVE_OPENSSL_ECDSA_H
-
-/* Define to 1 if you have the <openssl/ec.h> header file. */
-#undef HAVE_OPENSSL_EC_H
-
-/* Define to 1 if you have the <openssl/err.h> header file. */
-#undef HAVE_OPENSSL_ERR_H
-
-/* Define to 1 if you have the <openssl/sha.h> header file. */
-#undef HAVE_OPENSSL_SHA_H
-
 /* Define to 1 if you have the <pthread.h> header file. */
 #undef HAVE_PTHREAD_H
 
@@ -76,9 +55,6 @@
 
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET
-
-/* Define to 1 if you have the <srx/srxcryptoapi.h> header file. */
-#undef HAVE_SRX_SRXCRYPTOAPI_H
 
 /* Define to 1 if stdbool.h conforms to C99. */
 #undef HAVE_STDBOOL_H

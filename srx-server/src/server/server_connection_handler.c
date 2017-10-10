@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.4.0.1
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2016/08/29 - oborchert
+ *            * Fixed some compiler warnings.
  * 0.4.0.1  - 2016/07/02 - oborchert
  *            * Fixed wrongful conversion of a nework encoded word into a host
  *              encoded int. Changed from ntol to ntohs.
@@ -724,7 +726,7 @@ bool processValidationRequest(ServerConnectionHandler* self,
   // not have the flags set and no additional validation has to be performed at 
   // this point therefore also filter for sendFlags, the command handler will
   // do it otherwise and we can save this effort.
-  if ((doOriginVal || doPathVal) && (sendFlags & SRX_FLAG_ROA_AND_BGPSEC > 0))
+  if ((doOriginVal || doPathVal) && ((sendFlags & SRX_FLAG_ROA_AND_BGPSEC) > 0))
   {
     // Only keep the validation flags.
     hdr->flags = sendFlags & SRX_FLAG_ROA_AND_BGPSEC;

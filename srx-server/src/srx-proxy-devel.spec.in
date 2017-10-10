@@ -1,0 +1,76 @@
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
+%define package_num  @PKG_VER@
+%define major_ver    @MAJOR_VER@
+%define minor_ver    @MINOR_VER@
+%define update_num   @UPD_VER@
+%define lib_ver_info @VER_INFO@
+%define srxdir       @SRX_DIR@
+
+%define CLIENT_DIR src/client
+%define SHARED_DIR src/shared
+%define UTIL_DIR   src/util
+
+%define lib_version_info %{lib_ver_info}
+%define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
+%define version %{package_version}
+%define name srx-proxy-devel
+%define core_name srx
+%define _unpackaged_files_terminate_build 0
+%define 
+
+Name:%{name}
+Version:%{version}
+Release:1%{?dist}
+Summary:Package provides the SRx Proxy developer files
+Group:Networking/Daemons
+License:LGPL
+URL:www.antd.nist.gov
+Vendor:National Institute of Standards and Technology (NIST)
+Distribution:SRx Software Suite
+Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+
+Source0:%{core_name}-%{version}.tar.gz
+BuildRoot:/tmp/rpm/%{core_name}-%{version}
+
+BuildRequires:automake	
+Requires: %{core_name}-proxy = %{version}
+  
+%description
+The SRx Proxy developers package
+
+%prep
+%setup -q -n %{core_name}-%{version}
+
+%build
+
+%install
+# install the header files
+mkdir -p $RPM_BUILD_ROOT/%{_includedir}/%{srxdir}
+cat %{CLIENT_DIR}/srx_api.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <%{srxdir}\2>/g' > $RPM_BUILD_ROOT/%{_includedir}/%{srxdir}/srx_api.h
+cat %{SHARED_DIR}/srx_defs.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <%{srxdir}\2>/g' > $RPM_BUILD_ROOT/%{_includedir}/%{srxdir}/srx_defs.h
+cat %{UTIL_DIR}/prefix.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <%{srxdir}\2>/g' > $RPM_BUILD_ROOT/%{_includedir}/%{srxdir}/prefix.h
+cat %{UTIL_DIR}/slist.h | sed -e 's/^\(#include \"[a-z]\+\)\(.*\)\".*/#include <%{srxdir}\2>/g' > $RPM_BUILD_ROOT/%{_includedir}/%{srxdir}/slist.h
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+
+%preun
+
+%postun
+if [ "x$(ls -A %{_includedir}/%{srxdir})" = "x" ] ; then
+  rmdir %{_includedir}/%{srxdir}
+fi 
+
+%files
+#%defattr(644,root,root,755)
+%defattr(-,root,root,-)
+%{_includedir}/%{srxdir}/srx_defs.h
+%{_includedir}/%{srxdir}/srx_api.h
+%{_includedir}/%{srxdir}/slist.h
+%{_includedir}/%{srxdir}/prefix.h

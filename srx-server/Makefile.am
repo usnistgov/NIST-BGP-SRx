@@ -17,7 +17,6 @@ rpms srcrpm: all dist extra_dist
 		rm -rf $$dir/$(distdir); \
 	done
 	rm -rf $(extrasdir)/files/$(PACKAGE_TARNAME)-$(PACKAGE_VERSION).tar.gz
-	mv src/*.rpm .
 	
 
 

@@ -29,16 +29,20 @@
  * binary stream or extract the BGPsec_PATH from a BGP UPDATE and possible
  * other functions related to BGPsec.
  * 
- * @version 0.1.0.0
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.1.0.0 - 2017/06/27 - oborchert 
+ * 0.5.0.1 - 2017/08/25 - 
+ *           * Fixed compiler warnings.
+ * 0.5.0.0 - 2017/06/27 - oborchert 
  *           * File created
  */
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdlib.h>
+#include <netinet/in.h>
 #include "util/bgpsec_util.h"
 
 /** The BGPsec_PATH attribute type value. (IANA assigned) */

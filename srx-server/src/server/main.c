@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.5.0.0
+ * @version 0.5.0.1
  *
  * EXIT Values:
  *
@@ -39,6 +39,8 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/08/29 - oborchert
+ *            * Fixed compiler warning in define SETUP_ALL_HANDLERS
  * 0.5.0.0  - 2017/07/08 - oborchert
  *            * Added getBGPsecHandler
  *          - 2017/07/05 - oborchert
@@ -102,10 +104,10 @@
 #define SETUP_BGPSEC_HANDLER       2
 #define SETUP_COMMAND_HANDLER      4
 #define SETUP_CONNECTION_HANDLER   8
-#define SETUP_ALL_HANDLERS         SETUP_RPKI_HANDLER \
-                                   | SETUP_BGPSEC_HANDLER \
-                                   | SETUP_COMMAND_HANDLER \
-                                   | SETUP_CONNECTION_HANDLER
+#define SETUP_ALL_HANDLERS         (   SETUP_RPKI_HANDLER \
+                                     | SETUP_BGPSEC_HANDLER \
+                                     | SETUP_COMMAND_HANDLER \
+                                     | SETUP_CONNECTION_HANDLER )
 
 #define SETUP_KEY_CACHE            1
 #define SETUP_PREFIX_CACHE         2

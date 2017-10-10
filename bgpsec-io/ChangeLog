@@ -1,3 +1,9 @@
+Version 0.2.0.10
+  * Updated the spec file to require SCA >=0.2.0 and SCA < 0.3.0
+  * Fixed some issues with configuration relating to SCA library
+Version 0.2.0.9
+  * Fixed printer output for non transitive attributes by adding the output 
+    string "Non-transitive"
 Version 0.2.0.8
   * Modified the valies of BGP_CAP_T_BGPSEC and BGP_UPD_A_TYPE_BGPSEC to
     the IANA assigned values. 

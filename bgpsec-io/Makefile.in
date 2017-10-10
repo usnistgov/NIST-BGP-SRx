@@ -47,6 +47,10 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/srx_m4_check_arch.m4 \
+	$(top_srcdir)/m4/srx_m4_check_libconfig.m4 \
+	$(top_srcdir)/m4/srx_m4_check_libraries.m4 \
+	$(top_srcdir)/m4/srx_m4_check_openssl.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -177,6 +181,8 @@ CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CPU_ARCH = @CPU_ARCH@
+CPU_ARCH_FLAG = @CPU_ARCH_FLAG@
 CREATE_TESTVECTOR = @CREATE_TESTVECTOR@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
@@ -190,6 +196,8 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GREP = @GREP@
+HAVE_LIBCONFIG = @HAVE_LIBCONFIG@
+HAVE_LIBSRxCryptoAPI = @HAVE_LIBSRxCryptoAPI@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -231,6 +239,7 @@ PRINT_CRYPTO = @PRINT_CRYPTO@
 RANLIB = @RANLIB@
 SCA_CFLAGS = @SCA_CFLAGS@
 SCA_LDFLAGS = @SCA_LDFLAGS@
+SCA_LIBS = @SCA_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -302,7 +311,7 @@ bgpsecio_SOURCES = ASList.c \
                    updateStackUtil.c \
                    bgpsec/Crypto.c \
                    bgpsec/BGPSecPathBin.c \
-		   bgp/BGPFinalStateMachine.c \
+                   bgp/BGPFinalStateMachine.c \
                    bgp/BGPHeader.c \
                    bgp/printer/BGPPrinterUtil.c \
                    bgp/printer/BGPUpdatePrinter.c \
@@ -316,42 +325,43 @@ bgpsecio_SOURCES = ASList.c \
                    bgpsecio.c
 
 noinst_HEADERS = \
-		  player/player.h \
-		  updateStackUtil.h \
-		  ASList.h          \
-		  cfg/cfgFile.h     \
-		  cfg/configuration.h  \
-		  ASNTokenizer.h       \
-		  bgpsec/Crypto.h      \
-		  bgpsec/BGPSecPathBin.h  \
-		  bgp/BGPHeader.h         \
-		  bgp/printer/BGPNotificationPrinter.h \
-		  bgp/printer/BGPHeaderPrinter.h       \
-		  bgp/printer/BGPPrinterUtil.h         \
-		  bgp/printer/BGPOpenPrinter.h         \
-		  bgp/printer/BGPUpdatePrinter.h       \
-		  bgp/BGPSession.h                     \
-		  bgp/BGPFinalStateMachine.h           \
-		  config.h                             \
-		  antd-util/printer.h                  \
-		  antd-util/prefix.h                   \
-		  antd-util/linked_list.h              \
-		  antd-util/log.h                      \
-		  antd-util/stack.h
+                   player/player.h \
+                   updateStackUtil.h \
+                   ASList.h          \
+                   cfg/cfgFile.h     \
+                   cfg/configuration.h  \
+                   ASNTokenizer.h       \
+                   bgpsec/Crypto.h      \
+                   bgpsec/BGPSecPathBin.h  \
+                   bgp/BGPHeader.h         \
+                   bgp/printer/BGPNotificationPrinter.h \
+                   bgp/printer/BGPHeaderPrinter.h       \
+                   bgp/printer/BGPPrinterUtil.h         \
+                   bgp/printer/BGPOpenPrinter.h         \
+                   bgp/printer/BGPUpdatePrinter.h       \
+                   bgp/BGPSession.h                     \
+                   bgp/BGPFinalStateMachine.h           \
+                   config.h                             \
+                   antd-util/printer.h                  \
+                   antd-util/prefix.h                   \
+                   antd-util/linked_list.h              \
+                   antd-util/log.h                      \
+                   antd-util/stack.h
 
 
 # Crypto Key generation tools
 dist_bin_SCRIPTS = tools/bio-traffic.sh
 AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 bgpsecio_LDADD = $(top_srcdir)/antd-util/libantd_util.la
-bgpsecio_CFLAGS = $(CFLAGS) $(OPENSSL_CFLAGS) $(SCA_CFLAGS)
-bgpsecio_LDFLAGS = $(L_FLAGS) $(LIBS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
+bgpsecio_CFLAGS = $(CFLAGS) $(SCA_CFLAGS) $(OPENSSL_CFLAGS)
+bgpsecio_LDFLAGS = $(LDFLAGS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
                    -ldl \
                    -lm \
                    -lrt \
                    -lconfig \
-                   -lSRxCryptoAPI \
-                   @OPENSSL_LIBS@
+                   @OPENSSL_LIBS@ \
+                   $(SCA_LIBS) \
+                   $(LIBS)
 
 
 ################################################################################
@@ -370,7 +380,8 @@ rpmmacros = \
  --define="_builddir $${PWD}"
 
 RPMBUILD = rpmbuild
-RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+#RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+RPMFLAGS = --buildroot="$${PWD}/_rpm"
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -1261,7 +1272,7 @@ srcrpm: rpmcheck $(rpmspec)
 	($(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpmspec)) || exit 1
 
 rpms: dist rpmcheck $(rpmspec)
-	($(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpmspec)) || exit 1
+	($(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpmspec)) || exit 1
 	rpmarch=`$(RPM) --showrc | grep "^build arch" | sed 's/\(.*: \)\(.*\)/\2/'`; \
 	test -z "$$rpmarch" || ( mv $$rpmarch/* . && rm -rf $$rpmarch ); \
 	rm -rf $(distdir)

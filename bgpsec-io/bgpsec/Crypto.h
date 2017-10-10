@@ -22,24 +22,29 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.7  -2017/03/22 - oborchert
- *            * Added K into the header.
- *            * Added function CRYPTO_k_to_string
- *  0.2.0.5  -2017/01/03 - oborchert
- *            * Added function parameter "k_mode" to CRYPTO_createSignature.
- *  0.1.1.0 - 2016/03/28 - oborchert
- *            * Modified signature of preloadKeys to indicate what keys have to
- *              be loaded
- *          - 2016/03/22 - oborchert
- *            * Modified signature of function CRYPTO_createSignature by adding 
- *              the parameter testSig.
- *            * Removed not implemented function CRYTPO_release.
- *  0.1.0.0 - 2015/08/06 - oborchert
- *            * Created File.
+ *  0.2.0.10 - 2017/09/01 - oborchert
+ *             * Added CAPI_createSignature to header file.
+ *             * Replaced static arrays nist_p256_rfc6979_A_2_5_SHA256_k_sample 
+ *               and nist_p256_rfc6979_A_2_5_SHA256_k_test with appropriate
+ *               defines and moved the array generation into the Crypto.c file.
+ *  0.2.0.7  - 2017/03/22 - oborchert
+ *             * Added K into the header.
+ *             * Added function CRYPTO_k_to_string
+ *  0.2.0.5  - 2017/01/03 - oborchert
+ *             * Added function parameter "k_mode" to CRYPTO_createSignature.
+ *  0.1.1.0  - 2016/03/28 - oborchert
+ *             * Modified signature of preloadKeys to indicate what keys have to
+ *               be loaded
+ *           - 2016/03/22 - oborchert
+ *             * Modified signature of function CRYPTO_createSignature by adding 
+ *               the parameter testSig.
+ *             * Removed not implemented function CRYTPO_release.
+ *  0.1.0.0  - 2015/08/06 - oborchert
+ *             * Created File.
  */
 #ifndef CRYPTO_H
 #define	CRYPTO_H
@@ -65,18 +70,18 @@ typedef enum T_Key {
 #define CRYPTO_K_SIZE 32
 
 /** k, RFC 6979 A2.5, SHA-256, message="sample" */
-static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_sample[CRYPTO_K_SIZE] = {
-                0xA6, 0xE3, 0xC5, 0x7D, 0xD0, 0x1A, 0xBE, 0x90,
-                0x08, 0x65, 0x38, 0x39, 0x83, 0x55, 0xDD, 0x4C,
-                0x3B, 0x17, 0xAA, 0x87, 0x33, 0x82, 0xB0, 0xF2,
-                0x4D, 0x61, 0x29, 0x49, 0x3D, 0x8A, 0xAD, 0x60};
+#define NIST_P256_RFC6979_A_2_5_SHA256_K_SAMPLE                 \
+                0xA6, 0xE3, 0xC5, 0x7D, 0xD0, 0x1A, 0xBE, 0x90, \
+                0x08, 0x65, 0x38, 0x39, 0x83, 0x55, 0xDD, 0x4C, \
+                0x3B, 0x17, 0xAA, 0x87, 0x33, 0x82, 0xB0, 0xF2, \
+                0x4D, 0x61, 0x29, 0x49, 0x3D, 0x8A, 0xAD, 0x60
 
 /** k, RFC 6979 A2.5, SHA-256, message="test" */
-static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_test[CRYPTO_K_SIZE] = {
-                0xD1, 0x6B, 0x6A, 0xE8, 0x27, 0xF1, 0x71, 0x75,
-                0xE0, 0x40, 0x87, 0x1A, 0x1C, 0x7E, 0xC3, 0x50,
-                0x01, 0x92, 0xC4, 0xC9, 0x26, 0x77, 0x33, 0x6E,
-                0xC2, 0x53, 0x7A, 0xCA, 0xEE, 0x00, 0x08, 0xE0};
+#define NIST_P256_RFC6979_A_2_5_SHA256_K_TEST                   \
+                0xD1, 0x6B, 0x6A, 0xE8, 0x27, 0xF1, 0x71, 0x75, \
+                0xE0, 0x40, 0x87, 0x1A, 0x1C, 0x7E, 0xC3, 0x50, \
+                0x01, 0x92, 0xC4, 0xC9, 0x26, 0x77, 0x33, 0x6E, \
+                0xC2, 0x53, 0x7A, 0xCA, 0xEE, 0x00, 0x08, 0xE0
 
 /**
  * Create the signature from the given hash for the ASN. The given signature 
@@ -128,5 +133,24 @@ TASList* preloadKeys(char* fileName, char* keyRoot, bool addEC_KEY,
  */
 bool CRYPTO_k_to_string(char* str_buff, int buff_size, SignatureGenMode k_mode);
 
+/**
+ * Create the signature from the given hash for the ASN. The given signature 
+ * must be NULL. The return value is the signature in a memory allocated into 
+ * signature with the size given in the return value.
+ * 
+ * @param asList The list of as numbers - Contains all keys etc.
+ * @param segElem The signature element where the signature will be stored in.
+ * @param message The buffer containing the message to be signed.
+ * @param len The length of the message in host format.
+ * @param algoID  Specifies the algorithm to be used for signing.
+ * @param testSig If true the generated signature is validated right away. This
+ *                is for test purpose only.
+ * 
+ * @return 0 if the signature could not be generated, otherwise the length of 
+ *         the signature in host format
+ */
+int CAPI_createSignature(TASList* asList, tPSegList* segElem, 
+                         u_int8_t* message, int len, int algoID, bool testSig, 
+                         SignatureGenMode k_mode);
 #endif	/* CRYPTO_H */
 

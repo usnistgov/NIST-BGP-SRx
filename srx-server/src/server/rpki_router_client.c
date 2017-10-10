@@ -22,10 +22,12 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.5.0.0
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/10/01 - oborchert
+ *            * Fixed compiler warning
  * 0.5.0.0  - 2017/06/29 - oborchert
  *            * Added documentation to function handlePDURouterKey
  *            * Added function handleEndOfData
@@ -214,7 +216,7 @@ static bool handlePDURouterKey(RPKIRouterClient* client,
   keyInfo   = hdr->keyInfo;
 
   client->params->routerKeyCallback(clientID, sessionID, isAnn, ntohl(hdr->as),
-                                    ski, keyInfo, client->user);
+                                    (char*)ski, (char*)keyInfo, client->user);
   return true;
 }
 

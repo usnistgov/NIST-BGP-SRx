@@ -22,10 +22,13 @@
  *
  * Provides functionality to print a BGP Open message
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Removed not used variables.
+ *            * Fixed mismatch in formating and variables within printout.
  *  0.2.0.7 - 2017/03/17 - oborchert
  *            * Combined RREFRESH_PRIV and RREFRESH. (Same as Wireshark)
  *          - 2017/01/10 - oborchert
@@ -106,7 +109,7 @@ static void ___printCAP_T_BGPSEC(BGP_Cap_BGPSEC* bgpsec, const char* tabs)
   printf ("%s+--Flags: %s%s\n", tabs, bits[bgpsec->firstOctet >> 4], 
                                       bits[bgpsec->firstOctet & 0xFF]);
   printf ("%s|  +--Version: %u\n", tabs, (bgpsec->firstOctet >> 4));
-  printf ("%s|  +--Dir: ", tabs, (bgpsec->firstOctet >> 4));
+  printf ("%s|  +--Dir: ", tabs);
   if ((bgpsec->firstOctet & 0x08) != 0)
   {
     printf ("Send (1)\n");
@@ -269,7 +272,7 @@ static int _printOptionalParameter(BGP_OpenMessage_OptParam* param, bool more)
   data += sizeof(BGP_OpenMessage_OptParam);
   int capLen = 0;
   
-  printf("%s%s+--Optional Parameter: ", TAB_2, TAB_3, param->param_len);
+  printf("%s%s+--Optional Parameter: ", TAB_2, TAB_3);
   
   // Generate the tabs for the optional parameter
   char tabs[STR_MAX];
@@ -280,7 +283,7 @@ static int _printOptionalParameter(BGP_OpenMessage_OptParam* param, bool more)
   switch (param->param_type)
   {
     case BGP_T_CAP:
-      printf("Capability\n", param->param_type);
+      printf("Capability\n");
       printf("%s+--Type: Capability (%u)\n", tabs, param->param_type);
       printf("%s+--Length: %u\n", tabs, param->param_len);
       processed = 0;

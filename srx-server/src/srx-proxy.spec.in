@@ -1,3 +1,7 @@
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
 %define package_num  @PKG_VER@
 %define major_ver    @MAJOR_VER@
 %define minor_ver    @MINOR_VER@
@@ -29,14 +33,13 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 BuildRequires:automake	
-Requires:glibc srxcryptoapi >= 0.2.0
+Requires:glibc
 
 %description
 The SRx-Proxy allows routers to connect to the srx-server using API calls.
 Additionaly this package provides an srxsrv_client
 
 %prep
-pwd
 %setup -q -n %{core_name}-%{version}
 
 %build
@@ -75,9 +78,17 @@ ldconfig
 %if "@incl_la_lib@" == "yes" 
   %{_libdir}/%{srxdir}/libSRxProxy.la
   %{_libdir}/%{srxdir}/libSRxProxy.a
+%else
+  %exclude %{_libdir}/%{srxdir}/libSRxProxy.la
+  %exclude %{_libdir}/%{srxdir}/libSRxProxy.a
 %endif
-%{_includedir}/%{srxdir}/srx_defs.h
-%{_includedir}/%{srxdir}/srx_api.h
-%{_includedir}/%{srxdir}/slist.h
-%{_includedir}/%{srxdir}/prefix.h
+%exclude %{_includedir}/%{srxdir}/srx_defs.h
+%exclude %{_includedir}/%{srxdir}/srx_api.h
+%exclude %{_includedir}/%{srxdir}/slist.h
+%exclude %{_includedir}/%{srxdir}/prefix.h
 %{_bindir}/srxsvr_client
+%exclude %{_sysconfdir}/srx_server.conf
+%exclude %{_initddir}/srx_serverd
+%exclude %{_bindir}/srx_server
+%exclude %{_bindir}/rpkirtr_client
+%exclude %{_bindir}/rpkirtr_svr

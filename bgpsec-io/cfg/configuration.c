@@ -22,10 +22,12 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Removed not used variables.
  *  0.2.0.7 - 2017/07/11 - oborchert
  *            * Fixed speller in command line documentation.
  *          - 2017/05/03 - oborchert
@@ -672,7 +674,7 @@ void _setIPAddress(const char* ipStr, u_int16_t port, struct sockaddr_in* addr)
  */
 bool _setIP6Address(const char* ip6Str, u_int16_t port, struct sockaddr_in6* addr)
 {
-  int ret;
+  int ret = 0;
   addr->sin6_family      = AF_INET6;
   if (ip6Str != NULL)
   {
@@ -764,10 +766,8 @@ bool readConfig(PrgParams* params)
 {
   static config_t          cfg;
   static config_setting_t* cfgHlp;
-  static config_setting_t* cfgHlp1;
   static config_setting_t* session;
   static config_setting_t* sessVal;
-  static config_setting_t* prnFltr;
   static config_setting_t* updates;
 
   int sessCt  = 0;

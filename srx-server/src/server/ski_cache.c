@@ -85,10 +85,13 @@
  * 
  * [    ]      Struct Element
  * 
- * @version 0.5.0.0
+ * @version 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1 - 2017/08/25 - oborchert
+ *           * Modified ski parameter from char* to u_int8_t* in function
+ *             ___ski_createCacheData to resolve compiler warnings.
  * 0.5.0.0 - 2017/06/30 - oborchert
  *           * BZ1166: Added counter to update registration.
  *         - 2017/06/29 - oborchert
@@ -877,7 +880,7 @@ static bool _ski_unlock(_SKI_CACHE* sCache)
  * @return the cache data object or NULL.
  */
 static _SKI_CACHE_DATA* _ski_getCacheData(_SKI_CACHE* sCache, u_int32_t asn,
-                                          char* ski, u_int8_t algoID, 
+                                          u_int8_t* ski, u_int8_t algoID, 
                                           bool create)
 {
   /** The left most 2 bytes as unsigned word value. */

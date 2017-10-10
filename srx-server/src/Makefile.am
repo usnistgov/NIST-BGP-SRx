@@ -19,7 +19,7 @@ TEST_DIR = test
 SRX_REVISION=$(shell cat $(SRX_REVISION_FILE))
 
 AM_CFLAGS = -DSRX_REVISION=$(SRX_REVISION) \
-            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION)
+            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS)
 
 # Used to generate the srx folder for installation - DESTDIR for RPM generation
 INC_OUT = $(DESTDIR)$(includedir)/$(SRX_DIR)
@@ -118,10 +118,10 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
 		     $(SERVER_DIR)/update_cache.c 
 
-srx_server_LDADD = $(LIB_PATRICIA) $(LIB_SCA) \
+srx_server_LDADD = $(LIB_PATRICIA) $(SCA_LIBS) \
 		   libsrx_shared.la \
 		   libsrx_util.la
-srx_server_LDFLAGS = $(LIB_SCA_LDFLAGS)
+srx_server_LDFLAGS = $(SCA_LDFLAGS)
 
 # For the revision
 SRX_VENDOR=antd.nist.gov
@@ -217,6 +217,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(UTIL_DIR)/client_socket.h \
 		 $(UTIL_DIR)/debug.h \
 		 $(UTIL_DIR)/directory.h \
+		 $(UTIL_DIR)/io_util.h \
 		 $(UTIL_DIR)/log.h \
 		 $(UTIL_DIR)/math.h \
 		 $(UTIL_DIR)/multi_client_socket.h \
@@ -290,6 +291,7 @@ all-local: set-revision
 # RPM script and macros for SRx
 rpm_spec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 rpm_proxy_spec = $(PACKAGE_TARNAME)-proxy-$(PACKAGE_VERSION).spec
+rpm_proxy_devel_spec = $(PACKAGE_TARNAME)-proxy-devel-$(PACKAGE_VERSION).spec
 
 rpmmacros =\
  --define="_rpmdir $${PWD}"\
@@ -299,7 +301,7 @@ rpmmacros =\
  --define="_builddir $${PWD}"
 
 RPMBUILD = rpmbuild
-RPMFLAGS = --nodeps --buildroot="$${PWD}/_rpm"
+RPMFLAGS = --buildroot="$${PWD}/_rpm"
 
 rpmcheck:
 	if [ which rpmbuild &> /dev/null ]; then \
@@ -310,6 +312,11 @@ rpmcheck:
 srcrpm: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
 	$(RPMBUILD) $(RPMFLAGS) -bs $(rpmmacros) $(rpm_spec)
 
-rpms: rpmcheck $(rpm_spec) $(rpm_proxy_spec)
-	$(RPMBUILD) $(RPMFLAGS) -ba $(rpmmacros) $(rpm_spec)
+develrpm: rpmcheck $(rpm_proxy_devel_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_proxy_devel_spec)
+	
+proxyrpm: rpmcheck $(rpm_proxy_spec)
 	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_proxy_spec)
+
+rpms: develrpm proxyrpm rpmcheck $(rpm_spec)
+	$(RPMBUILD) $(RPMFLAGS) -bb $(rpmmacros) $(rpm_spec)

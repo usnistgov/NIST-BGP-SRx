@@ -23,10 +23,12 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Removed not used variables.
  *  0.2.0.7 - 2017/04/28 - oborchert
  *            * BZ1153: Updated error that GEN-C generated updates could not be 
  *              used by peer, missing next hop information.
@@ -312,12 +314,7 @@ void freeBGPSession (BGPSession* session)
 static int _isSocketAlive(BGPSession* session, int timeout, bool readOnly)
 {
   bool retVal = SOCKET_ALIVE;
-  
-  short int errmask  = POLLERR | POLLHUP | POLLNVAL;
-#ifdef __USE_GNU
-  errmask = errmask | POLLRDHUP;
-#endif
-            
+              
   struct pollfd pfd;
   pfd.fd      = session->sessionFD;
   pfd.events  = POLLIN | POLLPRI | POLLOUT | POLLRDNORM;
@@ -337,11 +334,10 @@ static int _isSocketAlive(BGPSession* session, int timeout, bool readOnly)
     { // REQUEST FOR SENDING TOO
       // Return error or timeout.
       retVal = (pollVal == 0) ? SOCKET_TIMEOUT : SOCKET_ERR;
-      //retVal = (pfd.revents & errmask) == 0;
     }
     else
     { // REQUEST FOR READ ONLY
-      // If still data is waiting on the in buffer anounce socekt to be ready.
+      // If still data is waiting on the in buffer announce socket to be ready.
       retVal = ((pfd.revents & POLLIN) != 0) ? SOCKET_ALIVE : SOCKET_ERR;
     }
   }
@@ -368,8 +364,7 @@ static void* _rcvBGP(void* bgpSession)
   BGPSession* session = (BGPSession*)bgpSession;
   int bytesReady = 0;
   int bytesRead  = 0;
-  int socketState = SOCKET_ALIVE;
-  int attempt = 1;
+  int attempt    = 1;
 
   while (session->fsm.state == FSM_STATE_ESTABLISHED) 
   {

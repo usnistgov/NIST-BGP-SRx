@@ -23,10 +23,13 @@
  * 
  * The reverse mode might be possible in future updates.
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Fixed compiler warning for un-used return value while using 
+ *              fgets in isUpdateStackEmpty
  *  0.2.0.7 - 2017/05/03 - borchert
  *            * BZ1122: Fixed problems with piped updates.
  *  0.2.0.2 - 2016/11/14 - borchert
@@ -108,35 +111,37 @@ bool isUpdateStackEmpty(PrgParams* params, bool inclStdIn)
     {
       UpdateData* update = NULL;
 
-      fgets(line, MAX_DATABUF, stdin);
-      lineLen = strlen(line);
-      if (lineLen != 0)
+      if (fgets(line, MAX_DATABUF, stdin) != NULL)
       {
-        if (lineLen <= MAX_LINE_LEN)
+        lineLen = strlen(line);
+        if (lineLen != 0)
         {
-          if (line[lineLen-1] == '\n')
+          if (lineLen <= MAX_LINE_LEN)
           {
-            // Replace a possible CR with '\0'
-            line[lineLen-1] = '\0';
-            update = createUpdate(line, params);
-            if (update != NULL)
+            if (line[lineLen-1] == '\n')
             {
-              pushStack(&params->updateStack, update);
-              isEmpty = false;
+              // Replace a possible CR with '\0'
+              line[lineLen-1] = '\0';
+              update = createUpdate(line, params);
+              if (update != NULL)
+              {
+                pushStack(&params->updateStack, update);
+                isEmpty = false;
+              }
+            }
+            else
+            {
+              printf("ERROR: Piped input is not closed with new line (\\n)- "
+                     "drop input to prevent dead loop!!'\n");            
+              printf ("   Line: '%s'\n", line);
             }
           }
           else
           {
-            printf("ERROR: Piped input is not closed with new line (\\n)- "
-                   "drop input to prevent dead loop!!'\n");            
+            printf("ERROR: Piped input line exceeded maximum size of %i bytes.\n", 
+                   MAX_LINE_LEN);
             printf ("   Line: '%s'\n", line);
           }
-        }
-        else
-        {
-          printf("ERROR: Piped input line exceeded maximum size of %i bytes.\n", 
-                 MAX_LINE_LEN);
-          printf ("   Line: '%s'\n", line);
         }
       }
     }

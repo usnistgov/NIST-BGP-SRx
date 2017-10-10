@@ -23,11 +23,14 @@
  * This software allows to generate the BGPSEC Path attribute as binary stream.
  * The path will be fully signed as long as all keys are available.
  *
-* @version 0.2.0.5
+* @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.5 - 2017/01/30 - oborchert
+ * 0.2.0.10 - 2017/09/01 - oborchert
+ *            * Call of CAPI_createSignature did not provide sufficient 
+ *              parameters
+ * 0.2.0.5  - 2017/01/30 - oborchert
  *            * increased initial buffer size from 3K to 60K (BZ1094)
  *          - 2016/12/21 - oborchert
  *            * Modified signature of the functions generateBGPSecAttr and
@@ -35,10 +38,10 @@
  *            2016/11/15 - oborchert
  *            * Updated function generateBGPSecAttr to allow updates with 
  *              extended flag not being set.
- *  0.2.0.5 - 2016/11/01 - oborchert
+ * 0.2.0.5  - 2016/11/01 - oborchert
  *            * Fixed length of BGPSEC_PathAttr which depends on the extended 
  *              flag.
- *  0.2.0.0 - 2016/06/02 - oborchert
+ * 0.2.0.0  - 2016/06/02 - oborchert
  *            * Merged modifications from 0.1.1.1 branch for measurement 
  *              framework
  *          - 2016/05/13 - oborchert
@@ -46,7 +49,7 @@
  *              BZ968
  *          - 2016/05/10 - oborchert
  *            * Fixed compiler warnings BZ950
- *  0.1.1.0 - 2016/05/03 - oborchert
+ * 0.1.1.0  - 2016/05/03 - oborchert
  *            * Fixed position of public fake key in signDraft13
  *          - 2016/04/21 - oborchert
  *            * Added indicator if fake signature was used
@@ -65,7 +68,7 @@
  *          - 2016/03/11 - oborchert
  *            * Fixed error with attribute length in signature processing.
  *              Rewrote some of the code.
- *  0.1.0.0 - 2015/07/31 - oborchert
+ * 0.1.0.0  - 2015/07/31 - oborchert
  *            * Created File.
  */
 #include <stdio.h>
@@ -743,7 +746,8 @@ static int _signDraft15(SRxCryptoAPI* capi,
                                        algoParam->algoID, testSignature, 
                                        algoParam->sigGenMode)
               : CAPI_createSignature(asList, segListElem, hashbuff, size, 
-                                       algoParam->algoID, testSignature);
+                                       algoParam->algoID, testSignature, 
+                                       algoParam->sigGenMode);
       if (success != 0)
       {
         if (algoParam->addPubKeys)
@@ -821,7 +825,8 @@ static int _signDraft15(SRxCryptoAPI* capi,
                                        algoParam->algoID, testSignature, 
                                        algoParam->sigGenMode)
               : CAPI_createSignature(asList, segListElem, hashbuff, size, 
-                                       algoParam->algoID, testSignature);
+                                       algoParam->algoID, testSignature, 
+                                       algoParam->sigGenMode);
       if (success != 0)
       {
         if (algoParam->addPubKeys)

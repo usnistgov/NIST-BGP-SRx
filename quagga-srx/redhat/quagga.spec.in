@@ -132,8 +132,8 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 # Needed for QuaggaSRx
-Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.4.0, srxcryptoapi >= 0.2.0
-
+Requires(pre): srxcryptoapi >= 0.2.0 srxcryptoapi < 0.3.0, srx-proxy >= 0.4.0, srx-proxy < 0.5.1
+Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.4.0, srx-proxy < 0.5.1, srxcryptoapi >= 0.2.0, srxcryptoapi < 0.3.0
 
 %description
 QuaggaSRx is a free software based upon Quagga that manages TCP/IP based routing

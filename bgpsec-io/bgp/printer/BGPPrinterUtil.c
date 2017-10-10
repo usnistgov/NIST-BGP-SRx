@@ -22,10 +22,13 @@
  *
  * Provides Utility function for the BGP printer
  * 
- * @version 0.2.0.1
+ * @version 0.2.0.10
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.10- 2017/09/01 - oborchert
+ *            * Fixed an invalid typecase error in printPrefix.
+ *            * Modified formating in printout.
  *  0.2.0.1 - 2016/06/24 - oborchert
  *            * Fixed printHex missing CR in case of empty data.
  *  0.2.0.0 - 2016/05/10 - oborchert
@@ -94,10 +97,10 @@ void printPrefix(BGPSEC_PrefixHdr* prefix)
 {
   u_int16_t afi = (prefix->afi & 0xFF00) ? ntohs(prefix->afi) : prefix->afi;
   BGPSEC_V4Prefix* v4 = NULL;
-  BGPSEC_V4Prefix* v6 = NULL;
+  BGPSEC_V6Prefix* v6 = NULL;
   
   printf("Prefix: \n");
-  printf("  +-----afi:    %d ", afi);  
+  printf("  +-----afi:    %u ", afi);  
   switch (afi)
   {
     case AFI_V4:
@@ -106,18 +109,18 @@ void printPrefix(BGPSEC_PrefixHdr* prefix)
       break;
     case AFI_V6:
       printf("(IPv6)\n");  
-      v6 = (BGPSEC_V4Prefix*)prefix;
+      v6 = (BGPSEC_V6Prefix*)prefix;
       break;
     default:
-      printf ("ERROR: Invalid Prefix type '%d'.\n", afi);
+      printf ("ERROR: Invalid Prefix type '%u'.\n", afi);
       return;
   }
-  printf("  +-----safi:   %d\n", prefix->safi);  
-  printf("  +-----length: %d\n", prefix->length);  
+  printf("  +-----safi:   %u\n", prefix->safi);  
+  printf("  +-----length: %u\n", prefix->length);  
   printf("  +-----data:   ");  
   if (v4)
   {
-    printf("%d.%d.%d.%d/%d\n", v4->addr[0], v4->addr[1], v4->addr[2], 
+    printf("%u.%u.%u.%u/%u\n", v4->addr[0], v4->addr[1], v4->addr[2], 
                                v4->addr[3], prefix->length);      
   }
   else

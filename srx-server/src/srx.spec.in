@@ -1,3 +1,7 @@
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
 %define package_num  @PKG_VER@
 %define major_ver    @MAJOR_VER@
 %define minor_ver    @MINOR_VER@
@@ -13,7 +17,7 @@
 Name:%{name}
 Version:%{version}
 Release:1%{?dist}
-Summary:Package provides the SRx server and tools for RPKI and BGPSEC processing
+Summary:This package provides the SRx server for RPKI origin validation and BGPsec path validation including tools
 Group:Networking/Daemons
 License:LGPL
 URL:www.antd.nist.gov
@@ -26,19 +30,19 @@ BuildRoot:/tmp/rpm/%{name}-%{version}
 Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
-BuildRequires:automake	
-#Requires:glibc libconfig >= 1.3 srxcryptoapi >= 0.1.1
-Requires:glibc libconfig >= 1.3 srx-proxy = %{version} srxcryptoapi >= 0.2.0
+BuildRequires:automake
+Requires(pre): srxcryptoapi >= 0.2.0 srxcryptoapi < 0.3.0
+Requires:glibc libconfig >= 1.3 openssl >= 1.0.1e readline >= 6.0 srxcryptoapi >= 0.2.0 srxcryptoapi < 0.3.0
 
 %description
-The SRx-server allows to out-source the validation of BGP updates using RPKI 
-processing and BGPSEC path validation. The SRx-server allows to provide RPKI and
-BGPSEC processing to more than one router. The srx-server can be accessed 
-remotely using a telnet client.
+The SRx-Server allows to out-source the validation of BGP updates using RPKI 
+processing (RFC6811) and BGPsec path validation (RFC8205). The SRx-server allows
+to provide RPKI and BGPsec path processing to more than one router. 
+The srx-server can be accessed remotely using a telnet client.
 
 In addition to the srx-server this package procives an RPKI test harness that 
-allows to feed ROA's and PKI keys to the srx server usint the rtr-to-cache 
-protocol.
+emulates an RPKI cache allowing to feed ROA's and PKI keys to the srx-server 
+using the rtr-to-cache protocol (RFC8210).
 
 
 %prep

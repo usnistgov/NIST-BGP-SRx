@@ -20,13 +20,15 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.10- 2017/09/01 - oborchert
+ *           * Removed not used variables.
  * 0.2.0.7 - 2017/05/03 - oborchert
  *           * Next hop for IPv4 prefixes was not generated due to incorrect
- *             reading of the afi value. 
+ *              reading of the afi value. 
  *         - 2017/04/28 - oborchert
  *           * Fixed BUG where sending IPv6 BGPsec updates was incorrectly 
  *             decided depending on IPv4 negotiation rather than IPv6.
@@ -1021,8 +1023,6 @@ int main(int argc, char** argv)
   int  retVal = parseParams(&params, argc, argv);
   bool keepGoing = true;
   bool printDone = true;
-  
-  int idx=0;
   
   switch (retVal)
   {

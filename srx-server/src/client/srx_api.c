@@ -23,10 +23,13 @@
  * Secure Routing extension (SRx) client API - This API provides a fully
  * functional proxy client to the SRx server.
  *
- * Version: 0.5.0.0
+ * Version: 0.5.0.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.1  - 2017/08/28 - oborchert
+ *            * Modified text in define HDR
+ *            * Removed unused code
  * 0.5.0.0  - 2017/06/16 - kyehwanl
  *            * Added values to bgpsecValRegData for remote BGPsec processing.
  * 0.4.0.0  - 2016/06/19 - oborchert
@@ -83,7 +86,7 @@
 #include "util/log.h"
 #include "util/socket.h"
 
-#define HDR "( SRX API): "
+#define HDR "(SRX API): "
 
 static ProxyLogger _pLogger = NULL;
 
@@ -633,7 +636,6 @@ uint8_t* createV4Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
                          SRxDefaultResult* defaultResult, IPPrefix* prefix,
                          uint32_t as32, BGPSecData* bgpsec)
 {
-  int i;
   uint32_t bgpsecLength = 0;
   uint16_t numHops      = 0;
   uint16_t attrLength   = 0;
@@ -690,7 +692,6 @@ uint8_t* createV6Request(uint8_t* pdu, SRxVerifyFlag method, uint32_t rToken,
                      SRxDefaultResult* defaultResult, IPPrefix* prefix,
                      uint32_t as32, BGPSecData* bgpsec)
 {
-  int i;
   uint32_t bgpsecLength = 0;
   uint16_t numHops      = 0;
   uint16_t attrLength   = 0;

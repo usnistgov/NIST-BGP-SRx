@@ -1,5 +1,10 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.2.0.4 - September 2017
+  - Moved Version 0.2 into branch to be able to address 0.2 related bugs. This
+    will include bugs of SCA 0.2 identified within trunk development of version 
+    0.3 and later that might need addressing in version 0.2
+  - Fixed some BUGS
 Version 0.2.0.3 - July - 2017
   - Fixed some bugs
   - Added some defines to the header file

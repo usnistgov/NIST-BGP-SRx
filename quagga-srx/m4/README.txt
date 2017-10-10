@@ -16,3 +16,6 @@ removed. The files are:
 	ltsugar.m4
 	ltversion.m4
 
+For BGP-SRx the following macros have been added
+        srx_m4_check_arch.m4
+        srx_m4_check_openssl.m4

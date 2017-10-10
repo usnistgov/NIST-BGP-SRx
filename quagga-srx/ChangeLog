@@ -6,10 +6,17 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.4.2.6 - October 2017
+    * Fixed more issues in configuration script
+  0.4.2.5 - August - October 2017
+    * Fixed some issues in configuration script
+    * Update RPM spec file. This version will be incompatible with srx-proxy
+      0.5.1, and SRxCryptoAPI 0.3.0
+
   0.4.2.4 - July 2017
     * Update implementation to comply with latest BGPsec Protocol specification
     * Modified the valies of CAPABILITY_CODE_BGPSEC and BGP_ATTR_BGPSEC to
-      the IANA assigned values. 
+      the IANA assigned values.
       For backwards compatibility with code written during the time where IANA 
       did not have the values assigned yet, these values still can be modified 
       during compile time to other values using -DCAPABILITY_CODE_BGPSEC=<num>

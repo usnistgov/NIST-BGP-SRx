@@ -21,47 +21,52 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.2.0.7
+ * @version 0.2.0.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.7 - 2017/03/23 - oborchert 
- *            * Removed DEBUG_SIGN and added CREATE_TESTVECTOR.
- *          - 2017/03/22 - oborchert
- *            * PRINT_CRYPTO used in incorrect hash length of 28 bytes rather than
- *              the correct length of 32 bytes.
- *            * Added function CRYPTO_k_to_string.
- *            * BIO-K1 used the wrong 'k'. I replaced it.
- *            * Specified K in the header but still initialized in the code.
- *          - 2017/02/28 - oborchert
- *            * Removed comma after '#endif' statement
- *          - 2017/02/17 - oborchert
- *            * BZ1117 Added define block PRINT_CRYPTO that allows to print the 
- *              generated digest and the resulting signature.
- *  0.2.0.5 - 2016/12/28 - oborchert
+ *  0.2.0.10 - 2017/09/01 - oborchert
+ *             * Added Crypto.h header file
+ *             * Moved arrays nist_p256_rfc6979_A_2_5_SHA256_k_sample and 
+ *               nist_p256_rfc6979_A_2_5_SHA256_k_test from header file to this
+ *               file.
+ *  0.2.0.7  - 2017/03/23 - oborchert 
+ *             * Removed DEBUG_SIGN and added CREATE_TESTVECTOR.
+ *           - 2017/03/22 - oborchert
+ *             * PRINT_CRYPTO used in incorrect hash length of 28 bytes rather 
+ *               than the correct length of 32 bytes.
+  *            * Added function CRYPTO_k_to_string.
+ *             * BIO-K1 used the wrong 'k'. I replaced it.
+ *             * Specified K in the header but still initialized in the code.
+ *           - 2017/02/28 - oborchert
+ *             * Removed comma after '#endif' statement
+ *           - 2017/02/17 - oborchert
+ *             * BZ1117 Added define block PRINT_CRYPTO that allows to print the 
+ *               generated digest and the resulting signature.
+ *  0.2.0.5  - 2016/12/28 - oborchert
  *            * Modified newly added code to use newly added configuration 
- *              settings
- *          - 2016/12/28 - Antara Teknik
- *            * Added customixed OpenSSL code fragments that allow specification
- *              of "k" for ECDSA signing.
- *          - 2016/11/21 - oborchert
- *            * Renamed internal methods using _ as initial character.
- *            * Restructured the usage of DEBUG_SIGN definition
- *  0.2.0.0 - 2016/05/10 - oborchert
- *            * Fixed compiler warnings BZ950
- *  0.1.1.0 - 2016/03/28 - oborchert
- *            * Modified signature of preloadKeys to indicate what keys have to
- *              be loaded
- *          - 2016/03/22 - oborchert
- *            * Modified signature of function CRYPTO_createSignature by adding 
- *              the parameter testSig.
- *          - 2016/03/21 - oborchert
- *            * Fixed BZ891 missing signature if keys are already loaded and 
- *              checked.
- *          - 2016/03/08 - oborchert
- *            * Added error reporting when signing failed.
- *  0.1.0.0 - 2015/08/06 - oborchert
- *            * Created File.
+ *               settings
+ *           - 2016/12/28 - Antara Teknik
+ *             * Added customixed OpenSSL code fragments that allow the 
+ *               specification of "k" for ECDSA signing.
+ *           - 2016/11/21 - oborchert
+ *             * Renamed internal methods using _ as initial character.
+ *             * Restructured the usage of DEBUG_SIGN definition
+ *  0.2.0.0  - 2016/05/10 - oborchert
+ *             * Fixed compiler warnings BZ950
+ *  0.1.1.0  - 2016/03/28 - oborchert
+ *             * Modified signature of preloadKeys to indicate what keys have to
+ *               be loaded
+ *           - 2016/03/22 - oborchert
+ *             * Modified signature of function CRYPTO_createSignature by adding 
+ *               the parameter testSig.
+ *           - 2016/03/21 - oborchert
+ *             * Fixed BZ891 missing signature if keys are already loaded and 
+ *               checked.
+ *           - 2016/03/08 - oborchert
+ *             * Added error reporting when signing failed.
+ *  0.1.0.0  - 2015/08/06 - oborchert
+ *             * Created File.
  */
 #include <stddef.h>
 #include <stdio.h>
@@ -83,6 +88,13 @@
 #ifdef CREATE_TESTVECTOR
 #define PRINT_CRYPTO
 #endif
+
+/** k, RFC 6979 A2.5, SHA-256, message="sample" */
+static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_sample[CRYPTO_K_SIZE] = 
+                     { NIST_P256_RFC6979_A_2_5_SHA256_K_SAMPLE };
+/** k, RFC 6979 A2.5, SHA-256, message="test" */
+static unsigned char nist_p256_rfc6979_A_2_5_SHA256_k_test[CRYPTO_K_SIZE] = 
+                     { NIST_P256_RFC6979_A_2_5_SHA256_K_TEST };
 
 /**
  * This function will load the OpenSSL version EC_KEY of the DER encoded key.
@@ -749,7 +761,7 @@ bool CRYPTO_k_to_string(char* str_buff, int buff_size, SignatureGenMode k_mode)
 {
   bool retVal = false;
   int  maxStrLen = ( CRYPTO_K_SIZE * 2 ) + 1;
-  unsigned char* k;
+  unsigned char* k = NULL;
   
   if ((str_buff != NULL) && (buff_size > maxStrLen))
   {
