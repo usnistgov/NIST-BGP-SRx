@@ -1,4 +1,8 @@
 Changelog for Version 0.5.0
+- Fixed some error handling and fixed verbose output (0.5.0.5)
+- Modified debugging of send and received messages (0.5.0.4)
+- Fixed rpkirtr_srv "cache" printout for router keys (update 0.5.0.3)
+- Fixed protocol version management in RPKI router protocol (update 0.5.0.3)
 - Dampen validation result changes during cache updates to reduce unnecessary
   churn
 - Added auto completion for commands in RPKI validation cache test harness

@@ -60,6 +60,7 @@ ldconfig
 %doc
 %{_bindir}/bgpsecio
 %{_bindir}/bio-traffic.sh
+%{_bindir}/mrt_to_bio.sh
 %{_libdir}/libantd_util.so.%{lib_version_info}
 %{_libdir}/libantd_util.so.%{major_ver}
 %{_libdir}/libantd_util.so

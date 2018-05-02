@@ -24,10 +24,24 @@
  * send BGP updates. It keeps the session open as long as the program is running 
  * or for a pre-determined time after the last update is send.
  * 
- * @version 0.2.0.10
+* @version 0.2.0.17
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.17- 2018/04/26 - oborchert
+ *            * Added parameter asSet to function generateBGP_PathAttr. 
+ *  0.2.0.15- 2018/04/19 - oborchert
+ *            * Fixed bug in generation of update with extended community string
+ *  0.2.0.14- 2018/04/19 - oborchert
+ *            * Added parameter rpkiVal to createUpdateMessage.
+ *  0.2.0.11- 2018/03/22 - oborchert
+ *            * Added detection of 4 byte ASN in path and modified code 
+ *              accordingly.
+ *          - 2018/03/21 - oborchert
+ *            * Modified function generateBGP_PathAttr to allow AS4 and AS2 path
+ *              generation.
+ *            * Modified function createUpdateMessage to allow multiple BGP path
+ *              attributes (AS4_PATH + AS_PATH) or BGPsec PATH.
  *  0.2.0.10- 2017/09/01 - oborchert
  *            * Removed not used variables.
  *  0.2.0.7 - 2017/04/27 - oborchert
@@ -78,12 +92,15 @@
 #include <math.h>
 #include <malloc.h>
 #include <sys/types.h>
+#include <stdlib.h>
 #include "antd-util/prefix.h"
 #include "ASNTokenizer.h"
 #include "updateStackUtil.h"
 #include "bgp/BGPHeader.h"
 #include "bgp/BGPSession.h"
+#include "cfg/configuration.h"
 #include "printer/BGPPrinterUtil.h"
+#include "antd-util/log.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 //  OPEN MESSAGE
@@ -392,61 +409,100 @@ int createNotificationMessage(u_int8_t* buff, int buffSize,
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Generate the regular AS_PATH attribute. The Attribute uses 4 byte AS numbers.
+ * Generate the regular AS(4)_PATH attribute. The Attribute uses 2 byte or
+ * 4 byte AS numbers depending on the parameter as4.
  * 
+ * @param attrType  The attribute type BGP_UPD_T_A_AS_PATH 
+ *                  or BGP_UPD_T_A_AS4_PATH
  * @param myAsn     The own ASN to be inserted into the path.
+ * @param isAS4     Specify if this attribute will be an 4 byte or 2 byte as
+ *                  path. (Ignored for attrType == BGP_UPD_T_A_AS4_PATH)
  * @param iBGP      Indicate if the session is an iBGP session or nor.
- * @param asPathStr The AS path string
+ * @param asPathStr The AS path string  in long format (without pcount, etc)
+ * @param asSetStr  The AS_SET String if an AS_SET is specified (can be NULL).
  * @param buff      The buffer where to write the attribute into.
  * @param buffSize  The maximum size of the buffer.
  * 
  * @return The buffer type casted to BGP_PathAttribte or NULL if the buffer is
  *         not large enough. 
  */
-BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP, 
-                                        char* asPathStr, 
+BGP_PathAttribute* generateBGP_PathAttr(u_int8_t attrType, u_int32_t myAsn, 
+                                        bool isAS4, bool iBGP, 
+                                        char* asPathStr, char* asSetStr, 
                                         u_int8_t* buff, int buffSize)
 {
-  int pLength = 0;  
+  int pLength = 0;
+  int sLength = 0; // Used for AS_SET
   BGP_PathAttribute* asPath = NULL;  
 
-  // Construct the AS_PATH string
-  char* longPath = convertAsnPath(asPathStr);  
+  if ((attrType == BGP_UPD_A_TYPE_AS4_PATH) && !isAS4)
+  {
+    RAISE_ERROR("generateBGP_PathAttr called with conflicting values "
+            "type=AS4_PATH and isAS4==false. isAS4 will be corrected!.");
+    // Make sure it is true in this case.
+    isAS4 = true;
+  }
+  
+  // The AS-PAth String will contain the own ASn as well.
+  char* myPath = NULL;
   if (!iBGP)
   {
     // Add myself to the path. BZ:922
     int digits = (int)(log10(myAsn)) + 2; // 1 for the blank and 1 to round up  
-    char* myPath = malloc(strlen(longPath) + digits);
-    sprintf (myPath, "%u %s%c", myAsn, longPath, '\0');
-    free(longPath);
-    longPath = myPath;  
+    myPath = malloc(strlen(asPathStr) + digits);
+    sprintf (myPath, "%u %s%c", myAsn, asPathStr, '\0');
+  }
+  else
+  {
+    myPath = malloc(strlen(asPathStr)+1);
+    sprintf (myPath, "%s%c", asPathStr, '\0');
   }
 
-  tASNTokenizer tok;
-  asntok_clear_th(&tok);
-  asntok_th(longPath, &tok);
+  // Prepare the AS Tokenizer for as path and as_set.
+  tASNTokenizer pathTok, asSetTok;
+  asntok_clear_th(&pathTok);
+  asntok_th(myPath, &pathTok);
+  asntok_clear_th(&asSetTok);
+  asntok_th(asSetStr, &asSetTok);    
   u_int32_t asn;
+  u_int32_t asn4;
+  u_int16_t asn2;
   asPath = (BGP_PathAttribute*)buff;
 
+  asPath->attr_type_code = attrType;
   asPath->attr_flags     = BGP_UPD_A_FLAGS_TRANSITIVE;
-  asPath->attr_type_code = BGP_UPD_A_TYPE_AS_PATH;
+  // if AS4_PATH add optional
+  if (attrType == BGP_UPD_A_TYPE_AS4_PATH) 
+  {
+    asPath->attr_flags |= BGP_UPD_A_FLAGS_OPTIONAL;
+  }
 
   buff += sizeof(BGP_PathAttribute);
 
-  // First count all ASN's to check if we need an extended length field  
-  while (asntok_next_th(&asn, &tok))
+  // First count all ASN's -> needed to determine if we need an extended length 
+  // field  
+  while (asntok_next_th(&asn, &pathTok))
   {
     pLength++;
   }
-  asntok_reset_th(&tok);
-
+  asntok_reset_th(&pathTok);
+  // First count all AS_SET ASN's -> needed to determine if we need an extended 
+  // length field  
+  while (asntok_next_th(&asn, &asSetTok))
+  {
+    sLength++;
+  }
+  asntok_reset_th(&asSetTok);
+ 
   // calculate  the length required for storing only the AS numbers.
-  int length = pLength * 4;
+  int length = (pLength + sLength) * (isAS4 ? 4 : 2);
   // calculate the number of segments needed to store the AS numbers
-  int segments = (pLength > 0) ? (int)(pLength / 255) + 1 : 0;
+  int pSegments = (pLength > 0) ? (int)(pLength / 255) + 1 : 0;
+  int sSegments = (sLength > 0) ? (int)(sLength / 255) + 1 : 0;
   // calculate the total byte size needed to store the AS numbers including
   // the required header size for each needed AS_PathSegment
-  int attrLength = segments * sizeof(BGP_Upd_AS_PathSegment) + length;
+  int attrLength = (pSegments + sSegments) * sizeof(BGP_Upd_AS_PathSegment) 
+                   + length;
 
   if (attrLength > buffSize)
   {
@@ -466,38 +522,81 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP,
     buff++;
   }
 
-  u_int32_t* asnPtr;
+  u_int32_t* as4Ptr;
+  u_int16_t* as2Ptr;
 
-  while (segments > 0)
+  // Now generate the segments - Modified the original code to process first all
+  // Path segments then the AS_SET segments. At this point BIO does only permit 
+  // to have AS_SET specified at the end of the path - No in-between 
+  // aggregation.
+  tASNTokenizer* tokenizer = &pathTok;
+  int idx                  = 0;
+  int segments             = pSegments;
+  u_int8_t  segmentType    = BGP_UPD_A_FLAGS_ASPATH_AS_SEQ;
+  int segmentTypeLength    = pLength;
+  
+  for (;idx <= 1; idx++, tokenizer = &asSetTok, segments = sSegments, 
+                         segmentType = BGP_UPD_A_FLAGS_ASPATH_AS_SET,
+                         segmentTypeLength = sLength)
   {
-    segments--;
-    BGP_Upd_AS_PathSegment* pathSegment = (BGP_Upd_AS_PathSegment*)buff;
-    pathSegment->segmentType    = BGP_UPD_A_FLAGS_ASPATH_AS_SEQ;
-    pathSegment->segment_length = segments > 0 ? 255 : pLength;
-    buff += sizeof(BGP_Upd_AS_PathSegment);
-    int ct = 255;
-    while (ct > 0 && pLength > 0)
+    while (segments > 0)
     {
-      pLength--;
-      asnPtr = (u_int32_t*)buff;
-      if (asntok_next_th(&asn, &tok))
+      segments--;
+      BGP_Upd_AS_PathSegment* pathSegment = (BGP_Upd_AS_PathSegment*)buff;
+      pathSegment->segmentType    = segmentType;
+      pathSegment->segment_length = segments > 0 ? 255 : segmentTypeLength;
+      buff += sizeof(BGP_Upd_AS_PathSegment);
+      int ct = 255;
+      if (isAS4)
       {
-        *asnPtr = htonl(asn);
-        buff += 4;
-        ct--;
+        while (ct > 0 && segmentTypeLength > 0)
+        {
+          segmentTypeLength--;
+          as4Ptr = (u_int32_t*)buff;
+          if (asntok_next_th(&asn, tokenizer))
+          {
+            *as4Ptr = htonl(asn);
+            buff += 4;
+            ct--;
+          }
+          else
+          {
+            ct = 0;
+          }
+        }
       }
       else
-      {
-        ct = 0;
+      { // Only use 2 byte ASN's
+        while (ct > 0 && segmentTypeLength > 0)
+        {
+          segmentTypeLength--;
+          as2Ptr = (u_int16_t*)buff;
+          if (asntok_next_th(&asn, tokenizer))
+          {
+            if ((asn & 0xFFFF0000) > 0)
+            {
+              // Use 2 byte AS_TRANS value - RFC 6793 - 9 (23456)
+              asn = BGP_AS_TRANS;
+            }
+            *as2Ptr = htons((u_int16_t)asn);
+            buff += 2;
+            ct--;
+          }
+          else
+          {
+            ct = 0;
+          }
+        }
       }
     }
   }
-  if (longPath != NULL)
+  
+  if (myPath != NULL)
   {
-    memset(longPath, '\0', strlen(longPath));
-    free(longPath);
+    memset(myPath, '\0', strlen(myPath));
+    free(myPath);
   }
-  longPath = NULL;
+  myPath = NULL;
   
   return asPath;
 }
@@ -511,24 +610,29 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP,
  * 
  * @param buff The   pre-allocated memory of sufficient size
  * @param buffSize   The size of the buffer
- * @param pathAttr   The buffer containing either the BGPSec path attribute or
+ * @param numAttr    The number of BGP/BGPsec path attributes are added. See 
+ *                   parameter pathAttr for details.
+ * @param pathAttr   The buffer(s) containing either the BGPSec path attribute or
  *                   the BGP4 ASpath attribute. (wire format)
+ *                   This array can contain more than one attribute in case it 
+ *                   is BGP4 and AS4_PATH and AS_PATH is required to be send.
  * @param origin     The origin of the prefix.
  * @param localPref  USe local pref attribute if > 0
- * @param nextHop    Pointer to nextHop address; Must be either a 
- *                   (struct sockaddr_in*) or (struct sockaddr_in6*) pointer.
+ * @param nextHop    The nextHop address (same afi as nlri)
  * @param nlri       The NLRI to be used. Depending on the AFI value it will be 
  *                   typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
  * @param useMPNLRI  Encode IPv4 prefixes as MPNLRI within the path attribute, 
  *                   otherwise V4 addresses will be added at the end as NLRI
- *                  
+ * @param rpkiVal    Add the RPKI validation state as community string if
+ *                   value is UPD_RPKI_VALID, UPD_RPKI_INVALID, 
+ *                   or UPD_RPKI_NOTFOUND, otherwise do not add this attribute.                  
  * 
  * @return the number of bytes used or if less than 0 the number of bytes missed
  */
-int createUpdateMessage(u_int8_t* buff, int buffSize, 
-                        BGP_PathAttribute* pathAttr, u_int8_t origin,
+int createUpdateMessage(u_int8_t* buff, int buffSize, int numAttributes,
+                        BGP_PathAttribute** pathAttr, u_int8_t origin,
                         u_int32_t localPref, void* nextHop, 
-                        BGPSEC_PrefixHdr* nlri, bool useMPNLRI)
+                        BGPSEC_PrefixHdr* nlri, bool useMPNLRI, char rpkiVal)
 {  
   if (ntohs(nlri->afi) == AFI_V6)
   {
@@ -536,11 +640,19 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     useMPNLRI = true;
   }  
   
-  int sizePathAttr = getPathAttributeSize(pathAttr); // includes the header size;
+  int idx = 0;
+  int sizePathAttr[numAttributes];
+  for (; idx < numAttributes; idx++)
+  {
+    sizePathAttr[idx] = getPathAttributeSize(pathAttr[idx]); // includes the header size;
+  }
   int sizeOrigin   = sizeof(BGP_Upd_Attr_Origin);
   int sizeMED      = sizeof(BGP_Upd_Attr_MED);
   int sizeLocPref  = localPref > 0 ? sizeof(BGP_Upd_Attr_LocPref) : 0;
   int sizeMPNLRI   = 0; // will be determined later if used
+  int sizeExtComm  = (rpkiVal != UPD_RPKI_NONE) 
+                       ? sizeof(BGP_PathAttribute) + 1 + 8 // + length + attr
+                       : 0;
   
   int sizeNextHop  = useMPNLRI ? 0 : sizeof(BGP_Upd_Attr_NextHop);
       
@@ -548,7 +660,11 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
   // (adding values here, don't forget to adjust the attrLength at the end of
   //  this function. This caused me already some painful debugging.)
   int length =  sizeof(BGP_UpdateMessage_1)+sizeof(BGP_UpdateMessage_2)
-              + sizePathAttr + sizeOrigin + sizeMED + sizeLocPref + sizeNextHop;
+              + sizeOrigin + sizeMED + sizeLocPref + sizeNextHop + sizeExtComm;
+  for (idx = 0; idx < numAttributes; idx++)
+  {
+    length += sizePathAttr[idx];
+  }
     
   // The buffer needs to be at least the required size. Most likely even a bit 
   // longer but if it is not even this length then stop right here and return 
@@ -608,6 +724,33 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     attrLocPref->localPref = htonl(localPref);
     buff += sizeLocPref;
   }
+
+  // take care of the extended community string attribute
+  if (rpkiVal != UPD_RPKI_NONE)
+  {
+    BGP_PathAttribute* pa = (BGP_PathAttribute*)buff;
+    pa->attr_flags     = BGP_UPD_A_FLAGS_OPTIONAL | BGP_UPD_A_FLAGS_TRANSITIVE;
+    pa->attr_type_code = BGP_UPD_A_TYPE_EXT_COMM;
+    buff += sizeof(BGP_PathAttribute);
+    *buff = 8;    buff++;   // length
+    // Now comes the extended community string.
+    *buff = 0x43; buff++;
+    memset (buff, 0, 6);
+    buff += 6;
+    switch (rpkiVal)
+    {
+      case UPD_RPKI_VALID:
+        *buff = 0; buff++;
+        break;
+      case UPD_RPKI_NOTFOUND:
+        *buff = 1; buff++;
+        break;
+      case UPD_RPKI_INVALID:
+      default:
+        *buff = 2; buff++;
+        break;
+    }
+  }
   
   if (!useMPNLRI)
   {
@@ -653,8 +796,7 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
       memcpy (buff, nh->sin6_addr.__in6_u.__u6_addr8, 16);
       buff += 16;
     }
-        
-    
+         
     // Now take care of the MPNLRI
     BGP_Upd_Attr_MPNLRI_2* attrMPNLRI_2 = (BGP_Upd_Attr_MPNLRI_2*)buff;
     attrMPNLRI_2->reserved = 0;
@@ -678,9 +820,12 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
     length += sizeMPNLRI;
   }
   
-  // Now store the BGP(SEC) path attribute
-  memcpy(buff, pathAttr, sizePathAttr);
-  buff += sizePathAttr;
+  // Now store the BGP(SEC) path attribute(s)
+  for (idx = 0; idx < numAttributes; idx++)
+  {
+    memcpy(buff, pathAttr[idx], sizePathAttr[idx]);
+    buff += sizePathAttr[idx];
+  }
   
   // SET NLRI
   if (!useMPNLRI)
@@ -694,7 +839,11 @@ int createUpdateMessage(u_int8_t* buff, int buffSize,
   
   // Now set the correct length values.
   u_int16_t attrSize =   sizeOrigin + sizeMED + sizeLocPref + sizeMPNLRI 
-                       + sizeNextHop + sizePathAttr;
+                       + sizeNextHop + sizeExtComm;
+  for (idx = 0; idx < numAttributes; idx++)
+  {
+    attrSize += sizePathAttr[idx];
+  }
   
   update_hdr2->path_attr_length     = htons(attrSize);
   update_hdr1->messageHeader.length = htons(length);

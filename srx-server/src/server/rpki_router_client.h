@@ -25,10 +25,23 @@
  *
  * Uses log.h for error reporting
  *
- * @version 0.5.0.0
+ * @version 0.5.0.4
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.4  - 2018/03/07 - oborchert
+ *            * Fixed speller in documentation.
+ *            * Removed 'extern' from functions. 
+ *            * Removed functions getLastSentPDUType and getLastReceivedPDUType.
+ *          - 2018/03/06 - oborchert
+ *            * Removed debugCallback of 0.5.0.3 by separating it into two 
+ *              individual functions 1:debugRecCallback and 2:debugSendCallback.
+ * 0.5.0.3  - 2018/02/26 - oborchert
+ *            * Added parameter allowDowngrade. (part of fix for BZ1261)
+ *            * Added function pointer debugCallback
+ *            * Added function doPrintRPKI_to_RTR_PDU
+ *          - 2018/02/23 - oborchert
+ *            * Modified RPKIRouterClientParams.version from int to u_int8_t
  * 0.5.0.0  - 2017/06/29 - oborchert
  *            * Added more documentation to function headers.
  *          - 2017/06/16 - kyehwanl
@@ -86,7 +99,8 @@ typedef struct {
    *                    cache state changes.
    * @param sessionID   The cache sessionID entry for this data. It is be useful
    *                    for sessionID changes in case SRx is implementing a
-   *                    performance driven approach.
+   *                    performance driven approach. This ID does not come from 
+   *                    the prefix PDU, it is the stored value in the client.
    * @param isAnn       Indicates if this in an announcement or not.
    * @param prefix      The prefix itself. Contains the information of v4/v6
    * @param maxLen      the maximum length this white-list / ROA entry covers.
@@ -180,7 +194,7 @@ typedef struct {
   /**
    * An error report was received.
    *
-   * @note Optional - can be \c NULL
+   * @note Optional - can be NULL
    *
    * @param errNo Error number all except 2 are fatal
    * @param msg Error message
@@ -188,6 +202,21 @@ typedef struct {
    * @return \c true = keep the connection, \c false = close connection
    */
   bool (*errorCallback)(uint16_t errNo, const char* msg, void* user);
+  
+  /**
+   * An erroneous PDU was received.
+   * 
+   * @note Optional - can be NULL
+   * 
+   * @param len Length of the erroneous PDU
+   * @param erronPDU The erroneus PDU
+   * @param user USer Data
+   * 
+   * @return true = keep the connection, false = close the connection
+   * 
+   * @since 0.5.0.3
+   */
+  bool (*erronPDUCallback)(u_int32_t len, u_int8_t* erronPDU, void* user);
 
   /**
    * The connections was lost. The client will try to reconnect.
@@ -200,13 +229,45 @@ typedef struct {
    */
   int (*connectionCallback)(void* user);
   // Server connection
+  
+  /**
+   * Allows to perform a debug callback prior processing the received PDU.
+   * 
+   * @note Optional - can be NULL
+   * 
+   * @param *user User data (commonly the client implementation itself
+   * @param *pdu The received PDU
+   * 
+   * @return false if the PDU has a syntax or logical error.
+   * 
+   * @since 0.5.0.4
+   */
+  bool (*debugRecCallback)(void* user, RPKICommonHeader* pdu);  
+
+    /**
+   * Allows to perform a debug callback prior processing the received PDU.
+   * 
+   * @note Optional - can be NULL
+   * 
+   * @param *user User data (commonly the client implementation itself
+   * @param *pdu The received PDU
+   * 
+   * @return false if the PDU has a syntax or logical error.
+   * 
+   * @since 0.5.0.4
+   */
+  bool (*debugSendCallback)(void* user, RPKICommonHeader* pdu);  
 
   /** Set this variable to the server host name - not IP. */
   const char* serverHost;
   /** Set this variable to the server port number. */
   int         serverPort;
-  /* rpki version info */
-  int         version;
+  /** rtr-to-cache version info */
+  u_int8_t    version;
+  /** Allow downgrading to lower version number if signaled during session 
+   * negotiation. 
+   * @since 0.5.0.3 */
+  bool        allowDowngrade;
 } RPKIRouterClientParams;
 
 /**
@@ -215,58 +276,59 @@ typedef struct {
  * @note Do not modify any of the variables!
  */
 typedef struct {
-  /** This id MUST be unique within the application. */
-  uint32_t                 routerClientID;
+  /** This id MUST be unique within the application. It is the ID that 
+   *  identifies the cache. */
+  uint32_t                routerClientID;
 
-  /** The Parameters of this clinet */
-  RPKIRouterClientParams*  params;
+  /** The Parameters of this client */
+  RPKIRouterClientParams* params;
   /** */
-  void*                    user;
+  void*                   user;
 
-  /** The socet information. */
-  ClientSocket             clSock;
-  /** Indicates if the sonnection is stopped. */
-  bool                     stop;
+  /** The socket information. */
+  ClientSocket            clSock;
+  /** Indicates if the connection is stopped. */
+  bool                    stop;
   /** The worker thread for this connection. */
-  pthread_t                thread;
-  /** The rwite mutex of this connection. */
-  Mutex                    writeMutex;
+  pthread_t               thread;
+  /** The write mutex of this connection. */
+  Mutex                   writeMutex;
   /** The last used serial number for this connection (in network order!). */
-  uint32_t                 serial; // < Stored in network order
+  uint32_t                serial; // < Stored in network order
   /** The type of the previous send PDU. */
-  RPKIRouterPDUType        lastSent;
+  RPKIRouterPDUType       lastSent;
   /** The type of the last received PDU. */
-  RPKIRouterPDUType        lastRecv;
+  RPKIRouterPDUType       lastRecv;
 
   // The following attributes are needed for cache sessionID and possible
   // changes within the sessionID number.
   /** The session_id given by the validation cache (in network order!). */
-  uint32_t                 sessionID; // < Stored in network order
+  uint32_t                sessionID; // < Stored in network order
   /** Indicates change in sessionID number. Once set the cache has to remove
    * all entries coming from this cache where the sessionID numbers are
    * different.*/
-  bool                     sessionIDChanged;
+  bool                    sessionIDChanged;
   /** Is needed to prevent twice reset at the beginning. If startup is true
    * the cache session_id values will be "ignored" but set to the received
    * value. See receivePDU for more info. */
-  bool                     startup;
+  bool                    startup;
   /** Is used to allow the receiver thread of ending after the END OF DATA is
    * received. This is used in the rpkirtr_client tool to allow single requests
    * without continuous polling.
    * @since 0.5.0.0 */
-  bool                     stopAfterEndOfData;
-  /* rpki version info */
-  int8_t                   version;
+  bool                    stopAfterEndOfData;
+  /** RTR-to-Cache protocol version info */
+  int8_t                  version;
 } RPKIRouterClient;
 
 /**
  * Create a unique router client ID
  *
- * @param self the router clinet the ID has to be generated for.
+ * @param self the router client the ID has to be generated for.
  *
  * @return the ID;
  */
-extern uint32_t createRouterClientID(RPKIRouterClient* self);
+uint32_t createRouterClientID(RPKIRouterClient* self);
 
 /**
  * Initializes a client and establishes a new connection to a server.
@@ -277,10 +339,10 @@ extern uint32_t createRouterClientID(RPKIRouterClient* self);
  * @param self Client variable that will be initialized.
  * @param params Pre-set parameters.
  * @param routerClientID an ID that will be assigned to this RPKIRouterClient.
- * @param user User data - will be passed to the callbacks
+ * @param user User data - will be passed to the callback functions
  * @return \c true = successful, \c false = something failed
  */
-extern bool createRPKIRouterClient(RPKIRouterClient* client,
+bool createRPKIRouterClient(RPKIRouterClient* client,
                                    RPKIRouterClientParams* params,
                                    void* user);
 
@@ -289,42 +351,45 @@ extern bool createRPKIRouterClient(RPKIRouterClient* client,
  *
  * @param client Client instance
  */
-extern void releaseRPKIRouterClient(RPKIRouterClient* client);
+void releaseRPKIRouterClient(RPKIRouterClient* client);
 
 /**
  * Sends a reset query.
  *
  * @param client Client instance
- * @return \c true = PDU sent, \c false = sending failed
+ * @return true = PDU sent, false = sending failed
  */
-extern bool sendResetQuery(RPKIRouterClient* client);
+bool sendResetQuery(RPKIRouterClient* client);
 
 /**
  * Sends a serial query. This request all new and all expired prefixes.
  *
  * @param client Client instance
- * @return \c true = PDU sent, \c false = sending failed
+ * @return true = PDU sent, false = sending failed
  */
-extern bool sendSerialQuery(RPKIRouterClient* client);
+bool sendSerialQuery(RPKIRouterClient* client);
 
 /**
- * Returns the type of the last sent PDU.
- *
- * @param client Client instance
- * @return Type
+ * Send an error report to the server.
+ * 
+ * @param self the instance of RPKI router client.
+ * @param errCode The error code to be used.
+ * @param erronPDU The PDU containing the error.
+ * @param lenErronPDU Length of the erroneous PDU.
+ * @param errText The administrative text message that accompanies the error.
+ * @param lenErrText The length of the text string.
+ * 
+ * @return true if the packet could be send successfully.
+ * 
+ * @since 0.5.0.3
  */
-extern RPKIRouterPDUType getLastSentPDUType(RPKIRouterClient* client);
+bool sendErrorReport(RPKIRouterClient* self, u_int16_t errCode,
+                            u_int8_t* erronPDU, u_int32_t lenErronPDU,
+                            char* errText, u_int32_t lenErrText);
 
-/**
- * Returns the type of the last received PDU.
- *
- * @param client Client instance
- * @return Type
- */
-extern RPKIRouterPDUType getLastReceivedPDUType(RPKIRouterClient* client);
-
+// @TODO: fix this not so nice work around
 int g_rpki_single_thread_client_fd;
 
-extern void generalSignalProcess(void);
+void generalSignalProcess(void);
 
 #endif // !__RPKI_ROUTER_CLIENT_H__

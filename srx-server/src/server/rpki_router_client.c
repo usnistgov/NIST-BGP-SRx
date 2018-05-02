@@ -22,10 +22,28 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.5.0.1
+ * @version 0.5.0.5
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.5  - 2018/04/24 - oborchert
+ *            * Added missing code in error handling.
+ * 0.5.0.4  - 2018/03/07 - oborchert
+ *            * Modified packet handling and added proper error handling and
+ *              version handshake, 
+ *            * Added internal error defines (RRC_.....)
+ *            * Completed missing documentation.
+ *            * Added documentation and removed inline from getLastSendPDU and 
+ *              getLastReceivedPDU.
+ *            * Fixed incorrect error code printing and streamlined the code in 
+ *              method method handleErrorReport (-1 return value was rubbish).
+ *            * Removed functions getLastSentPDUType and getLastReceivedPDUType
+ * 0.5.0.3  - 2018/02/26 - oborchert
+ *            * Added function wrapper _sendPDU to encapsulate allow debugging
+ *              debugging of sending packets.
+ *            * Added rpki_packet_printer header file.
+ *          - 2018/02/23 - oborchert
+ *            * Removed unnecessary code form sendResetQuery
  * 0.5.0.1  - 2017/10/01 - oborchert
  *            * Fixed compiler warning
  * 0.5.0.0  - 2017/06/29 - oborchert
@@ -66,6 +84,7 @@
 #include <signal.h>
 #include "server/rpki_queue.h"
 #include "server/rpki_router_client.h"
+#include "server/rpki_packet_printer.h"
 #include "util/client_socket.h"
 #include "util/log.h"
 #include "util/socket.h"
@@ -74,12 +93,23 @@
 
 #define HDR "([0x%08X] RPKI Router Client): "
 
+// Error codes for function receive PDU
+#define RRC_RCV_PDU_NO_ERROR     -1
+#define RRC_RCV_PDU_SOCKET_ERROR -2
+#define RRC_RCV_PDU_MEMORY_ERROR -3
+
+// Define a default string length
+#define RRC_MAX_STRING 255
+// Maximum errors during PDU processing
+#define RRC_MAX_ERRCT  10
+
 /**
  * Handle received IPv4 Prefixes.
  *
  * @param client The router client instance.
  * @param hdr the IPv4 prefix header.
- * @return
+ * 
+ * @return true if the IPv4 prefix could be properly processed.
  */
 static bool handleIPv4Prefix(RPKIRouterClient* client,
                              RPKIIPv4PrefixHeader* hdr)
@@ -138,53 +168,45 @@ static bool handleIPv6Prefix(RPKIRouterClient* client,
 }
 
 /**
- * Handles the receipt of an error pdu. The encapsulated PDU is ignored,
- * the error message will be printed though.
+ * This function is a wrapper for handling the received error pdu. 
+ * In case the client does not provide an additional error handler, this
+ * function will print the received error code, the error message and return
+ * the specified return values according to the quick processing of the packet. 
  *
- * @param client Client
- * @param hdr PDU header
- * @return \c 0 = stay connected, \c 1 = disconnect, \c -1 = socket error
+ * @param client This client
+ * @param hdr The received error PDU
+ * 
+ * @return 0: stay connected, 1: disconnect
  */
 static int handleErrorReport(RPKIRouterClient* client,
                              RPKIErrorReportHeader* hdr)
 {
-  uint32_t epduLen = ntohl(hdr->len_enc_pdu);
+  uint32_t  epduLen = ntohl(hdr->len_enc_pdu);
   // Go to the message portion
-  uint8_t* messagePtr = (uint8_t*)hdr+12+epduLen;
-  // Set the messageLen
-  uint32_t msgLen = ntohl(*(uint32_t*)messagePtr);
-  char     msgStr[msgLen+1];
-  int returnVal = (hdr->error_number == 2) ? 0 : 1; // all except 2 are fatal!
+  uint8_t*  messagePtr = (uint8_t*)hdr+12+epduLen;
+  // Retrieve the messageLen
+  uint32_t  msgLen = ntohl(*(uint32_t*)messagePtr);
+  char      errorStr[msgLen+1];
+  u_int16_t error_number = ntohs(hdr->error_number);
+  
+  // all except RPKI_EC_NO_DATA_AVAILABLE (2) are fatal!
+  int returnVal = (error_number == RPKI_EC_NO_DATA_AVAILABLE) ? 0 : 1; 
 
-  // Zero terminate message String
-  msgStr[msgLen] = '\0';
-  // read the Message:
-  int idx=0;
-  // fill the string
-  for (;idx < msgLen; idx++)
-  {
-    msgStr[idx] = *(messagePtr+4+idx);
-  }
-  // Read the error pdu
-
+  //Initialize and fill the message String
+  memset (errorStr, '\0', msgLen+1);
+  messagePtr += 4;
+  memcpy (errorStr, messagePtr, msgLen);
 
   if (client->params->errorCallback != NULL)
   {
     // Pass the code and message to the error callback of this connection
-    if (client->params->errorCallback(ntohs(hdr->error_number), msgStr,
-                                      client->user))
-    {
-      returnVal = 0;
-    }
-    else
-    {
-      returnVal = 1;
-    }
+    returnVal = (client->params->errorCallback(error_number, errorStr, 
+                                               client->user)) ? 0 : 1;
   }
   else
   {
-    LOG(LEVEL_INFO, "ERROR RECEIVING ERROR-PDU type:%d!", hdr->error_number);
-    returnVal = -1;
+    LOG(LEVEL_INFO, "ERROR RECEIVING ERROR-PDU type:%d, msg:'%s'!", 
+                    error_number, errorStr);
   }
 
   return returnVal;
@@ -241,6 +263,38 @@ static void handleEndOfData(RPKIRouterClient* client,
 }
 
 /**
+ * This function checks the version number between the client and the cache.
+ * If the session is still in negotiation stage and the client can downgrade to
+ * successfully negotiate the session, the client version number will be 
+ * downgraded. If not and the versions differ this function returns false.
+ * 
+ * @param client This client. 
+ * @param version The version of the peer
+ * 
+ * @return true if the communication can be continued.
+ * 
+ * @since 0.5.0.3
+ */
+static bool checkVersion(RPKIRouterClient* client, u_int8_t version)
+{
+  if (client->version != version)
+  {
+    // Check the startup stage
+    if (client->startup)
+    {
+      // In case client(self) has a higher version than the requested one
+      // but can downgrade, then downgrade to peers version.
+      if (  (client->version > version) && client->params->allowDowngrade)
+      {
+        client->version = version;
+      }
+    }
+  }
+  
+  return client->version == version;
+}
+
+/**
  * Verify that the cache session id is correct. In case the cache session id is
  * incorrect == changed the flag session id_changed will be set to true. The old
  * session id value will be preserved to allow referencing old values.
@@ -276,68 +330,59 @@ static bool checkSessionID(RPKIRouterClient* client, uint32_t sessionID)
 }
 
 /**
- * This method implements the receiver thread between the RPKI client and
- * RPKI server. It reads each PDU completely.
- *
- * @param client The client connection to the RPKI router.
- * @param returnAterEndOfData Allows to exit the function once an end of data
- *                            is received. This is used during cache session id
- *                            change where the cache is reloaded.
+ * Read the next packet from the socket into the provided buffer. In case the 
+ * buffer is not of sufficient size, the buffer will be extended.
+ * 
+ * In case of an internal error receiving the PDU the returned length can be 
+ * less then the length field of the PDU indicates. In this case the errCode
+ * contains an erorr.
+ * 
+ * The following errors can be reported:
+ * 
+ *     RRC_RCV_PDU_NO_ERROR:       No error
+ *     RRC_RCV_PDU_SOCKET_ERROR:   Somehwo not all data could be loaded.
+ * 
+ * @param client The client session
+ * @param errCode Returns the error code.
+ * @param buffer The buffer to be filled.
+ * @param buffSize The max size of the buffer.
+ * 
+ * @return 0 or the number of bytes received (can be less then the PDU length).
  */
-static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
+static u_int32_t _getPacket(RPKIRouterClient* client, int* errCode, 
+                            uint8_t** buffer, uint32_t* buffSize)
 {
-  RPKICommonHeader* hdr;  // A pointer to the Common header.
-  uint32_t          pduLen;
-  uint8_t*          byteBuffer;
-  uint8_t*          bufferPtr;
-  uint32_t          bytesMissing;
-  // Use the "maximum" header. It can grow in case an error pdu is received
-  // with a large error message or a PDU included or both. In this case the
-  // memory will be extended to the space needed. In case the space can not be
-  // extended, the PDU will be loaded as much as possible and the rest will be
-  // skipped.
-  uint32_t         bytesAllocated = sizeof(RPKIRouterKeyHeader);
-  // Keep going is used to keep the received thread up and running. It will be
-  // set false once the connection is shut down.
-  bool             keepGoing = true;
-
-  // Allocate the message buffer
-  byteBuffer = malloc(bytesAllocated);
-  // Set the bufferPtr to the position where the remaining data has be loaded
-  // into.
-  bufferPtr = (byteBuffer + sizeof(RPKICommonHeader));
-  if (!byteBuffer)
+  uint32_t pduLen       = 0;
+  uint32_t bytesMissing = 0;
+  uint8_t* bufferPtr    = *buffer + sizeof(RPKICommonHeader);
+  RPKICommonHeader* hdr = (RPKICommonHeader*)*buffer;
+  
+  // Initialize the values.
+  memset (*buffer, 0, *buffSize);
+  *errCode = RRC_RCV_PDU_NO_ERROR;
+  
+  // Read the common data for the Common header. This method fails in case the
+  // connection is lost.
+  if (!recvNum(getClientFDPtr(&client->clSock), *buffer,
+                              sizeof(RPKICommonHeader)))
   {
-    RAISE_ERROR("Could not allocate enough memory to read from socket!");
-    return;
+    LOG(LEVEL_DEBUG, HDR "Connection lost!", pthread_self());
+    *errCode  = RRC_RCV_PDU_SOCKET_ERROR;
   }
-
-  // KeepGoing until a cache session id changed / in case of connection loss,
-  // a break stops this while loop.
-  while (keepGoing)
+  else
   {
-    // Read the common data for the Common header. This method fails in case the
-    // connection is lost.
-    if (!recvNum(getClientFDPtr(&client->clSock), byteBuffer,
-                 sizeof(RPKICommonHeader)))
-    {
-      LOG(LEVEL_DEBUG, HDR "Connection lost!", pthread_self());
-      break;
-    }
-
-    hdr = (RPKICommonHeader*)byteBuffer;
     // retrieve the actual size of the message. In case more needs to be loaded
     // it will be done.
     pduLen = ntohl(hdr->length);
     if (pduLen < sizeof(RPKICommonHeader))
     {
-      LOG(LEVEL_DEBUG, HDR "Received an invalid RPKI-RTR PDU!", pthread_self());
-      break;
-    }
-    LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%d]", pthread_self(),
-                     hdr->type);
-
-/////////////////////////////////////////
+      LOG(LEVEL_DEBUG, HDR "Corrupted RPKI-RTR PDU: Size!", pthread_self());
+      *errCode  = RPKI_EC_CORRUPT_DATA;
+    }    
+  }
+  
+  if (*errCode == RRC_RCV_PDU_NO_ERROR)
+  {      
     // Determine how much data is still missing
     bytesMissing = pduLen - sizeof(RPKICommonHeader);
 
@@ -345,64 +390,209 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
     if (bytesMissing > 0)
     {
       // Check if the current buffer is big enough
-      if (bytesMissing > bytesAllocated)
+      if (bytesMissing > *buffSize)
       {
         // The current buffer is to small -> try to increase it.
-        uint8_t* newBuffer = realloc(byteBuffer, bytesMissing);
+        uint8_t* newBuffer = realloc(*buffer, *buffSize);
         if (newBuffer)
         {
-          byteBuffer = newBuffer; // reset to the bigger space
-          bytesAllocated = bytesMissing;
-          bufferPtr = (byteBuffer + sizeof(RPKICommonHeader));
+          *buffer   = newBuffer; // reset to the bigger space
+          *buffSize = bytesMissing;
+          bufferPtr = (*buffer + sizeof(RPKICommonHeader));
         }
         else
         {
           // can only happen in case it is an error packet that contains an
           // erroneous PDU or extreme large error text.
-          RAISE_ERROR("Invalid PDU length : type=%d, length=%u, data-size=%u",
-                      hdr->type, pduLen, bytesMissing);
+          LOG(LEVEL_ERROR, "Invalid PDU length : type=%d, length=%u, "
+                           "data-size=%u", hdr->type, pduLen, bytesMissing);
 
-          // Skip over the data
+          // Try to skip over the data
           if (!skipBytes(&client->clSock, bytesMissing))
           {
-            break;
+            LOG(LEVEL_ERROR, "While reading a corrupted PDU, could not skip "
+                             "over the remainig data");
           }
+          *errCode = RPKI_EC_CORRUPT_DATA;
         }
       }
 
       // Now load the remaining data
-      if (!recvNum(getClientFDPtr(&client->clSock), bufferPtr, bytesMissing))
+      if (*errCode == RRC_RCV_PDU_NO_ERROR)
       {
-        break;
+        if (!recvNum(getClientFDPtr(&client->clSock), bufferPtr, bytesMissing))
+        {
+          *errCode = RRC_RCV_PDU_SOCKET_ERROR; 
+          pduLen -= bytesMissing;
+        }
       }
     }
-/////////////////////////////////////////
-    client->lastRecv = hdr->type;
+  }
+  
+  return pduLen;
+}
 
+/**
+ * This method implements the receiver loop between the RPKI client and
+ * RPKI server. It reads and processes each PDU completely. It does NOT 
+ * close the socket on return.
+ * 
+ * The following error codes can be returned:
+ *   RPKI_EC_...: All RPKI error codes 0..255
+ *   RRC_RCV_PDU_NO_ERROR:     No Error
+ *   RRC_RCV_PDU_SOCKET_ERROR: Socket Error
+ *   RRC_RCV_PDU_MEMORY_ERROR: Memory Error
+ *
+ * @param client The client connection to the RPKI router.
+ * @param returnAterEndOfData Allows to exit the function once an end of data
+ *                            is received. This is used during cache session id
+ *                            change where the cache is reloaded.
+ * @param errCode -3: Memory Error, -2: Socket error, -1: NO ERROR, 
+ *                0..n RPKI_EC_... errors
+ * @param singlePoll if true only one single packet will be processed. This 
+ *                   allows to properly process a handshake.
+ * 
+ * @return true if all went well, false if an ERROR occurred.
+ */
+static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData, 
+                        int* errCode, bool singlePoll)
+{
+  RPKICommonHeader* hdr        = NULL;  // A pointer to the Common header.
+  uint32_t          pduLen     = 0;
+  // Use the "maximum" header. It can grow in case an error pdu is received
+  // with a large error message or a PDU included or both. In this case the
+  // memory will be extended to the space needed. In case the space can not be
+  // extended, the PDU will be loaded as much as possible and the rest will be
+  // skipped.
+  uint32_t         bytesAllocated = sizeof(RPKIRouterKeyHeader);
+  uint8_t*         byteBuffer = malloc(bytesAllocated);
+  // Keep going is used to keep the received thread up and running. It will be
+  // set false once the connection is shut down.
+  bool             keepGoing   = !client->stop;
+  
+  if (byteBuffer != NULL)
+  {
+    // Reset the error code to NO ERROR
+    *errCode = RRC_RCV_PDU_NO_ERROR;
+  }
+  else
+  {
+    RAISE_ERROR("Could not allocate enough memory to read from socket!");
+    *errCode  = RRC_RCV_PDU_MEMORY_ERROR;
+    keepGoing = false;
+  }
+
+  // KeepGoing until a cache session id changed / in case of connection loss,
+  // a break stops this while loop.
+  while (keepGoing && !client->stop)
+  {
+    // If singlePoll is selected, stop after this poll.
+    keepGoing = !singlePoll;
+    
+    pduLen = _getPacket(client, errCode, &byteBuffer, &bytesAllocated);
+    if (!pduLen)
+    {
+      keepGoing = false;
+      continue;
+    }
+    hdr = (RPKICommonHeader*)byteBuffer;
+    
     LOG(LEVEL_DEBUG, HDR "Received RPKI-RTR PDU[%u] length=%u\n",
                      pthread_self(), hdr->type, ntohl(hdr->length));
 
-    // Is needed in PDU_TYPE_ERROR_REPORT
-    int ret;
-
+    // This is for printing received PDU's
+    if (client->params->debugRecCallback != NULL)
+    {
+      printf ("Received Packet:\n");
+      client->params->debugRecCallback(client, hdr);
+    }
+    
+    // Check if a version conflict exist. During negotiation this method might 
+    // downgrade the protocol.
+    if (!checkVersion(client, hdr->version))
+    {
+      // Check if the cache has a higher unsupported version or if the
+      // cache or client only supports version 0. In both cases use 
+      // UNSUPPORTED, otherwise use UNEXPECTED (version 1+)
+      *errCode = ((hdr->version > RPKI_RTR_PROTOCOL_VERSION)
+                  || (client->version == 0))
+                 ? RPKI_EC_UNSUPPORTED_PROT_VER
+                 : RPKI_EC_UNEXPECTED_PROTOCOL_VERSION;
+      
+      // the router and cache might still be in handshake
+      if (client->startup)
+      {
+        // Still in session establishment RFC8210 Section 7
+        // Following RFC 8210 Section 7 the cache responded with a lower version.        
+        if (client->params->allowDowngrade)
+        {
+          // 1st. let us downgrade and then decide what to do next.
+          LOG(LEVEL_NOTICE, "Cache responded with a version %u PDU, the "
+                            "'router' can downgrade.", hdr->version);
+          client->version = hdr->version;
+          
+          // 2nd, check if we can continue processing or if we need to stop 
+          // here.
+        }
+        else
+        {
+          LOG(LEVEL_NOTICE, "Cache responded with a version %u PDU, the "
+                            "'router' cannot downgrade.", hdr->version);
+        }
+        
+        // In case the cache did not respond with an error PDU, let's accept 
+        // this PDU by clearing the error and continue processing.
+        if (hdr->type != PDU_TYPE_ERROR_REPORT)
+        {
+          *errCode = RRC_RCV_PDU_NO_ERROR;
+        }
+      }
+      
+      // Error is not cleared, register the PDU as last received and end loop
+      if (*errCode != RRC_RCV_PDU_NO_ERROR)
+      {
+        // Stop loop of receiving data
+        client->lastRecv = hdr->type;
+        keepGoing = false;
+        continue;
+      }  
+    }
+        
     // Handle the data depending on the type
+    u_int32_t sessionID = 0;
     switch (hdr->type)
     {
       case PDU_TYPE_SERIAL_NOTIFY :
         // Respond with a serial query
-        if (checkSessionID(client, ((RPKISerialNotifyHeader*)hdr)->sessionID))
+        sessionID = ((RPKISerialNotifyHeader*)hdr)->sessionID;
+        if (checkSessionID(client, sessionID))
         {
           sendSerialQuery(client);
         }
         else
         {
+          // incorrect session ID 
           keepGoing = false;
+          *errCode = RPKI_EC_CORRUPT_DATA;
         }
         break;
       case PDU_TYPE_CACHE_RESPONSE :
-        keepGoing = checkSessionID(client,
-                               ((RPKICacheResponseHeader*)hdr)->sessionID);
-        // No need to do anything
+        sessionID = ((RPKICacheResponseHeader*)hdr)->sessionID;
+        if (!checkSessionID(client, sessionID))
+        {
+          client->sessionIDChanged = true;
+          // Mark the clients cache DB as stale.
+          client->params->sessionIDChangedCallback(client->routerClientID, 
+                                                   sessionID);
+          // @TODO: Fix Session ID. 
+          // Only in case the previous message was a "Request Query" the session
+          // ID is allowed to change. RFC8210 5.5 2nd paragraph
+          if (client->lastSent != PDU_TYPE_CACHE_RESET)
+          {
+            keepGoing = false;
+            *errCode = RPKI_EC_CORRUPT_DATA;
+          }
+        }
         break;
       case PDU_TYPE_IP_V4_PREFIX :
         handleIPv4Prefix(client, (RPKIIPv4PrefixHeader*)byteBuffer);
@@ -411,21 +601,33 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
         handleIPv6Prefix(client, (RPKIIPv6PrefixHeader*)byteBuffer);
         break;
       case PDU_TYPE_END_OF_DATA :
-        if (checkSessionID(client, ((RPKIEndOfDataHeader*)hdr)->sessionID))
+        sessionID = ((RPKIEndOfDataHeader*)hdr)->sessionID;
+        if (checkSessionID(client, sessionID))
         {
           // store not byte-swapped
           client->serial = ((RPKIEndOfDataHeader*)byteBuffer)->serial;
           // Now process the RPKI_QUEUE
           handleEndOfData(client, (RPKIEndOfDataHeader*)byteBuffer);
+          // Stop the client is only one data poll is to be done.
+          // Replace client-stop with keepGoing
           keepGoing = !returnAterEndOfData;
         }
         else
         {
           keepGoing = false;
+          *errCode  = RPKI_EC_CORRUPT_DATA; 
         }
         break;
       case PDU_TYPE_ROUTER_KEY:
-        handlePDURouterKey(client, (RPKIRouterKeyHeader*)byteBuffer);
+        if (client->version != 0)
+        {
+          handlePDURouterKey(client, (RPKIRouterKeyHeader*)byteBuffer);
+        }
+        else
+        {
+          *errCode = RPKI_EC_UNSUPPORTED_PDU;
+          keepGoing = false;
+        }
         break;
       case PDU_TYPE_CACHE_RESET :
         // Reset our cache
@@ -434,29 +636,82 @@ static void receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData)
         sendResetQuery(client);
         break;
       case PDU_TYPE_ERROR_REPORT :
-        ret = handleErrorReport(client, (RPKIErrorReportHeader*)byteBuffer);
-        if (ret != 0)
-        {
-          if (ret == 1)
-          {
-            // BZ599 - Changed typecase from (int) to (uintptr_t) to prevent
-            // compiler warnings and other nasty side affects while compiling
-            // on 32 and 64 bit OS.
-            close((uintptr_t)getClientFDPtr(&client->clSock));
-          }
-          return;
-        }
+        // Switched from client-stop to keepGoing
+        keepGoing = !handleErrorReport(client, 
+                                       (RPKIErrorReportHeader*)byteBuffer);
         break;
       case PDU_TYPE_RESERVED :
-        LOG(LEVEL_ERROR, "Received reserved RPKI-PDU Type 255");
+        LOG(LEVEL_ERROR, "Received reserved RPKI-PDU Type %u", 
+            PDU_TYPE_RESERVED);
+        *errCode  = RPKI_EC_UNSUPPORTED_PDU;
+        keepGoing = false;
         break;
       default :
         // We handled all known types already
-        LOG(LEVEL_ERROR, "Unknown/unexpected RPKI-PDU Type %u", hdr->type);
+        LOG(LEVEL_ERROR, "Unsupported RPKI-PDU Type %u", hdr->type);
+        *errCode  = RPKI_EC_UNSUPPORTED_PDU;
+        keepGoing = false;
     }
+    // Set the last received PDU
+    client->lastRecv = hdr->type;
   }
+  
+  // Now do error handling but only if not in handshake mode.
+  if ((!client->startup) && (*errCode != RRC_RCV_PDU_NO_ERROR))
+  {
+    char errStr[RRC_MAX_STRING];
+    memset(errStr, '0', RRC_MAX_STRING);
+
+    if (*errCode == RRC_RCV_PDU_MEMORY_ERROR)
+    {
+      *errCode = RPKI_EC_INTERNAL_ERROR;
+      LOG(LEVEL_ERROR, "Not enough memory!");      
+    }
+    
+    switch (*errCode)
+    {
+      case RPKI_EC_CORRUPT_DATA:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_CORRUPT_DATA);
+        break;
+      case RPKI_EC_NO_DATA_AVAILABLE:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INTERNAL_ERROR);
+        break;
+      case RPKI_EC_INVALID_REQUEST:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INVALID_REQUEST);
+        break;
+      case RPKI_EC_UNSUPPORTED_PROT_VER:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNSUPPORTED_PROT_VER);
+        break;
+      case RPKI_EC_UNSUPPORTED_PDU:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNSUPPORTED_PDU);
+        break;
+      case RPKI_EC_UNKNOWN_WITHDRAWL:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNKNOWN_WITHDRAWL);
+        break;
+      case RPKI_EC_DUPLICATE_ANNOUNCEMENT:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_DUPLICATE_ANNOUNCEMENT);
+        break;
+      case RPKI_EC_UNEXPECTED_PROTOCOL_VERSION:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNEXPECTED_PROTOCOL_VERSION);
+        break;
+      case RPKI_EC_RESERVED:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_RESERVED);
+        break;        
+      case RPKI_EC_INTERNAL_ERROR:
+      default:
+        *errCode = RPKI_EC_INTERNAL_ERROR;
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INTERNAL_ERROR);
+        break;
+    }
+    
+    sendErrorReport(client, *errCode, (uint8_t*)hdr, pduLen, 
+                    errStr, strlen(errStr));
+  }
+  
   // Release the buffer again.
   free(byteBuffer);
+  
+  return *errCode == RRC_RCV_PDU_NO_ERROR;
 }
 
 
@@ -480,6 +735,9 @@ static void* manageConnection (void* clientPtr)
 {
   RPKIRouterClient* client = (RPKIRouterClient*)clientPtr;
   int               sec;
+  int               errCode;
+  // Counter for errors 
+  int errCount = 0;
 
   struct sigaction act;
   sigset_t errmask;
@@ -494,7 +752,7 @@ static void* manageConnection (void* clientPtr)
 
   LOG (LEVEL_DEBUG, "([0x%08X]) > RPKI Router Client Thread started!",
                     pthread_self());
-
+    
   while (!client->stop)
   {
     // Start off every new connection with a reset
@@ -504,19 +762,52 @@ static void* manageConnection (void* clientPtr)
       // is either lost, closed, or the end of data is received (single request)
       // Modified call with 0.5.0.0 to use variable as second parameter rather
       // than false
-      receivePDUs(client, client->stopAfterEndOfData);
-      if (client->stopAfterEndOfData)
+      receivePDUs(client, client->stopAfterEndOfData, &errCode, true);      
+      // Check the expected response, 
+      switch (client->lastRecv)
       {
-        client->stop = true;
+        case PDU_TYPE_CACHE_RESPONSE:
+          // Now, keep on going and receive data.
+          receivePDUs(client, client->stopAfterEndOfData, &errCode, false);
+
+          if (client->stopAfterEndOfData)
+          {
+            client->stop = true;
+          }
+          break;
+        case PDU_TYPE_ERROR_REPORT:
+          // Most likely an error regarding the version number, keep on going if 
+          // we can downgrade the version (and only if)
+          LOG(LEVEL_DEBUG, "Version conflict registered. ");
+          switch (errCode)
+          {
+            case RPKI_EC_UNSUPPORTED_PROT_VER:
+            case RPKI_EC_UNEXPECTED_PROTOCOL_VERSION:
+              // Stop if client was not allowed to downgrade.
+              client->stop = !client->params->allowDowngrade;
+              break;
+            default:
+              LOG(LEVEL_DEBUG, "PDU receive error[%u]!", errCode);
+              errCount++;
+              if (errCount >= RRC_MAX_ERRCT)
+              {
+                LOG(LEVEL_ERROR, "Experienced %u errors during receiving PDU's"
+                                 ", Stop client!", errCount);
+                client->stop = true;
+              }
+          }
+          break;
+        default:
+          RAISE_ERROR("Unexpected protocol behavior!");
+          client->stop = true;
       }
     }
-
-    // The connection is lost or did not even exist yet.
 
     // Test if the connection stopped!
     if (client->stop)
     {
       LOG(LEVEL_DEBUG, HDR "Client Connection was stopped!", pthread_self());
+      close((uintptr_t)getClientFDPtr(&client->clSock));
       break;
     }
 
@@ -528,6 +819,8 @@ static void* manageConnection (void* clientPtr)
 
     if (sec == -1)
     { // Stop trying to re-establish the connection
+      client->stop = true;
+      close((uintptr_t)getClientFDPtr(&client->clSock));
       pthread_exit((void*)1);
     }
 
@@ -537,7 +830,8 @@ static void* manageConnection (void* clientPtr)
       client->startup = true;
     }
 
-    // Now try to reconnect.
+    // Now try to reconnect if not stopped.
+    client->clSock.reconnect = !client->stop;
     reconnectToServer(&client->clSock, sec, MAX_RECONNECTION_ATTEMPTS);
 
     // See if the session_id changed!
@@ -565,7 +859,7 @@ static void* manageConnection (void* clientPtr)
         // Receive and process all PDUs. The flag client->session_id_changed
         // is already set to false.
         LOG (LEVEL_DEBUG, "SESSION ID CHANGE: RECEIVE DATA", pthread_self());
-        receivePDUs(client, true);
+        receivePDUs(client, true, &errCode, false);
       }
       LOG (LEVEL_DEBUG, "SESSION ID CHANGE: DATA ESTABLISHED", pthread_self());
       if (client->params->sessionIDEstablishedCallback != NULL)
@@ -652,8 +946,8 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
   self->sessionIDChanged = false;
   self->startup          = true;
 
-  self->routerClientID = createRouterClientID(self);
-  self->version         = params->version;
+  self->routerClientID   = createRouterClientID(self);
+  self->version          = params->version;
 
   ret = pthread_create (&self->thread, NULL, manageConnection, self);
   if (ret)
@@ -693,6 +987,41 @@ void releaseRPKIRouterClient (RPKIRouterClient* self)
 }
 
 /**
+ * Wrapper for function sendNum. This wrapper does call the debugCallback in 
+ * case it is specified. The call will only be done if the call to sendNum was
+ * successful.
+ *  
+ * @param client The RPKI Router Client (this)
+ * @param hdr The header to be send.
+ * 
+ * @return true if the packed was send, otherwise false.
+ * 
+ * @since 0.5.0.3 
+ */
+static bool _sendPDU(RPKIRouterClient* client, RPKICommonHeader* hdr)
+{
+  bool succ = sendNum(getClientFDPtr(&client->clSock), hdr, ntohl(hdr->length)); 
+  if (succ)
+  {
+    client->lastSent = hdr->type;
+  }
+  if (client->params->debugSendCallback != NULL)
+  {
+    printf("Sending packet:");
+    if (succ)
+    {
+      printf("\n");
+      client->params->debugSendCallback(client, hdr);
+    }
+    else
+    {
+      printf (" failed!\n");
+    }
+  }
+  return succ;
+}
+
+/**
  * Send a RESET QUERY to the validation cache to re-request the complete
  * data
  *
@@ -715,16 +1044,9 @@ bool sendResetQuery (RPKIRouterClient* self)
     hdr.length   = htonl(sizeof(RPKIResetQueryHeader));
 
     lockMutex(&self->writeMutex);
-    self->lastSent = PDU_TYPE_RESET_QUERY;
 
-    succ = sendNum (getClientFDPtr(&self->clSock), &hdr,
-                    sizeof(RPKIResetQueryHeader));
-
-    if (succ)
-    {
-      self->lastSent = PDU_TYPE_RESET_QUERY;
-    }
-    else
+    succ = _sendPDU (self, (RPKICommonHeader*)&hdr);
+    if (!succ)
     {
       // TODO: Maybe just close the old socket and set both to -1
       // The socket was not closed but the FD was set to -1. reset it to allow
@@ -742,6 +1064,66 @@ bool sendResetQuery (RPKIRouterClient* self)
 }
 
 /**
+ * Send an error report to the server.
+ * 
+ * @param self the instance of rpki router client.
+ * @param errCode The error code to be used.
+ * @param erronPDU The PDU containing the error.
+ * @param lenErronPDU Length of the erroneous PDU (host format).
+ * @param errText The administrative text message that accompanies the error.
+ * @param lenErrText Th length of the text string (host format).
+ * 
+ * @return true if the packet could be send successfully.
+ * 
+ * @since 0.5.0.3
+ */
+bool sendErrorReport(RPKIRouterClient* self, u_int16_t errCode,
+                     u_int8_t* erronPDU, u_int32_t lenErronPDU,
+                     char* errText, u_int32_t lenErrText)
+{
+  u_int32_t totalLen = sizeof(RPKIErrorReportHeader) + lenErronPDU
+                       + (4 + lenErrText);  // 4 byte for length field + text
+  bool  succ = false;
+
+  if (self->clSock.clientFD != -1)
+  {
+    u_int8_t* buff = malloc(totalLen);
+    memset(buff, 0, totalLen);
+    u_int32_t* hdr_len_err_txt = NULL;
+    RPKIErrorReportHeader* hdr = (RPKIErrorReportHeader*)buff;
+    hdr->version      = self->version;
+    hdr->type         = PDU_TYPE_ERROR_REPORT;
+    hdr->error_number = htons(errCode);
+    hdr->length       = htonl(totalLen);
+    hdr->len_enc_pdu  = htonl(lenErronPDU);
+    // Move buffer to position of error PDU
+    buff += sizeof(RPKIErrorReportHeader);
+    memcpy(buff, erronPDU, lenErronPDU);
+    buff += lenErronPDU;
+    hdr_len_err_txt  = (u_int32_t*)buff;
+    *hdr_len_err_txt = htonl(lenErrText);
+    buff += sizeof(u_int32_t);
+    memcpy(buff, errText, lenErrText); 
+    // Set buffer back to start of header; 
+    buff = (u_int8_t*)hdr;
+
+    lockMutex(&self->writeMutex);
+    LOG(LEVEL_DEBUG, HDR "Sending Serial Query...\n", pthread_self());
+
+    succ  = _sendPDU(self, (RPKICommonHeader*)hdr); 
+    unlockMutex(&self->writeMutex);
+
+    memset(buff, 0, totalLen);
+    free(buff);
+
+    buff = NULL;
+    hdr  = NULL;
+  }
+   
+  return succ;
+}
+
+/**
  * Send a SERIAL QUERY to the rpki validation cache. The sessionID and serial
  * number are extracted of the router client itself.
  *
@@ -751,38 +1133,25 @@ bool sendResetQuery (RPKIRouterClient* self)
  */
 bool sendSerialQuery (RPKIRouterClient* self)
 {
-  RPKISerialQueryHeader hdr;
-  hdr.version   = self->version;
-  hdr.type      = PDU_TYPE_SERIAL_QUERY;
-  hdr.sessionID = self->sessionID;
-  hdr.length    = htonl(sizeof(RPKISerialQueryHeader));
-  hdr.serial    = self->serial;
+  RPKISerialQueryHeader hdr;  
+  bool  succ = false;
 
-  bool succ  = false;
-
-  lockMutex(&self->writeMutex);
-  LOG(LEVEL_DEBUG, HDR "Sending Serial Query...\n", pthread_self());
-
-  if (sendNum(getClientFDPtr(&self->clSock), &hdr,
-              sizeof(RPKISerialQueryHeader)))
+  if (self->clSock.clientFD != -1)
   {
-    self->lastSent = PDU_TYPE_SERIAL_QUERY;
+    hdr.version   = self->version;
+    hdr.type      = PDU_TYPE_SERIAL_QUERY;
+    hdr.sessionID = self->sessionID;
+    hdr.length    = htonl(sizeof(RPKISerialQueryHeader));
+    hdr.serial    = self->serial;
+
+    lockMutex(&self->writeMutex);
+    LOG(LEVEL_DEBUG, HDR "Sending Serial Query...\n", pthread_self());
+
+    succ  = _sendPDU(self, (RPKICommonHeader*)&hdr);
+    unlockMutex(&self->writeMutex);
   }
-  unlockMutex(&self->writeMutex);
 
   return succ;
-}
-
-//TODO: Documentation missing
-inline RPKIRouterPDUType getLastSentPDUType(RPKIRouterClient* self)
-{
-  return self->lastSent;
-}
-
-//TODO: Documentation missing
-inline RPKIRouterPDUType getLastReceivedPDUType(RPKIRouterClient* self)
-{
-  return self->lastRecv;
 }
 
 //TODO: Documentation missing
@@ -805,4 +1174,3 @@ void generalSignalProcess(void)
   sigaction(SIGPIPE, &act, NULL);
   pthread_sigmask(SIG_UNBLOCK, &errmask, NULL);
 }
-

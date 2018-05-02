@@ -23,10 +23,22 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.16
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.16 - 2018/04/21 - oborchert
+ *            * Added regular expression as syntax helper for update scripting.
+ * 0.2.0.13 - 2018/04/17 - oborchert
+ *            * Fixed some minor issues like spelling and formatting in 
+ *              configuration file generation.
+ * 0.2.0.12 - 2018/04/15 - oborchert
+ *            * Added P_CFG_PRINT_SIMPLE to configuration file generation.  
+ * 0.2.0.11 - 2018/03/22 - oborchert
+ *            * Added configuration to enable/disable as4 capability.
+ *          - 2018/03/21 - oborchert
+ *            * Added parameter to enable/disable adding global updates to 
+ *              session.
  *  0.2.0.7 - 2017/03/17 - oborchert
  *            * Fixed speller in generated configuration.
  *          - 2017/03/15 - oborchert
@@ -195,20 +207,29 @@ bool generateFile(char* fName)
                         "not.\n");
     fprintf (file, "    #%s = true;\n\n", P_CFG_EXT_MSG_FORCE);
 
+    fprintf (file, "    # Configure BGP capabilities.\n");
+    fprintf (file, "    #%s = true;\n\n", P_CFG_CAP_AS4);
+
     fprintf (file, "    # Configure BGPSEC capabilities.\n");
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_S);
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V4_R);
     fprintf (file, "    %s = true;\n", P_CFG_BGPSEC_V6_S);
     fprintf (file, "    %s = true;\n\n", P_CFG_BGPSEC_V6_R);
-
+    
     fprintf (file, "    # Updates for this session only\n");
+    fprintf (file, "    # <prefix>[,[ <asn>[p<repitition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "    %s = (  \"%s\"\n", P_CFG_UPD_PARAM, 
                                                     "10.0.0.0/24");
     fprintf (file, "              , \"%s, %s\"\n", "10.0.1.0/24", "10 20p3 30");
     fprintf (file, "              , \"%s, %s\"\n", "10.0.2.0/24", "10 20 40 50");
-    fprintf (file, "              , \"%s, %s\"\n", "10.0.3.0/24", "10 20 60 70");
+    fprintf (file, "              , \"%s, %s\"\n", "10.0.3.0/24", "10 20 60 70V");
     fprintf (file, "             );\n\n");
-
+    fprintf (file, "    # Enable/Disable adding global updates to this session."
+                                                                          "\n");
+    fprintf (file, "    %s = %s;\n\n", P_CFG_INCL_GLOBAL_UPDATES, 
+                                       DEF_INCL_GLOBAL_UPDATE ? "true" 
+                                                              : "false");
+    
 // Removed this parameter from being added in default configuration. It will 
 // be completely removed in future revisions and was only needed during the 
 // draft13 -> draft15 merger.  
@@ -242,8 +263,8 @@ bool generateFile(char* fName)
     
     // @TODO: This MUST be modified to each message type once it is 
     //        supported.
-    fprintf (file, "    # Do some debug printout.\n");
-    fprintf (file, "    # For BGP Mode.\n");    
+    fprintf (file, "    # Allow printout of send and received BGP/BGPsec "
+                        "traffic.\n");
     fprintf (file, "    %s    = false;\n", P_CFG_PRINT_ON_SEND);
     fprintf (file, "    # Or more detailed as a filter\n");
     fprintf (file, "    #%s = {\n", P_CFG_PRINT_ON_SEND);
@@ -252,7 +273,7 @@ bool generateFile(char* fName)
     fprintf (file, "    #  %s    = true;\n", P_CFG_PRNFLTR_KEEPALIVE);
     fprintf (file, "    #  %s = true;\n", P_CFG_PRNFLTR_NOTIFICATION);
     fprintf (file, "    #  %s      = true;\n", P_CFG_PRNFLTR_UNKNOWN);
-    fprintf (file, "    #}\n");
+    fprintf (file, "    #};\n\n");
     fprintf (file, "    %s    = false;\n", P_CFG_PRINT_ON_RECEIVE);
     fprintf (file, "    # Or more detailed as a filter\n");
     fprintf (file, "    #%s = {\n", P_CFG_PRINT_ON_RECEIVE);
@@ -261,8 +282,10 @@ bool generateFile(char* fName)
     fprintf (file, "    #  %s    = true;\n", P_CFG_PRNFLTR_KEEPALIVE);
     fprintf (file, "    #  %s = true;\n", P_CFG_PRNFLTR_NOTIFICATION);
     fprintf (file, "    #  %s      = true;\n", P_CFG_PRNFLTR_UNKNOWN);
-    fprintf (file, "    #}\n");
-    
+    fprintf (file, "    #};\n\n");
+
+    fprintf (file, "    #%s     = false;\n\n", P_CFG_PRINT_SIMPLE);
+
     fprintf (file, "    %s  = false;\n\n", P_CFG_PRINT_POLL_LOOP);
     fprintf (file, "    # For CAPI Mode.\n");    
     fprintf (file, "    %s = false;\n\n", P_CFG_PRINT_CAPI_ON_INVALID);    
@@ -278,6 +301,7 @@ bool generateFile(char* fName)
     fprintf (file, ");\n\n");
 
     fprintf (file, "# global updates for all sessions\n");
+    fprintf (file, "# <prefix>[,[ <asn>[p<repitition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "%s = ( \n", P_CFG_UPD_PARAM);
     fprintf (file, "         );\n");
     fclose(file);

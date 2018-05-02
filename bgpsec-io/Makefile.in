@@ -350,7 +350,9 @@ noinst_HEADERS = \
 
 
 # Crypto Key generation tools
-dist_bin_SCRIPTS = tools/bio-traffic.sh
+dist_bin_SCRIPTS = tools/bio-traffic.sh \
+                   tools/mrt_to_bio.sh
+
 AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 bgpsecio_LDADD = $(top_srcdir)/antd-util/libantd_util.la
 bgpsecio_CFLAGS = $(CFLAGS) $(SCA_CFLAGS) $(OPENSSL_CFLAGS)

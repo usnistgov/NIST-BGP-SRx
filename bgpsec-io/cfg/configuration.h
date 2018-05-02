@@ -22,10 +22,21 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.17
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.17 -2018/04/26 - oborchert
+ *            * Added UPD_AS_SET_OPEN and UPD_AS_SET_CLKOSE
+ *  0.2.0.14 -2018/04/19 - oborchert
+ *            * Added 'validation' to update structure.
+ *  0.2.0.12 -2018/04/14 - oborchert
+ *            * Added switch 'printSimple' to update printer. 
+ *  0.2.0.11- 2018/03/22 - oborchert
+ *            * Added configuration P_CFG_CAP_AS4
+ *          - 2018/03/21 - oborchert
+ *            * Added switch to disable global updates for a session.
+ *            * Added define DEF_INCL_GLOBAL_UPDATE
  *  0.2.0.7 - 2017/05/03 - oborchert
  *            * Moved include of config.h into this  file rather then 
  *              configuration.c.
@@ -101,12 +112,13 @@
 #define LCONFIG_INT long
 #endif
 
-#define DEF_KEYLOCATION     "/var/lib/key-volt/\0"
-#define DEF_SKIFILE         "/var/lib/key-volt/ski-list.txt\0"
-#define DEF_PEER_PORT       179
-#define DEF_HOLD_TIME       180
-#define DEF_DISCONNECT_TIME 0
-#define DEF_ALGO_ID         1
+#define DEF_KEYLOCATION        "/var/lib/key-volt/\0"
+#define DEF_SKIFILE            "/var/lib/key-volt/ski-list.txt\0"
+#define DEF_PEER_PORT          179
+#define DEF_HOLD_TIME          180
+#define DEF_DISCONNECT_TIME    0
+#define DEF_ALGO_ID            1
+#define DEF_INCL_GLOBAL_UPDATE true
 
 // Operational type
 #define P_TYPE_BGP  "BGP"
@@ -325,6 +337,8 @@
 #define P_CFG_PRINT_ON_RECEIVE      "printOnReceive"
 // print bgp packages on send
 #define P_CFG_PRINT_ON_SEND         "printOnSend"
+// define if messages are printed simple (one liner) or in wireshark format.
+#define P_CFG_PRINT_SIMPLE          "printSimple"
 // print the poll loop for the session
 #define P_CFG_PRINT_POLL_LOOP       "printPollLoop"
 // print the status information on invalid - CAPI mode"
@@ -339,6 +353,12 @@
 #define P_CFG_FAKE_SIGNATURE       "fake_signature"
 // fake ski
 #define P_CFG_FAKE_SKI             "fake_ski"
+
+// Add Global updates to sessions.
+#define P_CFG_INCL_GLOBAL_UPDATES  "incl_global_updates"
+
+// Enable/Disable own capability of AS4 as numbers
+#define P_CFG_CAP_AS4              "cap_as4"
 
 // Force generation of one byte BGPSEC Path Attribute length field if attribute
 // length is less than 255 byte.
@@ -355,7 +375,7 @@
 
 // Enable / disable printing of OPEN message
 #define P_CFG_PRNFLTR_OPEN         "open"
-// Enable / disable printing of UPDATE message
+// Enable / disable (true|simple|false) printing of UPDATE message
 #define P_CFG_PRNFLTR_UPDATE       "update"
 // Enable / disable printing of NOTIFICATION message
 #define P_CFG_PRNFLTR_NOTIFICATION "notification"
@@ -375,6 +395,20 @@
 #define SESS_ERR   "Session[%i]: parameter '%s' missing!"
 #define SESS_ERR_1 "Session[%i]: parameter '%s' %s!"
 
+// Used for updates
+/** Used to specify no validation state available. */
+#define UPD_RPKI_NONE     '-'
+/** Used to signal validation state 'valid' */
+#define UPD_RPKI_VALID    'V'
+/** Used to signal validation state 'invalid' */
+#define UPD_RPKI_INVALID  'I'
+/** Used to signal validation state 'not found'*/
+#define UPD_RPKI_NOTFOUND 'N'
+
+/** Character to open AS_SET in update string */
+#define UPD_AS_SET_OPEN    '{'
+/** Character to close AS_SET in update string */
+#define UPD_AS_SET_CLOSE   '}'
 /**
  * Determines how the program operates
  */
@@ -391,7 +425,14 @@ typedef enum OP_Mode
 typedef struct 
 {
   BGPSEC_V6Prefix prefixTpl; // can be typecast to v4 and v6
+  /** The as path string. */
   char*           pathStr;
+  /** The as_set string - NULL if no AS_SET exists. */
+  char*           asSetStr;
+  /** used to determine if a validation state can be send via community string. 
+   */
+  char            validation; // contains the RPKI validation state 
+                              // either 0, 'V', 'I', 'N'
   // @TODO: Maybe here we can add the binary data as well?????
 } UpdateData;
 

@@ -22,10 +22,30 @@
  * Connects to an RPKI/Router Protocol server and prints all received
  * information on stdout.
  *
- * @version 0.5.0.0
+ * @version 0.5.0.4
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.5.0.4 - 2018/03/09 - oborchert
+ *            * Do not print starting string on single run except if verbose is 
+ *              enabled.
+ *          - 2018/03/07 - oborchert
+ *            * Modified setting of st_verbose and st_debug. Also modified
+ *              logging according to the st_... values.
+ *          - 2018/03/06 - oborchert
+ *            * Renamed printReset and printPrefix into handle... 
+ *            * Added information if client can downgrade if protocol is 
+ *              larger than cache protocol.
+ *            * Added Program header printout.
+ *          - 2018/03/01 - oborchert
+ *            * BZ1264: Fixed define DEF_FMT_WD to correct default withdrawal 
+ *              formating.
+ *            * Added usage of readline to command for non single run.
+ *  0.5.0.3 - 2018/02/22 - oborchert
+ *            * Added version printout to program start.
+ *            * Fixed syntax printout.
+ *            * Moved some defines into rpki_router.h header file.
+ *            * Added rpki_packet_printer.h
  *  0.5.0.0 - 2017/06/29 - oborchert
  *            * Added end of data handler.
  *            * Modified pringHex and calls to it to not have compiler warnings.
@@ -50,17 +70,28 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <string.h>
+#include <readline/readline.h>
+#include "shared/rpki_router.h"
+#include "server/rpki_packet_printer.h"
 #include "server/rpki_router_client.h"
 #include "util/log.h"
 #include "util/prefix.h"
 #include "util/io_util.h"
+#include "util/str.h"
 
 /** The default RPKI port (rfc6810) */
-#define DEF_RPKI_PORT  323
-#define DEF_RPKI_CACHE "localhost";
 #define DEF_FMT_AN "+ %u %s(%u)"
-#define DEF_FMT_WD "+ %u %s(%u)"
-#define RPKI_CONNECTION_TIMEOUT 3;
+#define DEF_FMT_WD "- %u %s(%u)"
+
+#define SRX_TOOLS_CACHE_CLIENT_NAME "RPKI Cache Client Tester"
+
+#define CMD_SERIAL_QUERY        's'
+#define CMD_RESET_QUERY         'r'
+#define CMD_QUIT_CLIENT         'q'
+#define CMD_HELP_CLIENT         'h'
+#define CMD_SEND_ERR_LAST_PD    'e'
+#define CMD_DEBUG_REC           '1'
+#define CMD_DEBUG_SND           '2'
 
 /**
  * Static parameter that specifies if this runs program in debug mode or not.
@@ -73,6 +104,18 @@ static bool st_debug   = false;
  * Static parameter to specify additional verbose information to be printed.
  */
 static bool st_verbose = false;
+
+/**
+ * Static parameter to indicate if received packages to be printed.
+ * @since 0.5.0.4
+ */
+static bool st_print_receive = false;
+
+/**
+ * Static parameter to indicate if send packages to be printed.
+ * @since 0.5.0.4
+ */
+static bool st_print_send = false;
 
 /**
  * Static parameter that indicates if this program should only perform a single
@@ -94,37 +137,38 @@ static char st_add_format[256] = {DEF_FMT_AN "\n\0"};
  * @since 0.5.0.0
  */
 static char st_del_format[256] = {DEF_FMT_WD "\n\0"};
+
 /*
  * RPKI/Router client handlers
  */
-void printPrefix(uint32_t valCacheID, uint16_t sessionID,
+void handlePrefix(uint32_t valCacheID, uint16_t sessionID,
                  bool isAnn, IPPrefix* prefix, uint16_t maxLen, uint32_t oas,
                  void* _u)
 {
   char prefixBuf[MAX_PREFIX_STR_LEN_V6];
 
-  if (st_debug)
+  if (isAnn)
   {
-    LOG(LEVEL_DEBUG, "[Prefix] %s (vcd=0x%08X sessionID=0x%04X): prefix=%s-%u, "
-                     "as=%u", (isAnn ? "Ann" : "Wd"), valCacheID, sessionID,
-                     ipPrefixToStr(prefix, prefixBuf, MAX_PREFIX_STR_LEN_V6),
-                     maxLen, oas);
-  }
-  else if (isAnn)
+    if (st_add_format[0] != 0)
+    {
+      printf (st_add_format, oas,
+              ipPrefixToStr(prefix, prefixBuf, MAX_PREFIX_STR_LEN_V6), maxLen);
+    }
+  } 
+  else
   {
-    printf (st_add_format, oas,
-            ipPrefixToStr(prefix, prefixBuf, MAX_PREFIX_STR_LEN_V6), maxLen);
-  } else
-  {
-    printf (st_del_format, oas,
-            ipPrefixToStr(prefix, prefixBuf, MAX_PREFIX_STR_LEN_V6), maxLen);
+    if (st_del_format[0] != 0)
+    {
+      printf (st_del_format, oas,
+              ipPrefixToStr(prefix, prefixBuf, MAX_PREFIX_STR_LEN_V6), maxLen);
+    }
   }
 }
 
 /**
  * Only adds a log entry
  */
-void printReset()
+void handleReset()
 {
   LOG(LEVEL_INFO, "Received a Cache Reset");
 }
@@ -210,7 +254,8 @@ void handleEndOfData(uint32_t valCacheID, uint16_t sessionID, void* user)
 bool handleError(uint16_t errNo, const char* msg, void* _u)
 {
   LOG(LEVEL_ERROR, "Received an error [%u], msg='%s'", errNo, msg);
-  return errNo == 2; // Keep the connection only if not fatal
+  return errNo == RPKI_EC_NO_DATA_AVAILABLE; // Keep the connection only if not 
+                                             // fatal
 }
 
 /**
@@ -258,22 +303,35 @@ void sessionIDEstablished (uint32_t valCacheID, uint16_t newSessionID)
  */
 void syntax(const char* prgName)
 {
-    printf ("syntax: %s [options] [<host> [<port>]]\n", prgName);
-    printf (" options: -hH?Dvs --help help\n");
-    printf ("   help, --help, -h, -H: This screen.\n");
-    printf ("     -D: enable debug output.\n");
-    printf ("     -D: enable debug output.\n");
-    printf ("     -v: verbose.\n");
-    printf ("     -s: perform only a single run.\n");
-    printf ("     -a <format>: The printout format for announcements.\n");
-    printf ("     -r <format>: The printout format for withdrawals.\n");
-    printf ("     -V <0|1>: version for rpki router client.\n");
+    printf ("\nSyntax: %s [options] [<host> [<port>]]\n\n", prgName);
+    printf (" Options:\n");
+    printf ("     -h, -H, -? --help\n"
+            "         This screen.\n");
+    printf ("     -D\n"
+            "         Enable debug output.\n");
+    printf ("     -v\n"
+            "         Verbose.\n");
+    printf ("     -pr\n"
+            "         Print receive.\n");
+    printf ("     -ps\n"
+            "         Print send.\n");
+    printf ("     -s\n"
+            "         Perform only a single run.\n");
+    printf ("     -a <format>\n"
+            "         The printout format for announcements.\n");
+    printf ("     -w <format>\n"
+            "         The printout format for withdrawals.\n");
+    printf ("     -V <0|1>\n"
+            "         Version for RPKI router client.\n");
+    printf ("     -d\n"
+            "         Allow downgrading to Version 0 (only for -V 1)\n\n");
     printf (" format:\n");
-    printf ("    The default format if \"%s\" for announcements and\n"
+    printf ("    The default format is \"%s\" for announcements and\n"
             "    \"%s\" for withdrawals.\n", DEF_FMT_AN, DEF_FMT_WD);
     printf ("    The order in which the data is printed is ASN, Prefix, Maxlen");
-    printf ("\n    This means the formating string must contain the order\n");
-    printf ("\n    integer - string - integer\n");
+    printf ("\n    This means the formating string must contain the order");
+    printf ("\n    integer - string - integer");
+    printf ("\n\n 2010-2018 ANTD NIST - Version %s\n", SRX_TOOLS_VERSION);
 }
 
 /**
@@ -290,100 +348,147 @@ void syntax(const char* prgName)
 bool parseParams(int argc, char** argv, RPKIRouterClientParams* params,
                  int* exitVal)
 {
-  char* arg    = NULL;
-  bool  retVal = true;
-  bool  doHelp = false;
+  char* arg     = NULL;
+  bool  retVal  = true;
+  bool  doHelp  = false;
+  // Determine if a parameter switch is provided
+  bool  pSwitch = false;
+  bool  isA     = false;
   int idx = 0;
 
   *exitVal = 0;
 
+  // serverhost MUST be NULL to indicate if it is set already
   params->serverHost = NULL;
+  // serverPort MUST be set to 0 to indicate if it is set already
   params->serverPort = 0;
-  params->version = 0;
+  // The protocol version to be used
+  params->version    = RPKI_RTR_PROTOCOL_VERSION;
 
-  for (idx = 1; (idx < argc) && !doHelp; idx++)
+  for (idx = 1; (idx < argc) && !doHelp && !*exitVal; idx++)
   {
     arg = (char*)argv[idx];
-    if (argv[idx][0] == '-')
+    pSwitch = false;
+    
+    switch (arg[0])
+    {
+      case '-' :
+        pSwitch = true;
+        break;
+      case '?' :
+        doHelp = true;
+      default:
+        break;
+    }
+    
+    if (pSwitch)
     {
       // Move over the '-'
       arg++;
-      if (strcmp(arg, "-help") == 0)
+      isA = false;
+
+      switch (arg[0])
       {
-        doHelp = true;
-      }
-      else
-      {
-        bool isA = false;
-        switch (arg[0])
-        {
-          case 'h':
-          case 'H':
-          case '?':
+        case 'h':
+        case 'H':
+        case '?':
+          doHelp = true;
+          break;
+        case 'D':
+          // Add debug information
+          st_debug   = true;
+          // Debugging requires verbose to be enabled - no break here
+        case 'v':
+          // Add verbose information.
+          st_verbose = true;
+          break;
+        case 'p':
+          if (strlen(arg) == 2)
+          {
+            if (arg[1] == 'r')
+            {
+              st_print_receive = true;
+            }
+            else if (arg[1] == 's')
+            {
+              st_print_send = true;
+            }
+          }
+          else
+          {
+            printf ("Error: Invalid print parameter '-%s'!\n", arg);
+            *exitVal = 1;            
+          }
+          break;
+        case 's':
+          // Perform a single request only
+          st_single_request = true;
+          break;
+        case 'V':
+          if (++idx < argc)
+          {
+            params->version= atoi(argv[idx]);
+          }
+          else
+          {
+            printf ("Error: Version 0|1 is missing!\n");
+            *exitVal = 1;
+            doHelp = true;
+          }
+          if (params->version > RPKI_RTR_PROTOCOL_VERSION)
+          {
+            printf ("Error: Invalid version number %u!\n", params->version);
+            *exitVal = 1;
+            doHelp = true;            
+          }
+          break;
+        case 'd':
+          params->allowDowngrade = true;
+          break;
+        case 'a':
+          isA = true;
+        case 'w':
+          idx++;
+          if (idx < argc)
+          {
+            arg = argv[idx];
+            snprintf(isA ? st_add_format : st_del_format, 256, "%s\n", arg);
+          }
+          else
+          {
+            printf ("Parameter 'format' is missing!\n");
+            doHelp   = true;
+            *exitVal = 1;
+          }
+          break;
+        case '-':
+          if (strcmp(arg, "-help") == 0)
+          {
             doHelp = true;
             break;
-          case 'v':
-            // Add verbose information.
-            st_verbose = true;
-            break;
-          case 'D':
-            // Add debug information
-            st_debug = true;
-            break;
-          case 's':
-            // Perform a single request only
-            st_single_request = true;
-            break;
-          case 'a':
-            isA = true;
-          case 'V':
-            params->version= atoi(argv[2] );
-            idx++;
-            break;
-          case 'w':
-            idx++;
-            if (idx < argc)
-            {
-              arg = argv[idx];
-              if (isA) snprintf(st_add_format, 256, "%s\n", arg);
-              else     snprintf(st_add_format, 256, "%s\n", arg);
-            }
-            else
-            {
-              printf ("Parameter 'format' is missing!\n");
-              doHelp   = true;
-              *exitVal = 1;
-            }
-            break;
-          default:
-            printf ("Invalid parameter '%s'\n", arg);
-            doHelp = true;
-            break;
-        }
+          }
+        default:
+          printf ("Invalid parameter '%s'\n", arg);
+          doHelp = true;
+          *exitVal = 1;
+          break;
       }
     }
     else
     {
-      if (strcmp(arg, "help") == 0)
+      if (params->serverHost == NULL)
       {
-        doHelp = true;
+        params->serverHost = arg;
+      }
+      else if (params->serverPort == 0)
+      {
+        params->serverPort = strtol(arg, NULL, 10);
       }
       else
       {
-        if (params->serverHost == NULL)
-        {
-          params->serverHost = arg;
-        }
-        else if (params->serverPort == 0)
-        {
-          params->serverPort = strtol(arg, NULL, 10);
-        }
-        else
-        {
-          printf ("Invalid parameter '%s'\n", arg);
-          doHelp   = true;
-          *exitVal = 1;
-        }
+        printf ("Invalid parameter '%s'\n", arg);
+        doHelp   = true;
+        *exitVal = 1;
       }
     }
   }
@@ -397,11 +502,11 @@ bool parseParams(int argc, char** argv, RPKIRouterClientParams* params,
   {
     if (params->serverHost == NULL)
     {
-      params->serverHost = DEF_RPKI_CACHE;
+      params->serverHost = RPKI_DEFAULT_CACHE;
     }
     if (params->serverPort == 0)
     {
-      params->serverPort = DEF_RPKI_PORT;
+      params->serverPort = RPKI_DEFAULT_CACHE_PORT;
     }
   }
 
@@ -429,26 +534,54 @@ int main(int argc, const char* argv[])
 
   client.stopAfterEndOfData = st_single_request;
 
+  // Retrieve program name out of the first program argument
+  char* realNamePtr = (char*)argv[0];
+  char* nextPtr = strstr(realNamePtr, "/");
+  while (nextPtr != NULL)
+  {
+    realNamePtr = nextPtr + 1;
+    nextPtr = strstr(realNamePtr, "/");
+  }
+  
+  if (!st_single_request || st_verbose)
+  {
+    printf ("Starting %s (%s) V%s\n", SRX_TOOLS_CACHE_CLIENT_NAME, realNamePtr,
+                                      SRX_TOOLS_VERSION);
+  }
+  
   // Print the configures settings.
   if (st_verbose)
   {
     printf ("Use Configuration RPKT/RTR:\n");
-    printf (" - Server...: %s\n", params.serverHost);
-    printf (" - Port.....: %i\n", params.serverPort);
+    printf (" - Server.........: %s\n", params.serverHost);
+    printf (" - Port...........: %i\n", params.serverPort);
+    printf (" - Version........: %i\n", params.version);
+    if (params.version > 0)
+    {
+      printf (" - Can Downgrade..: %s\n", params.allowDowngrade ? "on\0" 
+                                                                : "off\0");
+    }
   }
 
-  // Send all errors and debugging to stdout
-  setLogMethodToFile(st_debug ? stdout : NULL);
-
+  // if verbose is enabled log to stdout, otherwise drop it.
+  setLogMethodToFile(st_verbose ? stdout : NULL);
+  // set log-level.
+  setLogLevel(st_debug ? LEVEL_DEBUG : LEVEL_INFO);
+  
   // Create a new client (establish connection, "Reset Query")
-  params.prefixCallback               = printPrefix;
-  params.resetCallback                = printReset;
+  params.prefixCallback               = handlePrefix;
+  params.resetCallback                = handleReset;
   params.errorCallback                = handleError;
   params.routerKeyCallback            = handleRouterKey;
   params.connectionCallback           = handleConnection;
   params.endOfDataCallback            = handleEndOfData;
   params.sessionIDChangedCallback     = sessionIDChanged;
   params.sessionIDEstablishedCallback = sessionIDEstablished;
+  // The following is a default PDU printer.
+  params.debugRecCallback             = st_print_receive 
+                                        ? doPrintRPKI_to_RTR_PDU : NULL;
+  params.debugSendCallback            = st_print_send
+                                        ? doPrintRPKI_to_RTR_PDU : NULL;
 
   if (!createRPKIRouterClient(&client, &params, NULL))
   {
@@ -480,32 +613,81 @@ int main(int argc, const char* argv[])
     {
       continue;
     }
-    do
+    if (!st_single_request)
     {
-      if (!st_single_request)
+      char* line = readline(">> ");
+      if (line != NULL)
       {
-        printf (">> ");
+        cmd = line[0];
+        free(line);
+        line=NULL;
       }
-      cmd = au_getchar(&client.stop, 0);
-    } while (cmd == '\n');
-
+    }
+    else 
+    {
+      do
+      {
+        cmd = au_getchar(&client.stop, 0);
+      } while (cmd == '\n');
+      printf ("\n");
+    }
+      
     switch (cmd)
     {
-      case 's':
+      case CMD_SERIAL_QUERY:
+        printf ("\n");
         sendSerialQuery(&client);
         break;
-      case 'r':
+      case CMD_RESET_QUERY:
+        printf ("\n");
         sendResetQuery(&client);
         break;
-      case 'q':
+      case CMD_QUIT_CLIENT:
         doRun = false;
         break;
-      case 'h':
-        printf("s = Send Serial Query - Request all new PDU's\n"
-               "r = Send Reset Query  - Request all PDU's known to the cache\n"
-               "q = Quit the program\n"
-               "h = This screen\n"
-               "e = Send the last received PDU as error.\n");
+      case CMD_SEND_ERR_LAST_PD:
+        printf("Not implemented yet!\n");
+        break;
+      case CMD_DEBUG_REC:
+        if (params.debugRecCallback != NULL)
+        {
+          params.debugRecCallback = NULL;
+          printf ("Disabled debugging receiving PDUs\n");
+        }
+        else
+        {
+          params.debugRecCallback = doPrintRPKI_to_RTR_PDU;
+          printf ("Enable debugging receiving PDUs\n");          
+        }
+        break;
+      case CMD_DEBUG_SND:
+        if (params.debugSendCallback != NULL)
+        {
+          params.debugSendCallback = NULL;
+          printf ("Disabled debugging sending PDUs\n");
+        }
+        else
+        {
+          params.debugSendCallback = doPrintRPKI_to_RTR_PDU;
+          printf ("Enable debugging sending PDUs\n");          
+        }
+        break;
+      case CMD_HELP_CLIENT:
+        printf ("%c = Send Serial Query\n"
+                "    * Request all new PDU's\n", 
+                CMD_SERIAL_QUERY);
+        printf ("%c = Send Reset Query\n"
+                "    * Request all PDU's known to the cache\n", 
+                CMD_RESET_QUERY);
+        printf ("%c = Quit the program\n", CMD_QUIT_CLIENT);
+        printf ("%c = This screen\n", CMD_HELP_CLIENT);
+        printf ("%c = Send the last received PDU as error.\n",
+                CMD_SEND_ERR_LAST_PD);
+        printf ("%c = Toggle Printing of received messages (currently %s)\n",
+                CMD_DEBUG_REC, params.debugRecCallback != NULL ? "on"  : "off");
+        printf ("%c = Toggle Printing of send messages (currently %s)\n",
+               CMD_DEBUG_SND, params.debugSendCallback != NULL ? "on"  : "off");
+        printf ("\n");
       default:
         if (client.stop)
         {

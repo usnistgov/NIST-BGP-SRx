@@ -162,6 +162,12 @@ void releaseData();
 /**
  * Generate the BGPSec Path attribute byte stream. All values inside the stream 
  * are written in network format, all parameters are given in host format.
+ * In case the peer is iBGP the returned path will..
+ *   a) not be signed sign to the given peer for transit paths
+ *   b) not be generated for originations.
+ * 
+ * The returned path is stored in memory allocated using malloc() and need to be
+ * freed by the caller.
  * 
  * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
  *               performed using the internal signing implementation.
@@ -177,7 +183,8 @@ void releaseData();
  * @param onlyExtendedLength Indicates if the attributes flag must be set to 
  *               extended length regardless of parameter length.
  * 
- * @return Return the BGPSEC path attribute
+ * @return Return the BGPSEC path attribute or NULL if the path generation 
+ *         failed or the peer is iBGP and the path would be an origination.
  */
 BGP_PathAttribute* generateBGPSecAttr(SRxCryptoAPI* capi,
                                       bool useGlobal, char* asPath, 

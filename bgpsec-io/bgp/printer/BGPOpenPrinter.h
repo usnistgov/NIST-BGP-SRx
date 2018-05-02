@@ -22,10 +22,13 @@
  *
  * Contains functionality to print bgp open messages
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.12
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.12- 2018/04/12 - oborchert
+ *            * Added simple to printOpenData to allow a more simplistic 
+ *              printing.
  *  0.2.0.7 - 2017/03/10 - oborchert
  *            * Added printCapability to the header file
  *          - 2017/02/25 - oborchert
@@ -34,15 +37,17 @@
 #ifndef BGPOPENPRINTER_H
 #define	BGPOPENPRINTER_H
 
+#include <stdbool.h>
 #include "bgp/BGPHeader.h"
 
 /**
  * Print the BGP Update Message
  * 
  * @param openmsg The open message as complete BGP packet. 
+ * @param simple If true, do not use the tree format as in wireshark
  * 
  */
-void printOpenData(BGP_OpenMessage* openmsg);
+void printOpenData(BGP_OpenMessage* openmsg, bool simple);
 
 /** 
  * Print the Optional Parameter: Capability 

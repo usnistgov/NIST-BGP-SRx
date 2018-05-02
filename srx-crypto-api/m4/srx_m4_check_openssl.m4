@@ -1,8 +1,13 @@
-# Version 0.1
-#  0.1 - 2017/09/22 - oborchert
-         * Moved location processing inside this macro
-       - 2017/09/20 - oborchert
-#        * Created macro.
+# Version 0.2.1
+#  0.2.1 - 2018/04/14 - oborchert
+#          * Added instructions if openssl could not be found.
+#            ( Important for CentOS 7 )
+#  0.2   - 2017/10/27 - oborchert
+#          * Added .a library to OpenSSL check.
+#  0.1   - 2017/09/22 - oborchert
+#          * Moved location processing inside this macro
+#        - 2017/09/20 - oborchert
+#          * Created macro.
 #
 #
 # Check the OpenSSL installation if it provides the required CURVES
@@ -58,37 +63,33 @@ AC_DEFUN([SRX_M4_CHECK_OPENSSL], [
       # Default installation
       #
       srx_m4_libPath=$(/sbin/ldconfig -p | grep lib$srx_m4_libName.so$ | sed -e "s/.* => \(.*\)lib\(.*\)/\1/g")
-      if test "x$srx_m4_libPath" = "x"; then
+      if test "x$srx_m4_libPath" = "x"; then  
         AC_MSG_RESULT([not found])
         AC_MSG_ERROR([
     --------------------------------------------------
-    No OpenSSL installation found!
+    No OpenSSL installation found or incomplete!
+    - install openssl, openssl-devel, openssl-libs
+    - or/and call /sbin/ldconfig as root and try again
     --------------------------------------------------])
       fi
       AC_MSG_RESULT([-l$srx_m4_libName])
     else
       #
       # Custom installation
-      #     
-      if test -e $srx_m4_libPath/lib$srx_m4_libName.so; then    
-        AC_MSG_RESULT([-l$srx_m4_libName])
-        srx_m4_cflags="-I${srx_m4_openssl_dir}/include"
-        srx_m4_ldflags="-L${srx_m4_libPath}"
-        # libs will be set below in general section
-      else
-        AC_MSG_RESULT([not found])
-        if test -e $srx_m4_libPath/lib$srx_m4_libName.a; then
+      #
+      if test ! -e $srx_m4_libPath/lib$srx_m4_libName.so; then    
+        if test ! -e $srx_m4_libPath/lib$srx_m4_libName.a; then
+          AC_MSG_RESULT([not found])          
           AC_MSG_ERROR([
-    ---------------------------------------------------
-    Custom OpenSSL must be configured as shared library
-    (config shared ....) to generate lib$srx_m4_libName.so!
-    ---------------------------------------------------])
-        fi
-        AC_MSG_ERROR([
     --------------------------------------------------
     Library $srx_m4_libName required!
     --------------------------------------------------])
+        fi
       fi
+
+      srx_m4_cflags="-I${srx_m4_openssl_dir}/include"
+      srx_m4_ldflags="-L${srx_m4_libPath}"
+      AC_MSG_RESULT([-l$srx_m4_libName])
     fi
 
     # Add the library - cflags and ldflags are set in custom section

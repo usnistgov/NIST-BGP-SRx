@@ -22,10 +22,15 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.19
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.19- 2018/04/19 - oborchert
+ *            * Added clear text for notification sub-code in simple mode.
+ *  0.2.0.12- 2018/04/12 - oborchert
+ *            * Added simple to printNotificationData to allow a more simplistic 
+ *              printing.
  *  0.2.0.7 - 2017/03/10 - oborchert
  *            * Fixed wrong printout in ERR2.
  *            * Enhanced Notification printer by printing the capabilities data
@@ -56,9 +61,10 @@
  * Print the BGP Notification Message
  * 
  * @param update The notification message as complete BGP packet. 
+ * @param simple If true, do not use the tree format as in wireshark
  * 
  */
-void printNotificationData(BGP_NotificationMessage* notification)
+void printNotificationData(BGP_NotificationMessage* notification, bool simple)
 {
   u_int16_t notificationLength = ntohs(notification->messageHeader.length);
   u_int8_t* start = (u_int8_t*)notification;
@@ -186,49 +192,60 @@ void printNotificationData(BGP_NotificationMessage* notification)
       errStr = "UNKNOWN\0";
       subCodeStr = "UNKNOWN\0";
   }
-  printf("%s+--Error code: %u (%s)\n", TAB_2, notification->error_code, errStr);
-  printf("%s+--Error subcode: %u (%s)\n", TAB_2, notification->sub_code, 
-         subCodeStr);
   
-  char useTab[STR_MAX];
-  snprintf(useTab, STR_MAX, "%s", TAB_2);
-  
-  // If the notification contains Capabilities in the data block, print them.
-  if (notification->sub_code == BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY)
+  if (!simple)
   {
-    BGP_Capabilities* cap = (BGP_Capabilities*)data;
-    int minSize   = sizeof(BGP_Capabilities);    
-    int remainder = end - data;
-    int length    = minSize + cap->cap_length;
-    
-    printf("%s+--Unsupported Capabilities\n", useTab);
-    snprintf(useTab, STR_MAX, "%s   ", TAB_2);
-    
-    while ((remainder >= minSize) && (length <= remainder))
+    printf("%s+--Error code: %u (%s)\n", TAB_2, notification->error_code, errStr);
+    printf("%s+--Error subcode: %u (%s)\n", TAB_2, notification->sub_code, 
+           subCodeStr);
+
+    char useTab[STR_MAX];
+    snprintf(useTab, STR_MAX, "%s", TAB_2);
+
+    // If the notification contains Capabilities in the data block, print them.
+    if (notification->sub_code == BGP_ERR2_SUB_UNSUPPORTED_CAPABILITY)
     {
-      data += printCapability(cap, useTab, (length < remainder));
-      remainder = end - data;
-      if (remainder >= minSize)
+      BGP_Capabilities* cap = (BGP_Capabilities*)data;
+      int minSize   = sizeof(BGP_Capabilities);    
+      int remainder = end - data;
+      int length    = minSize + cap->cap_length;
+
+      printf("%s+--Unsupported Capabilities\n", useTab);
+      snprintf(useTab, STR_MAX, "%s   ", TAB_2);
+
+      while ((remainder >= minSize) && (length <= remainder))
       {
-        cap = (BGP_Capabilities*)data;
-        length = sizeof(BGP_Capabilities) + cap->cap_length;
+        data += printCapability(cap, useTab, (length < remainder));
+        remainder = end - data;
+        if (remainder >= minSize)
+        {
+          cap = (BGP_Capabilities*)data;
+          length = sizeof(BGP_Capabilities) + cap->cap_length;
+        }
       }
     }
+
+    if (data < end)
+    {
+      int dataLength = (int)(end - data);
+      char dataStr[STR_MAX];
+      // write the text first in the variable to see how long it becomes. This 
+      // will be the tab for the final print in case data is very large.
+
+      snprintf(dataStr, STR_MAX, "%s+--data: ", useTab);
+      // Now print the tree leaf name
+      printf("%s", dataStr);
+      // Now generate the tab
+      memset(dataStr, ' ', strlen(dataStr));
+      // Now write the hex data (formatted)
+      printHex(data, dataLength, dataStr);
+    }
   }
-  
-  if (data < end)
+  else
   {
-    int dataLength = (int)(end - data);
-    char dataStr[STR_MAX];
-    // write the text first in the variable to see how long it becomes. This 
-    // will be the tab for the final print in case data is very large.
-    
-    snprintf(dataStr, STR_MAX, "%s+--data: ", useTab);
-    // Now print the tree leaf name
-    printf("%s", dataStr);
-    // Now generate the tab
-    memset(dataStr, ' ', strlen(dataStr));
-    // Now write the hex data (formatted)
-    printHex(data, dataLength, dataStr);
+    // Do print only one simple string.
+    printf("NOTIFICATION: '%s' subcode %u (%s)\n", errStr, 
+                                                   notification->sub_code, 
+                                                   subCodeStr);
   }
 }

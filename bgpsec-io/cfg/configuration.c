@@ -15,17 +15,25 @@
  * DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING
  * FROM THE USE OF THIS SOFTWARE.
  *
- *
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.0.10
+ * @version 0.2.0.16
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.16- 2018/04/21 - oborchert
+ *            * Added more syntax description for update scripting.
+ *  0.2.0.14- 2018/04/19 - oborchert
+ *            * Added parsing of possible validation state to createUpdate.
+ *  0.2.0.11- 2018/03/22 - oborchert
+ *            * Added processing of P_CFG_CAP_AS4
+ *          - 2018/03/21 - oborchert
+ *            * Added inclGlobalUpdates
+ *            * Updated printSyntax with latest settings.
  *  0.2.0.10- 2017/09/01 - oborchert
  *            * Removed not used variables.
  *  0.2.0.7 - 2017/07/11 - oborchert
@@ -170,15 +178,21 @@ void printSyntax()
   printf ("          Display the version number.\n");
   
   printf ("  -%c <config>, %s <config>\n", P_C_CONFIG, P_CONFIG);
-  printf ("          config: the configuration file.\n");
+  printf ("          config: The configuration file.\n");
 
   printf ("  -%c <config>, %s <config>\n", P_C_CAPI_CFG, P_CAPI_CFG);
-  printf ("          config: an alternative SRxCryptoAPI configuration file.\n");
+  printf ("          config: An alternative SRxCryptoAPI configuration file.\n");
   
   // Update: <prefix,path>
   printf ("  -%c <prefix, path>, %s <prefix, path>\n", P_C_UPD_PARAM, P_UPD_PARAM);
-  printf ("          prefix: prefix to be announced.\n");
-  printf ("          path: the list of AS numbers (right most is origin).\n");
+  printf ("          prefix: Prefix to be announced.\n");
+  printf ("          path: The list of AS numbers (right most is origin).\n");
+  printf ("                The path can contain pCount values using <asn>p<value>\n");
+  printf ("                  to create p repetitions of asn.\n");
+  printf ("                In case the path contains the value 'I', 'V', or 'N'\n");
+  printf ("                  an extended community string will be added with\n");
+  printf ("                  the RPKI validation state I:invalid, V:valid, or\n");
+  printf ("                  N:not-found (no difference between iBGP or eBGP\n");
   
   // SKI_FILE
   printf ("  -%c <filename>, %s <filename>\n", P_C_SKI_FILE, P_SKI_FILE);
@@ -270,7 +284,17 @@ void printSyntax()
   
   printf ("\n Configuration file only parameters:\n");
   printf (" ===================================\n");
+  
+  // ENABLE / DISABLE Global updates per session
+  printf ("  %s\n", P_CFG_INCL_GLOBAL_UPDATES);
+  printf ("          Enable/Disable adding global updates to this session.\n");
+  printf ("          Default: %s\n", DEF_INCL_GLOBAL_UPDATE ? "true" : "false");
 
+  // ENABLE / DISABLE 4 byte ASNs
+  printf ("  %s\n", P_CFG_CAP_AS4);
+  printf ("          Enable/Disable the usage of 4 byte ASN.\n");
+  printf ("          Default: true (enable)\n");
+  
   // BGPSEC Configuration
   // Enable and disable BGPSEC IPv4 Receive
   printf ("  %s\n", P_CFG_BGPSEC_V4_R);
@@ -307,7 +331,7 @@ void printSyntax()
   CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K1);
   printf ("           k=%s\n", kStr);
   
-  // Force extended length for BGPSEC path attribtue.
+  // Force extended length for BGPSEC path attribute.
   printf ("  %s\n", P_CFG_ONLY_EXTENDED_LENGTH);
   printf ("          Force usage of extended length also for BGPSEC\n");
   printf ("          path attributes with a length of less than 255 bytes.\n");
@@ -355,6 +379,9 @@ void printSyntax()
   printf ("                      Printing of bgp NOTIFICATION messages.\n");
   printf ("              %s\n", P_CFG_PRNFLTR_UNKNOWN);
   printf ("                      Printing of future bgp messages.\n");
+  printf ("  %s\n", P_CFG_PRINT_SIMPLE);
+  printf ("          Print BGP messages in simple format (true) of in\n");
+  printf ("          Wireshark format (fasle).\n");  
   printf ("  %s\n", P_CFG_PRINT_POLL_LOOP);
   printf ("          Print information each time the poll loop runs.\n");  
   printf ("  %s\n", P_CFG_PRINT_CAPI_ON_INVALID);
@@ -362,7 +389,7 @@ void printSyntax()
   printf ("          This setting only affects the CAPI mode.\n");
   
   printf ("\n");
-  printf ("%s Version %s\nDeveloped 2015-2016 by Oliver Borchert ANTD/NIST\n", 
+  printf ("%s Version %s\nDeveloped 2015-2018 by Oliver Borchert ANTD/NIST\n", 
           PACKAGE_NAME, PACKAGE_VERSION);
   printf ("Send bug reports to %s\n\n", PACKAGE_BUGREPORT);
 }
@@ -597,6 +624,97 @@ UpdateData* createUpdate(char* prefix_path, PrgParams* params)
       snprintf(str, STR_MAX, "Invalid path specification '%s'!", pathStr);
       _setErrMsg(params, str);
     }    
+  }
+  
+  // Find if the AS Path contains an AS_SET in the path
+  if (update != NULL)
+  {
+    char* as_set_start = strchr(update->pathStr, UPD_AS_SET_OPEN);
+    char* as_set_stop  = strchr(update->pathStr, UPD_AS_SET_CLOSE);
+    if (as_set_start != NULL)
+    {
+      if (as_set_stop != NULL)
+      {
+        size_t assetStrlen = (as_set_stop - as_set_start) - 1;
+        update->asSetStr = malloc(assetStrlen+1);
+        memset(update->asSetStr, '\0', assetStrlen+1);
+        // Move over the open sign
+        as_set_start++;
+        memcpy(update->asSetStr, as_set_start, assetStrlen);
+        // move back to original start
+        as_set_start--;
+        // now wipe the asset clean (including the open and close characters)
+        memset (as_set_start, ' ', assetStrlen+2);
+        
+        
+       // Now there should not be any additional AS_SET specification.
+       as_set_start = strchr(update->pathStr, UPD_AS_SET_OPEN);
+       as_set_stop  = strchr(update->pathStr, UPD_AS_SET_CLOSE);
+       if ((as_set_start != NULL) || (as_set_stop != NULL))
+       {
+          // Should not happen
+          char str[STR_MAX];
+          snprintf(str, STR_MAX, "Invalid AS_SET specification '%s'!", pathStr);
+          _setErrMsg(params, str);        
+          freeUpdateData(update);
+          update = NULL;
+       }
+        
+      }
+      else
+      {
+        char str[STR_MAX];
+        snprintf(str, STR_MAX, "Invalid AS_SET specification '%s'!", pathStr);
+        _setErrMsg(params, str);        
+        freeUpdateData(update);
+        update = NULL;
+      }
+    }
+    else
+    {
+      if (as_set_stop != NULL)
+      {
+        char str[STR_MAX];
+        snprintf(str, STR_MAX, "Invalid AS_SET specification '%s'!", pathStr);
+        _setErrMsg(params, str);        
+        freeUpdateData(update);
+        update = NULL;        
+      }
+    }
+  }
+  
+  
+  // Find validation state of the update
+  if (update != NULL)
+  {
+    // Initialize the updates validation state.
+    update->validation = UPD_RPKI_NONE;
+    
+    // Check validation state
+    char* valstate = strchr(update->pathStr, UPD_RPKI_VALID);
+    if (valstate != NULL)
+    {
+      update->validation = UPD_RPKI_VALID;
+      *valstate = ' ';
+    }
+    else
+    {
+      valstate = strchr(update->pathStr, UPD_RPKI_INVALID);
+      if (valstate != NULL)
+      {
+        update->validation = UPD_RPKI_INVALID;
+        *valstate = ' ';
+      }
+      else
+      {
+        valstate = strchr(update->pathStr, UPD_RPKI_NOTFOUND);
+        if (valstate != NULL)
+        {
+          update->validation = UPD_RPKI_NOTFOUND;
+          *valstate = ' ';
+        }      
+      }
+    }
   }
   
   return update;  
@@ -1017,7 +1135,14 @@ bool readConfig(PrgParams* params)
           if (sessVal != NULL)
           {
             bgpConf->capConf.extMsgForce = config_setting_get_bool(sessVal);
-          }          
+          }
+          
+          // Configure the 4 Byte ASN
+          sessVal = config_setting_get_member(session, P_CFG_CAP_AS4);
+          if (sessVal != NULL)
+          {
+            bgpConf->capConf.asn_4byte = config_setting_get_bool(sessVal);
+          }
           
           // Read BGPSEC Configuration
           // Enable and disable BGPSEC IPv4 Receive          
@@ -1043,8 +1168,8 @@ bool readConfig(PrgParams* params)
           if (sessVal != NULL)
           {
             bgpConf->capConf.bgpsec_snd_v6 = config_setting_get_bool(sessVal);
-          }          
-          
+          }
+
           // Read Algorithm Settings
           // AlgoID
           sessVal = config_setting_get_member(session, P_CFG_ALGO_ID);
@@ -1124,6 +1249,13 @@ bool readConfig(PrgParams* params)
           // Read print on send and turn on or off all of them
           sessVal = config_setting_get_member(session, P_CFG_PRINT_ON_SEND);
           _readPrintSetting(sessVal, bgpConf->printOnSend);
+          
+          // Read printSimple value
+          sessVal = config_setting_get_member(session, P_CFG_PRINT_SIMPLE);
+          if (sessVal != NULL)
+          {
+            bgpConf->printSimple = config_setting_get_bool(sessVal);
+          }
 
           // Read print poll loop
           sessVal = config_setting_get_member(session, P_CFG_PRINT_POLL_LOOP);
@@ -1156,7 +1288,16 @@ bool readConfig(PrgParams* params)
                               " must be a comma separated list!!!");
               // break not necessary because the loop ends here anyway
             }
-          }        
+          }
+          
+          // Now check if global updates should be added to this session.
+          // enabled by default.
+          sessVal = config_setting_get_member(session,
+                                              P_CFG_INCL_GLOBAL_UPDATES);
+          if (sessVal != NULL)
+          {
+            bgpConf->inclGlobalUpdates = config_setting_get_bool(sessVal);
+          }
         }
       }
     
@@ -1164,7 +1305,7 @@ bool readConfig(PrgParams* params)
       {
         // Now read global updates
         updates = config_lookup(&cfg, P_CFG_UPD_PARAM);
-        if (updates)
+        if (updates && params->bgpConf.inclGlobalUpdates)
         {
           if (config_setting_is_list(updates))
           {
@@ -1206,6 +1347,7 @@ void initParams(PrgParams* params)
   snprintf((char*)&params->skiFName, FNAME_SIZE, "%s", DEF_SKIFILE);
   snprintf((char*)&params->keyLocation, FNAME_SIZE, "%s", DEF_KEYLOCATION);
   params->bgpConf.useMPNLRI           = true;
+  params->bgpConf.inclGlobalUpdates   = DEF_INCL_GLOBAL_UPDATE;
   params->preloadECKEY                = true;
   params->onlyExtLength               = true;
   params->appendOut                   = false;
@@ -1513,6 +1655,11 @@ void freeUpdateData(void* upd)
     {
       free(update->pathStr);
       update->pathStr = NULL;
+    }
+    if (update->asSetStr != NULL)
+    {
+      free(update->asSetStr);
+      update->asSetStr = NULL;
     }
     free(upd);
   }

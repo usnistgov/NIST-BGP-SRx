@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.1
+ * @version 0.5.0.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.3  - 2018/02/23 - oborchert
+ *            * BZ1223: Resolved compiler warning. Added TODO into code where
+ *              revisit is necessary.
  * 0.5.0.1  - 2017/08/29 - oborchert
  *            * BZ1225: Function doShowCount did not use the correct internal 
  *              commands.
@@ -1554,7 +1557,8 @@ static void doShowUpdate(SRXConsole* self, char* cmd, char* param)
   {
     //SRxUpdateID updateID = atoll(showParam);
     SRxUpdateID updateID = hexToInt(showParam);
-    doShowCount(self, &updateID);
+    // TODO: Fix doShowCount call of incorrect data size 
+    doShowCount(self, (char*)&updateID);
   }
   else
   {

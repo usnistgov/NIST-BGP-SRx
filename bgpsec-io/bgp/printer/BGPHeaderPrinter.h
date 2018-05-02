@@ -22,10 +22,17 @@
  *
  * Provides functions to print the BGP header in detail.
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.12
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.12- 2018/04/14 - oborchert
+ *            * Added parametrer received to function printBGP_Message.
+ *            * Removed define NO_WIRESHARK. It is replaced with printSimple. 
+ *  0.2.0.11- 2018/03/23 - oborchert
+ *            * Added AS_PATH printing (simple for now)
+ *          - 2018/03/22 - oborchert
+ *            * Added parameter isAS4 to printBGP_Message.
  *  0.2.0.7 - 2017/03/09 - oborchert
  *            * Removed individual printXXX_Message function with XXX equals the 
  *              message type.
@@ -50,13 +57,23 @@
 /** String size. */
 #define STR_MAX 256
 
+/** Received value for function printBGP_Message */
+#define BGPHP_MSG_RECEIVED true
+/** Send value for function printBGP_Message */
+#define BGPHP_MSG_SEND     false
+
 /**
  * Print the BGP Header. This message allows to only print the generic header 
  * information or also the following information as hex byte stream
  * 
- * @param hdr The header to be printed
+ * @param hdr The header to be printed.
+ * @param isAS4 Indicates if AS numbers are 4 byte (true) or 2 byte (false)
+ * @param simple indicates if the BGP message should be printed in the simple 
+ *               form (true) or Wireshark form (false).
+ * @param received Indicates if the message is received (true) or send (false)
  */
-void printBGP_Message(BGP_MessageHeader* hdr);
+void printBGP_Message(BGP_MessageHeader* hdr, bool isAS4, bool simple, 
+                      bool received);
 
 #endif	/* BGPHEADERPRINTER_H */
 

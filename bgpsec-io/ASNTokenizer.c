@@ -25,10 +25,16 @@
  * except 0-9 and "." dot. Other than in strtok the input string will NOT be 
  * altered.
  *
+ * @version 0.2.0.17
+ * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.0 - 2015/08/04 - oborchert
- *           * Created File.
+ *  0.2.0.17 - 2018/04/27 - oborchert
+ *             * Modified some function documentation to reflect the parameters
+ *               of the functions.
+ *             * Added the version tag to the source.
+ *  0.1.0.0  - 2015/08/04 - oborchert
+ *             * Created File.
  */
 #include <string.h>
 #include "ASNTokenizer.h"
@@ -51,9 +57,9 @@ void asntok(char* string)
 /**
  * Generate a global ASN tokenizer.
  * 
- * @param string the String containing the AS numbers
- * @param globalTokenizer The tokenizer to use internally. This allows being
- *                        threadsafe
+ * @param string The String containing the AS numbers
+ * @param tokenizer The tokenizer to use internally. This allows being
+ *                        thread safe
  * 
  */
 void asntok_th(char* string, tASNTokenizer* tokenizer)
@@ -84,7 +90,7 @@ bool asntok_next(u_int32_t* asn)
  * 
  * @param asn The address of the variable where to write the value of the asn
  *            into
- * @param globalTokenizer the tokenizer to be used
+ * @param tokenizer the tokenizer to be used
  * 
  * @return true if a token was found, otherwise false.
  */
@@ -139,6 +145,8 @@ void asntok_reset()
 
 /**
  * Reset the given tokenizer to the beginning of the string.
+ * 
+ * @param tokenizer The tokenizer to be reset.
  */
 void asntok_reset_th(tASNTokenizer* tokenizer)
 {

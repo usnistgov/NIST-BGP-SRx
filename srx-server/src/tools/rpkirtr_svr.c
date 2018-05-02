@@ -28,10 +28,22 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.5.0.1
+ * @version 0.5.0.5
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.5  - 2018/04/24 - oborchert
+ *            * Modified the function printLogMessage to use the current log 
+ *              level rather than hard coded log level.
+ *            * Change default value for verbose to false.
+ * 0.5.0.4  - 2018/03/08 - oborchert
+ *            * Fixed incorrect processing of parameters.
+ *            * Fixed incorrect syntax printout.
+ * 0.5.0.3  - 2018/03/01 - oborchert
+ *            * Added proper program stop when help parameter is provided.
+ *            * Fixed printout for router keys.
+ *          - 2018/02/28 - oborchert
+ *            * Fixed usage of incorrect version number.
  * 0.5.0.1  - 2017/09/25 - oborchert
  *            * Fixed compiler warnings.
  * 0.5.0.0  - 2017/07/08 - oborchert
@@ -253,7 +265,7 @@ ServerSocket svrSocket;
 /** A list of cache clients */
 CacheClient* clients   = NULL;
 /** Verbose mode on or off */
-bool         verbose   = true;
+bool         verbose   = false;
 /** the current cache session id value */
 uint16_t     sessionID = 0;
 
@@ -352,7 +364,8 @@ bool dropSession(int* fdPtr)
  *
  * @return
  */
-bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial, uint8_t version)
+bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial, 
+                       uint8_t version)
 {
   uint8_t                pdu[sizeof(RPKISerialQueryHeader)];
   RPKISerialQueryHeader* hdr;
@@ -373,17 +386,18 @@ bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial, uint
  * Send a CACHE RESET to the client.
  *
  * @param fdPtr the socket connection
+ * @param version The version for this session.
  *
  * @return true id the packet was send successful.
  */
-bool sendCacheReset(int* fdPtr)
+bool sendCacheReset(int* fdPtr, u_int8_t version)
 {
   uint8_t               pdu[sizeof(RPKICacheResetHeader)];
   RPKICacheResetHeader* hdr;
 
   // Create PDU
   hdr = (RPKICacheResetHeader*)pdu;
-  hdr->version  = RPKI_RTR_PROTOCOL_VERSION;
+  hdr->version  = version;
   hdr->type     = (uint8_t)PDU_TYPE_CACHE_RESET;
   hdr->reserved = 0;
   hdr->length   = htonl(sizeof(RPKICacheResetHeader));
@@ -395,10 +409,11 @@ bool sendCacheReset(int* fdPtr)
  * Send a CACHE RESPONSE to the client.
  *
  * @param fdPtr the socket connection
+ * @param version The version number of this session
  *
  * @return true id the packet was send successful.
  */
-bool sendCacheResponse(int* fdPtr, int version)
+bool sendCacheResponse(int* fdPtr, u_int8_t version)
 {
   uint8_t                  pdu[sizeof(RPKICacheResetHeader)];
   RPKICacheResponseHeader* hdr;
@@ -424,7 +439,7 @@ bool sendCacheResponse(int* fdPtr, int version)
  *                ignored.
  */
 void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
-                  bool isReset, int version)
+                  bool isReset, u_int8_t version)
 {
   // No need to send the notify anymore
   service.notify = false;
@@ -443,7 +458,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
            && (checkSerial(cache.minPSExpired, cache.maxSExpired, clientSerial))
           )
   { // Serial is incorrect, send a Cache Reset
-    if (!sendCacheReset(fdPtr))
+    if (!sendCacheReset(fdPtr, version))
     {
       ERRORF("Error: Failed to send a 'Cache Reset'\n");
     }
@@ -457,7 +472,7 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
     }
     else
     {
-      printf("Cache size = %u\n", cache.entries.size);
+      OUTPUTF(true, "Cache size = %u\n", cache.entries.size);
       if (cache.entries.size > 0) // there is always a root.
       {
         ValCacheEntry* cEntry;
@@ -587,7 +602,8 @@ void sendPrefixes(int* fdPtr, uint32_t clientSerial, uint16_t clientSessionID,
       OUTPUTF(true, "Sending an 'End of Data (max. serial = %u)\n",
               cache.maxSerial);
 
-      if (!sendPDUWithSerial(fdPtr, PDU_TYPE_END_OF_DATA, cache.maxSerial, cache.version))
+      // was sending cache version, not session version.
+      if (!sendPDUWithSerial(fdPtr, PDU_TYPE_END_OF_DATA, cache.maxSerial, version))
       {
         ERRORF("Error: Failed to send a 'End of Data'\n");
       }
@@ -614,7 +630,7 @@ int sendSerialNotifyToAllClients()
     for (client = clients; client; client = client->hh.next)
     {
       if (!sendPDUWithSerial(&client->fd, PDU_TYPE_SERIAL_NOTIFY,
-                             cache.maxSerial, cache.version))
+                             cache.maxSerial, client->version))
       {
         ERRORF("Error: Failed to send a 'Serial Notify\n");
       }
@@ -641,7 +657,7 @@ int sendCacheResetToAllClients()
 
     for (client = clients; client; client = client->hh.next)
     {
-      if (!sendCacheReset(&client->fd))
+      if (!sendCacheReset(&client->fd, client->version))
       {
         ERRORF("Error: Failed to send a 'Cache Reset\n");
       }
@@ -659,11 +675,15 @@ int sendCacheResetToAllClients()
  * @param fdPtr the socket connection
  * @param the error number to be send
  * @param data contains the error number followed by the PDU and text. The
- * character - as PDU or text generates a PDU / text length of zero.
+ *             character - as PDU or text generates a PDU / text length of zero.
+ * @param version The version of this session.
+ * 
  * @return true if it could be send.
  */
-bool sendErrorPDU(int* fdPtr, RPKICommonHeader* pdu, char* reason)
+bool sendErrorPDU(int* fdPtr, RPKICommonHeader* pdu, char* reason, 
+                  u_int8_t version)
 {
+  // @TODO: Fix this code.
   printf("ERROR: invalid PDU because of %s\n", reason);
 //  uint8_t                  pdu[sizeof(RPKIErrorReportHeader)];
 //  RPKICacheResponseHeader* hdr;
@@ -941,25 +961,26 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
   // read the beginning of the header to see how many bytes are actually needed
   while (recvNum(&sock, &hdr, sizeof(RPKICommonHeader)))
   {
-    switch (ccl->version)
+    if (hdr.version > RPKI_RTR_PROTOCOL_VERSION)
     {
-      case UNDEF_VERSION:
-        ccl->version = hdr.version;
-        break;
-      case 0:
-      case 1:
-        break;
-      default:
-        sendErrorPDU(&ccl->fd, &hdr, "Unsupported Version");
-        continue;
+      sendErrorPDU(&ccl->fd, &hdr, "Unsupported Version", 
+                   RPKI_RTR_PROTOCOL_VERSION);
+      close(sock);
+      break;          
     }
-    if (ccl->version != hdr.version)
+    if (ccl->version == UNDEF_VERSION)
     {
-      // Send error.
-      sendErrorPDU(&ccl->fd, &hdr, "Illegal switch of version number!");
-      continue;
+      ccl->version = hdr.version;
+    } 
+    else if (hdr.version != ccl->version)
+    {
+      // @TODO: Fix this and also close connection in this case.
+      sendErrorPDU(&ccl->fd, &hdr, "Illegal switch of version number!", 
+                   ccl->version);
+      close(sock);
+      break;
     }
-
+    
     // determine the remaining data that needs to be received - if any
     remainingDataLentgh = ntohl(hdr.length) - sizeof(RPKICommonHeader);
 
@@ -990,7 +1011,7 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
     // Time since the last request
     diffReq = lastReq - time(NULL);
 
-    printf ("Received Data From Client [%x]...\n", sock);
+    OUTPUTF(true, "Received Data From Client [%x]...\n", sock);
 
     // Action depending on the type
     switch ((RPKIRouterPDUType)hdr.type)
@@ -1861,6 +1882,7 @@ int printCache()
   unsigned    pos = 1;
   ValCacheEntry* cEntry;
   char        ipBuf[IPBUF_SIZE];
+  int         idx=0;
 
   now = time(NULL);
 
@@ -1881,25 +1903,30 @@ int printCache()
 
       if (cEntry->isKey)
       {
-        printf("SKI: %02X%02X%02X%02X, OAS=%u",
-                (unsigned char)cEntry->ski[0], (unsigned char)cEntry->ski[1],
-                (unsigned char)cEntry->ski[2], (unsigned char)cEntry->ski[3],
-                ntohl(cEntry->asNumber));
-      }
-      else if (cEntry->isV6)
-      {
-        printf("%s/%hhu, OAS=%u",
-               ipV6AddressToStr(&cEntry->address.v6, ipBuf, IPBUF_SIZE),
-               cEntry->prefixLength, ntohl(cEntry->asNumber));
+        printf("SKI: ");
+        for (idx = 0; idx < SKI_LENGTH; idx++)
+        {
+          printf ("%02X", (u_int8_t)cEntry->ski[idx]);
+        }
+        printf (", OAS=%u", ntohl(cEntry->asNumber));
       }
       else
       {
-        printf("%s/%hhu, OAS=%u",
-               ipV4AddressToStr(&cEntry->address.v4, ipBuf, IPBUF_SIZE),
-               cEntry->prefixLength, ntohl(cEntry->asNumber));
+        if (cEntry->isV6)
+        {
+          printf("%s/%hhu, OAS=%u",
+                 ipV6AddressToStr(&cEntry->address.v6, ipBuf, IPBUF_SIZE),
+                 cEntry->prefixLength, ntohl(cEntry->asNumber));
+        }
+        else
+        {
+          printf("%s/%hhu, OAS=%u",
+                 ipV4AddressToStr(&cEntry->address.v4, ipBuf, IPBUF_SIZE),
+                 cEntry->prefixLength, ntohl(cEntry->asNumber));
+        }
+        printf(", Max.Len=%hhu, Serial=%u, Prev.Serial=%u",
+               cEntry->prefixMaxLength, cEntry->serial, cEntry->prevSerial);
       }
-      printf(", Max.Len=%hhu, Serial=%u, Prev.Serial=%u",
-             cEntry->prefixMaxLength, cEntry->serial, cEntry->prevSerial);
 
       if (cEntry->expires > 0)
       {
@@ -2449,9 +2476,16 @@ void serviceTimerExpired(int id, time_t now)
   }
 }
 
+/** 
+ * Use the log level specified or if verbose is enabled.
+ * 
+ * @param level The log level of the message/
+ * @param fmt The format string
+ * @param args The argument list matching the format string.
+ */
 void printLogMessage(LogLevel level, const char* fmt, va_list args)
 {
-  if ((level == LEVEL_ERROR) || verbose)
+  if ((level == getLogLevel()) || verbose)
   {
     putc('\r', stdout);
     vprintf(fmt, args);
@@ -2527,6 +2561,8 @@ static void syntax(const char* prgName)
   printf ("  specify a script!\n");
   printf ("  If No port is specified the default port %u is used.\n",
           DEF_RPKI_PORT);
+  printf ("\n");
+  showVersion();
 }
 
 /**
@@ -2550,8 +2586,10 @@ static bool parseParams(int argc, const char* argv[],
   bool doHelp = false;
   char* arg   = NULL;
   int idx     = 0;
+  
+  #define HMSG " - try '-?' for more info"
 
-  for (idx = 1; (idx < argc) && !doHelp; idx++)
+  for (idx = 1; (idx < argc) && !doHelp && retVal; idx++)
   {
     arg = (char*)argv[idx];
     if (arg[0] == '-')
@@ -2588,48 +2626,69 @@ static bool parseParams(int argc, const char* argv[],
           }
           else
           {
-            printf ("ERROR: Log level missing!");
-            doHelp = true;
+            printf ("ERROR: Log level missing%s!\n", HMSG);
             retVal = false;
             eVal   = 1;
           }
           break;
           break;
         case 'f':
-          idx++;
-          if (idx < argc)
+          if (cfg->script == NULL)
           {
-            cfg->script = (char*)argv[idx++];
+            idx++;
+            if (idx < argc)
+            {
+              cfg->script = (char*)argv[idx];
+            }
+            else
+            {
+              printf ("ERROR: filename missing%s!\n", HMSG);
+              retVal = false;
+              eVal   = 1;
+            }
           }
           else
           {
-            printf ("ERROR: filename missing!");
-            doHelp = true;
-            retVal = false;
+            printf ("ERROR: Script already added%s!\n", HMSG);
+            retVal = false;            
             eVal   = 1;
-          }
+          }    
           break;
         default:
-          printf ("ERROR: Invalid parameter '%s'\n", arg);
-          doHelp = true;
+          printf ("ERROR: Invalid parameter '%s'%s!\n", arg, HMSG);
           retVal = false;
           eVal   = 1;
           break;
       }
     }
-    else if (strcmp(arg, "help") == 0)
+    else if ((strcmp(arg, "help") == 0) || (arg[0] == '?'))
     {
       doHelp = true;
     }
     else if (cfg->port == 0)
     {
-      cfg->port = strtol(argv[1], NULL, 10);
+      cfg->port = strtol(arg, NULL, 10);
+    }
+    else
+    {
+      if (cfg->script == NULL)
+      {
+        cfg->script = arg;
+        printf ("WARNING: Script added but use -f <script> to add scripts in "
+                "the future.\n");
+      }
+      else
+      {
+        printf ("ERROR: Script already added%s!\n", HMSG);
+        retVal = false;
+      }
     }
   }
 
   if (doHelp)
   {
     syntax(argv[0]);
+    retVal = false;
   }
 
   // Configure the default port if not specified otherwise.

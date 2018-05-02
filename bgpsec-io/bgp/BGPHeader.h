@@ -22,10 +22,27 @@
  *
  * This API contains a the headers and function to generate proper BGP messages.
  *
- * @version 0.2.0.8
+ * @version 0.2.0.20
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.20 - 2018/05/02 - oborchert
+ *            * Added define for BGP_UPD_A_TYPE_COMMUNITY.
+ * 0.2.0.17 - 2018/04/26 - oborchert
+ *            * Added parameter asSet to function generateBGP_PathAttr.
+ * 0.2.0.14 - 2018/04/19 - oborchert
+ *            * Added parameter rpkiVal to createUpdateMessage.
+ * 0.2.0.12 - 2018/04/14 - oborchert
+ *            * Added switch 'printSimple' to allow printing messages in simple 
+ *              format.
+ * 0.2.0.11 - 2018/03/22 - oborchert
+ *            * Fixed documentation for method generateBGP_PathAttr.
+ *          - 2018/03/21 - oborchert
+ *            * Added parameter "inclGlobalUpdates" to structure BGP_SessionConf
+ *            * Modified function generateBGP_PathAttr to allow AS4 and AS2 path
+ *              generation
+ *            * Modified function createUpdateMessage to allow multiple BGP path
+ *              attributes (AS4_PATH + AS_PATH) or BGPsec PATH.
  *  0.2.0.8 - 2017/07/10 - oborchert
  *            * Modified the BGPsec Capability code from 72 to IANA registered
  *              value 7.
@@ -195,19 +212,24 @@
 #define BGPSEC_DIR_RCV      0
 
 // RFC 4271 - 4.3
-#define BGP_UPD_A_TYPE_ORIGIN   1
-#define BGP_UPD_A_TYPE_AS_PATH  2 
-#define BGP_UPD_A_TYPE_NEXT_HOP 3
-#define BGP_UPD_A_TYPE_MED      4
-#define BGP_UPD_A_TYPE_LOC_PREF 5
-#define BGP_UPD_A_TYPE_ATOM_AGG 6
-#define BGP_UPD_A_TYPE_AGGR     7
+#define BGP_UPD_A_TYPE_ORIGIN         1
+#define BGP_UPD_A_TYPE_AS_PATH        2 
+#define BGP_UPD_A_TYPE_NEXT_HOP       3
+#define BGP_UPD_A_TYPE_MED            4
+#define BGP_UPD_A_TYPE_LOC_PREF       5
+#define BGP_UPD_A_TYPE_ATOM_AGG       6
+#define BGP_UPD_A_TYPE_AGGR           7
+//RFC 1997
+#define BGP_UPD_A_TYPE_COMMUNITY      8
 // RFC 4360 - 2
-#define BGP_UPD_A_TYPE_EXT_COMM 16
+#define BGP_UPD_A_TYPE_EXT_COMM      16
 // Will be BGPSEC RFC
 #ifndef BGP_UPD_A_TYPE_BGPSEC
-#define BGP_UPD_A_TYPE_BGPSEC   33
+#define BGP_UPD_A_TYPE_BGPSEC        33
 #endif
+
+// RFC 6793 - 9
+#define BGP_UPD_A_TYPE_AS4_PATH      17
 
 // RFC 4760 - 3
 #define BGP_UPD_A_TYPE_MP_REACH_NLRI 14
@@ -266,7 +288,7 @@
 #define BGP_ERR3_SUB_INVALID_NETWORK_FIELD  10
 #define BGP_ERR3_SUB_MALFORMED_AS_PATH      11
 
-// RFC 4486 Subcodes for BGP Cease Notification Message
+// RFC 4486 Sub codes for BGP Cease Notification Message
 #define BGP_ERR6_SUB_MAX_NUM_PREFIXES       1
 #define BGP_ERR6_SUB_ADMIN_SHUTDOWN         2
 #define BGP_ERR6_SUB_PEER_DE_CONFIGURED     3
@@ -275,6 +297,12 @@
 #define BGP_ERR6_SUB_OTHER_CONFIG_CHANGE    6
 #define BGP_ERR6_SUB_CONN_COLL_RESOLUTION   7
 #define BGP_ERR6_SUB_OUT_OF_RESOURCES       8
+
+// RFC 6793 - As number for transitioning to 4 byte ASN
+#define BGP_AS_TRANS 23456
+
+// RFC 8097 - RPKI Validation state
+#define BGP_COMMSTR_RPKI_VALIDATION         0x43
 
 typedef struct {
   u_int8_t  marker[BGP_MARKER_SIZE]; // must be set to 1
@@ -621,6 +649,13 @@ typedef struct {
    * signed updates. (host format)*/
   u_int32_t peerAS;
   
+  /**
+   * Indicates if global scripted updates to be included in this session.
+   * The default value is true.
+   * @since 0.2.0.11
+   */
+  bool inclGlobalUpdates;
+  
   /** 
    * Defines if IPv4 prefixes will be encoded in MPNLRI format or not. 
    * Currently BGP routers do not encode V4 as MPNLRI even though they announce
@@ -635,6 +670,9 @@ typedef struct {
   /** Print BGP messaged upon send. (one for each, OPEN, UPDATE, KEEPALIVE, 
    *                                 and NOTIFICATION)*/
   bool printOnSend[PRNT_MSG_COUNT];
+  
+  /** Print BGP packets in simple format, not hte long tree format. */
+  bool printSimple;
   
   /** Specify if the polling information will be printed or not. */
   bool printPollLoop;
@@ -745,8 +783,12 @@ int createNotificationMessage(u_int8_t* buff, int buffSize,
  * 
  * @param buff The   pre-allocated memory of sufficient size
  * @param buffSize   The size of the buffer
- * @param pathAttr   The buffer containing either the BGPSec path attribute or
- *                   the BGP4 ASpath attribute. (wire format)
+ * @param numAttr    The number of BGP/BGPsec path attributes are added. See 
+ *                   parameter pathAttr for details.
+ * @param pathAttr   The buffer(s) containing either the BGPSec path attribute 
+ *                   or the BGP4 ASpath attribute. (wire format)
+ *                   This array can contain more than one attribute in case it 
+ *                   is BGP4 and AS4_PATH and AS_PATH is required to be send.
  * @param origin     The origin of the prefix.
  * @param localPref  USe local pref attribute if > 0
  * @param nextHop    The nextHop address (same afi as nlri)
@@ -754,29 +796,38 @@ int createNotificationMessage(u_int8_t* buff, int buffSize,
  *                   typecast to either BGPSEC_V4Prefix or BGPSEC_V6Prefix
  * @param useMPNLRI  Encode IPv4 prefixes as MPNLRI within the path attribute, 
  *                   otherwise V4 addresses will be added at the end as NLRI
- *                  
+ * @param rpkiVal    Add the RPKI validation state as community string if
+ *                   value is UPD_RPKI_VALID, UPD_RPKI_INVALID, 
+ *                   or UPD_RPKI_NOTFOUND, otherwise do not add this attribute.                  
  * 
  * @return the number of bytes used or if less than 0 the number of bytes missed
  */
-int createUpdateMessage(u_int8_t* buff, int buffSize, 
-                        BGP_PathAttribute* pathAttr, u_int8_t origin,
+int createUpdateMessage(u_int8_t* buff, int buffSize, int numAttributes,
+                        BGP_PathAttribute** pathAttr, u_int8_t origin,
                         u_int32_t localPref, void* nextHop, 
-                        BGPSEC_PrefixHdr* nlri, bool useMPNLRI);
+                        BGPSEC_PrefixHdr* nlri, bool useMPNLRI, char rpkiVal);
 
 /**
- * Generate the regular AS_PATH attribute. The Attribute uses 4 byte AS numbers.
+ * Generate the regular AS(4)_PATH attribute. The Attribute uses 2 byte or
+ * 4 byte AS numbers depending on the parameter as4.
  * 
+ * @param attrType  The attribute type BGP_UPD_T_A_AS_PATH 
+ *                  or BGP_UPD_T_A_AS4_PATH
  * @param myAsn     The own ASN to be inserted into the path.
+ * @param isAS4     Specify if this attribute will be an 4 byte or 2 byte as
+ *                  path. (Ignored for attrType == BGP_UPD_T_A_AS4_PATH)
  * @param iBGP      Indicate if the session is an iBGP session or nor.
- * @param asPathStr The AS path string
+ * @param asPathStr The AS path string  in long format (without pcount, etc)
+ * @param asSetStr  The AS_SET String if an AS_SET is specified (can be NULL).
  * @param buff      The buffer where to write the attribute into.
  * @param buffSize  The maximum size of the buffer.
  * 
  * @return The buffer type casted to BGP_PathAttribte or NULL if the buffer is
  *         not large enough. 
  */
-BGP_PathAttribute* generateBGP_PathAttr(u_int32_t myAsn, bool iBGP, 
-                                        char* asPathStr, 
+BGP_PathAttribute* generateBGP_PathAttr(u_int8_t attrType, u_int32_t myAsn, 
+                                        bool isAS4, bool iBGP, 
+                                        char* asPathStr, char* asSetStr, 
                                         u_int8_t* buff, int buffSize);
 
 /**

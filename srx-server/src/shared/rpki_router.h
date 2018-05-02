@@ -22,10 +22,19 @@
  *
  * RPKI/Router definitions.
  *
- * @version 0.5.0.0
+ * @version 0.5.0.4
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.4  - 2018/03/07 - oborchert
+ *            * Added new error code of RFC 8210
+ *            * Added error string defines.
+ * 0.5.0.3  - 2018/02/28 - oborchert
+ *            * Modified RPKI_CONNECTION_TIMEOUT from 3 seconds to 10 seconds.
+ *          - 2018/02/22 - oborchert
+ *            * Updated the define RPKI_RTR_PROTOCOL_VERSION from 0 to 1
+ *            * Added define RPKI_DEFAULT_CACHE_PORT 323
+ *            * Added define RPKI_DEFAULT_CACHE "localhost"
  * 0.5.0.0  - 2017/07/09 - oborchert
  *            * Added include <srx/srxcryptoapi.h> and replaced hard coded 
  *              values with the appropriate defines
@@ -58,6 +67,29 @@
 #include <srx/srxcryptoapi.h>
 #include "util/prefix.h"
 
+/** The lowest bit is set if the prefix PDU is an announcement */
+#define PREFIX_FLAG_ANNOUNCEMENT  0x01
+
+/** The current protocol implementation. */
+#define RPKI_RTR_PROTOCOL_VERSION 1
+/** The default RPKI server port */
+#define RPKI_DEFAULT_CACHE_PORT 323
+/** The default address for a RPKI validation cache */
+#define RPKI_DEFAULT_CACHE "localhost"
+/** The default connection attempt timeout after 10 seconds. */
+#define RPKI_CONNECTION_TIMEOUT 10
+
+#ifndef SRX_SERVER_PACKAGE
+// Is provided by Makefile as CFLAGS -I
+#define SRX_SERVER_PACKAGE  "NA"
+#endif
+// Some Macros to deal with the SRX_REVISION compiler parameter
+#define SRX_TOOLS_STRINGIFY_ARG(ARG) " " #ARG
+#define SRX_TOOLS_STRINGIFY_IND(ARG) SRX_TOOLS_STRINGIFY_ARG(ARG)
+
+// Used version number -  make a string of the define
+#define SRX_TOOLS_VERSION  SRX_TOOLS_STRINGIFY_IND(SRX_SERVER_PACKAGE)
+
 /**
  * PDU Types
  */
@@ -72,29 +104,36 @@ typedef enum {
   PDU_TYPE_CACHE_RESET    = 8,  // 5.9
   PDU_TYPE_ROUTER_KEY     = 9,  // 5.10
   PDU_TYPE_ERROR_REPORT   = 10, // 5.11
-  PDU_TYPE_RESERVED       = 255
+  PDU_TYPE_RESERVED       = 255 // 14
 } RPKIRouterPDUType;
 
 /**
  * ERROR codes of the RPKI protocol
  */
 typedef enum {
-    RPKI_EC_CORRUPT_DATA           = 0,
-    RPKI_EC_INTERNAL_ERROR         = 1,
-    RPKI_EC_NO_DATA_AVAILABLE      = 2,
-    RPKI_EC_INVALID_REQUEST        = 3,
-    RPKI_EC_UNSUPPORTED_PROT_VER   = 4,
-    RPKI_EC_UNSUPPORTED_PDU        = 5,
-    RPKI_EC_UNKNOWN_WITHDRAWL      = 6,
-    RPKI_EC_DUPLICATE_ANNOUNCEMENT = 7,
-    RPKI_EC_RESERVED               = 255
+    RPKI_EC_CORRUPT_DATA                = 0,
+    RPKI_EC_INTERNAL_ERROR              = 1,
+    RPKI_EC_NO_DATA_AVAILABLE           = 2,
+    RPKI_EC_INVALID_REQUEST             = 3,
+    RPKI_EC_UNSUPPORTED_PROT_VER        = 4,
+    RPKI_EC_UNSUPPORTED_PDU             = 5,
+    RPKI_EC_UNKNOWN_WITHDRAWL           = 6,
+    RPKI_EC_DUPLICATE_ANNOUNCEMENT      = 7,
+    RPKI_EC_UNEXPECTED_PROTOCOL_VERSION = 8,   // NEW IN RFC8210
+    RPKI_EC_RESERVED                    = 255  //
 } RPKIErrorCode;
 
-/** The lowest bit is set if the prefix PDU is an announcement */
-#define PREFIX_FLAG_ANNOUNCEMENT  0x01
-
-/** The current protocol implementation. */
-#define RPKI_RTR_PROTOCOL_VERSION 0;
+// Added error text with version 0.5.0.4
+#define RPKI_ESTR_CORRUPT_DATA                "Corrupt Data\0"
+#define RPKI_ESTR_INTERNAL_ERROR              "Internal Error\0"
+#define RPKI_ESTR_NO_DATA_AVAILABLE           "No Data Available\0"
+#define RPKI_ESTR_INVALID_REQUEST             "invalid Request\0"
+#define RPKI_ESTR_UNSUPPORTED_PROT_VER        "Unsupported Protocol Version\0"
+#define RPKI_ESTR_UNSUPPORTED_PDU             "Unsupported PDU\0"
+#define RPKI_ESTR_UNKNOWN_WITHDRAWL           "Unknown Withdrawal\0"
+#define RPKI_ESTR_DUPLICATE_ANNOUNCEMENT      "Duplicate Announcement\0"
+#define RPKI_ESTR_UNEXPECTED_PROTOCOL_VERSION "Unexpected Protocol Version\0"
+#define RPKI_ESTR_RESERVED                    "Reserved\0"
 
 //
 // The following types could be optimized but

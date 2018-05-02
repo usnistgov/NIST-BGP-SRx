@@ -23,10 +23,13 @@
  * This software allows to generate the BGPSEC Path attribute as binary stream.
  * The path will be fully signed as long as all keys are available.
  *
-* @version 0.2.0.10
+ * @version 0.2.0.11
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.11 - 2018/03/22 - oborchert
+ *            * Fixed some spellers in documentation.
+ *            * Adjusted parameter change in convertAsnPath.
  * 0.2.0.10 - 2017/09/01 - oborchert
  *            * Call of CAPI_createSignature did not provide sufficient 
  *              parameters
@@ -337,6 +340,9 @@ static tPSegList* _createPSegList(BGPSEC_SecurePathSegment* segment,
  *   a) not be signed sign to the given peer for transit paths
  *   b) not be generated for originations.
  * 
+ * The returned path is stored in memory allocated using malloc() and need to be
+ * freed by the caller.
+ * 
  * @param capi   The CryptoAPI to be used for signing. If NULL, the signing is 
  *               performed using the internal signing implementation.
  * @param useGlobal use internal data stream (not thread safe but faster)
@@ -368,7 +374,7 @@ BGP_PathAttribute* generateBGPSecAttr(SRxCryptoAPI* capi,
   u_int8_t* ptr = NULL;
   int ctSegments = 0;
   
-  char* longPath = convertAsnPath(asPath);;
+  char* longPath = convertAsnPath(asPath, NULL, NULL);
   bool iBGP = bgp_conf->asn == bgp_conf->peerAS;     
   char* myPath = NULL;
   
@@ -982,7 +988,7 @@ static int _fillSignatureBlock(SRxCryptoAPI* capi,
 
 /**
  * Free the test data stream only if it is not the global stream. In case it
- * is the global stream the data will be errased only. To free the global
+ * is the global stream the data will be erased only. To free the global
  * data stream call releaseData().
  * 
  * @param data The data to be freed

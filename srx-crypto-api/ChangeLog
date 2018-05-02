@@ -1,5 +1,10 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.2.0.6 - April 2018
+  - Fixed incorrect entry in Changelog for 0.2.0.5
+  - Fixed M4 Script for OpenSSL
+Version 0.2.0.5 - October   2017
+  - Added .a into configuration.
 Version 0.2.0.4 - September 2017
   - Moved Version 0.2 into branch to be able to address 0.2 related bugs. This
     will include bugs of SCA 0.2 identified within trunk development of version 

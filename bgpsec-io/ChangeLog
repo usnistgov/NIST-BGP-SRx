@@ -1,3 +1,30 @@
+Version 0.2.0.20
+  * Fixed issues in printing Communit String and Extended Community
+    String.
+Version 0.2.0.19
+  * Added sub-code text for notifications in simple print mode. 
+Version 0.2.0.18
+  * Fixed BUG introduced in 0.2.0.17 regarding as path 
+    (incorrect duplicated origin if path is provided with AS_SET)
+Version 0.2.0.17
+  * Added scripting and sending of aggregated BGP paths.
+Version 0.2.0.16
+  * Fixed incorrect as path conversion from blank path string to as 0.
+  * Added additional syntax printout to update scripting by adding pCount and
+    RPKI validation state.
+  * Disabled buffering for stdout and strerr
+Version 0.2.0.15
+  * Fixed malformed update when community string is send.
+Version 0.2.0.14
+  * Added community string for iBGP validation state communication.
+Version 0.2.0.13
+  * Fixed printout of IP addresses, buffer was not initialized correctly.
+  * Fixed errors in generated configuration.  
+Version 0.2.0.12
+  * Added switch to enable simple printout
+Version 0.2.0.11
+  * Added a script for generating updates from MRT using bgpdump
+  * Added switch to disable global updates
 Version 0.2.0.10
   * Updated the spec file to require SCA >=0.2.0 and SCA < 0.3.0
   * Fixed some issues with configuration relating to SCA library

@@ -47,6 +47,7 @@
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPHeaderPrinter.h"
 #include "bgp/printer/BGPPrinterUtil.h"
+#include "bgp/printer/BGPOpenPrinter.h"
 
 /**
  * Print the MPNLRI Capability
@@ -326,58 +327,65 @@ static int _printOptionalParameter(BGP_OpenMessage_OptParam* param, bool more)
  * Print the BGP Open Message
  * 
  * @param openmsg The open message as complete BGP packet. 
- * 
+ * @param simple If true, do not use the tree format as in wireshark
  */
-void printOpenData(BGP_OpenMessage* openmsg)
+void printOpenData(BGP_OpenMessage* openmsg, bool simple)
 {
   u_int16_t openLength = ntohs(openmsg->messageHeader.length);
   u_int8_t* start = (u_int8_t*)openmsg;
   u_int8_t* data = start + sizeof(BGP_OpenMessage);  
   u_int8_t* end = start + openLength;  
-          
-  printf("%s+--Version: %u\n", TAB_2, openmsg->version);
-  printf("%s+--My AS: %u\n", TAB_2, ntohs(openmsg->my_as));    
-  printf("%s+--Hold Time: %u\n", TAB_2, ntohs(openmsg->hold_time));    
-  u_int8_t* bgp_id = (u_int8_t*)&openmsg->bgp_identifier;
+  
+  if (!simple)
+  {          
+    printf("%s+--Version: %u\n", TAB_2, openmsg->version);
+    printf("%s+--My AS: %u\n", TAB_2, ntohs(openmsg->my_as));    
+    printf("%s+--Hold Time: %u\n", TAB_2, ntohs(openmsg->hold_time));    
+    u_int8_t* bgp_id = (u_int8_t*)&openmsg->bgp_identifier;
 
-  printf("%s+--BGP Identifier: %u.%u.%u.%u\n", TAB_2, bgp_id[0], bgp_id[1], 
-                                                      bgp_id[2], bgp_id[3]);
-  printf("%s+--Optional Parameters Length: %u\n", TAB_2, openmsg->opt_param_len);
+    printf("%s+--BGP Identifier: %u.%u.%u.%u\n", TAB_2, bgp_id[0], bgp_id[1], 
+                                                        bgp_id[2], bgp_id[3]);
+    printf("%s+--Optional Parameters Length: %u\n", TAB_2, openmsg->opt_param_len);
 
-  if ((end - data) != openmsg->opt_param_len)
-  {
-    printf("%s+--MALEFORMED UPDATE - Remaining data != Optional param length!\n", 
-           TAB_2);      
-    
-    char dataStr[STR_MAX];
-    // write the text first in the variable to see how long it becomes. This 
-    // will be the tab for the final print in case data is very large.
-    
-    snprintf(dataStr, STR_MAX, "%s+--data:   ", TAB_2);
-    // Now print the tree leaf name
-    printf("%s", dataStr);
-    // Now generate the tab
-    memset(dataStr, ' ', strlen(dataStr));
-    // Now write the hex data (formatted)
-    printHex(data, (end - data), dataStr);
-  }
-  else
-  {
-    if (openmsg->opt_param_len != 0)
+    if ((end - data) != openmsg->opt_param_len)
     {
-      // Parse the optional parameters.
-      bool more = false;
-      int hdrSize = sizeof(BGP_OpenMessage_OptParam);
-      while (data < end)
-      {
-        BGP_OpenMessage_OptParam* optParam = (BGP_OpenMessage_OptParam*)data;
-        more = ( data + optParam->param_len + hdrSize) < end;
-        data += _printOptionalParameter(optParam, more);
-      }
+      printf("%s+--MALEFORMED UPDATE - Remaining data != Optional param length!\n", 
+             TAB_2);      
+
+      char dataStr[STR_MAX];
+      // write the text first in the variable to see how long it becomes. This 
+      // will be the tab for the final print in case data is very large.
+
+      snprintf(dataStr, STR_MAX, "%s+--data:   ", TAB_2);
+      // Now print the tree leaf name
+      printf("%s", dataStr);
+      // Now generate the tab
+      memset(dataStr, ' ', strlen(dataStr));
+      // Now write the hex data (formatted)
+      printHex(data, (end - data), dataStr);
     }
     else
     {
-      printf("%s+--data:   (no data)", TAB_2);
+      if (openmsg->opt_param_len != 0)
+      {
+        // Parse the optional parameters.
+        bool more = false;
+        int hdrSize = sizeof(BGP_OpenMessage_OptParam);
+        while (data < end)
+        {
+          BGP_OpenMessage_OptParam* optParam = (BGP_OpenMessage_OptParam*)data;
+          more = ( data + optParam->param_len + hdrSize) < end;
+          data += _printOptionalParameter(optParam, more);
+        }
+      }
+      else
+      {
+        printf("%s+--data:   (no data)", TAB_2);
+      }
     }
   }
+  else
+  {
+    printf ("OPEN\n");
+  } 
 }

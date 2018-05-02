@@ -12,7 +12,7 @@
 /*
  * CUnit Test Suite
  */
-u_int32_t asn;
+static u_int32_t asn;
 
 int init_suite(void) {
   asntok(" 10 1.20 ");

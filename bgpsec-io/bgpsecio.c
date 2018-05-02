@@ -20,10 +20,14 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.0.10
+ * @version 0.2.0.16
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.16- 2018/04/22 - oborchert
+ *           * Disabled buffering of stdout and stderr printout in main method.
+ * 0.2.0.11- 2018/03/22 - oborchert
+ *           * Fixed issues with 4 byte ASN.
  * 0.2.0.10- 2017/09/01 - oborchert
  *           * Removed not used variables.
  * 0.2.0.7 - 2017/05/03 - oborchert
@@ -111,6 +115,7 @@
 #include "cfg/configuration.h"
 #include "cfg/cfgFile.h"
 #include "player/player.h"
+#include "antd-util/log.h"
 
 /** Only be used as parameter for preloadKeys */
 #define LOAD_KEYS_PRIVATE true
@@ -178,6 +183,45 @@ void _errorParam(char* msg)
 }
 
 /**
+ * This function frees malloc-ed space or wipes it if it is protected and 
+ * initialized the array itself.
+ * 
+ * @param bgpPathAttr  The array containing attrCount bgpPathAttr elements.
+ * @param attrCount    The number elements in the array
+ * @param mem_1        Start address of protected memory not to be freed
+ * @param mem_2        end address of protected memory not to be freed
+ * 
+ * @since 0.2.0.11
+ */
+static void __sanitizePathAttribtueArray(BGP_PathAttribute** bgpPathAttr, 
+                                         int attrCount, 
+                                         u_int8_t* mem_1, u_int8_t* mem_2)
+{
+  int       idx      = 0;
+  u_int8_t* attrPtr  = NULL;
+  int       attrSize = 0;
+  
+  for (; idx < attrCount; idx++)
+  {
+    attrPtr = (u_int8_t*)bgpPathAttr[idx];
+    if (attrPtr != NULL)
+    {
+      if ((mem_1 <= attrPtr) && (mem_2 >= attrPtr))
+      {
+        // attribute located in protected memory, just wipe it to zero
+        attrSize = getPathAttributeSize(bgpPathAttr[idx]);
+        memset(attrPtr, 0, attrSize);
+      }
+      else
+      {
+        freeData(attrPtr);
+      }
+      bgpPathAttr[idx] = NULL;
+    }
+  }
+}
+
+/**
  * Start the BGP router session
  * 
  * @param params The program parameters
@@ -186,17 +230,19 @@ void _errorParam(char* msg)
  */
 static int _runBGPRouterSession(PrgParams* params)
 {
-    // perform BGP  
+  // perform BGP  
   BGPSession* session = createBGPSession(1024, &params->bgpConf, NULL);
   session->run = true;
   
   bool useGlobalMemory = true;
-  u_int8_t binBuff[SESS_MIN_MESSAGE_BUFFER];
-  memset(&binBuff, 0, sizeof(binBuff));
+  int binBuffSize      = SESS_MIN_MESSAGE_BUFFER;
+  u_int8_t binBuff[binBuffSize];
+  memset(binBuff, 1, binBuffSize);
+  
   BGPSEC_IO_Buffer ioBuff;
   memset(&ioBuff, 0, sizeof(ioBuff));
-  ioBuff.data     = (u_int8_t*)&binBuff;
-  ioBuff.dataSize = sizeof(binBuff);
+  ioBuff.data     = binBuff;
+  ioBuff.dataSize = binBuffSize;
           
   u_int8_t msgBuff[SESS_MIN_MESSAGE_BUFFER]; //10KB Message Size
   memset(&msgBuff, 0, sizeof(msgBuff));
@@ -210,7 +256,14 @@ static int _runBGPRouterSession(PrgParams* params)
     return EXIT_FAILURE;
   }
   
-  BGP_PathAttribute*   bgpPathAttr = NULL;
+  // This attribute is needed if AS4_PATH attribute us needed.
+  int                 maxAttrCount = 2;
+  int                 pathAttrPos  = 0;
+  BGP_PathAttribute** bgpPathAttr  = malloc(  maxAttrCount 
+                                            * sizeof(BGP_PathAttribute*));
+  memset (bgpPathAttr, 0, (maxAttrCount * sizeof(BGP_PathAttribute*)));
+  // Used to count the number of used BGP Path attributes;
+  
   BGP_UpdateMessage_1* bgp_update  = NULL;
   int               stopTime       = session->bgpConf.disconnectTime;
   bool              hasBinTraffic  = params->binInFile[0] != '\0';
@@ -237,6 +290,10 @@ static int _runBGPRouterSession(PrgParams* params)
   }
   
   int updatesSend = 0;
+  
+  // Helper to allow generation of more than one path attribute.
+  // for now AS4_PATH and AS_PATH for unsupported AS4 speakers.
+  u_int8_t* buffPtr = NULL;
         
   while (session->run)
   {
@@ -252,13 +309,24 @@ static int _runBGPRouterSession(PrgParams* params)
     bool bgpsec_v6_negotiated =   session->bgpConf.capConf.bgpsec_snd_v6 
                                 & session->bgpConf.peerCap.bgpsec_rcv_v6;
     bool doBGPSEC = true;
-    
+
+    // useAS4 is used for BGP4 updates and the usage depends on the negotiation 
+    // with the peer and out own capability.
+    bool useAS4      =    session->bgpConf.peerCap.asn_4byte 
+                       && session->bgpConf.capConf.asn_4byte;
+    int  as4AttrSize = 0;
+
     // Now session is established, first send all updates in the stack then
     // all stdin data followed by binary in data
     while (session->fsm.state == FSM_STATE_ESTABLISHED && sendData)
     {
       prefix      = NULL;
-      bgpPathAttr = NULL;
+      buffPtr     = binBuff + binBuffSize;
+      __sanitizePathAttribtueArray(bgpPathAttr, maxAttrCount, 
+                                   binBuff, buffPtr);
+      buffPtr     = binBuff;
+      pathAttrPos = 0; // Max 2
+      as4AttrSize = 0;
       bgp_update  = NULL;
 
       // set for the next run.      
@@ -294,16 +362,17 @@ static int _runBGPRouterSession(PrgParams* params)
               break;
           }
           
-          bgpPathAttr = doBGPSEC ? (BGP_PathAttribute*)generateBGPSecAttr(NULL,
-                                   useGlobalMemory, update->pathStr, NULL, 
-                                   &session->bgpConf, prefix, 
-                                   asList, params->onlyExtLength)
-                                 : NULL;
+          bgpPathAttr[pathAttrPos] = doBGPSEC 
+                                     ? (BGP_PathAttribute*)generateBGPSecAttr(
+                                        NULL, useGlobalMemory, update->pathStr, 
+                                        NULL, &session->bgpConf, prefix, 
+                                        asList, params->onlyExtLength)
+                                    : NULL;
           // if bgpsec attribute could not be generated use AS_PATH and no 
           // MPNLRI encoding for V4 prefixes
-          useMPNLRI = useMPNLRI & (bgpPathAttr != NULL);
+          useMPNLRI = useMPNLRI & (bgpPathAttr[pathAttrPos] != NULL);
           
-          if (bgpPathAttr == NULL)
+          if (bgpPathAttr[pathAttrPos] == NULL)
           {
             // Now this can have two reasons:
             // (1) The signing failed -> check for mode NS_BGP4 as fallback
@@ -327,9 +396,53 @@ static int _runBGPRouterSession(PrgParams* params)
               // be fine.
               // Generate an BPP4 packet.
               // added iBGP detection.
-              bgpPathAttr = generateBGP_PathAttr(session->bgpConf.asn, iBGP,
-                                  update->pathStr, binBuff, 
-                                  SESS_MIN_MESSAGE_BUFFER);
+              if (!useAS4)
+              {
+                // Peer does not support AS4 path. Check is as path contains 
+                // ASN's that exceed 2 bytes.
+                bool  has4ByteASN = false;
+                char* longPath = convertAsnPath(update->pathStr, 
+                                                update->asSetStr, &has4ByteASN);
+                if (has4ByteASN) //AS path contains 4byte ASN
+                {
+                  bgpPathAttr[pathAttrPos] 
+                                 = generateBGP_PathAttr(BGP_UPD_A_TYPE_AS4_PATH,
+                                              session->bgpConf.asn, true, iBGP, 
+                                              longPath, update->asSetStr,
+                                              buffPtr, SESS_MIN_MESSAGE_BUFFER);
+                  if (bgpPathAttr[pathAttrPos] != NULL)
+                  {
+                    as4AttrSize =getPathAttributeSize(bgpPathAttr[pathAttrPos]);
+                    buffPtr += as4AttrSize;
+                    pathAttrPos++;
+                  }
+                  else
+                  {
+                    RAISE_ERROR("Could not generate an AS4_PATH attribute for"
+                                " path '%s'", update->pathStr);
+                  }
+                }
+              }
+              if (pathAttrPos < maxAttrCount)
+              {
+                char* longPath = convertAsnPath(update->pathStr, NULL, NULL);
+                bgpPathAttr[pathAttrPos] 
+                                  = generateBGP_PathAttr(BGP_UPD_A_TYPE_AS_PATH,
+                                             session->bgpConf.asn, useAS4, iBGP, 
+                                             longPath, update->asSetStr,
+                                             buffPtr, SESS_MIN_MESSAGE_BUFFER);
+                if (bgpPathAttr[pathAttrPos] == NULL)
+                {
+                  RAISE_ERROR("Could not generate an AS_PATH attribute for"
+                              " path '%s'", update->pathStr);                
+                }
+              }
+              else
+              {
+                // Something went horrobly wrong.
+                RAISE_ERROR("The number of BGP path attributes exceeds the "
+                            "maximum of %i BGP path attributes.", maxAttrCount);                                
+              }
             }
           }
         }        
@@ -346,7 +459,7 @@ static int _runBGPRouterSession(PrgParams* params)
           {
             case BGPSEC_IO_TYPE_BGPSEC_ATTR:
                 // Prepare the attribute memory
-              bgpPathAttr = (BGP_PathAttribute*)ioBuff.data;
+              bgpPathAttr[0] = (BGP_PathAttribute*)ioBuff.data;
               prefix = (BGPSEC_PrefixHdr*)&record.prefix;
               break;
             case BGPSEC_IO_TYPE_BGP_UPDATE:
@@ -364,22 +477,26 @@ static int _runBGPRouterSession(PrgParams* params)
         sendData = false;
       }
         
-      if (bgpPathAttr != NULL)
+      if (bgpPathAttr[pathAttrPos] != NULL)
       {
         // Set no mpnlri if iBGP session. Will be overwritten for V6
         u_int32_t locPref = iBGP ? BGP_UPD_A_FLAGS_LOC_PREV_DEFAULT : 0;
         if (ntohs(prefix->afi) == AFI_V4)
         {
-          createUpdateMessage(msgBuff, sizeof(msgBuff), bgpPathAttr, 
+          createUpdateMessage(msgBuff, sizeof(msgBuff), 
+                              (pathAttrPos+1), bgpPathAttr, 
                               BGP_UPD_A_FLAGS_ORIGIN_INC, locPref,
-                              &(session->bgpConf.nextHopV4), prefix, useMPNLRI);
+                              &(session->bgpConf.nextHopV4), prefix, useMPNLRI,
+                              update->validation);
           
         }
         else
         {
-          createUpdateMessage(msgBuff, sizeof(msgBuff), bgpPathAttr, 
+          createUpdateMessage(msgBuff, sizeof(msgBuff), 
+                              (pathAttrPos+1), bgpPathAttr, 
                               BGP_UPD_A_FLAGS_ORIGIN_INC, locPref,
-                              &(session->bgpConf.nextHopV6), prefix, useMPNLRI);
+                              &(session->bgpConf.nextHopV6), prefix, useMPNLRI,
+                              update->validation);
         }
         // Maybe store the update ?????          
         bgp_update = (BGP_UpdateMessage_1*)msgBuff;
@@ -440,7 +557,10 @@ static int _runBGPRouterSession(PrgParams* params)
   }
   
   freeBGPSession(session);
-  freeData((u_int8_t*)bgpPathAttr);
+  buffPtr = binBuff + binBuffSize;
+  __sanitizePathAttribtueArray(bgpPathAttr, maxAttrCount, binBuff, buffPtr);
+  memset (bgpPathAttr, 0, (maxAttrCount  * sizeof(BGP_PathAttribute*)));
+  free(bgpPathAttr);
   
   return EXIT_SUCCESS;
 }
@@ -867,7 +987,7 @@ static int _runGEN(PrgParams* params, u_int8_t type)
     {
       // move to function that also reads from stdin
       UpdateData* update = NULL;
-      BGP_PathAttribute* bgpsecPathAttr = NULL;
+      BGP_PathAttribute* bgpsecPathAttr[] = {NULL};
       BGPSEC_PrefixHdr* prefix = NULL;
       BGPSEC_IO_StoreData store;
       int msgLen         = 0;
@@ -890,10 +1010,10 @@ static int _runGEN(PrgParams* params, u_int8_t type)
         u_int32_t segmentCount = 0;
         bool iBGP = params->bgpConf.asn == params->bgpConf.peerAS;
         u_int32_t locPref = iBGP ? BGP_UPD_A_FLAGS_LOC_PREV_DEFAULT : 0;
-        bgpsecPathAttr = (BGP_PathAttribute*)generateBGPSecAttr(NULL, true, 
+        bgpsecPathAttr[0] = (BGP_PathAttribute*)generateBGPSecAttr(NULL, true, 
                        update->pathStr, &segmentCount, &params->bgpConf, prefix, 
                        asList, params->onlyExtLength);        
-        if (bgpsecPathAttr != NULL)
+        if (bgpsecPathAttr[0] != NULL)
         {
           // Include the attribute header information.
           store.prefix       = prefix;
@@ -906,8 +1026,8 @@ static int _runGEN(PrgParams* params, u_int8_t type)
           switch (type)
           {            
             case BGPSEC_IO_TYPE_BGPSEC_ATTR:
-              store.dataLength   = getPathAttributeSize(bgpsecPathAttr);
-              store.data         = (u_int8_t*)bgpsecPathAttr;
+              store.dataLength   = getPathAttributeSize(bgpsecPathAttr[0]);
+              store.data         = (u_int8_t*)bgpsecPathAttr[0];
               if (!storeData(outFile, BGPSEC_IO_TYPE_BGPSEC_ATTR, 
                              params->bgpConf.asn, params->bgpConf.peerAS, 
                              &store))
@@ -921,10 +1041,10 @@ static int _runGEN(PrgParams* params, u_int8_t type)
                         ? (void*)&params->bgpConf.nextHopV4
                         : (void*)&params->bgpConf.nextHopV6;
               msgLen = createUpdateMessage(msgBuff, sizeof(msgBuff), 
-                                 (BGP_PathAttribute*)bgpsecPathAttr, 
+                                 1, bgpsecPathAttr, 
                                  BGP_UPD_A_FLAGS_ORIGIN_INC,
                                  locPref, nextHop, prefix, 
-                                 params->bgpConf.useMPNLRI);
+                                 params->bgpConf.useMPNLRI, update->validation);
               store.dataLength = msgLen;
               store.data       = (u_int8_t*)msgBuff;
               if (!storeData(outFile, BGPSEC_IO_TYPE_BGP_UPDATE, 
@@ -1017,6 +1137,10 @@ int main(int argc, char** argv)
   // First load parameters  
   PrgParams params;
   initParams(&params);
+  
+  // Disable printout buffering.
+  setbuf(stdout, NULL);
+  setbuf(stderr, NULL);
   
   SRxCryptoAPI* capi = NULL;
   

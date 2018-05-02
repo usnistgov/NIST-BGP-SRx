@@ -114,6 +114,7 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/rpki_handler.c \
 		     $(SERVER_DIR)/rpki_router_client.c \
 		     $(SERVER_DIR)/rpki_queue.c \
+		     $(SERVER_DIR)/rpki_packet_printer.c \
 		     $(SERVER_DIR)/server_connection_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
 		     $(SERVER_DIR)/update_cache.c 
@@ -142,11 +143,13 @@ tools_PROGRAMS= rpkirtr_client rpkirtr_svr srxsvr_client
 
 # Will be bundled with srx
 rpkirtr_client_SOURCES = $(TOOLS_DIR)/rpkirtr_client.c \
+                         $(SERVER_DIR)/rpki_packet_printer.c \
 		         $(SERVER_DIR)/rpki_router_client.c
 rpkirtr_client_LDADD   = libsrx_util.la
 
 # Will be bundled with srx
-rpkirtr_svr_SOURCES = $(TOOLS_DIR)/rpkirtr_svr.c 
+rpkirtr_svr_SOURCES = $(TOOLS_DIR)/rpkirtr_svr.c \
+                      $(SERVER_DIR)/rpki_packet_printer.h
 rpkirtr_svr_LDADD   = libsrx_util.la
 
 # Will be bundled with srx-proxy
@@ -201,6 +204,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SERVER_DIR)/rpki_queue.h \
 		 $(SERVER_DIR)/rpki_handler.h \
 		 $(SERVER_DIR)/rpki_router_client.h \
+	         $(SERVER_DIR)/rpki_packet_printer.h \
 		 $(SERVER_DIR)/server_connection_handler.h \
 		 $(SERVER_DIR)/ski_cache.h \
 		 $(SERVER_DIR)/srx_packet_sender.h \

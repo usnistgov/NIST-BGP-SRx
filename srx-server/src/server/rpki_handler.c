@@ -22,10 +22,12 @@
  *
  * This handler processes ROA validation
  *
- * @version 0.5.0.0
+ * @version 0.5.0.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.5.0.3 - 2018/02/26 - oborchert
+ *            * fixed incorrect import.
  *  0.5.0.0 - 2017/07/08 - oborchert
  *            * Added final steps to fully integrate BGPsec path validation. 
  *          - 2017/07/06 - oborchert
@@ -60,8 +62,8 @@
 #include "server/rpki_handler.h"
 #include "server/ski_cache.h"
 #include "server/update_cache.h"
+#include "server/bgpsec_handler.h"
 #include "util/log.h"
-#include "bgpsec_handler.h"
 
 ///////////////////
 // Constants

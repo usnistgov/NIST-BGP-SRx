@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.2.0.4], [bgpsrx-dev@nist.gov])
+AC_INIT([SRxCryptoAPI], [0.2.0.6], [bgpsrx-dev@nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -79,7 +79,6 @@ SRX_M4_CHECK_LIBCONFIG()
 #
 # Check for OPENSSL Parameter
 #
-AS_BOX([Process OPENSSL Setup])
 SRX_M4_CHECK_OPENSSL($CPU_ARCH, OPENSSL_LIBS, [OPENSSL_CFLAGS], [OPENSSL_LDFLAGS])
 
 # General checks for header files.

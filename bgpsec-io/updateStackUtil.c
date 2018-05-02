@@ -23,26 +23,33 @@
  * 
  * The reverse mode might be possible in future updates.
  * 
- * @version 0.2.0.10
+ * @version 0.2.0.17
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.17- 2018/04/26 - oborchert
+ *            * Added AS_SET to function convertAsnPath for 4byte ASN check.
+ *  0.2.0.16- 2018/04/21 - oborchert
+ *            * Removed incorrect adding of AS 0 to path when path consists of
+ *              string containing only blanks.
+ *  0.2.0.11- 2018/03/22 - oborchert
+ *            * Added OUT parameter to function convertAsnPath
  *  0.2.0.10- 2017/09/01 - oborchert
  *            * Fixed compiler warning for un-used return value while using 
  *              fgets in isUpdateStackEmpty
- *  0.2.0.7 - 2017/05/03 - borchert
+ *  0.2.0.7 - 2017/05/03 - oborchert
  *            * BZ1122: Fixed problems with piped updates.
- *  0.2.0.2 - 2016/11/14 - borchert
+ *  0.2.0.2 - 2016/11/14 - oborchert
  *            * Fixed speller in documentation.
- *          - 2016/06/29 - borchert
+ *          - 2016/06/29 - oborchert
  *            * Fixed BZ995 segmentation failed during AS path conversion. 
  *              Replaced sprintf with snprintf in convertAsnPath.
- *  0.2.0.1 - 2016/06/24 - borchert
+ *  0.2.0.1 - 2016/06/24 - oborchert
  *            * Assured that function convertAsnPath does return a zero 
  *              terminated string and not NULL.
  *  0.2.0.0 - 2016/05/10 - oborchert
  *            * Fixed compiler warnings BZ950
- *  0.1.1.0 - 2016/04/21 - borchert
+ *  0.1.1.0 - 2016/04/21 - oborchert
  *            * Added parameter inclStdIn for speedup
  *           - 2016/04/20 - borchert
  *            * Created File.
@@ -153,17 +160,21 @@ bool isUpdateStackEmpty(PrgParams* params, bool inclStdIn)
 /**
  * Converts a given path into either a compressed path or deflates a compressed 
  * path into its long string. It always returns a new string regardless of the
- * input. The length 0 string contains "\0" 
+ * input. The length 0 string contains "\0".
+ * The AS_SET will only be processed to determine if it contains 4Byte ASNs.
  * 
  * Compressed:   10p2 20 30p5
  * Decompressed: 10 10 20 30 30 30 30 30
  * 
  * @param path The path (can be NULL)
+ * @param asSet The AS_SET if specified. (can be NULL)
+ * @param hasAS4 (OUT) This bool pointer returns true if the given path contains
+ *               4 byte AS numbers. (CAN BE NULL)
  * 
  * @return A new allocated, zero terminated string that needs to be free'd by 
  *         the caller.
  */
-char* convertAsnPath(char* path)
+char* convertAsnPath(char* path, char* asSet, bool* has4ByteASN)
 {
   char       cASN[STR_MAX];
   char*      retVal  = NULL;
@@ -174,6 +185,8 @@ char* convertAsnPath(char* path)
   u_int32_t  asn2    = 0; // the lower asn;
   u_int32_t  pCount  = 0;
   u_int32_t* val     = &asn2;
+  
+  bool contains4ByteASN = false;
   
   int  idx;
   bool store   = false;
@@ -214,7 +227,7 @@ char* convertAsnPath(char* path)
       }
       pathLen--;
       ptr++;
-            
+                  
       // Either more ASN's are in the loop or the last was read - in both 
       // cases store the ASN
       if (store || pathLen == 0)
@@ -224,10 +237,19 @@ char* convertAsnPath(char* path)
         if (asn1 != 0)
         {
           snprintf(cASN, STR_MAX, "%d.%d", asn1, asn2);
+          contains4ByteASN = true;
         }
         else
         {
-          snprintf(cASN, STR_MAX, "%d", asn2);
+          // Added this query to prevent adding as zero to the path.
+          if (asn2 != 0)
+          {
+            snprintf(cASN, STR_MAX, "%d", asn2);
+            if (asn2 > 0xFFFF)
+            {
+              contains4ByteASN = true;
+            }
+          }
         }
         // Now use the pCount setting to repeat the ASN
         for (idx = 1; idx <= pCount; idx++)
@@ -255,6 +277,7 @@ char* convertAsnPath(char* path)
         
         // switch val back to read the ASN
         val    = &asn2;
+        *cASN  = '\0';
         asn2   = 0;
         asn1   = 0;
         pCount = 0;
@@ -268,5 +291,19 @@ char* convertAsnPath(char* path)
     retVal  = malloc(1);
     *retVal = '\0';
   }
+  
+  // Check AS_SET if it exists for 4 Byte AS numbers only if it is not found 
+  // already.
+  if ((asSet != NULL) && !contains4ByteASN)
+  {
+    char* tmpPath = convertAsnPath(asSet, NULL, &contains4ByteASN);
+    free (tmpPath);
+  }
+  
+  if (has4ByteASN != NULL)
+  {
+    *has4ByteASN = contains4ByteASN;
+  }
+  
   return retVal;
 }

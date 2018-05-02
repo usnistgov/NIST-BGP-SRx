@@ -23,10 +23,14 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.10
+ * @version 0.2.0.12
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.12- 2018/04/14 - oborchert
+ *            * Added processing printSimple.
+ *  0.2.0.11- 2018/03/23 - oborchert
+ *            * Added AS_PATH printing (simple for now)
  *  0.2.0.10- 2017/09/01 - oborchert
  *            * Removed not used variables.
  *  0.2.0.7 - 2017/04/28 - oborchert
@@ -164,20 +168,20 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
 
     sessConfig = &session->bgpConf;
     
-    sessConfig->asn                   = config->asn;
-    sessConfig->bgpIdentifier         = config->bgpIdentifier;
-    sessConfig->holdTime              = config->holdTime;
-    sessConfig->disconnectTime        = config->disconnectTime;
-    sessConfig->useMPNLRI             = config->useMPNLRI;
-    sessConfig->capConf.extMsgSupp    = config->capConf.extMsgSupp;
-    sessConfig->capConf.extMsgLiberal = config->capConf.extMsgLiberal;
-    sessConfig->capConf.extMsgForce   = config->capConf.extMsgForce;
+    sessConfig->asn               = config->asn;
+    sessConfig->bgpIdentifier     = config->bgpIdentifier;
+    sessConfig->holdTime          = config->holdTime;
+    sessConfig->disconnectTime    = config->disconnectTime;
+    sessConfig->useMPNLRI         = config->useMPNLRI;
+    sessConfig->inclGlobalUpdates = config->inclGlobalUpdates;
+        
     int idx;
     for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
     {
       sessConfig->printOnReceive[idx] = config->printOnReceive[idx];
       sessConfig->printOnSend[idx]    = config->printOnSend[idx];
     }
+    sessConfig->printSimple = config->printSimple;
     
     memcpy(&sessConfig->nextHopV4, &config->nextHopV4, sizeof(struct sockaddr_in));    
     memcpy(&sessConfig->nextHopV6, &config->nextHopV6, sizeof(struct sockaddr_in6));
@@ -783,8 +787,13 @@ int readNextBGPMessage(BGPSession* session, int timeout)
       }
       if (prnHdr)
       {
-        printf ("Received ");
-        printBGP_Message(hdr);
+        // The isAS4 calculation might be incorrect until the session is 
+        // completely negotiated. The value is only needed for AS_PATH
+        // printing and therefore it does not matter if the value is incorrect
+        // for all message types other than update.
+        printBGP_Message(hdr,    session->bgpConf.capConf.asn_4byte 
+                              && session->bgpConf.peerCap.asn_4byte,
+                         session->bgpConf.printSimple, BGPHP_MSG_RECEIVED);
       }
     }    
     // Moved inside the if section - count the message only if the FSM is
@@ -890,12 +899,14 @@ void processOpenMessage(BGPSession* session)
         nhdr = (BGP_NotificationMessage*)hdr;
         if (nhdr->error_code != BGP_ERR6_CEASE)
         {
-          printf("WARNING: Received NOTIFICATION with other error code than"
+          printf("WARNING: Received NOTIFICATION with other error code than "
                  "cease (%d)!\n", BGP_ERR6_CEASE);
           // Only print if not already printed
           if (!session->bgpConf.printOnReceive[PRNT_MSG_NOTIFICATION])
           {
-            printBGP_Message((BGP_MessageHeader*)hdr);
+            // isAS4 value not needed here, so set it to false
+            printBGP_Message((BGP_MessageHeader*)hdr, false, 
+                             session->bgpConf.printSimple, BGPHP_MSG_RECEIVED);
           }
         }
         
@@ -1354,8 +1365,9 @@ bool sendOpenMessage(BGPSession* session)
         written = _writeData(session, sendBuff, size);
         if (session->bgpConf.printOnSend[PRNT_MSG_OPEN])
         {
-          printf ("Send ");
-          printBGP_Message((BGP_MessageHeader*)sendBuff);
+          // isAS4 not needed in open message
+          printBGP_Message((BGP_MessageHeader*)sendBuff, false, 
+                           session->bgpConf.printSimple, BGPHP_MSG_SEND);
         }
       }
       retVal = written == size;
@@ -1431,8 +1443,10 @@ bool sendKeepAlive(BGPSession* session, int retryCounter)
         written = _writeData(session, sendBuff, size);
         if (session->bgpConf.printOnSend[PRNT_MSG_KEEPALIVE])
         {
-          printf ("Send ");
-          printBGP_Message((BGP_MessageHeader*)sendBuff);
+          printBGP_Message((BGP_MessageHeader*)sendBuff, 
+                              session->bgpConf.capConf.asn_4byte
+                           && session->bgpConf.peerCap.asn_4byte,
+                           session->bgpConf.printSimple, BGPHP_MSG_SEND);
         }
       }
       retVal = (written == size);
@@ -1505,8 +1519,9 @@ bool sendNotification(BGPSession* session, int error_code, int subcode,
         written = _writeData(session, sendBuff, size);
         if (session->bgpConf.printOnSend[PRNT_MSG_NOTIFICATION])
         {
-          printf ("Send ");
-          printBGP_Message((BGP_MessageHeader*)sendBuff);
+          // isAS4 not needed for NOTIFIVATION, so set it to false.          
+          printBGP_Message((BGP_MessageHeader*)sendBuff, false, 
+                           session->bgpConf.printSimple, BGPHP_MSG_SEND);
         }
       }
 
@@ -1632,12 +1647,14 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update,
       bool prnOnUpdate = session->bgpConf.printOnSend[PRNT_MSG_UPDATE];
       // Enable update printer in this mode.
       session->bgpConf.printOnSend[PRNT_MSG_UPDATE] = true;
-#endif            
+#endif                  
       if (session->bgpConf.printOnSend[PRNT_MSG_UPDATE])
       {
-        printf ("Send ");
-        printBGP_Message((BGP_MessageHeader*)update);
-        //printUpdateData((BGP_UpdateMessage_1*)update);
+        printBGP_Message((BGP_MessageHeader*)update, 
+                            session->bgpConf.capConf.asn_4byte
+                         && session->bgpConf.peerCap.asn_4byte, 
+                         session->bgpConf.printSimple, BGPHP_MSG_SEND);
+        // The last false indicates this message is send
       }
       
       retVal = (written == size);

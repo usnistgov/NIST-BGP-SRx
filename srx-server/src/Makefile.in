@@ -111,7 +111,7 @@ am_libsrx_util_la_OBJECTS = bgpsec_util.lo client_socket.lo debug.lo \
 libsrx_util_la_OBJECTS = $(am_libsrx_util_la_OBJECTS)
 PROGRAMS = $(srx_PROGRAMS) $(test_PROGRAMS) $(tools_PROGRAMS)
 am_rpkirtr_client_OBJECTS = rpkirtr_client.$(OBJEXT) \
-	rpki_router_client.$(OBJEXT)
+	rpki_packet_printer.$(OBJEXT) rpki_router_client.$(OBJEXT)
 rpkirtr_client_OBJECTS = $(am_rpkirtr_client_OBJECTS)
 rpkirtr_client_DEPENDENCIES = libsrx_util.la
 am_rpkirtr_svr_OBJECTS = rpkirtr_svr.$(OBJEXT)
@@ -122,7 +122,8 @@ am_srx_server_OBJECTS = bgpsec_handler.$(OBJEXT) \
 	configuration.$(OBJEXT) console.$(OBJEXT) key_cache.$(OBJEXT) \
 	ski_cache.$(OBJEXT) main.$(OBJEXT) prefix_cache.$(OBJEXT) \
 	rpki_handler.$(OBJEXT) rpki_router_client.$(OBJEXT) \
-	rpki_queue.$(OBJEXT) server_connection_handler.$(OBJEXT) \
+	rpki_queue.$(OBJEXT) rpki_packet_printer.$(OBJEXT) \
+	server_connection_handler.$(OBJEXT) \
 	srx_packet_sender.$(OBJEXT) update_cache.$(OBJEXT)
 srx_server_OBJECTS = $(am_srx_server_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -418,6 +419,7 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/rpki_handler.c \
 		     $(SERVER_DIR)/rpki_router_client.c \
 		     $(SERVER_DIR)/rpki_queue.c \
+		     $(SERVER_DIR)/rpki_packet_printer.c \
 		     $(SERVER_DIR)/server_connection_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
 		     $(SERVER_DIR)/update_cache.c 
@@ -443,12 +445,15 @@ toolsdir = $(bindir)
 
 # Will be bundled with srx
 rpkirtr_client_SOURCES = $(TOOLS_DIR)/rpkirtr_client.c \
+                         $(SERVER_DIR)/rpki_packet_printer.c \
 		         $(SERVER_DIR)/rpki_router_client.c
 
 rpkirtr_client_LDADD = libsrx_util.la
 
 # Will be bundled with srx
-rpkirtr_svr_SOURCES = $(TOOLS_DIR)/rpkirtr_svr.c 
+rpkirtr_svr_SOURCES = $(TOOLS_DIR)/rpkirtr_svr.c \
+                      $(SERVER_DIR)/rpki_packet_printer.h
+
 rpkirtr_svr_LDADD = libsrx_util.la
 
 # Will be bundled with srx-proxy
@@ -493,6 +498,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SERVER_DIR)/rpki_queue.h \
 		 $(SERVER_DIR)/rpki_handler.h \
 		 $(SERVER_DIR)/rpki_router_client.h \
+	         $(SERVER_DIR)/rpki_packet_printer.h \
 		 $(SERVER_DIR)/server_connection_handler.h \
 		 $(SERVER_DIR)/ski_cache.h \
 		 $(SERVER_DIR)/srx_packet_sender.h \
@@ -823,6 +829,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/prefix.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/prefix_cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_handler.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_packet_printer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpki_router_client.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpkirtr_client.Po@am__quote@
@@ -1040,6 +1047,20 @@ rpkirtr_client.obj: $(TOOLS_DIR)/rpkirtr_client.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(TOOLS_DIR)/rpkirtr_client.c' object='rpkirtr_client.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpkirtr_client.obj `if test -f '$(TOOLS_DIR)/rpkirtr_client.c'; then $(CYGPATH_W) '$(TOOLS_DIR)/rpkirtr_client.c'; else $(CYGPATH_W) '$(srcdir)/$(TOOLS_DIR)/rpkirtr_client.c'; fi`
+
+rpki_packet_printer.o: $(SERVER_DIR)/rpki_packet_printer.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_packet_printer.o -MD -MP -MF $(DEPDIR)/rpki_packet_printer.Tpo -c -o rpki_packet_printer.o `test -f '$(SERVER_DIR)/rpki_packet_printer.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_packet_printer.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_packet_printer.Tpo $(DEPDIR)/rpki_packet_printer.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_packet_printer.c' object='rpki_packet_printer.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_packet_printer.o `test -f '$(SERVER_DIR)/rpki_packet_printer.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_packet_printer.c
+
+rpki_packet_printer.obj: $(SERVER_DIR)/rpki_packet_printer.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_packet_printer.obj -MD -MP -MF $(DEPDIR)/rpki_packet_printer.Tpo -c -o rpki_packet_printer.obj `if test -f '$(SERVER_DIR)/rpki_packet_printer.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_packet_printer.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_packet_printer.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rpki_packet_printer.Tpo $(DEPDIR)/rpki_packet_printer.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(SERVER_DIR)/rpki_packet_printer.c' object='rpki_packet_printer.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rpki_packet_printer.obj `if test -f '$(SERVER_DIR)/rpki_packet_printer.c'; then $(CYGPATH_W) '$(SERVER_DIR)/rpki_packet_printer.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/rpki_packet_printer.c'; fi`
 
 rpki_router_client.o: $(SERVER_DIR)/rpki_router_client.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rpki_router_client.o -MD -MP -MF $(DEPDIR)/rpki_router_client.Tpo -c -o rpki_router_client.o `test -f '$(SERVER_DIR)/rpki_router_client.c' || echo '$(srcdir)/'`$(SERVER_DIR)/rpki_router_client.c

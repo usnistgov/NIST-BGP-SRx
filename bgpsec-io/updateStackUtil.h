@@ -28,18 +28,22 @@
  * 
  * The reverse mode might be possible in future updates.
  * 
- * @version 0.2.0.2
+ * @version 0.2.0.17
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *  0.2.0.7 - 2017/05/03 - borchert
+ * 0.2.0.17 - 2018/04/26 - oborchert
+ *            * Added AS_SET to function convertAsnPath for 4byte ASN check.
+ * 0.2.0.11 - 2018/03/22 - oborchert
+ *            * Added OUT parameter to function convertAsnPath
+ *  0.2.0.7 - 2017/05/03 - oborchert
  *            * BZ1122: Fixed problems with piped updates.
  *  0.2.0.1 - 2016/06/24 - oborchert
  *            * Assured that function convertAsnPath does return a zero 
  *              terminated string and not NULL.
- *  0.1.1.0 - 2016/04/21 - borchert
+ *  0.1.1.0 - 2016/04/21 - oborchert
  *            * Added parameter inclStdIn for speedup
- *          - 2016/04/20 - borchert
+ *          - 2016/04/20 - oborchert
  *            * Created File.
  */
 #ifndef UPDATESTACKUTIL_H
@@ -70,17 +74,21 @@ bool isUpdateStackEmpty(PrgParams* params, bool inclStdIn);
 /**
  * Converts a given path into either a compressed path or deflates a compressed 
  * path into its long string. It always returns a new string regardless of the
- * input. The length 0 string contains "\0" 
+ * input. The length 0 string contains "\0".
+ * The AS_SET will only be processed to determine if it contains 4Byte ASNs.
  * 
  * Compressed:   10p2 20 30p5
  * Decompressed: 10 10 20 30 30 30 30 30
  * 
  * @param path The path (can be NULL)
+ * @param asSet The AS_SET if specified. (can be NULL)
+ * @param hasAS4 (OUT) This bool pointer returns true if the given path contains
+ *               4 byte AS numbers. (CAN BE NULL)
  * 
  * @return A new allocated, zero terminated string that needs to be free'd by 
  *         the caller.
  */
-char* convertAsnPath(char* path);
+char* convertAsnPath(char* path, char* asSet, bool* has4ByteASN);
 
 #endif	/* UPDATESTACKUTIL_H */
 

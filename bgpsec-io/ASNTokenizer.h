@@ -25,10 +25,16 @@
  * except 0-9 and "." dot. Other than in strtok the input string will NOT be 
  * altered.
  *
+ * @version 0.2.0.17
+ * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *   0.1.0 - 2015/08/04 - oborchert
- *           * Created File.
+ *  0.2.0.17 - 2018/04/27 - oborchert
+ *             * Modified some function documentation to reflect the parameters
+ *               of the functions.
+ *             * Added the version tag to the source.
+ *  0.1.0.0  - 2015/08/04 - oborchert
+ *             * Created File.
  */
 
 #include <sys/types.h>
@@ -46,16 +52,16 @@ typedef struct {
 /**
  * Generate a global ASN tokenizer.
  * 
- * @param string the String containing the AS numbers
+ * @param string The String containing the AS numbers
  */
 void asntok(char* string);
 
 /**
  * Generate a global ASN tokenizer.
  * 
- * @param string the String containing the AS numbers
- * @param globalTokenizer The tokenizer to use internally. This allows being
- *                        threadsafe
+ * @param string The String containing the AS numbers
+ * @param tokenizer The tokenizer to use internally. This allows being
+ *                        thread safe
  * 
  */
 void asntok_th(char* string, tASNTokenizer* tokenizer);
@@ -75,14 +81,14 @@ bool asntok_next(u_int32_t* asn);
  * 
  * @param asn The address of the variable where to write the value of the asn
  *            into
- * @param globalTokenizer the tokenizer to be used
+ * @param tokenizer The tokenizer to be used
  * 
  * @return true if a token was found, otherwise false.
  */
 bool asntok_next_th(u_int32_t* asn, tASNTokenizer* tokenizer);
 
 /**
- * Reset the globale tokenizer to the beginning of the string.
+ * Reset the global tokenizer to the beginning of the string.
  */
 void asntok_reset();
 
@@ -101,7 +107,7 @@ void asntok_clear();
 /**
  * Initialized the given tokenizer to be empty.
  * 
- * @param tokenizer the Tokenizer to be emptied.
+ * @param tokenizer The tokenizer to be emptied.
  */
 void asntok_clear_th(tASNTokenizer* tokenizer);
 

@@ -57,7 +57,8 @@ noinst_HEADERS = \
                    antd-util/stack.h
 
 # Crypto Key generation tools
-dist_bin_SCRIPTS = tools/bio-traffic.sh
+dist_bin_SCRIPTS = tools/bio-traffic.sh \
+                   tools/mrt_to_bio.sh
 
 AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 

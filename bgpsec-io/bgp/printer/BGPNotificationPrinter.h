@@ -22,27 +22,32 @@
  *
  * Contains functionality to print update messages
  * 
- * @version 0.1.1.0
+ * @version 0.2.0.12
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
- *  0.1.1.0 - 2016/03/25 - borchert
+ *  0.2.0.12- 2018/04/12 - oborchert
+ *            * Added simple to printNotificationData to allow a more simplistic 
+ *              printing.
+ *  0.1.1.0 - 2016/03/25 - oborchert
  *            * Removed unused header file.
- *          - 2016/03/21 - borchert
+ *          - 2016/03/21 - oborchert
  *            * Created File.
  */
 #ifndef BGPNOTIFICATIONPRINTER_H
 #define	BGPNOTIFICATIONPRINTER_H
 
+#include <stdbool.h>
 #include "bgp/BGPHeader.h"
 
 /**
  * Print the BGP Update Message
  * 
  * @param notification The update message as complete BGP packet. 
+ * @param simple If true, do not use the tree format as in wireshark
  * 
  */
-void printNotificationData(BGP_NotificationMessage* notification);
+void printNotificationData(BGP_NotificationMessage* notification, bool simple);
 
 #endif	/* BGPNOTIFICATIONPRINTER_H */
 
