@@ -1,5 +1,12 @@
+Version 0.2.0.23
+  * Fixed segmentation fault when receiving > 60K updates.
+Version 0.2.0.22
+  * Fixed memory leaks.
+Version 0.2.0.21
+  * Added missing simple printout for MP_REACH_NLRI and BGPsec Path.
+  * Added printout of convergence information.
 Version 0.2.0.20
-  * Fixed issues in printing Communit String and Extended Community
+  * Fixed issues in printing Community String and Extended Community
     String.
 Version 0.2.0.19
   * Added sub-code text for notifications in simple print mode. 

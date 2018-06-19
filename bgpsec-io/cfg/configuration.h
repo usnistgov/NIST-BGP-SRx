@@ -22,10 +22,12 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.0.17
+ * @version 0.2.0.21
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.21 -2018/06/08 - oborchert
+ *            * Added P..._CONVERGENCE parameters.
  *  0.2.0.17 -2018/04/26 - oborchert
  *            * Added UPD_AS_SET_OPEN and UPD_AS_SET_CLKOSE
  *  0.2.0.14 -2018/04/19 - oborchert
@@ -269,6 +271,13 @@
 #define  P_NO_MPNLRI    "--no_mpnlri"
 // -M                  - do not use MPNLRI encoding for IPv4
 #define  P_C_NO_MPNLRI  'M'
+
+// Allow printing convergence time during keepalive
+#define  P_CFG_CONVERGENCE   "convergence"
+// --convergence       - enable printing out of convergence time
+#define  P_CONVERGENCE       "--" P_CFG_CONVERGENCE
+// --T                 - enable printing out of convergence time
+#define  P_C_CONVERGENCE     'T'
 
 // ext_msg_cap="true|false" - enable / disable the extended message size 
 //                                    capability (default enabled)

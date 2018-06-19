@@ -24,10 +24,12 @@
  * send BGP updates. It keeps the session open as long as the program is running 
  * or for a pre-determined time after the last update is send.
  * 
-* @version 0.2.0.17
+* @version 0.2.0.22
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.22- 2018/06/18 - oborchert
+ *            * Changed from sprintf to snprintf.
  *  0.2.0.17- 2018/04/26 - oborchert
  *            * Added parameter asSet to function generateBGP_PathAttr. 
  *  0.2.0.15- 2018/04/19 - oborchert
@@ -444,18 +446,20 @@ BGP_PathAttribute* generateBGP_PathAttr(u_int8_t attrType, u_int32_t myAsn,
   }
   
   // The AS-PAth String will contain the own ASn as well.
-  char* myPath = NULL;
+  char* myPath  = NULL;
+  int myPathLen = strlen(asPathStr) + 1; // for \0
   if (!iBGP)
   {
     // Add myself to the path. BZ:922
     int digits = (int)(log10(myAsn)) + 2; // 1 for the blank and 1 to round up  
-    myPath = malloc(strlen(asPathStr) + digits);
-    sprintf (myPath, "%u %s%c", myAsn, asPathStr, '\0');
+    myPathLen += digits;  // for \0
+    myPath = malloc(myPathLen);
+    snprintf (myPath, myPathLen, "%u %s", myAsn, asPathStr);
   }
   else
   {
-    myPath = malloc(strlen(asPathStr)+1);
-    sprintf (myPath, "%s%c", asPathStr, '\0');
+    myPath = malloc(myPathLen);
+    snprintf (myPath, myPathLen, "%s", asPathStr);
   }
 
   // Prepare the AS Tokenizer for as path and as_set.

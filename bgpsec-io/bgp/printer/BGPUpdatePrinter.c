@@ -22,10 +22,19 @@
  *
  * Provides functionality to print a BGP Update
  * 
- * @version 0.2.0.20
+ * @version 0.2.0.22
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.22- 2018/06/18 - oborchert
+ *            * Fixed memory leak in __printAS_PATH_List by passing the correct
+ *              method for freeing the data '_freeBGP_PRNT_AS_PATH'
+ *            * Fixed memory leak in __printAS_PATH by freeing the allocated 
+ *              asPath variable.
+ *  0.2.0.21- 2018/06/07 - oborchert
+ *            * Added missing simple print of MPNLRI and BGPsec_PATH
+ *            * Added text prefix (BSP:) to simple printout
+ *            * Performed right trim of the AS path for simple print
  *  0.2.0.20- 2018/05/02 - oborchert 
  *            * Fixed some issues in printing Community String and Extended 
  *              Community String          
@@ -436,9 +445,24 @@ static bool __printAS_PATH(BGP_PathAttribute* pa, bool isAS4, bool simple,
       }
     }
   }
+  // Quick Fix
+  else
+  {
+    // @TODO: I believe the complete block below must be added in to the 
+    //        if (list) loop. For now use this block as workaround.
+    asPath = malloc(2);
+    snprintf(asPath, 2, " ");
+  }
   
   if (simple)
   {
+    int strLen = strlen(asPath);
+    // right trim of the path string
+    while ((strLen-1 > 0) && asPath[--strLen] == ' ')
+    {
+      asPath[strLen] = '\0';
+      strLen = strlen(asPath);
+    }
     printf ("%s%s", (pa->attr_type_code == BGP_UPD_A_TYPE_AS4_PATH) 
                         ? PRN_SIMPLE_AS4PATH : PRN_SIMPLE_ASPATH, 
                     asPath);
@@ -451,7 +475,13 @@ static bool __printAS_PATH(BGP_PathAttribute* pa, bool isAS4, bool simple,
     printf ("%s   +--AS path: %s\n", tab, asPath);
   }
   
-  destroyListDeep(list, free);
+  // Fixed memory leak, fixed the free method passed into the printer.
+  destroyListDeep(list, _freeBGP_PRNT_AS_PATH);
+  // Fixed memory leak
+  if (asPath != NULL)
+  {
+    free(asPath);
+  }
 
   return printedData;
 }
@@ -521,46 +551,47 @@ static bool __printMP_REACH_NLRI(BGP_Upd_Attr_MPNLRI_1* mpnlri, int attrLen,
                                  char* tab, bool simple, bool more)
 {
   char* tName   = "MP_REACH_NLRI\0";
-  u_int16_t afi = 0;
+  u_int16_t afi = ntohs(mpnlri->afi);
   int idx       = 0;
 
-  if (tab == NULL)
-  {
-    tab = TAB_2;
-  }
   char myTab[TAB_MAX];
   memset (myTab, '\0', TAB_MAX);
-  if (more)
-  {
-    snprintf (myTab, TAB_MAX, "%s|%s", tab, TAB_2);
-  }
-  else
-  {
-    snprintf (myTab, TAB_MAX, "%s %s", tab, TAB_2);
-  }
-
-  // here pass tab rather than myTab because the additional tabs will be 
-  // added in __printDef...  
-  __printDefaultPAttrHdr((BGP_PathAttribute*)mpnlri, tName, attrLen, 
-                         mpnlri->length, NULL, tab, more);
-  
-  afi = ntohs(mpnlri->afi);
   char string[STR_MAX];
   memset(string, 0, STR_MAX);
-  snprintf (string, STR_MAX, (afi == AFI_V4) ? "IPv4" : "IPv6");
+
   if (!simple)
+  {
+    if (tab == NULL)
+    {
+      tab = TAB_2;
+    }
+    if (more)
+    {
+      snprintf (myTab, TAB_MAX, "%s|%s", tab, TAB_2);
+    }
+    else
+    {
+      snprintf (myTab, TAB_MAX, "%s %s", tab, TAB_2);
+    }
+
+    // here pass tab rather than myTab because the additional tabs will be 
+    // added in __printDef...  
+    __printDefaultPAttrHdr((BGP_PathAttribute*)mpnlri, tName, attrLen, 
+                           mpnlri->length, NULL, tab, more);
+
+    snprintf (string, STR_MAX, (afi == AFI_V4) ? "IPv4" : "IPv6");
+
     printf ("%s+--Address family: %s (%d)\n", myTab, string, afi);
-  switch (mpnlri->safi)
-  {
-    case SAFI_UNICAST: 
-      snprintf (string, STR_MAX, "Unicast");
-      break;
-    default:
-      snprintf (string, STR_MAX, "???");
-      break;
-  }
-  if (!simple)
-  {
+    switch (mpnlri->safi)
+    {
+      case SAFI_UNICAST: 
+        snprintf (string, STR_MAX, "Unicast");
+        break;
+      default:
+        snprintf (string, STR_MAX, "???");
+        break;
+    }
+
     printf ("%s+--Subsequent address family identifier: %s (%d)\n", myTab, string, 
             mpnlri->safi);
     printf ("%s+--Next hop network address: (%d bytes)\n", myTab, 
@@ -654,13 +685,14 @@ static bool __printMP_REACH_NLRI(BGP_Upd_Attr_MPNLRI_1* mpnlri, int attrLen,
 /**
  * Process the secure path information
  * 
- * @param data the updates attribute buffer
+ * @param data The updates attribute buffer
  * @param tab The tabulator of this attribute. (if NULL then it will be replaced 
  *            with TAB_2
+ * @param simple Indicate if the path has to be printed in simple form. 
  * 
  * @return the number of bytes processed
  */
-static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab)
+static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab, bool simple)
 {
   if (tab == NULL)
   {
@@ -669,9 +701,13 @@ static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab)
   
   char myTab[3][TAB_MAX];
   memset (myTab,  '\0', TAB_MAX*3);
-  snprintf (myTab[0], TAB_MAX, "%s|%s", tab, TAB_2);
-  snprintf (myTab[1], TAB_MAX, "%s|%s", myTab[0], TAB_2);
-  snprintf (myTab[2], TAB_MAX, "%s %s", myTab[0], TAB_2);
+  
+  if (!simple)
+  {
+    snprintf (myTab[0], TAB_MAX, "%s|%s", tab, TAB_2);
+    snprintf (myTab[1], TAB_MAX, "%s|%s", myTab[0], TAB_2);
+    snprintf (myTab[2], TAB_MAX, "%s %s", myTab[0], TAB_2);
+  }
   
   BGPSEC_SecurePath* sp = (BGPSEC_SecurePath*)data;
   data += sizeof(BGPSEC_SecurePath);
@@ -679,8 +715,11 @@ static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab)
   int size = 0;
   int length = ntohs(sp->length);
   
-  printf("%s+--Secure Path (%d %s)\n", tab, length, __byteString(length));
-  printf("%s+--Length: %d %s\n", myTab[0], length, __byteString(length));
+  if (!simple)
+  {
+    printf("%s+--Secure Path (%d %s)\n", tab, length, __byteString(length));
+    printf("%s+--Length: %d %s\n", myTab[0], length, __byteString(length));
+  }
   
   BGPSEC_SecurePathSegment* seg = NULL;
   
@@ -693,13 +732,29 @@ static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab)
     processed += size;
     
     u_int32_t asn = ntohl(seg->asn);
-    tab = processed < length ? myTab[1] : myTab[2];
-    printf("%s+--Secure Path Segment: (%d %s)\n", myTab[0], 
-                                                  size, __byteString(size));
-    printf("%s+--pCount: %d\n", tab, seg->pCount);
-    printf("%s+--Flags: %d\n", tab, seg->flags);
-    printf("%s+--AS number: %d (%d.%d)\n", tab, 
-                                           asn, (asn >> 16), (asn & 0xFFFF));
+    
+    if (!simple)
+    {
+      tab = processed < length ? myTab[1] : myTab[2];
+      printf("%s+--Secure Path Segment: (%d %s)\n", myTab[0], 
+                                                    size, __byteString(size));
+      printf("%s+--pCount: %d\n", tab, seg->pCount);
+      printf("%s+--Flags: %d\n", tab, seg->flags);
+      printf("%s+--AS number: %d (%d.%d)\n", tab, 
+                                             asn, (asn >> 16), (asn & 0xFFFF));
+    }
+    else
+    {
+      // simple
+      tab = processed < length ? " " : "";
+      int idx = seg->pCount-1;
+      printf ("%d", asn);
+      while (idx-- != 0)
+      {
+        printf (" %d", asn);      
+      }
+      printf ("%s", tab);
+    }
   }
   
   return length;
@@ -712,13 +767,14 @@ static int __printBGPSEC_SecurePath(u_int8_t* data, char* tab)
  * @param buffSize The complete buffer size. If it is larger than the
  *                 space occupied by data itself than more attributes or
  *                 more signature blocks to follow.
+ * @param simple Indicates if the printout has to be simple or not.
  * @param tab The tabulator of this attribute. (if NULL then it will be replaced 
  *            with TAB_2
  * 
  * @return the number of bytes processed
  */
 static int __printBGPSEC_SignatureBlockPath(u_int8_t* data, int buffSize,
-                                            char* tab)
+                                            bool simple, char* tab)
 {
   if (tab == NULL)
   {
@@ -742,9 +798,12 @@ static int __printBGPSEC_SignatureBlockPath(u_int8_t* data, int buffSize,
   snprintf (myTab[1], TAB_MAX, "%s|%s", myTab[0], TAB_2);
   snprintf (myTab[2], TAB_MAX, "%s %s", myTab[0], TAB_2);
   
-  printf("%s+--Signature Block (%d %s)\n", tab, length, __byteString(length));
-  printf("%s+--Length: %d %s\n", myTab[0], length, __byteString(length));
-  printf("%s+--Algo ID: %d\n", myTab[0], sigB->algoID);
+  if (!simple)
+  {
+    printf("%s+--Signature Block (%d %s)\n", tab, length, __byteString(length));
+    printf("%s+--Length: %d %s\n", myTab[0], length, __byteString(length));
+    printf("%s+--Algo ID: %d\n", myTab[0], sigB->algoID);
+  }
   
   BGPSEC_SignatureSegment* seg = NULL;
   
@@ -755,24 +814,33 @@ static int __printBGPSEC_SignatureBlockPath(u_int8_t* data, int buffSize,
     processed += size;
     
     tab = (processed < length) ? myTab[1] : myTab[2];
-    
-    printf("%s+--Signature Segment: (%d %s)\n", myTab[0], size, __byteString(size));
-    printf("%s+--SKI: ", tab);
-    for (size = 0; size < sizeof(seg->ski); size++)
+   
+    if (!simple)
     {
-      printf ("%02X", seg->ski[size]);
+      printf("%s+--Signature Segment: (%d %s)\n", myTab[0], size, __byteString(size));
+      printf("%s+--SKI: ", tab);
+      for (size = 0; size < sizeof(seg->ski); size++)
+      {
+        printf ("%02X", seg->ski[size]);
+      }
+      printf("\n");
     }
-    printf("\n");
     size = ntohs(seg->siglen);
-    printf("%s+--Length: %d %s\n", tab, size, __byteString(size));
+    
+    if (!simple)
+      printf("%s+--Length: %d %s\n", tab, size, __byteString(size));
 
     // Move data to the key
     data += sizeof(BGPSEC_SignatureSegment);
     
     snprintf (str[0], STR_MAX, "%s+--Signature: ", tab);
     snprintf (str[1], STR_MAX, "%s              ", tab);
-    printf("%s", str[0]);
-    printHex(data, size, str[1]);    
+    
+    if (!simple)
+    {
+      printf("%s", str[0]);
+      printHex(data, size, str[1]);
+    }
     // Move data over the key
     data += size;
   }
@@ -786,10 +854,13 @@ static int __printBGPSEC_SignatureBlockPath(u_int8_t* data, int buffSize,
  * @param pa The BGP Path Attribute
  * @param tab The tabulator of this attribute. (if NULL then it will be replaced 
  *            with TAB_2
+ * @param simple Indicates if the simple printer has to be used.
+ * @param more Identifies if more attributes re to come.
  * 
  * @return true if the attributes data was included in the print.
  */
-bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool more)
+bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool simple, 
+                          bool more)
 {
   bool extended = (pa->attr_flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0;
   int length  = 0;
@@ -807,33 +878,42 @@ bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool more)
   }
   
   char myTab[TAB_MAX];
+  memset(myTab, '\0', TAB_MAX);
+
   if (tab == NULL)
   {
     tab = "";
   }
-  memset(myTab, '\0', TAB_MAX);
-  if (more)
+  
+  if (!simple)
   {
-    snprintf(myTab, TAB_MAX, "%s|%s", tab, TAB_2);
-  }
-  else
-  {
-    snprintf(myTab, TAB_MAX, "%s %s", tab, TAB_2);    
+    if (more)
+    {
+      snprintf(myTab, TAB_MAX, "%s|%s", tab, TAB_2);
+    }
+    else
+    {
+      snprintf(myTab, TAB_MAX, "%s %s", tab, TAB_2);    
+    }
   }
   
   // here pass tab rather than myTab because the additional tabs will be 
   // added in __printDef...
-  __printDefaultPAttrHdr(pa, "BGPSEC Path Attribute", attrLen, length, NULL, 
-                         tab, more);
+  if (!simple)
+    __printDefaultPAttrHdr(pa, "BGPSEC Path Attribute", attrLen, length, NULL, 
+                           tab, more);
+  else
+    printf("%s", PRN_SIMPLE_SECPATH);
 
   // Goto the beginning of the real data.
   u_int8_t* data = (u_int8_t*)pa + (attrLen - length);
   u_int8_t* end = (u_int8_t*)pa + attrLen;
-  data += __printBGPSEC_SecurePath(data, myTab);
+  data += __printBGPSEC_SecurePath(data, myTab, simple);
   
   while (data < end)
   {
-    data += __printBGPSEC_SignatureBlockPath(data, attrLen - length, myTab);
+    data += __printBGPSEC_SignatureBlockPath(data, attrLen - length, simple, 
+                                             myTab);
   }
   if (data != end)
   {
@@ -1013,7 +1093,7 @@ static int _printPathAttr(u_int8_t* data, int buffSize, bool isAS4, bool simple,
             printf ("%02X", *ptr);
             ptr++;
           }
-          printf (" ");
+          //printf (" ");
           if (idx1 < length)
           {
             printf (", ");
@@ -1027,11 +1107,8 @@ static int _printPathAttr(u_int8_t* data, int buffSize, bool isAS4, bool simple,
                                         myTab, simple, more);
       break;
     case BGP_UPD_A_TYPE_BGPSEC:
-      // @TODO: Add a simple print for BGPsec path.
-      if (!simple)
-      {
-        printData = !printBGPSEC_PathAttr(pa, myTab, more);
-      }
+      __processFirstSimpleToPrint(simple, firstToPrint);
+      printData = !printBGPSEC_PathAttr(pa, myTab, simple, more);
       break;
     default: 
       if (!simple)

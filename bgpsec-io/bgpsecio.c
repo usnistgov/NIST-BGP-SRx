@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.0.16
+ * @version 0.2.0.22
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.22- 2018/06/18 - oborchert
+ *           * Fixed memory leak in _runBGPRouterSession. long as path was not 
+ *             freed.
  * 0.2.0.16- 2018/04/22 - oborchert
  *           * Disabled buffering of stdout and stderr printout in main method.
  * 0.2.0.11- 2018/03/22 - oborchert
@@ -431,6 +434,8 @@ static int _runBGPRouterSession(PrgParams* params)
                                              session->bgpConf.asn, useAS4, iBGP, 
                                              longPath, update->asSetStr,
                                              buffPtr, SESS_MIN_MESSAGE_BUFFER);
+                // Fix Memory Leak.
+                free(longPath);
                 if (bgpPathAttr[pathAttrPos] == NULL)
                 {
                   RAISE_ERROR("Could not generate an AS_PATH attribute for"

@@ -21,10 +21,15 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.0.16
+ * @version 0.2.0.21
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.21- 2018/06/08 - oborchert
+ *            * Updated configuration initialization.
+ *          - 2018/06/07 - oborchert
+ *            * Added -T --convergence to allow enabling and  disabling the 
+ *              convergence printout.
  *  0.2.0.16- 2018/04/21 - oborchert
  *            * Added more syntax description for update scripting.
  *  0.2.0.14- 2018/04/19 - oborchert
@@ -247,6 +252,11 @@ void printSyntax()
   printf ("          the last update was sent. The real disconnect time is\n");
   printf ("          somewhere between <time> and <holdTime> / 3.\n");
   printf ("          A time of 0 \"zero\" disables the automatic disconnect.\n");
+  
+  // Convergence
+  printf ("  -%c, %s\n", P_C_CONVERGENCE, P_CONVERGENCE);
+  printf ("          Enable BGP convergence statistics to be displayed for\n");
+  printf ("          updates received.\n");
   
   // Pre-compute EC_KEY
   printf ("  -%c, %s\n", P_C_NO_PL_ECKEY, P_NO_PL_ECKEY);
@@ -1081,6 +1091,13 @@ bool readConfig(PrgParams* params)
                                    ? DEF_DISCONNECT_TIME
                                    : (u_int32_t)config_setting_get_int(sessVal);
           
+          // Display convergence data
+          sessVal = config_setting_get_member(session, P_CFG_CONVERGENCE);
+          if (sessVal != NULL)
+          {
+            bgpConf->display_convergenceTime = config_setting_get_bool(sessVal);
+          }
+          
           // Peer AS
           sessVal = config_setting_get_member(session, P_CFG_PEER_AS);
           if (sessVal == NULL)
@@ -1346,13 +1363,14 @@ void initParams(PrgParams* params)
   // Now initialize what should not be 0 - false - NULL
   snprintf((char*)&params->skiFName, FNAME_SIZE, "%s", DEF_SKIFILE);
   snprintf((char*)&params->keyLocation, FNAME_SIZE, "%s", DEF_KEYLOCATION);
-  params->bgpConf.useMPNLRI           = true;
-  params->bgpConf.inclGlobalUpdates   = DEF_INCL_GLOBAL_UPDATE;
-  params->preloadECKEY                = true;
-  params->onlyExtLength               = true;
-  params->appendOut                   = false;
-  params->bgpConf.printPollLoop       = false;
-  params->bgpConf.printOnInvalid      = false;
+  params->bgpConf.useMPNLRI               = true;
+  params->bgpConf.inclGlobalUpdates       = DEF_INCL_GLOBAL_UPDATE;
+  params->preloadECKEY                    = true;
+  params->onlyExtLength                   = true;
+  params->appendOut                       = false;
+  params->bgpConf.printPollLoop           = false;
+  params->bgpConf.printOnInvalid          = false;
+  params->bgpConf.display_convergenceTime = false;
   for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
   {
     params->bgpConf.printOnSend[idx]    = false;
@@ -1584,6 +1602,10 @@ int parseParams(PrgParams* params, int argc, char** argv)
         if (++idx >= argc) 
         { _setErrMsg(params, "Disconnect time not specified!"); break; }
         params->bgpConf.disconnectTime = atoi(argv[idx]);
+        break;
+        
+      case P_C_CONVERGENCE:
+        params->bgpConf.display_convergenceTime = true;
         break;
         
       case P_C_OUTFILE:

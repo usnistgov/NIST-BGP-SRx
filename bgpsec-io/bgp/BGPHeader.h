@@ -22,10 +22,12 @@
  *
  * This API contains a the headers and function to generate proper BGP messages.
  *
- * @version 0.2.0.20
+ * @version 0.2.0.21
  *   
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.21 - 2018/06/08 - oborchert
+ *            * Added display_convergenceTime to session structure.
  * 0.2.0.20 - 2018/05/02 - oborchert
  *            * Added define for BGP_UPD_A_TYPE_COMMUNITY.
  * 0.2.0.17 - 2018/04/26 - oborchert
@@ -636,6 +638,11 @@ typedef struct {
   /** Time in seconds to keep the session up after the last update is send. 
    * 0 - forever. */
   u_int16_t disconnectTime;
+  
+  /** Indicates if BGP update data (count, firstReceived, lastReceived) should
+   * be collected and displayed. 
+   * @since 0.2.0.21 */
+  bool display_convergenceTime;
   
   /* the next hop IPv4 address. If 0'ed then not defined. */
   struct sockaddr_in nextHopV4;

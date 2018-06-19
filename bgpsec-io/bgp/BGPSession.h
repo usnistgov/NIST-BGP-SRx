@@ -22,10 +22,14 @@
  *
  * This header provides the function headers for the BGPSocket loop.
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.21
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.21- 2018/06/06 - oborchert
+ *            * Added parameters furstUpdateReceived and lastUpdateReceived to 
+ *              allow measurement of convergence time.
+ *            * Added update counter numUpdatesReceived.
  *  0.2.0.7 - 2017/01/20 - oborchert
  *            * BZ1043: Added defines for socket flow control.
  *          - 2017/03/09 - oborchert
@@ -106,26 +110,34 @@ typedef struct
   BGP_SessionConf bgpConf;
   
   /** Last time any BGP packet was send after session was established. */
-  time_t lastSent;
+  time_t* lastSent;
   /** Last time a BGP update was send. */
-  time_t lastSentUpdate;
+  time_t* lastSentUpdate;
   /** Last time any BGP packet was received after session was established. */
-  time_t lastReceived;
-
+  time_t* lastReceived;
+  
+  // For convergence time measurement
+  /** Time of first BGP update received. */
+  time_t* firstUpdateReceived;
+  /** Time of last BGP update received. */
+  time_t* lastUpdateReceived;
+  /** Number of updates received. */
+  u_int32_t numUpdatesReceived;
+  
   /** The BGP Final State Machine for this session. s*/
   BGPFinalStateMachine fsm;
   
-  /** This callback method is used to preciess receiving messages. The message
+  /** This callback method is used to process receiving messages. The message
    * itself contains a BGP message specified in RFC4271*/
   process_packet processPkt;
   
-  /** The semaphor for the hold timer. This allows to be woken up prior the time
-   * expiration. No need for sleep anymore. */
+  /** The semaphore for the hold timer. This allows to be woken up prior the 
+   * time expiration. No need for sleep anymore. */
   sem_t* sessHoldTimerSem;
 } BGPSession;
 
 /**
- * Allocates the memory for the session and configures soem of its values.
+ * Allocates the memory for the session and configures some of its values.
  * the configured values are he minimal necessary values to be able to establish
  * a BGP session.
  *  

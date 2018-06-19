@@ -23,10 +23,12 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.0.16
+ * @version 0.2.0.21
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.21 - 2018/06/08 - oborchert
+ *            * Added parameter "convergence" to the configuration.
  * 0.2.0.16 - 2018/04/21 - oborchert
  *            * Added regular expression as syntax helper for update scripting.
  * 0.2.0.13 - 2018/04/17 - oborchert
@@ -195,6 +197,9 @@ bool generateFile(char* fName)
 
     fprintf (file, "    # Run forever or until the peer shuts down.\n");
     fprintf (file, "    %s = 0;\n\n", P_CFG_DISCONNECT_TIME);
+    
+    fprintf (file, "    # Enable BGP convergence measurement framework.\n");
+    fprintf (file, "    %s = false;\n\n", P_CFG_CONVERGENCE);
     
     fprintf (file, "    # Allow to enable/disable extended message capability."
                           "\n");

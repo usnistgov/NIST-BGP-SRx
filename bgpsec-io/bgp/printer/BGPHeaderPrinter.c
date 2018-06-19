@@ -20,12 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * Print BGP Headers in tree format
+ * @version 0.2.0.21
  * 
- * @version 0.2.0.12
- * 
- * ChangeLog:
+ * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.2.0.21- 2018/06/07 - oborchert
+ *            * Added parameter simple to function printBGPSEC_PathAttr
  * 0.2.0.12 - 2018/04/14 - oborchert
  *            * Added parameter received to method printBGP_Message.
  * 0.2.0.11 - 2018/03/23 - oborchert

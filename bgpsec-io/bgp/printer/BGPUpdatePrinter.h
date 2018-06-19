@@ -22,10 +22,12 @@
  *
  * Contains functionality to print update messages
  * 
- * @version 0.2.0.20
+ * @version 0.2.0.21
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.21- 2018/06/07 - oborchert
+ *            * Added parameter simple to function printBGPSEC_PathAttr
  *  0.2.0.20- 2018/05/02 - oborchert
  *            * Added define for RPN_SIMPLE_CA
  *  0.2.0.13- 2018/04/17 - oborchert
@@ -59,6 +61,8 @@
 #define PRN_SIMPLE_ASPATH    "ASP: \0"
 /** String prefix for the AS4 path. */
 #define PRN_SIMPLE_AS4PATH   "A4P: \0"
+/** String prefix for the BGPsec secure path. */
+#define PRN_SIMPLE_SECPATH   "BSP: \0"
 /** String prefix for the Extended community attribute. */
 #define PRN_SIMPLE_ECA       "ECA: \0"
 /** String prefix for the community attribute*/
@@ -88,10 +92,13 @@ void printUpdateData(BGP_UpdateMessage_1* update, bool isAS4, bool simple);
  * @param pa The BGP Path Attribute
  * @param tab The tabulator of this attribute. (if NULL then it will be replaced 
  *            with TAB_2
+ * @param simple Indicates if the simple printer has to be used.
+ * @param more Identifies if more attributes re to come.
  * 
  * @return true if the attributes data was included in the print.
  */
-bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool more);
+bool printBGPSEC_PathAttr(BGP_PathAttribute* pa, char* tab, bool simple, 
+                          bool more);
 
 #endif	/* BGPUPDATEPRINTER_H */
 

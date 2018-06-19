@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bgpsecio], [0.2.0.20], [bgpsrx-dev@antd.nist.gov])
+AC_INIT([bgpsecio], [0.2.0.23], [bgpsrx-dev@antd.nist.gov])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 
 # AC_CONFIG_SRCDIR specifies a file that the configuration checks for existence.

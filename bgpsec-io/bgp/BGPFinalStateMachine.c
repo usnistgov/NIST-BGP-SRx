@@ -22,11 +22,15 @@
  *
  * Provides the BGP Final State Machine
  * 
- * @version 0.2.0.7
+ * @version 0.2.0.21
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
- *  0.2.0.7 - BZ1043: Added socket flow control.
+ *  0.2.0.21- 2018/06/08 - oborchert
+ *            * Modified type of timing variables.
+ *            * included string.h
+ *  0.2.0.7 - 2017/03/20 - oborchert
+ *            * BZ1043: Added socket flow control.
  *          - 2017/03/09 - oborchert
  *            * BZ1133: Modified the session establishment. BGP header checks 
  *              are now processed within the session code. Added interpretation 
@@ -43,6 +47,7 @@
  */
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
@@ -146,7 +151,7 @@ bool fsmSwitchState(BGPFinalStateMachine* fsm, int newState)
       // Reset the lastSent which is needed to force a regular keep alive
       // as answer for the established session.
       BGPSession* session = (BGPSession*)fsm->session;
-      session->lastSent = 0;
+      memset(session->lastSent, 0, sizeof(time_t));
     }
   }
   else
@@ -354,7 +359,7 @@ void fsmRunHoldTimeLoop(BGPFinalStateMachine* fsm)
     now = time(0);
 
     // First check if we received everything - like update or keep alive ?
-    if (now > (session->lastReceived + session->bgpConf.holdTime))
+    if (now > (*session->lastReceived + session->bgpConf.holdTime))
     {
       printf("ERROR: Did not hear back from peer AS %u - seems dead!\n",
              session->bgpConf.peerAS);
@@ -365,7 +370,7 @@ void fsmRunHoldTimeLoop(BGPFinalStateMachine* fsm)
 
     // Yeah we're still good with an alive peer
     // Now calculate if we need to send a keep alive
-    if ((session->lastSent + intervalTime) <= now)
+    if ((*session->lastSent + intervalTime) <= now)
     {
       // its time to send a keep alive
       if (!sendKeepAlive(session, SESS_FLOW_CONTROL_REPEAT))
@@ -378,7 +383,7 @@ void fsmRunHoldTimeLoop(BGPFinalStateMachine* fsm)
     }
     
     // Recalculate the sleep time until next keep alive is to be send.
-    secToSleep = (now - session->lastSent) + intervalTime;                    
+    secToSleep = (now - *session->lastSent) + intervalTime;                    
     
     if (secToSleep > 0)
     {

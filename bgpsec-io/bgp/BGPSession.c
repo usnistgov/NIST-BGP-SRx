@@ -23,10 +23,14 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.12
+ * @version 0.2.0.23
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.23- 2018/06/19 - oborchert
+ *            * Fixed segmentation fault when receive buffer needs increasing.
+ *  0.2.0.21- 2018/06/08 - oborchert
+ *            * Added instrumentation to monitor BGP/BGPsec convergence.
  *  0.2.0.12- 2018/04/14 - oborchert
  *            * Added processing printSimple.
  *  0.2.0.11- 2018/03/23 - oborchert
@@ -126,6 +130,7 @@
 #include <pthread.h>
 #include <sys/ioctl.h>
 #include <poll.h>
+#include <malloc.h>
 #include "bgp/BGPSession.h"
 #include "bgp/BGPHeader.h"
 #include "bgp/printer/BGPHeaderPrinter.h"
@@ -140,6 +145,7 @@
 
 static void _processPacket(void* session);
 static bool _checkMessageHeader(BGPSession* session);
+static void _printConvergence(BGPSession* session);
 
 /**
  * Allocates the memory for the session and configures soem of its values.
@@ -168,12 +174,13 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
 
     sessConfig = &session->bgpConf;
     
-    sessConfig->asn               = config->asn;
-    sessConfig->bgpIdentifier     = config->bgpIdentifier;
-    sessConfig->holdTime          = config->holdTime;
-    sessConfig->disconnectTime    = config->disconnectTime;
-    sessConfig->useMPNLRI         = config->useMPNLRI;
-    sessConfig->inclGlobalUpdates = config->inclGlobalUpdates;
+    sessConfig->asn                     = config->asn;
+    sessConfig->bgpIdentifier           = config->bgpIdentifier;
+    sessConfig->holdTime                = config->holdTime;
+    sessConfig->disconnectTime          = config->disconnectTime;
+    sessConfig->useMPNLRI               = config->useMPNLRI;
+    sessConfig->inclGlobalUpdates       = config->inclGlobalUpdates;
+    sessConfig->display_convergenceTime = config->display_convergenceTime;
         
     int idx;
     for (idx = 0; idx < PRNT_MSG_COUNT; idx++)
@@ -188,8 +195,16 @@ BGPSession* createBGPSession(int buffSize, BGP_SessionConf* config,
     
     sessConfig->printPollLoop  = config->printPollLoop;
                 
-    session->lastSent  = 0;
-    
+    session->lastSent       = malloc(sizeof(time_t));
+    memset (session->lastSent, 0, sizeof(time_t));
+    session->lastSentUpdate = malloc(sizeof(time_t));
+    memset (session->lastSentUpdate, 0, sizeof(time_t));
+    session->lastReceived   = malloc(sizeof(time_t));
+    memset (session->lastReceived, 0, sizeof(time_t));
+    // below values MUST be NULL to determine when first one is received.
+    session->firstUpdateReceived = NULL;
+    session->lastUpdateReceived  = NULL;
+        
     session->sessionFD = -1;
     session->recvBuff  = malloc(buffSize);
     memset(session->recvBuff, 0, buffSize);
@@ -289,6 +304,16 @@ void freeBGPSession (BGPSession* session)
     }
     free(session->recvBuff);
     session->recvBuff = NULL;
+    free(session->lastSent);
+    free(session->lastReceived);
+    free(session->lastSentUpdate);
+    if (session->firstUpdateReceived != NULL)
+    {
+      memset(session->firstUpdateReceived, 0, sizeof(time_t));
+      free(session->firstUpdateReceived);
+      memset(session->lastUpdateReceived, 0, sizeof(time_t));
+      free(session->lastUpdateReceived);
+    }
     AlgoParam* sessParam = session->bgpConf.algoParam.next;
     AlgoParam* next = NULL;
     while (sessParam != NULL)
@@ -297,6 +322,7 @@ void freeBGPSession (BGPSession* session)
       free(sessParam);
       sessParam = next;
     }
+    memset(session, 0, sizeof(BGPSession));
     free(session);
   }
 }
@@ -516,7 +542,7 @@ void* runBGP(void* bgp)
             {
               // disconnect after last update message was send.
               time_t now = time(0);
-              if (now < (session->lastSentUpdate 
+              if (now < (*session->lastSentUpdate 
                          + session->bgpConf.disconnectTime))
               {
                 sendNotification(session, BGP_ERR6_CEASE, 
@@ -737,13 +763,22 @@ int readNextBGPMessage(BGPSession* session, int timeout)
       // maxLen here is the total size of the read buffer.
       if (length > maxLen)
       {
+        // realloc erroneously did empty the memory so I decided to use a 
+        // 'manually realloc' by allocating the new memory and copying the
+        // old content into the new one.
         void* new = NULL;
-        new = realloc(session->recvBuff, length+1);
-        if (new != NULL)
-        {
-          session->recvBuff = new;
-          session->buffSize = length+1;
-        }
+        new = malloc(length+1);
+        // Copy content into new buffer
+        memcpy (new, session->recvBuff, maxLen);
+        // Now clean the old buffer and free up the memory again.
+        memset(session->recvBuff, 0, maxLen);
+        free(session->recvBuff);
+        
+        // Now realign all pointers.
+        session->recvBuff = new;
+        hdr = (BGP_MessageHeader*)new;
+        session->buffSize = length+1;
+        buff = session->recvBuff + readBytes;
       }
       // now adjust the length and subtract the number of already read bytes.
       length -= readBytes;
@@ -800,7 +835,7 @@ int readNextBGPMessage(BGPSession* session, int timeout)
     // ready to receive messages
     if (session->fsm.state != FSM_STATE_IDLE && totalBytesRead > 0)
     {
-      session->lastReceived = time(0);
+      time(session->lastReceived);
     }
   }
   else
@@ -1216,9 +1251,33 @@ void processOpenMessage(BGPSession* session)
 }
 
 /**
- * Process the provided bgp message.
+ * Print the convergence statistics.
  * 
- * @param session the bgpsession that received the packet. 
+ * @param session The BGP session the convergence data will be printed for.
+ */
+static void _printConvergence(BGPSession* session)
+{
+  if (session->bgpConf.display_convergenceTime)
+  {
+    if (session->numUpdatesReceived != 0)
+    {
+      printf("Received: %d updates, first @ %d sec., last @ %d sec."
+             ", elapsed: %d sec.\n", session->numUpdatesReceived, 
+           *session->firstUpdateReceived, *session->lastUpdateReceived, 
+           *session->lastUpdateReceived - *session->firstUpdateReceived);
+    }
+    else
+    {
+      printf("Received: 0 updates\n");
+      
+    }
+  }  
+}
+
+/**
+ * Process the provided BGP message.
+ * 
+ * @param self the BGPsession* that received the packet. 
  */
 static void _processPacket(void* self)
 {
@@ -1260,7 +1319,8 @@ static void _processPacket(void* self)
                          (u_int8_t*)session->recvBuff, 
                          SESS_FLOW_CONTROL_REPEAT);        
       }
-      session->lastReceived = time(0);
+      time(session->lastReceived);
+      _printConvergence(session);
       break;
     case BGP_T_NOTIFICATION:        
       session->fsm.state = FSM_STATE_IDLE;
@@ -1272,7 +1332,20 @@ static void _processPacket(void* self)
       //shutDownTCPSession(session);
       break;
     case BGP_T_UPDATE:
-      session->lastReceived = time(0);
+      session->numUpdatesReceived++;
+      time(session->lastReceived);
+      time(session->lastUpdateReceived);
+      if (session->firstUpdateReceived != NULL)
+      {
+        time(session->lastUpdateReceived);
+      }
+      else
+      {
+        session->firstUpdateReceived = malloc(sizeof(time_t));
+        session->lastUpdateReceived = malloc(sizeof(size_t));
+        time(session->firstUpdateReceived);
+        time(session->lastUpdateReceived);
+      }
       break;
     default:
       printf("ERROR: Received unknown message type [%u]!\n", hdr->type);
@@ -1313,7 +1386,7 @@ static void _checkRetryCounter(BGPSession* session, int* retryCounter)
 static int _writeData(BGPSession* session, u_int8_t* data, int size)
 {
   int written = write(session->sessionFD, data, size);
-  session->lastSent = time(0);
+  time(session->lastSent);
   return written;
 }
 
@@ -1398,6 +1471,7 @@ bool sendKeepAlive(BGPSession* session, int retryCounter)
   bool retVal = false;
   
   _checkRetryCounter(session, &retryCounter);
+  _printConvergence(session);
   
   switch (_isSocketAlive(session, POLL_TIMEOUT_MS, false))
   {
@@ -1661,7 +1735,7 @@ bool sendUpdate(BGPSession* session, BGP_UpdateMessage_1* update,
 
       if (retVal)
       {
-        session->lastSentUpdate = session->lastSent;
+        memcpy(session->lastSentUpdate, session->lastSent, sizeof(time_t));
       }      
       break;
       
