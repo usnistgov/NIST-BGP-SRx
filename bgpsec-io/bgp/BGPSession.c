@@ -23,10 +23,12 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.0.23
+ * @version 0.2.0.24
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.24- 2018/06/19 - oborchert
+ *            * Increased socket timeout from 100ms to 2000ms (2s)
  *  0.2.0.23- 2018/06/19 - oborchert
  *            * Fixed segmentation fault when receive buffer needs increasing.
  *  0.2.0.21- 2018/06/08 - oborchert
@@ -137,7 +139,7 @@
 #include "bgp/printer/BGPUpdatePrinter.h"
 #include "printer/BGPPrinterUtil.h"
 
-#define POLL_TIMEOUT_MS 100
+#define POLL_TIMEOUT_MS 2000
 
 #define SOCKET_ERR      -1
 #define SOCKET_TIMEOUT   0

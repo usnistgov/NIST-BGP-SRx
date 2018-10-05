@@ -22,10 +22,14 @@
  *
  * This header provides the function headers for the BGPSocket loop.
  * 
- * @version 0.2.0.21
+ * @version 0.2.0.24
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.0.24- 2018/06/19 - oborchert
+ *            * Decreased sleep time for socket flow control from 10 sec down to 
+ *              2 sec.
+ *            * Increased flow controll loop to 20 atempts from 10.
  *  0.2.0.21- 2018/06/06 - oborchert
  *            * Added parameters furstUpdateReceived and lastUpdateReceived to 
  *              allow measurement of convergence time.
@@ -65,11 +69,11 @@
 /** Buffer mostly used for Open, KeepAlive, Notification */
 #define SESS_MIN_SEND_BUFF 1024
 
-/** Time in seconds the receiver thread sleeps when a socket timeout occured. */
-#define SESS_FLOW_CONTROL_SLEEP 10
+/** Time in seconds the receiver thread sleeps when a socket timeout occurred. */
+#define SESS_FLOW_CONTROL_SLEEP 2
 
 /** Continuous attempts to resend an update not send due to socket timeout. */
-#define SESS_FLOW_CONTROL_REPEAT 10
+#define SESS_FLOW_CONTROL_REPEAT 20
 
 /** The default sleep time in the receiver loop */
 #define SESS_DEV_RCV_SLEEP 1
