@@ -6,8 +6,17 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.4.2.7 - May - July 2020
+    * Removed doc folder from build scripts due to text compile errors which require
+      --disable-doc and prevent rpms from being created. Might be added at a later 
+      point in time again. Search for ^^ -*-DOC-*- ^^ in 
+      configure.ac, Makefile.am, and redhat/quagga.spec.in
+    * Fixed more issues in configuration script regarding static OpenSSL library
+    * Fixed issues with configuration switch (en/dis)able_srx and (en/dis)able_srxxryptoapi 
+
   0.4.2.6 - October 2017
     * Fixed more issues in configuration script
+
   0.4.2.5 - August - October 2017
     * Fixed some issues in configuration script
     * Update RPM spec file. This version will be incompatible with srx-proxy

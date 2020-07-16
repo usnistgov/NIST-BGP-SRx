@@ -8,12 +8,12 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.2.6, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.2.7, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
 # Set the requires SRxCryptoAPI Version
-REQ_SCA_VER=2
+REQ_SCA_VER=3
 REQ_PROXY_VER=5
 
 dnl -----------------------------------
@@ -346,11 +346,23 @@ AC_ARG_ENABLE(fpm,
 [  --enable-fpm                  enable Forwarding Plane Manager support])
 
 AC_ARG_ENABLE(srx,
-              [  --disable-srx                disable all SRx functionality], 
-              [enable_srx="no"], [enable_srx="yes"])
+  AC_HELP_STRING([--disable-srx],[disable all SRx functionality!!]))
 AC_ARG_ENABLE(srxcryptoapi,
-              [  --disable-srxcryptoapi        disable srxcryptoapi integration], 
-              [enable_srxcryptoapi="no"] [enable_srxcryptoapi="yes"])
+  AC_HELP_STRING([--disable-srxcryptoapi],[disable srxcryptoapi integration]))
+
+AC_MSG_NOTICE(["srx=${enable_srx}"])
+AC_MSG_NOTICE(["srxcryptoapi=${enable_srxcryptoapi}"])
+
+# Make sure the values are set
+if test x"${enable_srx}" = x ; then
+  enable_srx=yes
+fi
+if test x"${enable_srxcryptoapi}" = x ; then
+  enable_srxcryptoapi=${enable_srx}
+fi
+
+AC_MSG_NOTICE(["srx=${enable_srx}"])
+AC_MSG_NOTICE(["srxcryptoapi=${enable_srxcryptoapi}"])
 
 if test x"${enable_srx}" != x"yes" ; then
   if test x"${enable_srxcryptoapi}" = x"yes" ; then
@@ -1806,21 +1818,29 @@ AC_CONFIG_FILES([Makefile
     lib/Makefile zebra/Makefile ripd/Makefile 
 	  ripngd/Makefile bgpd/Makefile ospfd/Makefile watchquagga/Makefile
 	  ospf6d/Makefile isisd/Makefile babeld/Makefile vtysh/Makefile
-    doc/Makefile ospfclient/Makefile tests/Makefile m4/Makefile
+                 ospfclient/Makefile tests/Makefile m4/Makefile
     redhat/Makefile
 	  pkgsrc/Makefile
 	  redhat/quagga.spec 
 	  lib/version.h
-	  doc/defines.texi
+	  
 	  isisd/topology/Makefile
 	  pkgsrc/bgpd.sh pkgsrc/ospf6d.sh pkgsrc/ospfd.sh
 	  pkgsrc/ripd.sh pkgsrc/ripngd.sh pkgsrc/zebra.sh])
+##  removed doc files (doc/Makefile and doc/defines.texi)
+
 AC_CONFIG_FILES([solaris/Makefile])
 
 AC_CONFIG_FILES([vtysh/extract.pl],[chmod +x vtysh/extract.pl])
 ## Hack, but working solution to avoid rebuilding of quagga.info.
 ## It's already in CVS until texinfo 4.7 is more common.
 AC_OUTPUT
+
+if test x"${enable_srxcryptoapi}" = "xyes" ; then
+  sca_usage="yes (default)"
+else  
+  sca_usage="no"
+fi
 
 echo "
 Quagga SRx Configuration
@@ -1838,9 +1858,10 @@ config file directory   : `eval echo \`echo ${sysconfdir}\``
 example directory       : `eval echo \`echo ${exampledir}\``
 user to run as          : ${enable_user}
 group to run as         : ${enable_group}
-group for vty sockets	: ${enable_vty_group}
+group for vty sockets  	: ${enable_vty_group}
 config file mask        : ${enable_configfile_mask}
 log file mask           : ${enable_logfile_mask}
+enable srx-crypto-api   : ${sca_usage}
 
 The above user and group must have read/write access to the state file
 directory and to the config files in the config file directory."

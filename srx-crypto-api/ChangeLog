@@ -1,5 +1,19 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.3.0.0 - October 2020
+  - !!! This version is not backwards compatible to V0.2 !!!
+  - Fixed m4 scripts regarding OpenSSL header file location
+  - Modified sign method parameters to allow signing more than one update 
+    message digest. This allows to generate all signatures of an update required
+    for each signature block at once.
+  - Modified the data structure handed into the sign method to make it more 
+    easy to understand. Removed ambiguous attribute declarations.
+  - Added More documentation on how to use the API
+  - Added more functionality
+  - Removed all "merged" comments to make future merging easier
+Version 0.2.0.7 - November 2018
+  - Fixed OpenSSL deprecation issues (Needed for Ubuntu 18 platforms)
+  - Added alternative library (.so) configuration in sample configuration
 Version 0.2.0.6 - April 2018
   - Fixed incorrect entry in Changelog for 0.2.0.5
   - Fixed M4 Script for OpenSSL

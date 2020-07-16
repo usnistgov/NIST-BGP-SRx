@@ -28,11 +28,24 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.5.0.5
+ * @version 0.5.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.5.0.5  - 2018/04/24 - oborchert
+ * 0.5.1.0  - 2018/06/09 - oborchert
+ *            * Added command 'echo' to allow printing messaged from a script
+ *              to the console. CMD_ID_ECHO
+ *            * Added command waitFor <client-ip> to allow to wait until the 
+ *              specific client connects. This will time out after 60 seconds.
+ *            * Added command pause to allow to wait until any key is pressed.
+ *          - 2018/03/09 - oborchert 
+ *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
+ *              of 0.5.1.0.
+ *          - 2017/10/12 - oborchert
+ *            * BZ1103: Fixed incorrect RFC reference
+ * 0.5.0.5  - 2018/05/17 - oborchert
+ *            * (merged branch 0.5.0 into trunk)
+ *          - 2018/04/24 - oborchert
  *            * Modified the function printLogMessage to use the current log 
  *              level rather than hard coded log level.
  *            * Change default value for verbose to false.
@@ -77,7 +90,7 @@
  *              a more gracefull stop.
  *            * Modified old fix M713 to not call trim on NULL. BZ1017
  * 0.4.0.2  - 2016/08/12 - oborchert
- *            * Changed default port from 50000 to 323 as specified by RFC6811
+ *            * Changed default port from 50000 to 323 as specified by RFC6810
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Added parentheses around comparison in operand & in sendPrefixes
  *            * Removed unused sessionID from function readPrefixData
@@ -221,6 +234,9 @@ typedef struct {
 #define CMD_ID_RUN          17
 #define CMD_ID_SLEEP        18
 #define CMD_ID_KEY_LOC      19
+#define CMD_ID_ECHO         20
+#define CMD_ID_WAIT_CLIENT  21
+#define CMD_ID_PAUSE        22
 
 #define DEF_RPKI_PORT    323
 #define UNDEF_VERSION    -1
@@ -230,7 +246,7 @@ typedef struct {
 #ifdef PACKAGE_VERSION
 const char* RPKI_RTR_SRV_VER          = PACKAGE_VERSION "\0";
 #else
-const char* RPKI_RTR_SRV_VER          = "> 0.4\0";
+const char* RPKI_RTR_SRV_VER          = "> 0.5.0\0";
 #endif
 const char* RPKI_RTR_SRV_NAME         = "RPKI Cache Test Harness\0";
 const char* HISTORY_FILENAME          = ".rpkirtr_svr.history\0";
@@ -266,9 +282,15 @@ ServerSocket svrSocket;
 CacheClient* clients   = NULL;
 /** Verbose mode on or off */
 bool         verbose   = false;
-/** the current cache session id value */
+/** The current cache session id value */
 uint16_t     sessionID = 0;
 
+/** Used to indicate if the system is in a controlled wait loop. This allows
+ *  The CTRL+C handler to not initiate a shutdown but set the ctr__c variable
+ *  to true. */
+bool         inWait    = false;
+/** Indicates if the ctrl+c combination was pressed.  */
+bool         ctrl_c    = false;
 /** Location (directory) where the key files are stored. */
 char keyLocation[LINE_BUF_SIZE];
 
@@ -1433,6 +1455,15 @@ int showHelp(char* command)
            "                 Send a SERIAL NOTIFY to all clients.\n"
            "  - reset\n"
            "                 Send a CACHE RESET to all clients.\n"
+           "  - echo [text]\n"
+           "                 Print the given text on the console window.\n"
+           "  - waitFor <client-IP>\n"
+           "                 Wait until the client with the given IP connect.\n"
+           "                 This function times out after 60 seconds.\n"
+           "  - pause [prompt]\n"
+           "                 Wait until any key is pressed. This is mainly\n"
+           "                 for scripting scenarios. If no prompt is used,\n"
+           "                 the default prompt will be applied!\n"
 
            "\n"
            "Program Commands:\n"
@@ -1508,9 +1539,35 @@ int showHelp(char* command)
                    "              Use \"-\" to not include a message.\n"
       );
     }
+    else if (strcmp(command, "echo")==0)
+    {
+      SHOW_CMD_HLP("echo [text]",
+                   "This command allows to display a given text on the console "
+                   "window. It is mainly useful for scripted scenarios, where "
+                   "follow up actions by the user is needed or where the "
+                   "it makes sense to inform about the script process.\n"
+      );
+    }
+    else if (strcmp(command, "waitFor")==0)
+    {
+      SHOW_CMD_HLP("waitFor <client-IP>",
+                   "This command waits for a client to connect but will time "
+                   "out after 60 seconds and writes a timeout statement on the "
+                   "console.\n"
+      );
+    }
+    else if (strcmp(command, "pause")==0)
+    {
+      SHOW_CMD_HLP("pause [prompt]",
+                   "This command is for scripting scenarios the have user "
+                   "interactions to continue. For instance CTRL+C will "
+                   "further loading or deleting of cache entries. In case "
+                   "no prompt is provided the default prompt is used.\n"
+      );
+    }
     else
     {
-      printf ("Detailed help for '%s' available - use standard help!\n",
+      printf ("No detailed help for '%s' available - use standard help!\n",
               command);
     }
   }
@@ -1597,6 +1654,45 @@ unsigned char hex2bin_byte(char* in)
       result |= (in[i] - DIGIT_CONV_CONST) << (4-(i*4));
   }
   return result;
+}
+
+/**
+ * This function loops through the list of clients and checks if one client
+ * matches the given IP address.
+ * 
+ * @param clientIP The IP address the clients will be compared too.
+ * 
+ * @return true if one client exists with the given IP address.
+ * 
+ * @since 0.5.1.0 
+ */
+bool hasClient(char* clientIP)
+{
+  #define BUF_SIZE (MAX_IP_V6_STR_LEN + 6)
+  char*        buf = malloc(BUF_SIZE);
+  char*        ipStr1 = malloc(BUF_SIZE);
+  char*        ipStr2 = malloc(BUF_SIZE);
+  CacheClient* cl;
+  bool         retVal = false;
+
+  if ((clientIP != NULL) && (HASH_COUNT(clients) != 0))
+  {
+    cl = clients;
+    snprintf(ipStr1, BUF_SIZE, "%s:", clientIP);
+    while (cl != NULL)
+    {
+      socketToStr(cl->fd, true, buf, BUF_SIZE);
+      snprintf(ipStr2, strlen(ipStr1)+1, "%s:", buf);
+      // ==0 because the client also has the port number attached.
+      retVal = strcmp(ipStr1, ipStr2) == 0;
+      cl = retVal ? cl=NULL : cl->hh.next;
+    }
+  }
+
+  free (buf);
+  free (ipStr1);
+  free (ipStr2);
+  return retVal;
 }
 
 /**
@@ -2136,7 +2232,7 @@ int listClients()
   {
     for (cl = clients; cl; cl = cl->hh.next, idx++)
     {
-      printf("%u: %s\n", cl->fd, socketToStr(cl->fd, true, buf, BUF_SIZE));
+      printf("%i: %s\n", cl->fd, socketToStr(cl->fd, true, buf, BUF_SIZE));
     }
   }
 
@@ -2217,6 +2313,90 @@ int pauseExecution(char* noSeconds)
 }
 
 /**
+ * Display the given text on the screen. A new line will be added at the end.
+ * 
+ * @param text the text to be printed.
+ * 
+ * @return CMD_ID_ECHO
+ * 
+ * @since 0.5.1.0
+ */
+int printText(char* text)
+{
+  if (text == NULL)
+  {
+    text = "";
+  }
+  printf ("%s\n", text);
+  
+  return CMD_ID_ECHO;
+}
+
+/**
+ * Wait for a client to connect but no longer than 60 seconds
+ * 
+ * @param clientIP The IP of the client
+ * 
+ * @return CMD_ID_WAIT_CLIENT 
+ * 
+ * @since 0.5.1.0
+ */
+int waitForClient(char* clientIP)
+{
+  int  timeout = 60;
+  bool found = hasClient(clientIP);
+  
+  // initialize flags
+  inWait = true;
+  ctrl_c = false;
+  char* space = " ";
+  
+  if (clientIP != NULL)
+  {
+    printf("Waiting for client (%s)", clientIP);
+    while (!found && (timeout != 0) && !ctrl_c)
+    {
+      space = "";
+      found = hasClient(clientIP);
+      found = false;
+      if (!found && !ctrl_c)
+      {
+        printf(".");
+        sleep(1);
+        timeout--;
+      }
+    }
+    printf("%s%s!\n", space, found ? "connected" 
+                                   : ctrl_c ? "stopped" : "timeout");
+  }
+  else
+  {
+    printf("No IP provided!\n");
+  }
+  
+  // clear flags
+  ctrl_c = false;
+  inWait = false;
+    
+  return CMD_ID_WAIT_CLIENT;
+}
+
+/**
+ * This function waits until any key was pressed.
+ * 
+ * @param prompt Contains the prompt. If not provided the default prompt will 
+ *               be used.
+ * 
+ * @return CMD_ID_PAUSE 
+ */
+int doPause(char* text)
+{
+  printf("%s ", text != NULL ? text : "Press any key to continue!");
+  fgetc(stdin);   
+  return CMD_ID_PAUSE;
+}
+
+/**
  * Doesn't really do anything
  *
  * @return CMD_ID_QUIT
@@ -2256,6 +2436,9 @@ char* commands[] = {
   "sleep",
   "quit",
   "exit",
+  "echo",
+  "waitFor",
+  "pause",
   "*",
   NULL};
 
@@ -2338,6 +2521,10 @@ int handleLine(char* line)
   CMD_CASE("clients",   listClients);
   CMD_CASE("run",       executeScript);
   CMD_CASE("sleep",     pauseExecution);
+  CMD_CASE("waitFor",   waitForClient);
+  CMD_CASE("pause",     doPause);
+  
+  CMD_CASE("echo",      printText);
 
   CMD_CASE("quit",      processQuit);
   CMD_CASE("exit",      processQuit);
@@ -2501,9 +2688,11 @@ void printLogMessage(LogLevel level, const char* fmt, va_list args)
  */
 void handleSigInt(int signal)
 {
-  printf ("exit\n");
-  // Let 'readline' return 0, i.e. stop the user-input loop
-  fclose(stdin);
+  if (!inWait)
+  {
+    printf ("\nUse command 'exit'\n");
+  }
+  ctrl_c = true;
 }
 
 
@@ -2717,6 +2906,11 @@ int main(int argc, const char* argv[])
 {
   pthread_t rlthread;
   int       ret = 0;
+  
+  // Disable printout buffering.
+  setbuf(stdout, NULL);
+  setbuf(stderr, NULL);
+  
   RPKI_SRV_Configuration config;
   memset(&config, 0, sizeof(RPKI_SRV_Configuration));
   // Initialize keyLocation

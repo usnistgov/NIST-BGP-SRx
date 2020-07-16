@@ -27,10 +27,15 @@
  * Known Issue:
  *   At this time only pem formated private keys can be loaded.
  * 
- * @version 0.2.0.3
+ * @version 0.3.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.0 - 2017/08/18 - oborchert
+ *            * Added source to structure _KS_Key_Element
+ *            * Added source parameter to ks_... functions.
+ *            * Added missing documentation
+ *            * Added funtion ks_removeSource
  *  0.2.0.3 - 2017/07/09 - oborchert
  *            * Modified return value documentation of function ks_getKey which
  *              mentioned DER key but did not mention it encapsulated in the 
@@ -73,6 +78,8 @@ typedef struct _KS_Key_Element
   
   /** The ASN of all the keys. */
   u_int32_t   asn;
+  /** The key source. */
+  sca_key_source_t source;
   /** The array containing the ASKI of the key. */
   u_int8_t    ski[SKI_LENGTH];
   /** An array containing the DER formated key - Normally contains only one key 
@@ -88,7 +95,7 @@ typedef struct _KS_Key_Element
   u_int16_t  timesUsed;
   /** Indicates how many different DER keys are stored. Normally 1 but > 1 in 
    * case of an SKI / ASN collision */
-  u_int16_t  noKeys;  
+  u_int16_t  noKeys;
 } KS_Key_Element;
 
 typedef struct 
@@ -143,30 +150,47 @@ void** ks_getKey(KeyStorage* storage, u_int8_t* ski, u_int32_t asn,
  * 
  * @param storage The storage where the key is stored in
  * @param key The BGPSecKey to be stored.
+ * @param source The source of the key.
  * @param status an OUT value that provides more information.
  * @param convert if true then convert the DER key into the EC_KEY
  * 
  * @return API_SUCESS if it could be stored, otherwise API_FAILED. 
  */
-int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status, 
-                bool convert);
+int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_key_source_t source,
+                sca_status_t* status, bool convert);
 
 /**
  * Delete the key from the given KeyStorage.
  * 
  * @param storage The storage where the key is stored in
  * @param key The BGPSecKey to be stored.
+ * @param source The source of the key.
  * @param status an OUT value that provides more information.
  * 
  * @return API_SUCESS if it could be stored, otherwise API_FAILED. 
  */
-int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status);
+int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_key_source_t source,
+              sca_status_t* status);
 
 /** 
  * Free all Key Storage elements and *associated memory that was generated
  * within the list.
+ * 
+ * @param storage The storage to be emptied
  */
 void ks_empty(KeyStorage* storage);
+
+/** 
+ * Remove all keys from the given source.
+ * 
+ * @param storage The storage from where the keys will be removed.
+ * @param source The source specifying the keys to be removed.
+ * 
+ * @return The number of keys that are removed.
+ * 
+ * @since 0.3.0.0
+ */
+int ks_removeSource(KeyStorage* storage, sca_key_source_t source);
 
 /**
  * Empty the storage if necessary and free the allocated memory.

@@ -1932,7 +1932,7 @@ static bgp_attr_parse_ret_t bgp_attr_bgpsec(struct bgp_attr_parser_args *args)
   SCA_BGP_PathAttribute* bsPa = (SCA_BGP_PathAttribute*)valdata->bgpsec_path_attr;
   bsPa->flags      = args->flags;
   bsPa->type_code  = args->type;
-  if ((args->flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0)
+  if ((args->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) > 0)
   {
     SCA_BGPSEC_ExtPathAttribute* bsEPa = (SCA_BGPSEC_ExtPathAttribute*)bsPa;
     bsEPa->attrLength = htons(args->length);
@@ -2982,7 +2982,7 @@ bgp_packet_attribute (struct bgp *bgp, struct peer *peer,
         SCA_BGP_PathAttribute* pa =
                               (SCA_BGP_PathAttribute*)valData->bgpsec_path_attr;
         u_int16_t len = 0;
-        if (pa->flags & BGP_UPD_A_FLAGS_EXT_LENGTH > 0)
+        if (pa->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH> 0)
         {
           len = ntohs(((SCA_BGPSEC_ExtPathAttribute*)pa)->attrLength);
         }

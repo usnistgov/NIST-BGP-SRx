@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.5.0.5], [bgpsrx-dev@nist.gov])
+AC_INIT([SRx], [0.5.1.0], [bgpsrx-dev@nist.gov])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -10,7 +10,7 @@ LT_INIT([dlopen])
 
 # IMPORTANT = This variable if, set requires a particular SCA version for 
 #             compilation. 
-REQ_SCA_VER=2
+REQ_SCA_VER=3
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([server/command_queue.h])
@@ -314,8 +314,6 @@ AC_TYPE_UINT8_T
 
 # Create automake conditional variables
 #AM_CONDITIONAL([OS_TYPE], [`uname -s`])
-
-AC_SUBST([SRX_REVISION_FILE],[srx-server-rev.txt])
 
 AM_CONDITIONAL([LIB_VER_INFO_COND], [test $LIB_VER_INFO])
 AC_SUBST(LIB_VER_INFO)

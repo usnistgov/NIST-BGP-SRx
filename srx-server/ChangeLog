@@ -1,4 +1,13 @@
+Changelog for Version 0.5.1
+- Added the commands waitFor, pause, and echo to the rpki rtr server
+- Updated using SCA 3.0
+- Extended RPKI Cache test harness commands to allow pausing a script until a 
+  key is pressed.
+- Extended RPKI Cache test harness to wait for up to 60 seconds for a client to 
+  connect. 
 Changelog for Version 0.5.0
+- Removed revision test (0.5.0.7)
+- Removed inine keyword from header files and minor bug fixes (0.5.0.6)
 - Fixed some error handling and fixed verbose output (0.5.0.5)
 - Modified debugging of send and received messages (0.5.0.4)
 - Fixed rpkirtr_srv "cache" printout for router keys (update 0.5.0.3)

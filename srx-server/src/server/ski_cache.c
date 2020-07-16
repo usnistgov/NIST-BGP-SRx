@@ -1055,7 +1055,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
     stream += sizeof(SCA_BGP_PathAttribute);
     // Contains the length of SecurePath and all Signature blocks.
     u_int16_t remainder = 0;  
-    if ((pathAttr->flags & BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
+    if ((pathAttr->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
     {
       remainder = *stream;
       stream++;

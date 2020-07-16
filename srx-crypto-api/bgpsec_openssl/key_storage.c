@@ -27,10 +27,15 @@
  * Known Issue:
  *   At this time only PEM formated private keys can be loaded.
  * 
- * @version 0.2.0.3
+ * @version 0.3.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.0 - 2017/09/13 - oborchert
+ *            * Removed unused code.
+ *            * Fixed timestamp in Version control
+ *          - 2017/08/17 - oborchert
+ *            * Added function ks_removeSource.
  *  0.2.0.3 - 2017/07/09 - oborchert
  *            * BZ1186: Fixed problem while unregistering keys.
  *            * Modified return value documentation of function ks_getKey which
@@ -161,7 +166,8 @@ static EC_KEY* _ks_convertKey(u_int8_t* keyData, u_int16_t keyLength,
 }
 
 /**
- * Retrieve the EC_KEY associated to the given ski and asn
+ * Retrieve the EC_KEY associated to the given ski and asn. Here the source is
+ * ignored.
  * 
  * Possible USER return values:
  * 
@@ -192,7 +198,7 @@ void** ks_getKey(KeyStorage* storage, u_int8_t* ski, u_int32_t asn,
   if (myStatus == API_STATUS_OK)
   {
     // find the correct elem list
-    int bucket = _ks_getBucket(asn);    
+    u_int8_t bucket = _ks_getBucket(asn);    
     KS_Key_Element* elem = storage->head[bucket];
     
     while (elem != NULL)
@@ -502,12 +508,14 @@ void ks_release(KeyStorage* storage)
  * @param storage The storage where the key is stored in
  * @param key The BGPSecKey to be deleted - the given key will not be touched, 
  *            the stored version will. If both are the exact same, then the 
- *            provided key is deleted as well. 
+ *            provided key is deleted as well.
+ * @param source The source of the key.
  * @param status an OUT value that provides more information.
  * 
- * @return API_SUCESS (1) otherwise API_FAILED (0 - see status). 
+ * @return API_SUCESS otherwise API_FAILED (see status). 
  */
-int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status)
+int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_key_source_t source,
+              sca_status_t* status)
 {
   int retVal = API_SUCCESS; 
   int myStatus = API_STATUS_OK;
@@ -684,18 +692,19 @@ void ks_empty(KeyStorage* storage)
  * API_STATUS_ERR_USER1: Wrong algorithmID
  * API_STATUS_INFO_USER1: Duplicate Key
  * API_STATUS_INFO_KEY_NOT_FOUND: In case the real key is supposed to be located
- *                                in the srx-crypto-api's keyvolt but could not
+ *                                in the srx-crypto-api's key volt but could not
  *                                be found there.
  * 
  * @param storage The storage where the key is stored in
  * @param key The BGPSecKey to be stored.
+ * @param source The source where the ley came from.
  * @param status an OUT value that provides more information.
  * @param convert if true then convert the DER key into the EC_KEY
  * 
  * @return API_SUCESS if it could be stored, otherwise API_FAILED. 
  */
-int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status, 
-                bool convert)
+int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_key_source_t source, 
+                sca_status_t* status, bool convert)
 {
   sca_status_t myStatus = API_STATUS_OK;
   int  retVal   = API_SUCCESS;
@@ -862,4 +871,63 @@ int ks_storeKey(KeyStorage* storage, BGPSecKey* key, sca_status_t* status,
   
   return retVal = ((myStatus & API_STATUS_ERROR_MASK) != 0) ? API_FAILURE
                                                             : API_SUCCESS;
+}
+
+/** 
+ * Remove all keys from the given source.
+ * 
+ * @param storage The storage from where the keys will be removed.
+ * @param source The source specifying the keys to be removed.
+ * 
+ * @return The number of keys that are removed.
+ * 
+ * @since 0.3.0.0
+ */
+int ks_removeSource(KeyStorage* storage, sca_key_source_t source)
+{
+  printf ("KEYSTORAGE: ks_removeSource not implemented yet.");
+  int idx = 0;
+  KS_Key_Element* keyElem  = NULL;
+  
+  // Walk through all buckets
+  for (; idx < KS_BUCKETS; idx++)
+  {
+    // set element to kead and check from here
+    keyElem  = storage->head[idx];
+    if (keyElem != NULL)
+    {
+      // This bucket contains keys, walk the list.
+      while (keyElem != NULL)
+      {
+        if (keyElem->source == source)
+        {
+          if (keyElem->next != NULL)
+          {
+            // Move to the next already and then remove the element
+            keyElem = keyElem->next;
+            _ks_freeKS_Elem(storage, idx, keyElem->prev);  
+          }
+          else if (keyElem->prev != NULL)
+          {
+            // No next available, goto the previous and then remove it.
+            keyElem = keyElem->prev;
+            _ks_freeKS_Elem(storage, idx, keyElem->next);  
+          }
+          else
+          {
+            // It seams only this element is available, remove it
+            _ks_freeKS_Elem(storage, idx, keyElem);  
+            keyElem = NULL;
+          }
+        }
+        else
+        {
+          keyElem = keyElem->next;
+        }
+      }
+    }
+  }
+  
+  
+  return 0;
 }

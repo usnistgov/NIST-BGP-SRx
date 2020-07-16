@@ -132,8 +132,8 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 # Needed for QuaggaSRx
-Requires(pre): srxcryptoapi >= 0.2.0 srxcryptoapi < 0.3.0, srx-proxy >= 0.4.0, srx-proxy < 0.5.1
-Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.4.0, srx-proxy < 0.5.1, srxcryptoapi >= 0.2.0, srxcryptoapi < 0.3.0
+Requires(pre): srxcryptoapi >= 0.3.0 srxcryptoapi < 0.3.1, srx-proxy >= 0.5.1, srx-proxy < 0.5.2
+Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.5.1, srx-proxy < 0.5.2, srxcryptoapi >= 0.3.0, srxcryptoapi < 0.3.1
 
 %description
 QuaggaSRx is a free software based upon Quagga that manages TCP/IP based routing
@@ -249,9 +249,11 @@ sca_dir= srx_dir=
 
 make %{?_smp_mflags} MAKEINFO="makeinfo --no-split"
 
-pushd doc
-texi2html -number quagga.texi
-popd
+# pushd doc
+# texi2html -number quagga.texi
+# popd
+# ^^ -*-DOC-*- ^^ removed doc install
+
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -409,8 +411,9 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %doc */*.sample* AUTHORS COPYING
-%doc doc/quagga.html
-%doc doc/mpls
+# %doc doc/quagga.html
+# %doc doc/mpls
+# ^^ -*-DOC-*- ^^ removed from install
 %doc ChangeLog INSTALL NEWS README REPORTING-BUGS SERVICES TODO
 %if %{quagga_user}
 %dir %attr(751,%quagga_user,%quagga_user) %{_sysconfdir}
@@ -425,8 +428,9 @@ rm -rf $RPM_BUILD_ROOT
 %if %{vty_group}
 %attr(750,%quagga_user,%vty_group) %{_sysconfdir}/vtysh.conf.sample
 %endif
-%{_infodir}/*info*
-%{_mandir}/man*/*
+#%{_infodir}/*info*
+#%{_mandir}/man*/*
+# ^^ -*-DOC-*- ^^ removed from install
 %{_sbindir}/zebra
 %{_sbindir}/ospfd
 %{_sbindir}/ripd
@@ -475,6 +479,10 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Wed Jul 1 2020 Oliver Borchert <borchert@nist.gov>
+- Removed doc generation - texi files are faulty and not up to date.
+- Updated pre requirements and requirements for BGP-SRx 5.1
+
 * Tue Oct 13 2015 Oliver Borchert <borchert@nist.gov>
 - renamed package to quaggasrx
 - disabled babeld

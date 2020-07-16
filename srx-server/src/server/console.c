@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.3
+ * @version 0.5.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.6 - 2018/11/20 - oborchert
+ *           * Added missing header file.
  * 0.5.0.3  - 2018/02/23 - oborchert
  *            * BZ1223: Resolved compiler warning. Added TODO into code where
  *              revisit is necessary.
@@ -73,6 +75,7 @@
 #include <string.h>
 #include <signal.h>
 
+#include "server/command_queue.h"
 #include "server/configuration.h"
 #include "server/console.h"
 #include "server/prefix_cache.h"

@@ -20,13 +20,16 @@
  * generation.
  * 
  * Known Issue:
- *   At this time only pem formated private keys can be loaded and the keys must
+ *   At this time only PEM formated private keys can be loaded and the keys must
  *   fir CURVE_ECDSA_P_256
  *
- * @version 0.2.0.4
+ * @version 0.2.0.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.2.0.7 - 2018/11/27 - oborchert
+ *             * Replaced OpenSSL deprecated code with new functions or other 
+ *               ones.
  *   0.2.0.4 - 2017/09/13 - oborchert
  *             * Fixed memset bug in _new_pub_ecpoint2Der.
  *   0.2.0.3 - 2017/04/21 - oborchert
@@ -205,9 +208,13 @@ static bool _getPublicKey(X509* cert, BGPSecKey* key, int curveID)
     if (ecPointPublicKey != NULL)
     {
       memset (&asn1Buff, '\0', ASN1_BUFF_SIZE);
-      asn1Len = ASN1_STRING_length(cert->cert_info->key->public_key);
-      memcpy (asn1Buff, ASN1_STRING_data(cert->cert_info->key->public_key),
-              asn1Len);
+      ASN1_BIT_STRING* asn1BS = X509_get0_pubkey_bitstr(cert);
+      asn1Len = ASN1_STRING_length(asn1BS);
+#if defined OPENSSL_API_COMPAT && OPENSSL_API_COMPAT < 0x10100000L      
+      memcpy (asn1Buff, ASN1_STRING_get0_data(asn1BS), asn1Len);
+#else
+      memcpy (asn1Buff, ASN1_STRING_data(asn1BS), asn1Len);
+#endif
       ecdsa_key = EC_KEY_new_by_curve_name(curveID);
       if (ecdsa_key != NULL)
       {
@@ -358,7 +365,9 @@ static bool _loadPubKey(char* fName, BGPSecKey* key)
   EVP_cleanup();
   ENGINE_cleanup();
   CRYPTO_cleanup_all_ex_data();
-  ERR_remove_state(0);
+  // Replace ERR_remove_state(0) with ERR_clear_error due to deprecation
+  //ERR_remove_state(0);
+  ERR_clear_error();
   ERR_free_strings();
   
   return retVal;

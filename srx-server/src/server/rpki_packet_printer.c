@@ -23,10 +23,12 @@
  * Provides a printer for RPKI Router to Cache Protocol Packages. 
  * Supports RFC6810 and RFC8210 package formats.
  *
- * @version 0.5.0.4
+ * @version 0.5.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.5.0.6 - 2018/11/20 - oborchert
+ *            * Fixed incorrect printing of a string.
  *  0.5.0.4 - 2018/03/06 - oborchert
  *            * Fixed printout of IPv6 number.
  *            * Fixed formating error in error PDU printing.
@@ -70,7 +72,7 @@ static void _doPrintHex(int len, u_int8_t* data, char* line2Tab)
         printf("\n");
         if (idx+1 < len)
         {
-          printf (line2Tab);
+          printf ("%s", line2Tab);
         }
       } 
       else if ((col % 8) == 0)

@@ -25,10 +25,16 @@
  *
  * Uses log.h for error reporting
  *
- * @version 0.5.0.4
+ * @version 0.5.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.0  - 2018/03/09 - oborchert 
+ *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
+ *              of 0.5.1.0.
+ *          - 2017/10/13 - oborchert
+ *            * Removed keyword extern from functions in header file.
+ *            * Removed backslash c from comments
  * 0.5.0.4  - 2018/03/07 - oborchert
  *            * Fixed speller in documentation.
  *            * Removed 'extern' from functions. 
@@ -221,10 +227,10 @@ typedef struct {
   /**
    * The connections was lost. The client will try to reconnect.
    *
-   * @note Optional - can be \c NULL
+   * @note Optional - can be NULL
    *
    * @param user User data
-   * @return \c -1 = do not reconnect, otherwise wait sec and then try to
+   * @return -1 = do not reconnect, otherwise wait sec and then try to
    *      reconnect to the server
    */
   int (*connectionCallback)(void* user);
@@ -334,7 +340,7 @@ uint32_t createRouterClientID(RPKIRouterClient* self);
  * Initializes a client and establishes a new connection to a server.
  * This also sends a reset query.
  *
- * @note \c All variables of \c param need to be set
+ * @note All variables of  param need to be set
  *
  * @param self Client variable that will be initialized.
  * @param params Pre-set parameters.
@@ -343,8 +349,8 @@ uint32_t createRouterClientID(RPKIRouterClient* self);
  * @return \c true = successful, \c false = something failed
  */
 bool createRPKIRouterClient(RPKIRouterClient* client,
-                                   RPKIRouterClientParams* params,
-                                   void* user);
+                            RPKIRouterClientParams* params,
+                            void* user);
 
 /**
  * Closes the connection, and releases all used resources.

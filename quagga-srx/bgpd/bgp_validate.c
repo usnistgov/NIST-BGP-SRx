@@ -918,9 +918,20 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
   scaSignData.hashMessage = attr->bgpsec_validationData->hashMessage[BLOCK_0];
 
 
+
+  SCA_BGPSecSignData * bgpsec_data[2];
+  memset(bgpsec_data, SCA_MAX_SIGBLOCK_COUNT, sizeof(SCA_BGPSecSignData *));
+  bgpsec_data[0] = &scaSignData;
+  bgpsec_data[1] = NULL;
+
+  /* TODO: according to the number of signature blocks,
+   *       it needs to calculate the number of total signature blocks
+   */
+  int countSigBlocks = 1;
+
   // Now do the signing. If it fails, cleanup what needs to be clean up
   // and return 0
-  if (bgp->srxCAPI->sign(&scaSignData) == API_FAILURE)
+  if (bgp->srxCAPI->sign(countSigBlocks, bgpsec_data) == API_FAILURE)
   {
     zlog_err("[BGPSEC] Signing the bgpsec path to peer %u failed status (0x%X)\n",
             peer->as, scaSignData.status);

@@ -20,17 +20,20 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.3.0
+ * @version 0.5.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- *   0.3.0 - 2013/02/06 - oborchert
- *           * Added Version Control
- *           * Changed log level of output during shutdown
- *   0.2.0 - 2011/11/01 - oborchert
- *           * Rewritten.
- *   0.1.0 - 2010/05/05 - pgleichm
- *           * Code Created
+ *   0.5.0.6 - 2018/11/20 - oborchert
+ *             * Removed "inline" keyword from functions - caused linker error 
+ *               on Ubuntu 18
+ *   0.3.0.0 - 2013/02/06 - oborchert
+ *             * Added Version Control
+ *             * Changed log level of output during shutdown
+ *   0.2.0.0 - 2011/11/01 - oborchert
+ *             * Rewritten.
+ *   0.1.0.0 - 2010/05/05 - pgleichm
+ *             * Code Created
  * -----------------------------------------------------------------------------
  */
 #ifndef __COMMAND_QUEUE_H__
@@ -148,7 +151,7 @@ void removeAllCommands(CommandQueue* self);
  * 
  * @return the maximum number of items in the queue.
  */
-inline int getTotalQueueSize(CommandQueue* self);
+int getTotalQueueSize(CommandQueue* self);
 
 /**
  * Return the number of unprocessed commands in the queue
@@ -157,6 +160,6 @@ inline int getTotalQueueSize(CommandQueue* self);
  * 
  * @return the number of unprocessed items in the queue.
  */
-inline int getUnprocessedQueueSize(CommandQueue* self);
+int getUnprocessedQueueSize(CommandQueue* self);
 #endif // !__COMMAND_QUEUE_H__
 

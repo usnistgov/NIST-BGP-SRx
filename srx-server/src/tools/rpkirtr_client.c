@@ -142,8 +142,8 @@ static char st_del_format[256] = {DEF_FMT_WD "\n\0"};
  * RPKI/Router client handlers
  */
 void handlePrefix(uint32_t valCacheID, uint16_t sessionID,
-                 bool isAnn, IPPrefix* prefix, uint16_t maxLen, uint32_t oas,
-                 void* _u)
+                  bool isAnn, IPPrefix* prefix, uint16_t maxLen, uint32_t oas,
+                  void* _u)
 {
   char prefixBuf[MAX_PREFIX_STR_LEN_V6];
 

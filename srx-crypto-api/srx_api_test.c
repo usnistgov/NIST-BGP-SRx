@@ -22,10 +22,17 @@
  *
  * File contains methods to test API.
  * 
- * @version 0.2.0.3
+ * @version 0.3.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.3.0.0 - 2018/11/29 - oborchert
+ *             * Removed all "merged" comments to make future merging easier
+ *           - 2017/09/06 - oborchert
+ *             - Fixed missing type in static variable declaration.
+ *           - 2017/08/17 - oborchert
+ *             - Removed structure KeyTester. API changed in such that it became 
+ *               obsolete for the task it was needed.
  *   0.2.0.4 - 2017/09/12 - oborchert
  *             * Moved SCA 0.2.x into branch for further bugfixes. Trunk will
  *               is different.
@@ -77,8 +84,15 @@
 
 #define TEST_1 1
 #define TEST_2 2
+#define TEST_3 3
 #define TEST_OK 0
 #define TEST_FAILED 1
+
+/** The KEY source */
+#define TEST_KEY_SOURCE 1
+
+#define PRIV_KEY_NAME "private\0"
+#define PUB_KEY_NAME  "public\0"
 
 /** Contains provided key specifications. */
 typedef struct {
@@ -88,6 +102,8 @@ typedef struct {
   u_int32_t asn;
   /** the SKI of the key as hex string.*/
   char      ski[STR_MAX];
+  /** the source of the key */
+  sca_key_source_t  source;
   /** The algorithm ID of the key */
   u_int8_t  algoID;
 } KeySpec;
@@ -98,18 +114,26 @@ typedef struct _st_list {
   KeySpec keySpec;
 } st_list;
 
-/** This struct allows to reduce the code by assigning the requred public or 
- * private function to the key management. */
-typedef struct {
-  u_int8_t(*registerKey)(BGPSecKey* key, sca_status_t* status);
-  u_int8_t(*unregisterKey)(BGPSecKey* ski, sca_status_t* status);
-} KeyTester;
-
 static st_list* keyList = NULL;
 static int st_test = TEST_1;
 
 /**
- * Add the key specification to the list
+ * Return the static string "private" or "public"
+ * 
+ * @param isPrivate Indicates the requested key type 
+ * 
+ * @return PRIV_KEY_NAME of PUB_KEY_NAME
+ * 
+ * @since 0.3.0.0
+ */
+static char* _keyName(bool isPrivate)
+{
+  return isPrivate ? PRIV_KEY_NAME : PUB_KEY_NAME;
+}
+
+/**
+ * Add the key specification to the list using TEST_KEY_SOURCE as key source and
+ * SCA_ECDSA_ALGORITHM as algorithm ID.
  * 
  * @param ski the SKI
  * @param isPrivate indicates if the key is private or not.
@@ -124,6 +148,7 @@ static void pushKeySpec(char* priv, char* asn, char* ski)
   listElem->keySpec.asn = htonl(atoi(asn));
   snprintf(listElem->keySpec.ski, STR_MAX, "%s", ski);
   listElem->keySpec.isPrivate = strncmp(priv, "priv", 4) == 0;
+  listElem->keySpec.source    = TEST_KEY_SOURCE;
   listElem->keySpec.algoID    = SCA_ECDSA_ALGORITHM;
   
   if (keyList == NULL)
@@ -335,7 +360,7 @@ static void _setBGPSEcKey(BGPSecKey* key, KeySpec* keySpec)
     memset (key, 0, sizeof(BGPSecKey));
     
     key->asn    = keySpec->asn;
-    key->algoID = keySpec->algoID;
+    key->algoID = keySpec->algoID;    
 
     int keySpecLen = strlen(keySpec->ski);
     int idx1, idx2;
@@ -350,28 +375,68 @@ static void _setBGPSEcKey(BGPSecKey* key, KeySpec* keySpec)
   }  
 }
 
-/** Test the keys by installing and un installing. 
- * For best results, do NOT preload keys.
+/**
+ * Register the key specified in the keySpec parameter with the given SCA.
  * 
- * @param key The BGPSEC Key (empty)
- * @param keySpec The key specificatoin
- * @param api points to the register and unregister fundtions
- * @param privacyStr Contains "private" or "public" 
- * @param status The status informtaion 
+ * @param key The key itself
+ * @param keySpec The key specification
+ * @param api The SRxCryptoAPI
+ * @param status The status flag. (OUT PARAM)
+ * 
+ * @return API_SUCCESS or API_FAILURE
+ * 
+ * @since 0.3.0.0
+ */
+u_int8_t static __registerKey(BGPSecKey* key, KeySpec* keySpec, 
+                              SRxCryptoAPI* api, sca_status_t* status)
+{
+  return keySpec->isPrivate 
+         ? api->registerPrivateKey (key, status)
+         : api->registerPublicKey  (key, keySpec->source, status);
+}
+
+/**
+ * Un-register the key specified in the keySpec parameter with the given SCA.
+ * 
+ * @param key The key itself
+ * @param keySpec The key specification
+ * @param api The SRxCryptoAPI
+ * @param status The status flag. (OUT PARAM)
+ * 
+ * @return API_SUCCESS or API_FAILURE
+ * 
+ * @since 0.3.0.0
+ */
+u_int8_t static __unregisterKey(BGPSecKey* key, KeySpec* keySpec, 
+                                SRxCryptoAPI* api, sca_status_t* status)
+{
+  return keySpec->isPrivate 
+         ? api->unregisterPrivateKey(key->asn, key->ski, key->algoID, status)
+         : api->unregisterPublicKey(key, keySpec->source, status);
+}
+
+/** Test the keys by installing and un-installing.
+ * For best results, do NOT pre-load any keys.
+ * 
+ * @param key The BGPSEC Key
+ * @param keySpec The key specification
+ * @param api The mapped SRxCryptoAPI to be tested
+ * @param status The status information 
  * 
  * @return 0 if all went well, otherwise 1.
  */
-static int _doKeyTest_1(BGPSecKey* key, KeySpec* keySpec, KeyTester* api, 
+static int _doKeyTest_1(BGPSecKey* key, KeySpec* keySpec, SRxCryptoAPI* api, 
                         char* keyName, sca_status_t* status)
 {
   int retVal = TEST_OK;
   
   // 1st try to store a key that does not provide DER key.
   printf ("  - Register incomplete %s key...", keyName);
-  if (api->registerKey(key, status) == API_SUCCESS)
+  if (__registerKey(key, keySpec, api, status) == API_SUCCESS)
   {
     printf ("failed - key stored!!\n"
-            "WARNING: %s key without DER information stored!\n", keyName);
+            "WARNING: %s key without DER information stored!\n", 
+            _keyName(keySpec->isPrivate));
     retVal = TEST_FAILED;
   }
   else
@@ -380,9 +445,9 @@ static int _doKeyTest_1(BGPSecKey* key, KeySpec* keySpec, KeyTester* api,
   }
   // 2nd have the crypto API load the key
   sca_loadKey(key, keySpec->isPrivate, status);
-  // 3rd have the crypto API loaded key register in the plugin
+  // 3rd have the crypto API loaded key register in the plug-in
   printf ("  - Register complete %s key...", keyName);
-  if (api->registerKey(key, status) != API_SUCCESS)
+  if (__registerKey(key, keySpec, api, status) != API_SUCCESS)
   {
     printf ("failed\n"
             "WARNING: Could not store %s key.\n", keyName);
@@ -392,7 +457,7 @@ static int _doKeyTest_1(BGPSecKey* key, KeySpec* keySpec, KeyTester* api,
   {
     // - Now unregister
     printf ("succes\n  - Unregister %s key...", keyName);
-    if (api->unregisterKey(key, status) != API_SUCCESS)
+    if (__unregisterKey(key, keySpec, api, status) != API_SUCCESS)
     {
       printf ("failed\n"
               "WARNING: could not unregister %s key.\n", keyName);
@@ -408,26 +473,25 @@ static int _doKeyTest_1(BGPSecKey* key, KeySpec* keySpec, KeyTester* api,
 }
 
 /** Test the keys by installing and un installing. 
- * For best results, do NOT preload keys.
+ * For best results, do NOT pre-load keys.
  * 
- * @param key The BGPSEC Key (empty)
- * @param keySpec The key specificatoin
- * @param api points to the register and unregister fundtions
- * @param privacyStr Contains "private" or "public" 
- * @param status The status informtaion 
+ * @param keySpec The key specification
+ * @param api points to the SRxCryptoAPI implementation
+ * @param isPrivate indicates the type of key
+ * @param status The status information 
  * 
  * @return 0 if all went well, otherwise 1.
  */
-static int _doKeyTest_2(BGPSecKey* key, KeySpec* keySpec, KeyTester* api, 
+static int _doKeyTest_2(BGPSecKey* key, KeySpec* keySpec, SRxCryptoAPI* api, 
                         char* keyName, sca_status_t* status)
 {
   int retVal =  TEST_OK;
 
   sca_loadKey(key, keySpec->isPrivate, status);
-  api->registerKey(key, status);
-  api->registerKey(key, status);
-  api->unregisterKey(key, status);
-  api->unregisterKey(key, status);
+  __registerKey(key, keySpec, api, status);
+  __registerKey(key, keySpec, api, status);
+  __unregisterKey(key, keySpec, api, status);
+  __unregisterKey(key, keySpec, api, status);
     
   return retVal;
 }
@@ -465,12 +529,8 @@ int main(int argc, char** argv)
       memset (&keySpec, 0, sizeof(KeySpec));
       BGPSecKey key;
       memset (&key, 0, sizeof(BGPSecKey));
-      KeyTester keyTester;
-      memset(&keyTester, 0, sizeof(KeyTester));
 
       bool lastPrivate = true;
-      keyTester.registerKey   = crypto->registerPrivateKey;
-      keyTester.unregisterKey = crypto->unregisterPrivateKey;
       char* keyName = "private";
       
       while (popKeySpec(&keySpec))
@@ -478,19 +538,7 @@ int main(int argc, char** argv)
       {
         if (keySpec.isPrivate != lastPrivate)
         {
-          memset(&keyTester, 0, sizeof(keyTester));
-          if (keySpec.isPrivate)
-          {
-            keyTester.registerKey   = crypto->registerPrivateKey;
-            keyTester.unregisterKey = crypto->unregisterPrivateKey;
-            keyName = "private";
-          }
-          else
-          {
-            keyTester.registerKey   = crypto->registerPublicKey;
-            keyTester.unregisterKey = crypto->unregisterPublicKey;
-            keyName = "public";
-          }
+          keyName  = _keyName(keySpec.isPrivate);
           lastPrivate = keySpec.isPrivate;
         }
         
@@ -502,11 +550,11 @@ int main(int argc, char** argv)
         {
           case TEST_1 : 
             printf ("Run TEST 1\n");
-            _doKeyTest_1(&key, &keySpec, &keyTester, keyName , &status);
+            _doKeyTest_1(&key, &keySpec, crypto, keyName, &status);
             break;
           case TEST_2:
             printf ("Run TEST 2\n");
-            _doKeyTest_2(&key, &keySpec, &keyTester, keyName , &status);
+            _doKeyTest_2(&key, &keySpec, crypto, keyName , &status);
             break;
           default:
             printf ("No test!\n");
@@ -519,7 +567,6 @@ int main(int argc, char** argv)
         }        
         memset(&key, 0, sizeof(BGPSecKey));
       }      
-      memset(&keyTester, 0, sizeof(keyTester));
     }
     else
     {

@@ -1,12 +1,19 @@
 ## Process this file with automake to produce Makefile.in.
 
 SUBDIRS = lib @ZEBRA@ @BGPD@ @RIPD@ @RIPNGD@ @OSPFD@ @OSPF6D@ @BABELD@ \
-         @ISISD@ @WATCHQUAGGA@ @VTYSH@ @OSPFCLIENT@ @DOC@ m4 @pkgsrcdir@ \
+         @ISISD@ @WATCHQUAGGA@ @VTYSH@ @OSPFCLIENT@       m4 @pkgsrcdir@ \
          redhat @SOLARIS@ @BUILD_TESTS@
 
+## ^^ -*-DOC-*- ^^ doc subdirectory has compiler errors and does not 
+## function properly during rpm generation. For that reason I removed 
+## @DOC@ from SUBDIRS. It was located between @OSPFCLIENT and m4 (2nd row)
+
 DIST_SUBDIRS = lib zebra bgpd ripd ripngd ospfd ospf6d babeld \
-	  isisd watchquagga vtysh ospfclient doc m4 pkgsrc redhat tests \
+	  isisd watchquagga vtysh ospfclient     m4 pkgsrc redhat tests \
 	  solaris
+
+## ^^ -*-DOC-*- ^^ doc also removed from DIST_SUBDIRS. Removed "doc" 
+## located between "ospfclient" and "m4"
 
 EXTRA_DIST = aclocal.m4 SERVICES TODO REPORTING-BUGS INSTALL.quagga.txt \
 	update-autotools \

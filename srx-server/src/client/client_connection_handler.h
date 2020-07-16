@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * Version 0.3.0.10
+ * Version 0.5.0.6
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.6 - 2018/11/20 - oborchert
+ *           * Removed "inline" keyword from functions - caused linker error 
+ *             on Ubuntu 18
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.3.0    - 2013/02/27 - oborchert
@@ -154,7 +157,7 @@ void releaseClientConnectionHandler(ClientConnectionHandler* self);
  *
  * @return true if the wait could be executed, otherwise false.
  */
-inline bool connHandlerWait(ClientConnectionHandler* self);
+bool connHandlerWait(ClientConnectionHandler* self);
 
 /**
  * This method waits until data is received. It is expected that the lock is
@@ -164,7 +167,7 @@ inline bool connHandlerWait(ClientConnectionHandler* self);
  *
  * @return true if the notify could be send, otherwise false.
  */
-inline bool connHandlerNotify(ClientConnectionHandler* self);
+bool connHandlerNotify(ClientConnectionHandler* self);
 
 /**
  * This method locks the mutex for wait and notification
@@ -173,7 +176,7 @@ inline bool connHandlerNotify(ClientConnectionHandler* self);
  *
  * @return true if the lock could be taken.
  */
-inline bool connHandlerLock(ClientConnectionHandler* self);
+bool connHandlerLock(ClientConnectionHandler* self);
 
 /**
  * This method unlocks the mutex for wait and notification
@@ -182,7 +185,7 @@ inline bool connHandlerLock(ClientConnectionHandler* self);
  *
  * @return true if the lock could be removed.
  */
-inline bool connHandlerUnlock(ClientConnectionHandler* self);
+bool connHandlerUnlock(ClientConnectionHandler* self);
 
 /**
  * Sends a packet to the server.

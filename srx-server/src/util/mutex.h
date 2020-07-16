@@ -24,10 +24,13 @@
  * @note Currently based on PThread
  * log.h is used for error reporting.
  * 
- * @version 0.3.0.10
+ * @version 0.5.0.6
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.6 - 2018/11/20 - oborchert
+ *           * Removed "inline" keyword from functions - caused linker error 
+ *             on Ubuntu 18
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  *            * Added Changelog
@@ -105,6 +108,6 @@ extern int waitCond(Cond *cond, Mutex *self, uint32_t millis);
 extern int sem_wait_wrapper(sem_t *sem_var, uint32_t millis);
 
 
-inline int destroyCond(Cond *cond);
+int destroyCond(Cond *cond);
 #endif // !__MUTEX_H__
 

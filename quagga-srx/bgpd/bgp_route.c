@@ -2867,7 +2867,7 @@ static BGPSecData* srx_create_bgpsec_data (struct bgp *bgp, struct bgp_info* inf
   if (attr->bgpsec_validationData != NULL)
   {
     SCA_BGP_PathAttribute* pa = (SCA_BGP_PathAttribute*)attr->bgpsec_validationData->bgpsec_path_attr;
-    int size = (pa->flags & BGP_UPD_A_FLAGS_EXT_LENGTH) > 0
+    int size = (pa->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) > 0
                ? ntohs(((SCA_BGPSEC_ExtPathAttribute*)pa)->attrLength)
                : ((SCA_BGPSEC_NormPathAttribute*)pa)->attrLength;
     if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))

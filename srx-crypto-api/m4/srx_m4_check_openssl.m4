@@ -1,4 +1,6 @@
-# Version 0.2.1
+# Version 0.2.2
+#  0.2.2 - 2020/05/21 - kyehwanl
+#          * Fixed compilation issue with openssl include directory.
 #  0.2.1 - 2018/04/14 - oborchert
 #          * Added instructions if openssl could not be found.
 #            ( Important for CentOS 7 )
@@ -34,6 +36,11 @@ AC_DEFUN([SRX_M4_CHECK_OPENSSL], [
   if test "x$openssl_dir" = "x"; then
     AC_MSG_RESULT([default])    
     srx_m4_openssl_dir=$(which openssl 2>/dev/null | sed -e "s/\(.*\)\/bin\/openssl/\1/g")
+    if test "x$srx_m4_openssl_dir" = "x"; then
+      srx_m4_openssl_dir="/usr/"
+      AC_MSG_RESULT([ using default directory /usr ])
+    fi
+
   else
     AC_MSG_RESULT([custom])
     srx_m4_openssl_dir=$openssl_dir
@@ -77,19 +84,25 @@ AC_DEFUN([SRX_M4_CHECK_OPENSSL], [
       #
       # Custom installation
       #
-      if test ! -e $srx_m4_libPath/lib$srx_m4_libName.so; then    
-        if test ! -e $srx_m4_libPath/lib$srx_m4_libName.a; then
+      if test -e $srx_m4_libPath/lib$srx_m4_libName.so; then    
+        AC_MSG_RESULT([-l$srx_m4_libName])
+        srx_m4_cflags="-I${srx_m4_openssl_dir}/include"
+        srx_m4_ldflags="-L${srx_m4_libPath}"
+        # libs will be set below in general section
+      else
           AC_MSG_RESULT([not found])          
+        if test -e $srx_m4_libPath/lib$srx_m4_libName.a; then
+          AC_MSG_ERROR([
+    ---------------------------------------------------
+    Custom OpenSSL must be configured as shared library
+    (config shared ....) to generate lib$srx_m4_libName.so!
+    ---------------------------------------------------])
+        fi
           AC_MSG_ERROR([
     --------------------------------------------------
     Library $srx_m4_libName required!
     --------------------------------------------------])
         fi
-      fi
-
-      srx_m4_cflags="-I${srx_m4_openssl_dir}/include"
-      srx_m4_ldflags="-L${srx_m4_libPath}"
-      AC_MSG_RESULT([-l$srx_m4_libName])
     fi
 
     # Add the library - cflags and ldflags are set in custom section

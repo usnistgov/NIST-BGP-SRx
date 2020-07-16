@@ -1,8 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 .PHONY: clean-local distclean-local install-exec-local uninstall-local \
-	all-local rpmcheck srcrpm rpms set-revision \
-	set-revision-1
+	all-local rpmcheck srcrpm rpms 
 
 # Directories containing source files.
 CLIENT_DIR = client
@@ -12,14 +11,7 @@ TOOLS_DIR = tools
 UTIL_DIR = util
 TEST_DIR = test
 
-# Read the revision number of the revision file
-# This needs GNU-Make. if this is a problem, replace the 
-# assignment of SRX_REVISION=... with either an empty
-# string or the content of the revision file.
-SRX_REVISION=$(shell cat $(SRX_REVISION_FILE))
-
-AM_CFLAGS = -DSRX_REVISION=$(SRX_REVISION) \
-            -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS)
+AM_CFLAGS = -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS)
 
 # Used to generate the srx folder for installation - DESTDIR for RPM generation
 INC_OUT = $(DESTDIR)$(includedir)/$(SRX_DIR)
@@ -236,31 +228,7 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(UTIL_DIR)/str.h \
 		 $(UTIL_DIR)/test.h \
 		 $(UTIL_DIR)/timer.h \
-		 $(UTIL_DIR)/xml_out.h
-
-set-revision:
-	@echo "Check for revision framework"
-	@touch $(SRX_REVISION_FILE);
-	@if test -d $(SVN_DIR); then \
-	  if test -f $(SVN_CMD); then \
-	    $(SVN_CMD) info | grep $(SRX_VENDOR); \
-	    if test "$$?" = "0"; then \
-	      $(SVN_CMD) info | grep $(SRX_VENDOR); \
-	      if test "$$?" = "0"; then \
-		$(MAKE) set-revision-1; \
-	      fi; \
-	    fi; \
-	  fi; \
-	fi;
-	
-set-revision-1:
-	@echo "Revision file=" $(SRX_REVISION_FILE)
-	@echo -n $$($(SVN_CMD) info | grep Revision | sed -e "s/\(Revision:[ ]*\)\(.*\)\([ ]*\)/R\2-/g") > $(SRX_REVISION_FILE)
-	@echo -n $$($(SVN_CMD) info | grep "Last Changed Rev" | sed -e "s/\(Last Changed Rev:[ ]*\)\(.*\)\([ ]*\)/LR\2/g") >> $(SRX_REVISION_FILE)
-	@echo -n "Full-Version = $(VERSION)-"
-	@cat $(SRX_REVISION_FILE)
-	@echo
-	@echo
+		 $(UTIL_DIR)/xml_out.h	
 	
 distclean-local:
 	rm -f *.spec *.rpm $(CLIENT_DIR)/*.conf; \
@@ -285,7 +253,7 @@ uninstall-local:
 	  rmdir $(INC_OUT) > /dev/null 2>&1; \
 	fi
 	
-all-local: set-revision 
+all-local:
 	chmod ugo+x $(SERVER_DIR)/srx_serverd > /dev/null 2>&1
 
 ################################################################################

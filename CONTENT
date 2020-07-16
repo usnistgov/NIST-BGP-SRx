@@ -1,19 +1,12 @@
-This folder containts NIST BGP-SRx Software Suite V5.0.6
- * quagga-srx V0.99.22.srx.0.4.2.6_release
- * srx-server V0.5.0.5_release
- * srx-crypto-api V0.2.0.6_release
- * bgpsec-io version_0.2.0.24
+This folder contains NIST BGP-SRx Software Suite V5.1.0
+ * quagga-srx V0.99.22.srx.0.4.2.7_release
+ * srx-server V0.5.1.0_release
+ * srx-crypto-api V0.3.0.0_release
+ * bgpsec-io version_0.2.1.0
 
 Comments for this software package:
 ===================================
-NOTE FOR QSRx:
-  Due to a BUG in the configuration script configure.ac, 
-  the compiler switch --enable-srx does have the opposite affect.
-  By default, SRx is enabled and there is no need to use this switch.
-  The usage of SRxCryptoAPI is disabled by default. To enable it for
-  local use within QSRx do use the switch --enable-srxcryptoapi.
-  IMPORTANT: Do NOT use --enable-srx and --enable-srxcryptoapi incombination.
-* quagga-srx 0.99.22.srx.0.4.2.6_release was developed and tested under CentOS.
+* quagga-srx 0.99.22.srx.0.4.2.7_release was developed and tested under CentOS.
   - requires srx-server (Proxy API)
   - requires srx-crypto-api
   - requires net-snmp
@@ -21,7 +14,7 @@ NOTE FOR QSRx:
   - requires libconfig-devel
   - requires uthash-devel
   - requires readline-devel
-* srx-server 0.5.0.5_release developed and tested under CentOS.
+* srx-server 0.5.1.0_release developed and tested under CentOS.
   Use telnet for login into the srx-server!
   - requires readline-devel
   - requires ncurses-devel
@@ -29,15 +22,15 @@ NOTE FOR QSRx:
   - requires openssl-devel
   - requires libconfig-devel
   - requires uthash-devel
-* srx-crypto-api 0.2.0.6_release developed and tested under CentOS.
+* srx-crypto-api 0.3.0.0_release developed and tested under CentOS.
   - requires libconfig-devel
   - requires openssl-devel
   - requires uthash-devel
-* bgpsec-io version_0.2.0.24 developed and tested under CentOS.
+* bgpsec-io version_0.2.1.0 developed and tested under CentOS.
   - requires srx-crypto-api
   - requires libconfig-devel
   - requires openssl-devel
   - requires readline-devel
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V2.4.5
+Packaged by BGP-SRx Software Suite Bundler V2.4.6

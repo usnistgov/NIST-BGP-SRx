@@ -25,13 +25,24 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @version 0.2.0.3
+ * @version 0.3.0.0
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.0 - 2020/05/21 - kyehwanl
+ *            * Fixed speller in function sca_generateOriginHashMessage from
+ *              sca_gnener... to sca_gener...
+ *          - 2017/08/18 - oborchert
+ *            * Added function cleanPrivateKeys
+ *            * Added missing wrapper functions
+ *            * Fixed speller in function name sca_generateOriginHashMessage
+ *          - 2017/08/15 - oborchert
+ *            * Updated the following methods to reflect API changes:
+ *              wrap_sign, wrap_registerPrivateKey, wrap_unregisterPrivateKey,
+ *              wrap_registerPublicKey, wrap_unregisterPublicKey
  *  0.2.0.3 - 2017/06/05 - oborchert
- *            *  Added missing default mapping to api->setDebugLevel and 
- *               api->getDebugLevel
+ *            * Added missing default mapping to api->setDebugLevel and 
+ *              api->getDebugLevel
  *          - 2017/04/17 - oborchert
  *            * Fixed possible memory overflow in sca_SetKeyPath, use snprintf 
  *              in lieu of sprintf.
@@ -143,6 +154,11 @@
 #define SCA_REGISTER_PUBLIC_KEY    "method_registerPublicKey"
 #define SCA_UNREGISTER_PUBLIC_KEY  "method_unregisterPublicKey"
 
+#define SCA_CLEAN_KEYS             "method_cleanKeys"
+#define SCA_CLEAN_PRIVATE_KEYS     "method_cleanPrivateKeys"
+
+#define SCA_IS_ALGO_SUPPORTED      "method_isAlgorithmSupported"
+
 #define SCA_DEF_INIT                   "init"
 #define SCA_DEF_RELEASE                "release"
 
@@ -152,6 +168,8 @@
 #define SCA_DEF_GET_DEBUGLEVEL         "getDebugLevel"
 #define SCA_DEF_SET_DEBUGLEVEL         "setDebugLevel"
 
+#define SCA_DEF_IS_ALGO_SUPPORTED      "isAlgorithmSupported"
+
 #define SCA_DEF_SIGN                   "sign"
 #define SCA_DEF_VALIDATE               "validate"
 
@@ -160,6 +178,9 @@
 
 #define SCA_DEF_REGISTER_PUBLIC_KEY    "registerPublicKey"
 #define SCA_DEF_UNREGISTER_PUBLIC_KEY  "unregisterPublicKey"
+
+#define SCA_DEF_CLEAN_KEYS             "cleanKeys"
+#define SCA_DEF_CLEAN_PRIVATE_KEYS     "cleanPrivateKeys"
 
 #ifndef SYSCONFDIR
 #define SYSCONFDIR               "/etc"
@@ -181,6 +202,8 @@ typedef struct {
   const char* str_method_getDebugLevel;
   const char* str_method_setDebugLevel;
   
+  const char* str_method_isAlgorithmSupported;
+  
   const char* str_method_sign;
   const char* str_method_validate;
 
@@ -189,6 +212,10 @@ typedef struct {
   
   const char* str_method_registerPublicKey;
   const char* str_method_unregisterPublicKey;
+  
+  const char* str_method_cleanKeys;
+  const char* str_method_cleanPrivateKeys;
+  
 } SCA_Mappings;
 
 // Hash struct for first signature in path
@@ -325,12 +352,27 @@ bool wrap_freeHashMessage(SCA_HashMessage* hashMessage)
   }
   
   /**
+   * Set the new debug level going forward. This method returns the previous set 
+   * debug level or -1 if not supported.
+   * 
+   * @param debugLevel The debug level to be set - Follows system debug values.
+   * 
+   * @return false (not supported)
+   */
+  bool wrap_isAlgorithmSupported(u_int8_t algoID)
+  {
+    sca_debugLog (LOG_DEBUG, "Called local test wrapper "
+                             "'wrap_isAlgorithmSupported'\n");
+    return false;    
+  }  
+  
+  /**
    * Perform BGPSEC path validation. This function required the keys to be 
    * pre-registered to perform the validation. 
    * The caller manages the memory and MUST assure the memory is intact until
    * the function returns.
    * This function only returns API_VALRESULT_VALID and API_VALRESULT_INVALID.
-   * In case of erorrs API_VALRESULT_INVALID will be returned with an error code
+   * In case of errors API_VALRESULT_INVALID will be returned with an error code
    * passed in the status flag. This flag also contains more details about the 
    * validation status (why invalid, etc.)
    *
@@ -360,31 +402,36 @@ int wrap_validate(SCA_BGPSecValidationData* data)
 /**
  * This is the internal wrapper function. Currently it does return only the
  * error code and provides a debug log.
+ * 
+ * API_STATUS_ERR_UNSUPPPORTED_ALGO: Data is provided but NO algorithm is 
+ *                                   supported.
+ * 
+ * @param count The number of bgpsec_data elements in the given array
+ * @param bgpsec_data Array containing the data objects to be signed. This 
+ *                    also includes the generated signature.
  *
- * @param bgpsec_path The BGPSEC Path Segment
- * @param number_keys The number of keys provided
- * @param keys The array of keys
- * @param prefix pointer to the prefix.
- * @param localAS the callers local AS number.
- *
- * @return API_VALRESULT_INVALID -> status = API_STATUS_ERR_USER1
+ * @return API_FAILURE
+ * 
  */
-int wrap_sign(SCA_BGPSecSignData* data)
+ int wrap_sign(int count, SCA_BGPSecSignData** bgpsec_data)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'sign'\n");
-  if (data != NULL)
+  if (bgpsec_data != NULL)
   {
-    data->status = API_STATUS_INFO_KEY_NOTFOUND
-                   | API_STATUS_ERR_INVLID_KEY            
-                   | API_STATUS_ERR_KEY_IO;
+    int idx = 0;
+    for (idx = 0; idx < count; idx++)
+    {
+      bgpsec_data[idx]->status = API_STATUS_ERR_UNSUPPPORTED_ALGO;
+    }
   }
+  
   return API_FAILURE;
 }
 
 /**
- * Register the private key. This method does not store the key. the return
- * value is 0
+ * Register the private key. This method does not store the key. The return
+ * value is API_FAILURE.
  *
  * @param key The key to be stored
  * @param status Will contain the status information of this call.
@@ -406,73 +453,140 @@ u_int8_t wrap_registerPrivateKey(BGPSecKey* key, sca_status_t* status)
 }
 
 /**
- * Unregister the Private key. This method actually does not register unregister
- * the private key. It returns 0
+ * Unregister the Private key. This method actually does not unregister
+ * the private key. The return value is API_FAILURE.
  *
- * @param key The key needs at least contain the ASN and SKI.
- * @param status Will contain the status information of this call.
- *
- * @return API_FAILURE - check status
- */
-u_int8_t wrap_unregisterPrivateKey(BGPSecKey* key, sca_status_t* status)
+   * @param asn The ASN of the private key (network format).
+   * @param ski The 20 Byte ski
+   * @param algoID The algorithm ID of the key.
+   * @param status Will contain the status information of this call.
+   *
+   * @return API_SUCCESS or API_FAILURE (check status)
+   */
+u_int8_t wrap_unregisterPrivateKey(u_int32_t asn, u_int8_t* ski, 
+                                   u_int8_t algoID, sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper "
                            "'unregisterPrivateKey'\n");
   if (status != NULL)
   {
-    *status =  API_STATUS_ERR_KEY_IO
-              | API_STATUS_INFO_KEY_NOTFOUND;
+    *status = API_STATUS_ERR_UNSUPPPORTED_ALGO;
+    if (ski == NULL)
+    {
+      *status |= API_STATUS_ERR_NO_DATA;
+    }
   }
 
   return API_FAILURE;
 }
 
 /**
- * Register the public key. This method does not store the key. the return
- * value is 0
+ * Register the public key. This method does not store the key. The return
+ * value is API_FAILURE.
  *
+ * API_STATUS_ERR_UNSUPPPORTED_ALGO: Algorithm not supported
+ * API_STATUS_ERR_NO_DATA: No key was provided
+ * 
  * @param key The key to be stored
+ * @param source The source of the key.
  * @param status Will contain the status information of this call.
  *
- * @return API_FAILURE - check status
+ * @return API_FAILURE (check status)
  */
-u_int8_t wrap_registerPublicKey(BGPSecKey* key, sca_status_t* status)
+u_int8_t wrap_registerPublicKey(BGPSecKey* key, sca_key_source_t source,
+                                sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'registerPublicKey'\n");
   if (status != NULL)
   {
-    *status =   API_STATUS_ERR_INSUF_KEYSTORAGE 
-              | API_STATUS_ERR_INVLID_KEY 
-              | API_STATUS_ERR_KEY_IO;
+    *status = API_STATUS_ERR_UNSUPPPORTED_ALGO;
+    if (key == NULL)
+    {
+      *status |= API_STATUS_ERR_NO_DATA;
+    }      
   }
 
   return API_FAILURE;
 }
 
 /**
- * Unregister the Private key. This method actually does not register unregister
- * the private key. It returns 0
+ * Unregister the Private key. This method actually does not unregister
+ * the private key. The return value is API_FAILURE.
  *
+ * API_STATUS_ERR_UNSUPPPORTED_ALGO: Algorithm not supported
+ * API_STATUS_ERR_NO_DATA: No key was provided
+ * 
  * @param keyID The key id to unregister.
+ * @param source The source of the key.
  * @param status Will contain the status information of this call.
  *
  * @return API_FAILURE - check status
  */
-u_int8_t wrap_unregisterPublicKey(BGPSecKey* key, sca_status_t* status)
+u_int8_t wrap_unregisterPublicKey(BGPSecKey* key, sca_key_source_t source,
+                                  sca_status_t* status)
 {
   // Return an error for missing implementation.
   sca_debugLog (LOG_DEBUG, "Called local test wrapper 'unregisterPublicKey'\n");
   
   if (status != NULL)
   {
-    // Just set all errors
-    *status =   API_STATUS_INFO_KEY_NOTFOUND
-              | API_STATUS_ERR_KEY_IO;
+    *status = API_STATUS_ERR_UNSUPPPORTED_ALGO;
+    if (key == NULL)
+    {
+      *status |= API_STATUS_ERR_NO_DATA;
+    }      
   }
 
   return API_FAILURE;
+}
+
+/**
+ * Remove all public keys from the internal storage that were provided by the 
+ * given key source. This function returns API_SUCCESS
+ * 
+ * @param source The source of the keys.
+ * @param status Will contain the status information of this call.
+ * 
+ * @return API_SUCCESS
+ * 
+ * @since 0.3.0.0
+ */
+u_int8_t wrap_cleanKeys(sca_key_source_t source, sca_status_t* status)
+{
+  // Return an error for missing implementation.
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'cleanKeys'\n");  
+  
+  if (status != NULL)
+  {
+    *status = API_STATUS_OK;
+  }
+  
+  return API_SUCCESS;
+}
+
+/**
+ * Remove all private keys from the internal storage. This function returns 
+ * API_SUCCESS
+ * 
+ * @param status Will contain the status information of this call.
+ * 
+ * @return API_SUCCESS
+ * 
+ * @since 0.3.0.0
+ */
+u_int8_t wrap_cleanPrivateKeys(sca_status_t* status)
+{
+  // Return an error for missing implementation.
+  sca_debugLog (LOG_DEBUG, "Called local test wrapper 'cleanPrivateKeys'\n");  
+  
+  if (status != NULL)
+  {
+    *status = API_STATUS_OK;
+  }
+  
+  return API_SUCCESS;
 }
 
 /**
@@ -634,36 +748,39 @@ static void _loadMapping(config_setting_t *set, SCA_Mappings* mappings)
                      &mappings->str_method_freeSignature);
 
   //////////////////////////////////////////////////////////////////////////////
-  // LOAD DEBUG FUNCTIONS
+  // LOAD DEBUG AND HELPER FUNCTIONS
   //////////////////////////////////////////////////////////////////////////////  
   __readMapping(set, SCA_GET_DEBUGLEVEL, 
                      &mappings->str_method_getDebugLevel);
   __readMapping(set, SCA_SET_DEBUGLEVEL, 
                      &mappings->str_method_setDebugLevel);
   
+  __readMapping(set, SCA_IS_ALGO_SUPPORTED, 
+                     &mappings->str_method_isAlgorithmSupported);
   
   //////////////////////////////////////////////////////////////////////////////
   // SIGN / VALIDATE FUNCTIONS
   //////////////////////////////////////////////////////////////////////////////
   __readMapping(set, SCA_SIGN, &mappings->str_method_sign);
-  __readMapping(set, SCA_VALIDATE, &mappings->str_method_validate);
-  
+  __readMapping(set, SCA_VALIDATE, &mappings->str_method_validate);  
   
   //////////////////////////////////////////////////////////////////////////////
-  // PRIVATE KEY STORAGE
+  // KEY STORAGE
   //////////////////////////////////////////////////////////////////////////////
   __readMapping(set, SCA_REGISTER_PRIVATE_KEY,
                      &mappings->str_method_registerPrivateKey);
   __readMapping(set, SCA_UNREGISTER_PRIVATE_KEY,
                      &mappings->str_method_unregisterPrivateKey);
 
-  //////////////////////////////////////////////////////////////////////////////
-  // EXTENDED - validation and public key storage
-  //////////////////////////////////////////////////////////////////////////////
   __readMapping(set, SCA_REGISTER_PUBLIC_KEY,
                      &mappings->str_method_registerPublicKey);
   __readMapping(set, SCA_UNREGISTER_PUBLIC_KEY,
                      &mappings->str_method_unregisterPublicKey);
+  
+  __readMapping(set, SCA_CLEAN_KEYS, 
+                     &mappings->str_method_cleanKeys);
+  __readMapping(set, SCA_CLEAN_PRIVATE_KEYS, 
+                     &mappings->str_method_cleanPrivateKeys);
 }
 
 /**
@@ -779,7 +896,17 @@ static int _mapAPI(SCA_Mappings* mappings, SRxCryptoAPI* api)
                     mappings->str_method_freeSignature, 
                     SCA_DEF_FREE_SIGNATURE);    
 
+    __doMapFunction(api->libHandle, (void**)&api->setDebugLevel,
+                    mappings->str_method_setDebugLevel,
+                    SCA_DEF_SET_DEBUGLEVEL);
+    __doMapFunction(api->libHandle, (void**)&api->getDebugLevel,
+                    mappings->str_method_getDebugLevel,
+                    SCA_DEF_GET_DEBUGLEVEL);
     
+    __doMapFunction(api->libHandle, (void**)&api->isAlgorithmSupported,
+                    mappings->str_method_isAlgorithmSupported,
+                    SCA_DEF_IS_ALGO_SUPPORTED);
+        
     __doMapFunction(api->libHandle, (void**)&api->sign,
                     mappings->str_method_sign, SCA_DEF_SIGN);
     __doMapFunction(api->libHandle, (void**)&api->validate,
@@ -799,12 +926,13 @@ static int _mapAPI(SCA_Mappings* mappings, SRxCryptoAPI* api)
                     mappings->str_method_unregisterPrivateKey,
                     SCA_DEF_UNREGISTER_PRIVATE_KEY);
     
-    __doMapFunction(api->libHandle, (void**)&api->setDebugLevel,
-                    mappings->str_method_setDebugLevel,
-                    SCA_DEF_SET_DEBUGLEVEL);
-    __doMapFunction(api->libHandle, (void**)&api->getDebugLevel,
-                    mappings->str_method_getDebugLevel,
-                    SCA_DEF_GET_DEBUGLEVEL);
+    __doMapFunction(api->libHandle, (void**)&api->cleanKeys,
+                    mappings->str_method_cleanKeys,
+                    SCA_DEF_CLEAN_KEYS);
+    
+    __doMapFunction(api->libHandle, (void**)&api->cleanPrivateKeys,
+                    mappings->str_method_cleanPrivateKeys,
+                    SCA_DEF_CLEAN_PRIVATE_KEYS);    
   }
 
   return retVal;
@@ -871,6 +999,11 @@ int srxCryptoInit(SRxCryptoAPI* api, sca_status_t* status)
   api->freeHashMessage      = wrap_freeHashMessage;
   api->freeSignature        = wrap_freeSignature;
   
+  api->setDebugLevel        = wrap_setDebugLevel;
+  api->getDebugLevel        = wrap_getDebugLevel;
+  
+  api->isAlgorithmSupported = wrap_isAlgorithmSupported;
+  
   api->sign                 = wrap_sign;
   api->validate             = wrap_validate;
 
@@ -880,8 +1013,8 @@ int srxCryptoInit(SRxCryptoAPI* api, sca_status_t* status)
   api->registerPrivateKey   = wrap_registerPrivateKey;
   api->unregisterPrivateKey = wrap_unregisterPrivateKey;
   
-  api->setDebugLevel        = wrap_setDebugLevel;
-  api->getDebugLevel        = wrap_getDebugLevel;
+  api->cleanKeys            = wrap_cleanKeys;
+  api->cleanPrivateKeys     = wrap_cleanPrivateKeys;
 
   // Now initialize mapping names
   mappings = malloc(sizeof(SCA_Mappings));
@@ -1191,7 +1324,7 @@ void sca_debugLog( int level, const char *format, ...)
  * @param status The status information - The status flag will NOT be 
  *                                        initialized.
  *
- * @return API_SUCCESS(1) or API_FAILURE(0 - see status) 
+ * @return API_SUCCESS or API_FAILURE (see status) 
  */
 int sca_loadKey(BGPSecKey* key, bool fPrivate, sca_status_t* status)
 {
@@ -1237,6 +1370,10 @@ long sca_getCurrentLogLevel()
   return g_loglevel;
 }
 
+long sca_setCurrentLogLevel(int l)
+{
+  return g_loglevel = l;
+}
 ////////////////////////////////////////////////////////////////////////////////
 // DRAFT 15 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1318,7 +1455,7 @@ int sca_generateHashMessage(SCA_BGPSecValidationData* data, u_int8_t algoID,
   bgpsecPathAttr += sizeof(SCA_BGP_PathAttribute);
   // Contains the length of SecurePath and all Signature blocks.
   u_int16_t remainder = 0;
-  if ((bgpsecAttrHdr->flags & BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
+  if ((bgpsecAttrHdr->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
   {
     remainder = *bgpsecPathAttr;
     bgpsecPathAttr++;
@@ -1571,7 +1708,7 @@ int sca_generateHashMessage(SCA_BGPSecValidationData* data, u_int8_t algoID,
  * 
  * @return Return the hash message.
  */
-SCA_HashMessage* sca_gnenerateOriginHashMessage(u_int32_t targetAS, 
+SCA_HashMessage* sca_generateOriginHashMessage(u_int32_t targetAS, 
                                             SCA_BGPSEC_SecurePathSegment* spSeg, 
                                             SCA_Prefix* nlri, u_int8_t algoID)
 {
@@ -1620,7 +1757,7 @@ SCA_HashMessage* sca_gnenerateOriginHashMessage(u_int32_t targetAS,
 #pragma GCC pop_options    
 
 /**
- * This function will free the copmlete digest structure if NOT owned by the 
+ * This function will free the complete digest structure if NOT owned by the 
  * API.
  * 
  * @param data The validation data that contain the validation digest that
@@ -1700,6 +1837,104 @@ u_int8_t sca_getAlgorithmID(SCA_HashMessage* hashMessage)
   return algoID;
 }
 
+
+/**
+ * Return the algorithm ID's from the BGPsec_PATH attribute. It is possible 
+ * that no signature block can be found within a iBGP announced update.
+ * 
+ * @param attr the bgpsec algorithm ID
+ * @param status The status information - The status flag will NOT be 
+ *                                        initialized.
+ * @param algoID1 The algorithm ID of signature block one or 0 if not found. 
+ * @param algoID2 The algorithm ID of signature block two or 0 if not found.
+ * 
+ * @return API_SUCCESS or API_FAILURE
+ * 
+ * @since 0.3.0.0
+ */
+u_int8_t sca_getAlgorithmIDs(SCA_BGP_PathAttribute* attr, sca_status_t* status,
+                             u_int8_t* algoID1, u_int8_t* algoID2)
+{
+  u_int8_t retVal = API_SUCCESS;
+  sca_status_t myStatus = API_STATUS_OK;
+  u_int8_t algoID[SCA_MAX_SIGBLOCK_COUNT];
+  memset(algoID, 0, SCA_MAX_SIGBLOCK_COUNT);
+  SCA_BGPSEC_SecurePath*     secPath  = NULL;
+  SCA_BGPSEC_SignatureBlock* sigBlock = NULL;
+  u_int8_t* ptr = (u_int8_t*)attr;
+  u_int16_t remainder = 0;
+  int size     = 0;
+  int segments = 0;
+  int blockIdx = 0;
+  
+  if (attr != NULL)
+  {
+    if ((attr->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
+    {
+      SCA_BGPSEC_NormPathAttribute* norm = (SCA_BGPSEC_NormPathAttribute*)attr;
+      remainder  = norm->attrLength;
+      size = sizeof(SCA_BGPSEC_NormPathAttribute);
+    }
+    else
+    {
+      SCA_BGPSEC_ExtPathAttribute* ext = (SCA_BGPSEC_ExtPathAttribute*)attr;
+      remainder  = ntohs(ext->attrLength);
+      size = sizeof(SCA_BGPSEC_ExtPathAttribute);
+    }
+    ptr       += size;
+    remainder -= size;
+    
+    secPath = (SCA_BGPSEC_SecurePath*)ptr;
+    size  = ntohs(secPath->length);
+    segments = (size-2) / LEN_SECPATHSEGMENT;
+    // Now move to the beginning of the signature block.
+    ptr       += size;
+    remainder -= size;
+    // Now walk through the signature blocks
+    while (remainder > 0)
+    {
+      if (blockIdx < SCA_MAX_SIGBLOCK_COUNT)
+      {
+        sigBlock  = (SCA_BGPSEC_SignatureBlock*)ptr;
+        size      = ntohs(sigBlock->length);
+        ptr       += size;
+        remainder -= size;
+        algoID[blockIdx] = sigBlock->algoID;
+        blockIdx++;
+      }
+      else
+      {
+        myStatus |= API_STATUS_ERR_SYNTAX;
+        break;
+      }
+    }
+  }
+  else
+  {
+    myStatus |= API_STATUS_ERR_NO_DATA;
+  }
+  
+  // Now set the algorithm identifiers into the OUT variables.
+  if (algoID1 != NULL)
+  {
+    *algoID1 = algoID[0];
+  }
+  if (algoID2 != NULL)
+  {
+    *algoID1 = algoID[1];
+  }
+  
+  if (status != NULL)
+  {
+    *status |= myStatus;
+  }
+  
+  if ((myStatus & API_STATUS_ERROR_MASK) != 0)
+  {
+    retVal = API_FAILURE;
+  }
+  return retVal;
+}
 
 /**
  * Print the status information in human readable format

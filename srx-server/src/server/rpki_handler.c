@@ -22,10 +22,16 @@
  *
  * This handler processes ROA validation
  *
- * @version 0.5.0.3
+ * @version 0.5.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.0  - 2018/03/09 - oborchert 
+ *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
+ *              of 0.5.1.0.
+ *          - 2017/10/13 - oborchert
+ *            * BZ1238: Used valCacheID Id as key source during key 
+ *              registration.
  *  0.5.0.3 - 2018/02/26 - oborchert
  *            * fixed incorrect import.
  *  0.5.0.0 - 2017/07/08 - oborchert
@@ -384,7 +390,8 @@ static void handleRouterKey (uint32_t valCacheID, uint16_t session_id,
     if (isAnn)
     {
       // A new key is announced
-      res = srxCAPI->registerPublicKey(&bsKey, &status);
+      res = srxCAPI->registerPublicKey(&bsKey, (sca_key_source_t)valCacheID, 
+                                       &status);
 
       if (res == API_SUCCESS)
       {
@@ -401,7 +408,8 @@ static void handleRouterKey (uint32_t valCacheID, uint16_t session_id,
     else
     {
       // A key is withdrawn
-      res = srxCAPI->unregisterPublicKey(&bsKey, &status);
+      res = srxCAPI->unregisterPublicKey(&bsKey, (sca_key_source_t)valCacheID, 
+                                         &status);
       ski_unregisterKey(sCache, asn, (u_int8_t*)ski, bsKey.algoID);
 
       if (res == API_SUCCESS)

@@ -21,10 +21,13 @@
  *
  * This file does provide CONSTANT declarations ONLY
  *
- * Version 0.3.1.0
+ * Version 0.5.0.7
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.0.7 - 2018/11/30 - oborchert
+ *         * Removed SRX_REVISION framework. Does not work with GIT and is not
+ *           needed anymore due to correct version numbering of the code.
  * 0.3.1.0 - 2015/11/11 - oborchert
  *         * Fixed speller in program name from SRX to SRx
  * 0.3.0.7 - 2015/04/21 - oborchert
@@ -55,22 +58,10 @@
 #define SRX_SERVER_PACKAGE  "NA"
 #endif
 
-// Compiler setting -D SRX_REVISION
-#ifdef SRX_REVISION
-  #if (SRX_CHECKVAL(SRX_REVISION) == 1)
-    // SRX_REVISION is empty -> discard it
-    #define SRX_SERVER_REVISION ""    
-  #else
-    #define SRX_SERVER_REVISION SRX_STRINGIFY_IND(SRX_REVISION)
-  #endif
-#else
-  #define SRX_SERVER_REVISION ""
-#endif
-
 // Used version number -  make a string of the define
 #define SRX_SERVER_VERSION  SRX_STRINGIFY_IND(SRX_SERVER_PACKAGE)
 // Used full version number
-#define SRX_SERVER_FULL_VER SRX_SERVER_VERSION SRX_SERVER_REVISION
+#define SRX_SERVER_FULL_VER SRX_SERVER_VERSION
 
 #define SRX_CREDITS "This program was developed at the National Institute "  \
                 "of Standards and Technology (NIST - www.nist.gov) in "      \

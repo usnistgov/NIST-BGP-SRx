@@ -30,6 +30,9 @@ key_ext_public="cert";
 bgpsec_openssl: {
   library_name = "libSRxBGPSecOpenSSL.so";
 
+# In case the library can not be found use path to library
+#  library_name = "../lib64/srx/libSRxBGPSecOpenSSL.so";
+
 #
 # The following method mappings allow to customize the mapping. In case the 
 # mapping is disabled using the hash tag, misspelled, or missing at all the 
@@ -46,6 +49,11 @@ bgpsec_openssl: {
   method_freeHashMessage      = "freeHashMessage";
   method_freeSignature        = "freeSignature";
 
+  method_getDebugLevel        = "getDebugLevel";
+  method_setDebugLevel        = "setDebugLevel";
+
+  method_isAlgorithmSupported = "isAlgorithmSupported";
+
   method_sign                 = "sign";
   method_validate             = "validate";
 
@@ -54,11 +62,17 @@ bgpsec_openssl: {
 
   method_registerPrivateKey   = "registerPrivateKey";
   method_unregisterPrivateKey = "unregisterPrivateKey";
+
+  method_cleanKeys            = "cleanKeys";
+  method_cleanPrivateKeys     = "cleanPrivateKeys";
 };
 
 # Some other example configuration 
 testlib: {
   library_name="libSRxCryptoTestlib.so";
+
+# In case the library can not be found use path to library
+#  library_name = "../lib64/srx/libSRxCryptoTestlib.so";
 
 # A String "0|1;0|1;0|1" or "NULL" as initialization parameter.
 # This initialization value is as follows: (each value 0 or 1)
@@ -73,6 +87,11 @@ testlib: {
   method_freeHashMessage      = "freeHashMessage";
   method_freeSignature        = "freeSignature";
 
+  method_getDebugLevel        = "getDebugLevel";
+  method_setDebugLevel        = "setDebugLevel";
+
+  method_isAlgorithmSupported = "isAlgorithmSupported";
+
   method_sign                 = "sign";
   method_validate             = "validate";
 
@@ -81,4 +100,7 @@ testlib: {
 
   method_registerPrivateKey   = "registerPrivateKey";
   method_unregisterPrivateKey = "unregisterPrivateKey";
+
+  method_cleanKeys            = "cleanKeys";
+  method_cleanPrivateKeys     = "cleanPrivateKeys";
 };

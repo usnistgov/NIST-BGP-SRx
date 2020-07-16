@@ -1451,11 +1451,11 @@ DEFUN (srx_show_config,
     if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
     {
       vty_out (vty, "bgpsec (prefix-origin and path processing) using "
-                    "srx-server%s", VTY_NEWLINE);      
+                    "srx-server%s", VTY_NEWLINE);
     }
     else
     {
-      vty_out (vty, "bgpsec (prefix-origin and path processing) locally%s", 
+      vty_out (vty, "bgpsec (prefix-origin and path processing) locally%s",
                VTY_NEWLINE);
     }
   }
@@ -1676,7 +1676,7 @@ int srx_set_ski(struct vty* vty, u_int8_t skiNum, char* skiStr, u_int8_t algoID)
     if (bgp->srxCAPI != NULL)
     {
       sca_status_t keyStatus = API_STATUS_OK;
-      if (bgp->srxCAPI->unregisterPrivateKey(key, &keyStatus) == API_FAILURE)
+      if (bgp->srxCAPI->unregisterPrivateKey(key->asn, key->ski, key->algoID, &keyStatus) == API_FAILURE)
       {
         vty_out (vty, "Removal of previous router key '%s' failed (status:0x%X)!%s",
                  skiStr, keyStatus, VTY_NEWLINE);

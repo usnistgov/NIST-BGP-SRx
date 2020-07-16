@@ -22,11 +22,19 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.5.0.5
+ * @version 0.5.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.5.0.5  - 2018/04/24 - oborchert
+ * 0.5.1.0  - 2018/03/09 - oborchert 
+ *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
+ *              of 0.5.1.0.
+ *          - 2017/10/13 - oborchert
+ *            * Temporarily modified hard coded return value of function 
+ *              createRouterClientID from 0 to 1.
+ * 0.5.0.5  - 2018/05/17 - oborchert
+ *            (merged from branch 0.5.0.x)
+ *          - 2018/04/24 - oborchert
  *            * Added missing code in error handling.
  * 0.5.0.4  - 2018/03/07 - oborchert
  *            * Modified packet handling and added proper error handling and
@@ -703,6 +711,42 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
         snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INTERNAL_ERROR);
         break;
     }
+        
+    switch (*errCode)
+    {
+      case RPKI_EC_CORRUPT_DATA:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_CORRUPT_DATA);
+        break;
+      case RPKI_EC_NO_DATA_AVAILABLE:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INTERNAL_ERROR);
+        break;
+      case RPKI_EC_INVALID_REQUEST:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INVALID_REQUEST);
+        break;
+      case RPKI_EC_UNSUPPORTED_PROT_VER:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNSUPPORTED_PROT_VER);
+        break;
+      case RPKI_EC_UNSUPPORTED_PDU:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNSUPPORTED_PDU);
+        break;
+      case RPKI_EC_UNKNOWN_WITHDRAWL:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNKNOWN_WITHDRAWL);
+        break;
+      case RPKI_EC_DUPLICATE_ANNOUNCEMENT:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_DUPLICATE_ANNOUNCEMENT);
+        break;
+      case RPKI_EC_UNEXPECTED_PROTOCOL_VERSION:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_UNEXPECTED_PROTOCOL_VERSION);
+        break;
+      case RPKI_EC_RESERVED:
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_RESERVED);
+        break;        
+      case RPKI_EC_INTERNAL_ERROR:
+      default:
+        *errCode = RPKI_EC_INTERNAL_ERROR;
+        snprintf (errStr, RRC_MAX_STRING, "%s", RPKI_ESTR_INTERNAL_ERROR);
+        break;
+    }
     
     sendErrorReport(client, *errCode, (uint8_t*)hdr, pduLen, 
                     errStr, strlen(errStr));
@@ -889,7 +933,9 @@ static void* manageConnection (void* clientPtr)
 uint32_t createRouterClientID(RPKIRouterClient* self)
 {
   // TODO: Add implementation for a unique ID. Maybe an initial hash over self.
-  return 0;
+  // BZ1239: For now use hard coded value 1. This ID is used for registering 
+  // keys and 0 is reserved within SCA.
+  return 1;
 }
 
 /**
