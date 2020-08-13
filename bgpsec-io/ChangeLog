@@ -1,3 +1,6 @@
+Version 0.2.1.1
+  * Updated the project email address.
+  * Updated spec file.
 Version 0.2.1.0
   * Updated to be compatible with SCA 3.0
   * Added capability to use bgpIdentifier as outgoing IP address.

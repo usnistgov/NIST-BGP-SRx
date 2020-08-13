@@ -22,10 +22,13 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.0
+ * @version 0.2.1.1
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.1 - 2020/07/29 - oborchert
+ *            * Fixed speller in documentation
+ *            * Added define for development year (SRX_DEV_TOYEAR).
  *  0.2.1.0 - 2018/01/16 - oborchert
  *            * Added DEF_PACKING and deprecated useMPNLRI attribute.
  *          - 2018/01/12 - oborchert
@@ -58,7 +61,7 @@
  *  0.2.0.21 -2018/06/08 - oborchert
  *            * Added P..._CONVERGENCE parameters.
  *  0.2.0.17 -2018/04/26 - oborchert
- *            * Added UPD_AS_SET_OPEN and UPD_AS_SET_CLKOSE
+ *            * Added UPD_AS_SET_OPEN and UPD_AS_SET_CLOSE
  *  0.2.0.14 -2018/04/19 - oborchert
  *            * Added 'validation' to update structure.
  *  0.2.0.12 -2018/04/14 - oborchert
@@ -141,6 +144,11 @@
 // configuration.ac - used for libconfig 
 #ifndef LCONFIG_INT
 #define LCONFIG_INT long
+#endif
+
+// Can be overwritten in configure.ac if needed.
+#ifndef SRX_DEV_TOYEAR
+#define SRX_DEV_TOYEAR "2020"
 #endif
 
 /******************************************************************************/

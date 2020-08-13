@@ -23,6 +23,8 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 /* For union sockunion.  */
 #include "sockunion.h"
+// NIST: Added config.h to reduce invalid errors reported in IDE's
+#include "config.h"
 
 #ifdef USE_SRX
 #include <srx/srx_api.h>
@@ -74,7 +76,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                 "Disconnect from the SRx server\n"
 
 #define SRX_VTY_CMD_DISPLAY     "srx display"
-#define SRX_VTY_OUT_DISPLAY     "srx diaplay%s"
+#define SRX_VTY_OUT_DISPLAY     "srx display%s"
 #define SRX_VTY_HLP_DISPLAY     SRX_VTY_HLP_STR \
                                 "Add SRx related output to the \"show\"" \
                                 " commands\n"
@@ -287,7 +289,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define SRX_VTY_CMD_BGPSEC_REGISTER_P_KEYS "srx bgpsec register keys"
 #define SRX_VTY_HLP_BGPSEC_REGISTER_P_KEYS SRX_VTY_HLP_STR SRX_VTY_HLP_BGPSEC \
                           "This command will attempt to register the current " \
-                          "keys. This migth be required if a previous " \
+                          "keys. This might be required if a previous " \
                           "registration failed!\n"
 
 // DEPRECATED AND REMOVED KEY COMMANDS
@@ -958,8 +960,8 @@ struct peer
 #define PEER_DOWN_NOTIFY_RECEIVED       13 /* notification received */
 #define PEER_DOWN_NOTIFY_SEND           14 /* notification send */
 #define PEER_DOWN_CLOSE_SESSION         15 /* tcp session close */
-#define PEER_DOWN_NEIGHBOR_DELETE       16 /* neghbor delete */
-#define PEER_DOWN_RMAP_BIND             17 /* neghbor peer-group command */
+#define PEER_DOWN_NEIGHBOR_DELETE       16 /* neighbor delete */
+#define PEER_DOWN_RMAP_BIND             17 /* neighbor peer-group command */
 #define PEER_DOWN_RMAP_UNBIND           18 /* no neighbor peer-group command */
 #define PEER_DOWN_CAPABILITY_CHANGE     19 /* neighbor capability command */
 #define PEER_DOWN_PASSIVE_CHANGE        20 /* neighbor passive command */

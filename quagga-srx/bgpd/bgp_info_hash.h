@@ -21,21 +21,24 @@
  *
  * Various function to make debugging easier.
  *
- * @version 0.3.1.0
+ * @version 0.4.2.9
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.4.2.9 - 2020/08/12 - oborchert
+ *           * Added config.h and moved other includes inside USR_SRX
  * 0.3.1.0 - 2015/11/26 - oborchert
- *            * Added Changelog
- *            * Changed include of uthash.h from local to stock
+ *           * Added Changelog
+ *           * Changed include of uthash.h from local to stock
  */
-#include <zebra.h>
-
 #ifndef _QUAGGA_BGP_INFO_HASH_H
 #define _QUAGGA_BGP_INFO_HASH_H
 
+#include "config.h"
+
 #ifdef USE_SRX
 
+#include <zebra.h>
 #include <uthash.h>
 
 struct bgp_info_hash_item {

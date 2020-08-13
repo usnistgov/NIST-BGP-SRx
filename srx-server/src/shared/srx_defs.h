@@ -24,12 +24,15 @@
 /**
  * Contains Constants and its definitions for SRX client/server and protocol.
  *
- * @version 0.5.0.0
+ * @version 0.5.1.1
  *
  * SRx constant and type definitions.
  *
  * Change log:
  * -----------------------------------------------------------------------------
+ * 0.5.1.1. - 2020/07/31 - oborchert
+ *            * Added PRG_DEV_TOYEAR To allow specifying the last development
+ *              year.
  *  0.5.0.0 - 2017/07/06 - oborchert
  *            * Added ValidationResultType VRT_NONE=0
  *          - 2017/06/22 - oborchert
@@ -67,6 +70,12 @@
 #define SRX_PROXY_RESTYPE_ROA       1
 #define SRX_PROXY_RESTYPE_BGPSEC    2
 #define SRX_PROXY_RESTYPE_RECEIPT 128
+
+// SRX_DEV_TOYEAR can be overwritten in the config.h through configuration
+// my modifying configure.ac and rerun with autoreconf -i --force
+#ifndef SRX_DEV_TOYEAR
+#define SRX_DEV_TOYEAR "2020"
+#endif
 
 /** The time in which a handshake between proxy and SRx SHOULD be performed
  *  before the handshake is considered as failed.

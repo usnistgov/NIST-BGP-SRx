@@ -2,7 +2,7 @@
 case "$1" in
   "" | "?" | "h")
     echo "Syntax: $0 <mrt file> [-o outfile] [num-updates]"
-    echo "num-updtas: number of updates or all if not specified"
+    echo "num-updates: number of updates or all if not specified"
     exit 0;
     ;;
   *)

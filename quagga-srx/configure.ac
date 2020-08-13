@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.2.7, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.4.2.9, [http://bgpsrx.antd.nist.gov])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -194,35 +194,43 @@ AC_PROG_MAKE_SET
 AC_CHECK_TOOL(AR, ar)
 
 dnl - Check for programs depending on switches set
-AS_BOX([Check more tools needed depending on enable/disable settings.])
+AS_BOX([Check for tools needed depending on enable/disable settings.])
+AC_MSG_CHECKING([Enable SNMP])
 if test "${enable_snmp}" != "no" ; then
-  MORE_TOOLS=""
-  AC_CHECK_TOOL(MORE_TOOLS, net-snmp-config, [err])
-  if test "$MORE_TOOLS" = "err" ; then
+  AC_MSG_RESULT([yes])
+  TOOL_SNMP=""
+  AC_CHECK_TOOL([TOOL_SNMP], [net-snmp-config], [err])
+  if test "$TOOL_SNMP" = "err" ; then
     AC_MSG_ERROR([
 	--------------------------------------------------------
 	tool 'net-snmp-config' needed - install 'net-snmp-devel'
 	--------------------------------------------------------])
   fi
+else
+  AC_MSG_RESULT([no])
 fi
 
+AC_MSG_CHECKING([Enable documentation])
 if test "${enable_doc}" != "no" ; then
-  MORE_TOOLS=""
-  AC_CHECK_TOOL([MORE_TOOLS], [makeinfo], [err])
-  if test "$MORE_TOOLS" = "err" ; then
+  AC_MSG_RESULT([yes])
+  TOOL_MAKEINFO=""
+  AC_CHECK_TOOL([TOOL_MAKEINFO], [makeinfo], [err])
+  if test "$TOOL_MAKEINFO" = "err" ; then
     AC_MSG_ERROR([
 	--------------------------------------------------
 	tool 'makeinfo' needed - install 'texinfo'
 	--------------------------------------------------])
   fi
-  MORE_TOOLS=""
-  AC_CHECK_TOOL([MORE_TOOLS], [texi2html], [err])
-  if test "$MORE_TOOLS" = "err" ; then
+  TOOL_TEXI2HTML=""
+  AC_CHECK_TOOL([TOOL_TEXI2HTML], [texi2html], [err])
+  if test "$TOOL_TEXI2HTML" = "err" ; then
     AC_MSG_ERROR([
 	--------------------------------------------------
 	tool 'texi2html' needed - install 'texi2html'
 	--------------------------------------------------])
   fi
+else
+  AC_MSG_RESULT([no])
 fi
 
 dnl ---------------------------
@@ -350,19 +358,21 @@ AC_ARG_ENABLE(srx,
 AC_ARG_ENABLE(srxcryptoapi,
   AC_HELP_STRING([--disable-srxcryptoapi],[disable srxcryptoapi integration]))
 
-AC_MSG_NOTICE(["srx=${enable_srx}"])
-AC_MSG_NOTICE(["srxcryptoapi=${enable_srxcryptoapi}"])
-
 # Make sure the values are set
+AC_MSG_CHECKING([SRx additions are enabled])
 if test x"${enable_srx}" = x ; then
   enable_srx=yes
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
 fi
+AC_MSG_CHECKING([SRx Crypto API addition is enabled])
 if test x"${enable_srxcryptoapi}" = x ; then
   enable_srxcryptoapi=${enable_srx}
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
 fi
-
-AC_MSG_NOTICE(["srx=${enable_srx}"])
-AC_MSG_NOTICE(["srxcryptoapi=${enable_srxcryptoapi}"])
 
 if test x"${enable_srx}" != x"yes" ; then
   if test x"${enable_srxcryptoapi}" = x"yes" ; then
@@ -1448,7 +1458,12 @@ if test "x${enable_srx}" = "xyes"; then
                       [srx/prefix.h srx/slist.h srx/srx_defs.h srx/srx_api.h],
                       [$ARCH], [$srx_dir])
 
-  AC_CHECK_HEADERS (uthash.h)
+  AC_CHECK_HEADERS(uthash.h,[],[AC_MSG_ERROR([
+	--------------------------------------------------
+	uthash is missing. On CentOS, install epel-release
+        and then uthash-devel.
+	--------------------------------------------------])
+  ])
   # uthash.h is used for bgp_info_hash.h, not really an SRx header but still
   # needed to compile and therefore added here.
 
@@ -1818,12 +1833,12 @@ AC_CONFIG_FILES([Makefile
     lib/Makefile zebra/Makefile ripd/Makefile 
 	  ripngd/Makefile bgpd/Makefile ospfd/Makefile watchquagga/Makefile
 	  ospf6d/Makefile isisd/Makefile babeld/Makefile vtysh/Makefile
-                 ospfclient/Makefile tests/Makefile m4/Makefile
+    doc/Makefile ospfclient/Makefile tests/Makefile m4/Makefile
     redhat/Makefile
 	  pkgsrc/Makefile
 	  redhat/quagga.spec 
 	  lib/version.h
-	  
+	  doc/defines.texi
 	  isisd/topology/Makefile
 	  pkgsrc/bgpd.sh pkgsrc/ospf6d.sh pkgsrc/ospfd.sh
 	  pkgsrc/ripd.sh pkgsrc/ripngd.sh pkgsrc/zebra.sh])

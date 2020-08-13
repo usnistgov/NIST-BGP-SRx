@@ -1,12 +1,14 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.5.1.0], [bgpsrx-dev@nist.gov])
-# The -Wno=portability is needed for the $(shell...) GNU extension.
+AC_INIT([SRx], [0.5.1.1], [bgpsrx-dev@nist.gov], [srx], [https://bgpsrx.antd.nist.gov])
+s# The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 LT_PREREQ([2.2])
 LT_INIT([dlopen])
+LICENSE=https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software
+
 
 # IMPORTANT = This variable if, set requires a particular SCA version for 
 #             compilation. 
@@ -23,6 +25,7 @@ MAJOR_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 2`
 MINOR_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 3`
 UPD_VER=`echo AC_PACKAGE_VERSION | cut -d . -f 4`
 PACKAGE_VERSION=AC_PACKAGE_VERSION
+URL=AC_PACKAGE_URL
 
 current=$MAJOR_VER
 revision=$MINOR_VER
@@ -330,6 +333,8 @@ AC_SUBST(SCA_DIR, [$sca_dir])
 AC_SUBST(CPU_ARCH)
 AC_SUBST(CPU_ARCH_FLAGS)
 AC_SUBST(LCONFIG_INT)
+AC_SUBST(LICENSE)
+AC_SUBST(URL)
 
 # Checks for library functions.
 #AS_BOX(Processing library functions)

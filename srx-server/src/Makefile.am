@@ -116,12 +116,6 @@ srx_server_LDADD = $(LIB_PATRICIA) $(SCA_LIBS) \
 		   libsrx_util.la
 srx_server_LDFLAGS = $(SCA_LDFLAGS)
 
-# For the revision
-SRX_VENDOR=antd.nist.gov
-# Since SVN 1.7 the .svn folder is only located in the projects root.
-SVN_DIR = ../.svn
-SVN_CMD = /usr/bin/svn
-
 ################################################################################
 ##  END SRX SERVER INSTALL
 ################################################################################

@@ -38,10 +38,9 @@ Version:%{version}
 Release:	1%{?dist}
 Summary:SRx Crypto API for BGPsec speakers
 
-
-Group:Networking/Daemons
-License:LGPL	
-URL:www.antd.nist.gov
+Group:Security Libraries
+License:https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software
+URL:https://bgpsrx.antd.nist.gov
 Source0:%{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 Prefix: %{_prefix}

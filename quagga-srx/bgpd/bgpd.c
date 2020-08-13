@@ -155,7 +155,7 @@ bgp_flag_check (struct bgp *bgp, int flag)
   return CHECK_FLAG (bgp->flags, flag);
 }
 
-/* Internal function to set BGP structure configureation flag.  */
+/* Internal function to set BGP structure configuration flag.  */
 static void
 bgp_config_set (struct bgp *bgp, int config)
 {
@@ -198,7 +198,7 @@ static void srx_config_unset (struct bgp *bgp, int flags)
 }
 
 /**
- * Checks for the existance of all flags specified in flags. The check is
+ * Checks for the existence of all flags specified in flags. The check is
  * performed on bgp->srx_config.
  *
  * @param bgp The bgp instance
@@ -334,8 +334,8 @@ bgp_cluster_id_unset (struct bgp *bgp)
   return 0;
 }
 
-/* time_t value that is monotonicly increasing
- * and uneffected by adjustments to system clock
+/* time_t value that is monotonically increasing
+ * and unaffected by adjustments to system clock
  */
 time_t bgp_clock (void)
 {
@@ -406,7 +406,7 @@ bgp_confederation_id_set (struct bgp *bgp, as_t as)
 	}
       else
 	{
-	  /* Not doign confederation before, so reset every non-local
+	  /* Not doing confederation before, so reset every non-local
 	     session */
 	  if (peer_sort (peer) != BGP_PEER_IBGP)
 	    {
@@ -1621,7 +1621,7 @@ peer_nsf_stop (struct peer *peer)
   bgp_clear_route_all (peer);
 }
 
-/* Delete peer from confguration.
+/* Delete peer from configuration.
  *
  * The peer is moved to a dead-end "Deleted" neighbour-state, to allow
  * it to "cool off" and refcounts to hit 0, at which state it is freed.
@@ -1787,7 +1787,7 @@ peer_group_active (struct peer *peer)
   return 0;
 }
 
-/* Peer group cofiguration. */
+/* Peer group configuration. */
 static struct peer_group *
 peer_group_new (void)
 {
@@ -3031,7 +3031,7 @@ static const struct peer_flag_action peer_flag_action_list[] =
     { PEER_FLAG_DISABLE_CONNECTED_CHECK,  0, peer_change_reset },
 #ifdef USE_SRX
 // @TODO: I think this has to be peer_change_reset. For now I will keep it
-//        but definetely need to get back and verify
+//        but definitely need to get back and verify
     { PEER_FLAG_BGPSEC_CAPABILITY_SEND,   0, peer_change_none },
     { PEER_FLAG_BGPSEC_CAPABILITY_RECV,   0, peer_change_none },
     { PEER_FLAG_BGPSEC_MPE_IPV4,          0, peer_change_none },
@@ -3284,7 +3284,7 @@ peer_af_flag_modify (struct peer *peer, afi_t afi, safi_t safi, u_int32_t flag,
   if (! found)
     return BGP_ERR_INVALID_FLAG;
 
-  /* Adress family must be activated.  */
+  /* Address family must be activated.  */
   if (! peer->afc[afi][safi])
     return BGP_ERR_PEER_INACTIVE;
 
@@ -3292,12 +3292,12 @@ peer_af_flag_modify (struct peer *peer, afi_t afi, safi_t safi, u_int32_t flag,
   if (action.not_for_member && peer_is_group_member (peer, afi, safi))
     return BGP_ERR_INVALID_FOR_PEER_GROUP_MEMBER;
 
- /* Spcecial check for reflector client.  */
+ /* Special check for reflector client.  */
   if (flag & PEER_FLAG_REFLECTOR_CLIENT
       && peer_sort (peer) != BGP_PEER_IBGP)
     return BGP_ERR_NOT_INTERNAL_PEER;
 
-  /* Spcecial check for remove-private-AS.  */
+  /* Special check for remove-private-AS.  */
   if (flag & PEER_FLAG_REMOVE_PRIVATE_AS
       && peer_sort (peer) == BGP_PEER_IBGP)
     return BGP_ERR_REMOVE_PRIVATE_AS;
@@ -3749,11 +3749,11 @@ peer_default_originate_set (struct peer *peer, afi_t afi, safi_t safi,
   struct peer_group *group;
   struct listnode *node, *nnode;
 
-  /* Adress family must be activated.  */
+  /* Address family must be activated.  */
   if (! peer->afc[afi][safi])
     return BGP_ERR_PEER_INACTIVE;
 
-  /* Default originate can't be used for peer group memeber.  */
+  /* Default originate can't be used for peer group member.  */
   if (peer_is_group_member (peer, afi, safi))
     return BGP_ERR_INVALID_FOR_PEER_GROUP_MEMBER;
 
@@ -3805,11 +3805,11 @@ peer_default_originate_unset (struct peer *peer, afi_t afi, safi_t safi)
   struct peer_group *group;
   struct listnode *node, *nnode;
 
-  /* Adress family must be activated.  */
+  /* Address family must be activated.  */
   if (! peer->afc[afi][safi])
     return BGP_ERR_PEER_INACTIVE;
 
-  /* Default originate can't be used for peer group memeber.  */
+  /* Default originate can't be used for peer group member.  */
   if (peer_is_group_member (peer, afi, safi))
     return BGP_ERR_INVALID_FOR_PEER_GROUP_MEMBER;
 
@@ -3915,7 +3915,7 @@ peer_timers_set (struct peer *peer, u_int32_t keepalive, u_int32_t holdtime)
   struct peer_group *group;
   struct listnode *node, *nnode;
 
-  /* Not for peer group memeber.  */
+  /* Not for peer group member.  */
   if (peer_group_active (peer))
     return BGP_ERR_INVALID_FOR_PEER_GROUP_MEMBER;
 
@@ -5814,7 +5814,7 @@ bgp_config_write_peer (struct vty *vty, struct bgp *bgp,
   /* Filter. */
   bgp_config_write_filter (vty, peer, afi, safi);
 
-  /* atribute-unchanged. */
+  /* attribute-unchanged. */
   if ((CHECK_FLAG (peer->af_flags[afi][safi], PEER_FLAG_AS_PATH_UNCHANGED)
       || CHECK_FLAG (peer->af_flags[afi][safi], PEER_FLAG_NEXTHOP_UNCHANGED)
       || CHECK_FLAG (peer->af_flags[afi][safi], PEER_FLAG_MED_UNCHANGED))

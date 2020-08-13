@@ -6,13 +6,24 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.4.2.9 - August 2020
+    * Fixed sections in configure.ac that did not properly check for the 
+      existence of needed tools depending on configured settings.
+    * Fixed bug in .texi doc files that prevented a proper rpm generation.
+    * Updated spec file and added doc back in. The previous change cased 
+      an error during uninstall.
+
+  0.4.2.8 - July 2020
+    * Updated spec file.
+    * Added include "config.h" to bgpd/bgpd.h
+
   0.4.2.7 - May - July 2020
     * Removed doc folder from build scripts due to text compile errors which require
       --disable-doc and prevent rpms from being created. Might be added at a later 
       point in time again. Search for ^^ -*-DOC-*- ^^ in 
       configure.ac, Makefile.am, and redhat/quagga.spec.in
     * Fixed more issues in configuration script regarding static OpenSSL library
-    * Fixed issues with configuration switch (en/dis)able_srx and (en/dis)able_srxxryptoapi 
+    * Fixed issues with configuration switch (en/dis)able_srx and (en/dis)able_srxcryptoapi 
 
   0.4.2.6 - October 2017
     * Fixed more issues in configuration script
@@ -24,7 +35,7 @@ QuaggaSRx changes are:
 
   0.4.2.4 - July 2017
     * Update implementation to comply with latest BGPsec Protocol specification
-    * Modified the valies of CAPABILITY_CODE_BGPSEC and BGP_ATTR_BGPSEC to
+    * Modified the values of CAPABILITY_CODE_BGPSEC and BGP_ATTR_BGPSEC to
       the IANA assigned values.
       For backwards compatibility with code written during the time where IANA 
       did not have the values assigned yet, these values still can be modified 
@@ -47,7 +58,7 @@ QuaggaSRx changes are:
 
   0.4.2.0 - July 2016
     * Rewrote BGPSEC Path processing according to bgpsec draft 17
-    * Removed handling of public keys. This musat be done in SRxCryptoAPI as 
+    * Removed handling of public keys. This must be done in SRxCryptoAPI as 
       well as SRx-Server
     * Enabled MPNLRI encoding for IPv4 addresses
     * Allowing to specify more than one private key for path signing

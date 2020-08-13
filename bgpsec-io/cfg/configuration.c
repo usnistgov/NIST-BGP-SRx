@@ -21,10 +21,12 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.0
+ * @version 0.2.1.1
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.1 - 2020/07/31 - oborchert
+ *            * Added define SRX_DEV_TOYEAR
  *  0.2.1.0 - 2018/11/29 - oborchert
  *            * Removed merge comments in version control.
  *          - 2018/01/16 - oborchert
@@ -449,8 +451,8 @@ void printSyntax()
   printf ("          This setting only affects the CAPI mode.\n");
   
   printf ("\n");
-  printf ("%s Version %s\nDeveloped 2015-2018 by Oliver Borchert ANTD/NIST\n", 
-          PACKAGE_NAME, PACKAGE_VERSION);
+  printf ("%s Version %s\nDeveloped 2015-%s by Oliver Borchert ANTD/NIST\n", 
+          PACKAGE_NAME, PACKAGE_VERSION, SRX_DEV_TOYEAR);
   printf ("Send bug reports to %s\n\n", PACKAGE_BUGREPORT);
 }
 

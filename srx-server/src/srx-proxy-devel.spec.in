@@ -26,11 +26,11 @@ Version:%{version}
 Release:1%{?dist}
 Summary:Package provides the SRx Proxy developer files
 Group:Networking/Daemons
-License:LGPL
-URL:www.antd.nist.gov
+License:@LICENSE@
+URL:@URL@
 Vendor:National Institute of Standards and Technology (NIST)
-Distribution:SRx Software Suite
-Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+Distribution:NIST BGP-SRx Software Suite
+Packager:BGP-SRx Dev <@PACKAGE_BUGREPORT@>
 
 Source0:%{core_name}-%{version}.tar.gz
 BuildRoot:/tmp/rpm/%{core_name}-%{version}

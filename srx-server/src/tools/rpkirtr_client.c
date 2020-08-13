@@ -22,10 +22,12 @@
  * Connects to an RPKI/Router Protocol server and prints all received
  * information on stdout.
  *
- * @version 0.5.0.4
+ * @version 0.5.1.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.5.1.1 - 2020/07/31 - oborchert
+ *            * Use define SRX_DEV_TOYEAR for year printout.
  *  0.5.0.4 - 2018/03/09 - oborchert
  *            * Do not print starting string on single run except if verbose is 
  *              enabled.
@@ -331,7 +333,7 @@ void syntax(const char* prgName)
     printf ("    The order in which the data is printed is ASN, Prefix, Maxlen");
     printf ("\n    This means the formating string must contain the order");
     printf ("\n    integer - string - integer");
-    printf ("\n\n 2010-2018 ANTD NIST - Version %s\n", SRX_TOOLS_VERSION);
+    printf ("\n\n 2010-%s ANTD NIST - Version %s\n", SRX_DEV_TOYEAR, SRX_TOOLS_VERSION);
 }
 
 /**

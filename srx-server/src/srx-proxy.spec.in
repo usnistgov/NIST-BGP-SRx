@@ -21,11 +21,11 @@ Version:%{version}
 Release:1%{?dist}
 Summary:Package provides the SRx Proxy
 Group:Networking/Daemons
-License:LGPL
-URL:www.antd.nist.gov
+License:@LICENSE@
+URL:@URL@
 Vendor:National Institute of Standards and Technology (NIST)
-Distribution:SRx Software Suite
-Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+Distribution:NIST BGP-SRx Software Suite
+Packager:BGP-SRx Dev <@PACKAGE_BUGREPORT@>
 
 Source0:%{core_name}-%{version}.tar.gz
 BuildRoot:/tmp/rpm/%{core_name}-%{version}	
@@ -37,7 +37,7 @@ Requires:glibc
 
 %description
 The SRx-Proxy allows routers to connect to the srx-server using API calls.
-Additionaly this package provides an srxsrv_client
+Additionally this package provides an srxsrv_client
 
 %prep
 %setup -q -n %{core_name}-%{version}

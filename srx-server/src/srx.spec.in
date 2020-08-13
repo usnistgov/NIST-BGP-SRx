@@ -19,11 +19,11 @@ Version:%{version}
 Release:1%{?dist}
 Summary:This package provides the SRx server for RPKI origin validation and BGPsec path validation including tools
 Group:Networking/Daemons
-License:LGPL
-URL:www.antd.nist.gov
+License:@LICENSE@
+URL:@URL@
 Vendor:National Institute of Standards and Technology (NIST)
-Distribution:SRx Software Suite
-Packager: BGPSrx Dev <bgpsrx-dev@nist.gov>
+Distribution:NIST BGP-SRx Software Suite
+Packager:BGP-SRx Dev <@PACKAGE_BUGREPORT@>
 
 Source0:%{name}-%{version}.tar.gz
 BuildRoot:/tmp/rpm/%{name}-%{version}	
@@ -40,7 +40,7 @@ processing (RFC6811) and BGPsec path validation (RFC8205). The SRx-server allows
 to provide RPKI and BGPsec path processing to more than one router. 
 The srx-server can be accessed remotely using a telnet client.
 
-In addition to the srx-server this package procives an RPKI test harness that 
+In addition to the srx-server this package provides an RPKI test harness that 
 emulates an RPKI cache allowing to feed ROA's and PKI keys to the srx-server 
 using the rtr-to-cache protocol (RFC8210).
 

@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.5.0.1
+ * @version 0.5.1.1
  *
  * EXIT Values:
  *
@@ -39,6 +39,9 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.1  - 2020/07/22 - oborchert
+ *            * Fixed a speller
+ *            * Fixed error message when unknown parameter is provided.
  * 0.5.0.1  - 2017/08/29 - oborchert
  *            * Fixed compiler warning in define SETUP_ALL_HANDLERS
  * 0.5.0.0  - 2017/07/08 - oborchert
@@ -211,6 +214,10 @@ static int setupConfiguration (int argc, const char* argv[])
   params = parseProgramArgs(&config, argc, argv, true);
   if (params != 1)
   {
+    if (params == -2)
+    {
+      params = -1;
+    }
     return params;
   }
 
@@ -425,7 +432,7 @@ static void signalReceived(int _sig)
 
   releaseConsole(&console);
 
-  // Stopps, clears and releases all memory used by the send queue
+  // Stops, clears and releases all memory used by the send queue
   releaseSendQueue();
 }
 

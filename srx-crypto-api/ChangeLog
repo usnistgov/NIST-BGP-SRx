@@ -1,6 +1,10 @@
 More details on changes are scripted in the files itself.
 ===========================================================
-Version 0.3.0.0 - October 2020
+Version 0.3.0.1 - July 2020
+  - Fixed errors in dates.
+  - Updated email address
+  - Updated spec file.
+Version 0.3.0.0 - June 2020
   - !!! This version is not backwards compatible to V0.2 !!!
   - Fixed m4 scripts regarding OpenSSL header file location
   - Modified sign method parameters to allow signing more than one update 

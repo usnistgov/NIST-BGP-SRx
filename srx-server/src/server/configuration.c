@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.0
+ * @version 0.5.1.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.1 - 2020/07/22 - oborchert
+ *           * Fixed error message when unknown parameter is provided.
  * 0.5.0.0 - 2017/07/05 - oborchert
  *           * Fixed the default parameter value expected proxies to be 
  *             initialized with the define specified in server/update_cache.h
@@ -331,13 +333,13 @@ static char* _duplicateString(char* src, char** dest, const char* err)
  * @param argv The command line parameters.
  * @param onlyCfgFileName only parse for the configuration file.
  *
- * @return 1 = successful, 0 = invalid parameters found, -1 exit silent (for
- *         example -h)
+ * @return 1 = successful, 0 = Error occurred, -1 exit silent (for
+ *         example -h), -2 = invalid parameters found, 
  */
 int parseProgramArgs(Configuration* self, int argc, const char** argv,
                      bool onlyCfgFileName)
 {
-  int optc;
+  int optc = 0;
   int processed = 0;
 
   optind = 0; // Reset
@@ -363,8 +365,26 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         case CFG_PARAM_VERSION:      // --version
         case CFG_PARAM_FULL_VERSION: // --full-version
           break;
-        default:
+        case 'v':
+        case 's':
+        case 'C':
+        case 'k':
+        case 'l':
+        case CFG_PARAM_LOGLEVEL:
+        case CFG_PARAM_SYSLOG:
+        case 'p':
+        case 'c':
+        case 'P':
+        case CFG_PARAM_RPKI_HOST:
+        case CFG_PARAM_RPKI_PORT:
+        case CFG_PARAM_SCA_CFG:
+        case CFG_PARAM_CREDITS:
+        case CFG_PARAM_MODE_NO_SEND_QUEUE:
+        case CFG_PARAM_MODE_NO_RCV_QUEUE:
           optc = -1;
+        default:
+          printf("Use '-h' for help!\n");
+          return -2;
       }
     }
 
@@ -547,7 +567,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         printf("Turn off receive queue!\n");
         break;
       default:
-        RAISE_ERROR("Usage: %s %s", argv[0], _USAGE_TEXT);
+        RAISE_ERROR("Usage: %s %s", argv[0], _USAGE_TEXT);        
         return 0;
     }
   }

@@ -20,15 +20,15 @@ Name:%{name}
 Version:%{version}
 Release:1%{?dist}
 Summary:SRx Crypto API - developers package
-Group:Networking/Daemons
-License:LGPL
+
+Group:Security Libraries
+License:https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software
 URL:https://bgpsrx.antd.nist.gov
 Vendor:National Institute of Standards and Technology (NIST)
-Distribution:SRx Software Suite
+Distribution:NIST BGP-SRx Software Suite
 Packager: BGP-Srx Dev <bgpsrx-dev@nist.gov>
-
 Source0:%{core_name}-%{version}.tar.gz
-BuildRoot:/tmp/rpm/%{core_name}-%{version}
+BuildRoot:/tmp/rpm/%{core_name}-%{version}s
 #Prefix: %{_prefix}
 #Prefix: %{_sysconfdir}
 

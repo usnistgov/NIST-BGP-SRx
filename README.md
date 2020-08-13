@@ -52,14 +52,30 @@ See Installing for notes on how to deploy the project on a live system.
 
 ### Prerequisites
 
-For required libraries please check the [CONTENT](CONTENT) file.
+It is recommended to install the "Development Tools" which contain
+a full set of libraries and tools to build the software. For a list
+of the required developer (*-devel) packages in CENTOS please see 
+the [CONTENT](CONTENT) file.
+
+For minimal installs without the "Development Tools" the following
+packages are needed:
+
+- patch        ( needed to compile the extras package in srx-server )
+- openssl      ( required for srx-crypto-api )
+- epel-release ( provides the uthash-devel package )
+- gcc
+- automake     ( only needed if the following error is displayed! 
+                 WARNING: 'aclocal-1.13' is missing on your system. )
+
+The section quick-install below provides a sample script that can be 
+used to configure and install the software without prior download.
 
 ### Building & Installing
 
-The CONTENT file does specify what libraries are required to be 
-installed for a successful installation. This is based upon a 
-fresh CENTOS 7 install. Other distributions might require additional
-packages. 
+The CONTENT file does specify what development libraries are required 
+to be for a successful installation. This is based upon a fresh 
+CENTOS 7 install. 
+Other distributions might require additional or different packages. 
 
 It is recommended to use the provided build and install script rather 
 than configuring and compiling the software manual. Nevertheless the 
@@ -95,12 +111,12 @@ not only the complete project but also separately sub components.
 
 For manual installation, each component's separate source folder contains the 
 appropriate README and INSTALL files. They contain all necessary information. 
-It is important to note that building the components requires to keep a certain order.
-It is also possible to manually call the auto build script for each component
-individually.
+It is important to note that building the components requires to keep a certain 
+order. It is also possible to manually call the auto build script for each 
+component individually.
 
-To rebuild the configuration scripts call *autoreconf -i --force*. For that the autoconfig tools
-are required.
+To rebuild the configuration scripts call *autoreconf -i --force*. For that 
+the automake tools are required.
 
 To build and install only the SRx Crypto API use the SCA option.
 ```
@@ -122,6 +138,80 @@ To build and install only the SRx Crypto API use the SCA option.
 1) Build and install SRx Crypto API (srx-crypto-api)
 2) Build and install SRx Server and Proxy (srx-server)
 3) Quagga SRx (quagga-srx)
+
+### Install Script
+
+This section provides a script that can be used for a CENTOS 7 minimal
+install:
+
+```
+#Install Script for BGP-SRx on clean CentOS-7 install
+echo "Install Script for BGP-SRx on clean CentOS-7 install"
+
+# wget: needed to retrieve the GitHub repo via zip file
+# unzip: needed to extract the repo
+# git:  needed to retrieve the GitHub repo via clone
+# epel-release: needed for uthash-devel later on
+
+mode=""
+while [ "$1" != "" ]
+do
+  case "$1" in 
+    "git") mode="git" ; tool_pkg="git" ;;
+    "zip") mode="zip" ; tool_pkg="wget unzip" ;;
+    "-h" | "-?" | "?" | "h") echo "$0 <git|zip>"; exit ;;
+    *) echo "Unknown parameter '$1'"; exit ;; 
+  esac
+  shift
+done
+
+if [ "$mode" == "" ] ; then
+  echo "You must select an install mode."
+  echo "$0 <git|zip>"
+  exit 1
+else
+  echo "Use $mode mode!"
+fi
+
+tool_pkg="$(echo $tool_pkg) gcc patch openssl epel-release autoconf"
+devel_pkg="libconfig-devel openssl-devel uthash-devel readline-devel net-snmp-devel"
+echo "yum -y install $tool_pkg"
+yum -y install $tool_pkg
+# $devel_pkg requires one package from the epel-release repo. Therefore 2 steps of install.
+echo “yum -y install $devel_pkg”
+yum -y install $devel_pkg
+
+if [ "$mode" == "zip" ] ; then
+  # Now get the repository and unpack it
+  echo "wget https://github.com/usnistgov/NIST-BGP-SRx/archive/master.zip"
+  wget https://github.com/usnistgov/NIST-BGP-SRx/archive/master.zip
+  echo "unzip master.zip"
+  unzip master.zip 
+else
+  # Now get the source via git clone
+  echo "git clone https://github.com/usnistgov/NIST-BGP-SRx NIST-BGP-SRx"
+  git clone https://github.com/usnistgov/NIST-BGP-SRx NIST-BGP-SRx-master
+fi
+
+# Enter into the Source code folder
+#echo "cd NIST-BGP-SRx-master/"
+cd NIST-BGP-SRx-master/
+
+# Build the software (-A runs it fully automated)
+echo "./buildBGP-SRx.sh -A"
+./buildBGP-SRx.sh -A
+
+# Call the quick tester
+echo "./testBGP-SRx.sh"
+./testBGP-SRx.sh
+
+# Display the compiled and installed software 
+echo "The installed software can be found at:"
+ls | grep local-
+```
+
+To use this script, create a folder and create an empty file. Copy
+the above content into the file and call 'sh <your-file>'
 
 
 ### Quick Functional Test / Demo
@@ -156,7 +246,7 @@ available regarding performance testing. Please visit the
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) sfor details on how to contribute
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute
 to the projects.
 
 ## Authors & Main Contributors
@@ -170,15 +260,11 @@ Kyehwan Lee
 
 Patrick Gleichmann
 
-## Related Work
-
-Note: Optional - if there are related works or background reading
-Add links to any papers or publications here if appropriate. 
-
 ## Copyright
 
 For license information see the [LICENSE](LICENSE) file. 
 
 ## Contacts
 
-Please send an email to bgpsrx-dev@nist.gov for more information on the project.
+For information, questions, or comments, contact by sending
+an email to bgpsrx-dev@nist.gov.

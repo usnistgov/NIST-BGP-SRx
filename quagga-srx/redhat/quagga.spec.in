@@ -110,7 +110,7 @@ Group:    System Environment/Daemons
 Source0:  %{name}-%{version}.tar.gz
 #Source0:	http://www.quagga.net/snapshots/cvs/%{name}-%{version}.tar.gz
 #URL:		  http://www.quagga.net
-URL:	 	  http://bgpsec.antd.nist.gov
+URL:	 	  http://bgpsrx.antd.nist.gov
 
 %if %{with_snmp}
 BuildRequires:	net-snmp-devel
@@ -249,10 +249,9 @@ sca_dir= srx_dir=
 
 make %{?_smp_mflags} MAKEINFO="makeinfo --no-split"
 
-# pushd doc
-# texi2html -number quagga.texi
-# popd
-# ^^ -*-DOC-*- ^^ removed doc install
+pushd doc
+texi2html -number quagga.texi
+popd
 
 
 %install
@@ -411,9 +410,8 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %doc */*.sample* AUTHORS COPYING
-# %doc doc/quagga.html
-# %doc doc/mpls
-# ^^ -*-DOC-*- ^^ removed from install
+%doc doc/quagga.html
+%doc doc/mpls
 %doc ChangeLog INSTALL NEWS README REPORTING-BUGS SERVICES TODO
 %if %{quagga_user}
 %dir %attr(751,%quagga_user,%quagga_user) %{_sysconfdir}
@@ -428,9 +426,8 @@ rm -rf $RPM_BUILD_ROOT
 %if %{vty_group}
 %attr(750,%quagga_user,%vty_group) %{_sysconfdir}/vtysh.conf.sample
 %endif
-#%{_infodir}/*info*
-#%{_mandir}/man*/*
-# ^^ -*-DOC-*- ^^ removed from install
+%{_infodir}/*info*
+%{_mandir}/man*/*
 %{_sbindir}/zebra
 %{_sbindir}/ospfd
 %{_sbindir}/ripd
@@ -480,7 +477,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Wed Jul 1 2020 Oliver Borchert <borchert@nist.gov>
-- Removed doc generation - texi files are faulty and not up to date.
 - Updated pre requirements and requirements for BGP-SRx 5.1
 
 * Tue Oct 13 2015 Oliver Borchert <borchert@nist.gov>
@@ -621,7 +617,7 @@ rm -rf $RPM_BUILD_ROOT
 * Thu Aug 09 2001 Elliot Lee <sopwith@redhat.com> 0.91a-6
 - Fix bug #51336
 
-* Wed Aug  1 2001 Trond Eivind Glomsr�d <teg@redhat.com> 0.91a-5
+* Wed Aug  1 2001 Trond Eivind Glomsr\F8d <teg@redhat.com> 0.91a-5
 - Use generic initscript strings instead of initscript specific
   ( "Starting foo: " -> "Starting $prog:" )
 
