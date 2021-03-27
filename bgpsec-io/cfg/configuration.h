@@ -22,10 +22,13 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.1
+ * @version 0.2.1.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.3 - 2021/03/26 - oborchert
+ *            * Changed DEF_KEYLOCATION and DEF_SKIFILE from /var/lib/key-volt 
+ *              to /var/lib/key-vault 
  *  0.2.1.1 - 2020/07/29 - oborchert
  *            * Fixed speller in documentation
  *            * Added define for development year (SRX_DEV_TOYEAR).
@@ -155,9 +158,9 @@
 /***  Defines for default BGP session configuration  **************************/
 /******************************************************************************/
 // The default location where to find the keys
-#define DEF_KEYLOCATION        "/var/lib/key-volt/\0"
+#define DEF_KEYLOCATION        "/var/lib/key-vault/\0"
 // The default file containing the list of public keys
-#define DEF_SKIFILE            "/var/lib/key-volt/ski-list.txt\0"
+#define DEF_SKIFILE            "/var/lib/key-vault/ski-list.txt\0"
 // The default port of the peer
 #define DEF_PEER_PORT          179
 // The default BGP hold time

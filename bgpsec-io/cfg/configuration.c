@@ -21,10 +21,12 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.1
+ * @version 0.2.1.2
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.2 - 2020/09/14 - oborchert
+ *            * Fixed segmentation fault in postProcessUpdateStack.
  *  0.2.1.1 - 2020/07/31 - oborchert
  *            * Added define SRX_DEV_TOYEAR
  *  0.2.1.0 - 2018/11/29 - oborchert
@@ -573,8 +575,10 @@ void postProcessUpdateStack(PrgParams* params)
           sStack->head->prev = pStack->tail;
         }
         sStack->head = pStack->head;
-        pStack->head = NULL;
-        sStack->head = NULL;
+        // Removed teh following two lines, they caused a segmentation 
+        // fault.
+        // pStack->head = NULL;
+        // sStack->head = NULL;
       }
     }
   }

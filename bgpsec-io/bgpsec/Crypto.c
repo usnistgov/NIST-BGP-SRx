@@ -21,10 +21,12 @@
  *
  * A wrapper for the OpenSSL crypto needed. It also includes a key storage.
  *
- * @version 0.2.1.0
+ * @version 0.2.1.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.3  - 2020/10/10 - oborchert
+ *             * Fixed speller in documentation 
  *  0.2.1.0  - 2017/12/21 - oborchert
  *             * Added capability to add keys into an existing as list. Modified
  *               function preloadKeys.
@@ -698,7 +700,7 @@ int CAPI_createSignature(SRxCryptoAPI* capi, TASList* asList,
  * Read the given ASN-SKI file and generate an internal list containing all 
  * entries including the keys.
  * 
- * @param asList a preloaded as list that will receive more keys.
+ * @param asList a pre-loaded as list that will receive more keys.
  * @param fileName The key-loader filename of the ASN-SKI list
  * @param keyRoot The root of the key files.
  * @param addEC_KEY if true the EC_KEY will be generated as well.

@@ -1,3 +1,10 @@
+Version 0.2.1.3
+  * Fixed speller in configuration. Changed key-volt to file-vault but still
+    allow the usage of key-volt for backwards compatibility. This might be
+    removed though in the next version of the tool.
+Version 0.2.1.2
+  * Fixed BUG in UPDATE generation using pipe
+  * Bug Fixes
 Version 0.2.1.1
   * Updated the project email address.
   * Updated spec file.

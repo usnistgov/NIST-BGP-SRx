@@ -23,10 +23,13 @@
  * This software implements a BGP final state machine, currently only for the
  * session initiator, not for the session receiver. 
  *  
- * @version 0.2.1.0
+ * @version 0.2.1.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.3 - 2020/10/10 - oborchert
+ *            * Fixed access to value of pointer session->lastSentUpdate in 
+ *              function runBGP
  *  0.2.1.0 - 2018/11/29 - oborchert
  *            * Removed merge comments in version control.
  *          - 2018/01/16 - oborchert
@@ -542,7 +545,9 @@ void* runBGP(void* bgp)
             {
               // disconnect after last update message was send.
               time_t now = time(0);
-              if (now < (session->lastSentUpdate 
+              // lastSendUpdate is a pointer, modified it to address the vlue
+              // instead.
+              if (now < (*(session->lastSentUpdate)
                          + session->bgpConf->disconnectTime))
               {
                 sendNotification(session, BGP_ERR6_CEASE, 

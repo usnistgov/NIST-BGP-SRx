@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.0
+ * @version 0.2.1.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.3 - 2021/03/26 - oborchert
+ *            * Renamed attribute inludeStdIn into includeStdIn
  *  0.2.1.0 - 2018/11/29 - oborchert
  *            * Removed merge comments in version control.
  *          - 2018/03/09 - AntaraTek
@@ -287,12 +289,12 @@ static int _runBGPRouterSession(PrgParams* params, int sessionNr)
   BGP_UpdateMessage_1* bgp_update  = NULL;
   int               stopTime       = session->bgpConf->disconnectTime;
   bool              hasBinTraffic  = params->binInFile[0] != '\0';
-  bool              inludeStdIn    = sessionNr == 0;
+  bool              includeStdIn    = sessionNr == 0;
   // @TODO: The stack empty call might need the session number to 
   //        figure which update stack is asked for. Also hasBinTraffic should
-  //        only be considdered for session 0
+  //        only be considered for session 0
   bool              sendData    = (!isUpdateStackEmpty(params, sessionNr, 
-                                                       inludeStdIn) 
+                                                       includeStdIn) 
                                    || hasBinTraffic) 
                                   && (params->maxUpdates != 0);
 
@@ -359,7 +361,7 @@ static int _runBGPRouterSession(PrgParams* params, int sessionNr)
       bool iBGP = session->bgpConf->asn == session->bgpConf->peerAS;
       
       // First check the stack and stdin
-      if (!isUpdateStackEmpty(params, sessionNr, inludeStdIn))
+      if (!isUpdateStackEmpty(params, sessionNr, includeStdIn))
       {
         record.recordType = BGPSEC_IO_TYPE_BGPSEC_ATTR;
         update    = (UpdateData*)popStack(&session->bgpConf->updateStack);
@@ -485,7 +487,7 @@ static int _runBGPRouterSession(PrgParams* params, int sessionNr)
       }
       else if (hasBinTraffic)
       {
-        inludeStdIn = false;
+        includeStdIn = false;
         hasBinTraffic = loadData(dataFile, htonl(session->bgpConf->asn), 
                                  htonl(session->bgpConf->peerAS), 
                                  BGPSEC_IO_TYPE_ALL, &record, &ioBuff);

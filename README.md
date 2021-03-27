@@ -213,6 +213,12 @@ ls | grep local-
 To use this script, create a folder and create an empty file. Copy
 the above content into the file and call 'sh <your-file>'
 
+To install the binaries outside of the "sandbox" folder where the code is
+located, call the build script 
+```buildBGP-SRx.sh -P <absolute-path> [<more parameters>]```
+and the binaries will will be installed inthe given ```<absolute-path>```
+folder. Make sure the build script has access to either create the path 
+and or create the binaries in the  given path.
 
 ### Quick Functional Test / Demo
 
@@ -253,12 +259,12 @@ to the projects.
 
 ### Developer
 
-Oliver Borchert (Lead)
-Kyehwan Lee
+- Oliver Borchert (Lead)
+- Kyehwan Lee
 
 ### Previous Developer
 
-Patrick Gleichmann
+- Patrick Gleichmann
 
 ## Copyright
 

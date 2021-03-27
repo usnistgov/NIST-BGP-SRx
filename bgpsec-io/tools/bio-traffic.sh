@@ -33,7 +33,7 @@ function syntax()
   echo "    -l          : List mode, one update per line."
   echo "    -?, ?, -h   : This screen."
   echo
-  echo " 2017 ANTD/NIST (bgpsrx-dev@nist.gov)"
+  echo " 2017-2020 ANTD/NIST (bgpsrx-dev@nist.gov)"
   echo
   exit $1
 }
@@ -105,7 +105,7 @@ function processParam()
      "-p")
         shift
         if [ $1 -ge -1 ] && [ $1 -le 32 ] ; then
-          PFX-$1
+          PFX=$1
         else
           echo "Invalid prefix length '$1'"
           exit 1

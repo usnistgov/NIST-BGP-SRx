@@ -6,8 +6,8 @@
 # The ASNs as well as the IPv4 and IPv6 prefixes used in this example are taken 
 # from RFC5398 and RFC6890
 
-ski_file    = "/var/lib/key-volt/ski-list.txt";
-ski_key_loc = "/var/lib/key-volt/";
+ski_file    = "/var/lib/key-vault/ski-list.txt";
+ski_key_loc = "/var/lib/key-vault/";
 
 preload_eckey = false;
 

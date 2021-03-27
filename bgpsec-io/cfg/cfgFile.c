@@ -23,10 +23,12 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPSEC-IO
  * 
- * @version 0.2.1.0
+ * @version 0.2.1.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.3 - 2021/03/26 - oborchert
+ *            * Fixed speller in configuration printout.
  *  0.2.1.0 - 2018/11/29 - oborchert
  *            * Removed merge comments in version control.
  *          - 2018/01/16 - oborchert
@@ -353,7 +355,7 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
     
     fprintf (file, "    # Updates for this session only\n");
     fprintf (file, "    # (path prefix B4 specifies BGP4 only update!)\n");
-    fprintf (file, "    # <prefix>[,[[B4]? <asn>[p<repitition>]]*[ ]*[I|V|N]?]\n");
+    fprintf (file, "    # <prefix>[,[[B4]? <asn>[p<repetition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "    %s = (  \"%s\"\n", P_CFG_UPD_PARAM, 
                                                     "10.0.0.0/24");
     fprintf (file, "              , \"%s, %s\"\n", "10.1.0.0/24", 
@@ -448,7 +450,7 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
     fprintf (file, ");\n\n");
 
     fprintf (file, "# global updates for all sessions\n");
-    fprintf (file, "# <prefix>[,[[B4]? <asn>[p<repitition>]]*[ ]*[I|V|N]?]\n");
+    fprintf (file, "# <prefix>[,[[B4]? <asn>[p<repetition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "%s = ( \n", P_CFG_UPD_PARAM);
     fprintf (file, "         );\n");
     fclose(file);
