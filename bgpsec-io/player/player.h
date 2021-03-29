@@ -20,13 +20,15 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * This header file contains the data structure for the BGPSEC-IO player.
+ * This header file contains the data structure for the BGPsec-IO player.
  * The player itself allows to write/read the data to and from a file.
  * 
- * @version 0.2.0.5
+ * @version 0.2.1.4
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.4 - 2021/03/29 - oborchert
+ *            * Changed naming from all uppercase to BGPsec-IO
  *  0.2.0.5 - 2016/11/15 - oborchert
  *            * modified BGPSEC_IO_DRAFT to version 18
  *  0.1.2.0 - 2016/05/05 - oborchert

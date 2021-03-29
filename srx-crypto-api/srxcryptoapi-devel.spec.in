@@ -26,7 +26,7 @@ License:https://www.nist.gov/director/copyright-fair-use-and-licensing-statement
 URL:https://bgpsrx.antd.nist.gov
 Vendor:National Institute of Standards and Technology (NIST)
 Distribution:NIST BGP-SRx Software Suite
-Packager: BGP-Srx Dev <bgpsrx-dev@nist.gov>
+Packager: BGP-SRx Team <itrg-contact@list.nist.gov>
 Source0:%{core_name}-%{version}.tar.gz
 BuildRoot:/tmp/rpm/%{core_name}-%{version}s
 #Prefix: %{_prefix}

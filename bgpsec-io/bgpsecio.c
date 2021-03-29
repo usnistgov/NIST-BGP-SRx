@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.3
+ * @version 0.2.1.4
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.4 - 2021/03/29 - oborchert
+ *            * Changed naming from all uppercase to BGPsec-IO
  *  0.2.1.3 - 2021/03/26 - oborchert
  *            * Renamed attribute inludeStdIn into includeStdIn
  *  0.2.1.0 - 2018/11/29 - oborchert
@@ -166,7 +168,7 @@
 /** For time measurement */
 #define TIME_BILLION 1000000000L
 
-/** Used as key source for BGPSEC-IO bin: 1111 1100 dec: 252 */
+/** Used as key source for BGPsec-IO bin: 1111 1100 dec: 252 */
 #define BIO_KEYSOURCE 0xFC
 
 /**

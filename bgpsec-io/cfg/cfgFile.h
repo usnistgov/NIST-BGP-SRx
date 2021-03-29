@@ -21,12 +21,14 @@
  * by this software.
  *
  * cfgFile allows to generate a fully functional sample configuration file
- * for BGPSEC-IO
+ * for BGPsec-IO
  *
- * @version 0.2.1.0
+ * @version 0.2.1.4
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.4 - 2021/03/29 - oborchert
+ *            * Changed naming from all uppercase to BGPsec-IO
  *  0.2.1.0 - 2017/12/20 - oborchert
  *            * Moved default defines into configuration.h
  *          - 2017/12/13 - oborchert

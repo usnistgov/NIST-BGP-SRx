@@ -487,10 +487,10 @@ bgpsecio_LDFLAGS = $(LDFLAGS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
 ################################################################################
 ################################################################################
 
-# RPM script and macros for BGPSEC-IO
+# RPM script and macros for BGPsec-IO
 RPM = rpm
 
-# RPM script and macros for BGPSEC-IO
+# RPM script and macros for BGPsec-IO
 rpmspec = $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).spec
 rpmmacros = \
  --define="_rpmdir $${PWD}"\

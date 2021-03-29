@@ -33,7 +33,7 @@ function syntax()
   echo "    -l          : List mode, one update per line."
   echo "    -?, ?, -h   : This screen."
   echo
-  echo " 2017-2020 ANTD/NIST (bgpsrx-dev@nist.gov)"
+  echo " 2017-2021 BGP-SRx Team / NIST (itrg-contact@list.nist.gov)"
   echo
   exit $1
 }
