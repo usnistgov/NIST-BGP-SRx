@@ -22,10 +22,14 @@
  *
  * Stores and loads the BGPSEC data.
  * 
- * @version 0.2.0.5
+ * @version 0.2.1.5
  * 
- * Changelog:
+ * Changelog
  * -----------------------------------------------------------------------------
+ *  0.2.1.5 - 2021/05/20 - oborchert
+ *            * Fixed bug in storing the BGPsec data that the number of keys 
+ *              was not properly stored.
+ *            * Corrected function description in comment section.
  *  0.2.0.5 - 2016/11/15 - oborchert
  *            * Added capability of storing/loading one byte length bgpsec path 
  *              attributes.
@@ -153,11 +157,11 @@ bool loadData(FILE* file, u_int32_t myAS, u_int32_t peerAS, u_int8_t type,
  * as is. Best is if the data contains data types to convert them into 
  * big-endian prior to saving to prevent issues on different platforms.
  * 
- * @param outFileFD the file descriptor.
+ * @param file the file descriptor.
  * @param type the type of data (update or just attribute)
- * @param asn the ASN of the bgpsec-io player (host format_.
+ * @param asn the ASN of the bgpsec-io player (host format)
  * @param peerAS the peer AS (host format)
- * @param data The data to be stored.
+ * @param store The data to be stored.
  * 
  * @return true if it could be stored, otherwise false.
  */
@@ -186,6 +190,7 @@ bool storeData(FILE* file, u_int8_t type, u_int32_t asn, u_int32_t peerAS,
   record.peerAS     = htonl(peerAS);
   record.dataLength = htons(store->dataLength);
   record.noSegments = htonl(store->segmentCount);
+  record.numKeys    = htons(store->numKeys);
   
   BGPSEC_PrefixHdr* pHdr = (BGPSEC_PrefixHdr*)&record.prefix;
 
@@ -254,7 +259,7 @@ bool storeData(FILE* file, u_int8_t type, u_int32_t asn, u_int32_t peerAS,
     bytesWritten += fwrite(keyBuff, 1, keyBuffSize, file);
   }
 
-  // Now write the attribute (ass the BGP header length to the attrLength)
+  // Now write the attribute (add the BGP header length to the attrLength)
   bytesWritten += fwrite(store->data, 1, store->dataLength, file);
   length += store->dataLength;
 

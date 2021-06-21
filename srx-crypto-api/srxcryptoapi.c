@@ -25,10 +25,14 @@
  * that do generate the key files in the required form. See the tool sub
  * directory for more information.
  *
- * @version 0.3.0.0
+ * @version 0.3.0.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.3 - 2021/05/08 - oborchert
+ *            * Renamed all instances of volt to vault
+ *            * Added a deprecation of the incorrect key_volt to be backwards 
+ *              compatible
  *  0.3.0.0 - 2020/05/21 - kyehwanl
  *            * Fixed speller in function sca_generateOriginHashMessage from
  *              sca_gnener... to sca_gener...
@@ -126,7 +130,8 @@
 
 #define CRYPTO_CFG_FILE            "srxcryptoapi.conf"
 
-#define SCA_KEY_VOLT               "key_volt"
+#define SCA_KEY_VAULT_DEPRECATED   "key_volt"
+#define SCA_KEY_VAULT              "key_vault"
 #define SCA_KEY_EXT_PRIV           "key_ext_private"
 #define SCA_KEY_EXT_PUB            "key_ext_public"
 #define SCA_LIBRARY_NAME           "library_name"
@@ -257,7 +262,7 @@ extern LT_DLSYM_CONST lt_dlsymlist lt_libltdl_LTX_preloaded_symbols[];
 
 /* Default logging information will be changed once configuration is loaded. */
 static int g_loglevel = LOG_INFO;
-/* Contains the path information to the key volt. */
+/* Contains the path information to the key vault. */
 static char _keyPath [MAXPATHLEN];
 /* The file extension for DER encoded private key. */
 static char _key_ext_priv[MAX_EXT_SIZE];
@@ -666,23 +671,32 @@ static void _loadGeneralConfiguration(config_t* cfg, sca_status_t* status)
   }
 
   // Set the default key location if configured.
-  const char* key_volt;
-  if (config_lookup_string(cfg, SCA_KEY_VOLT, &key_volt))
+  const char* key_vault = NULL;
+  if (!config_lookup_string(cfg, SCA_KEY_VAULT, &key_vault))
   {
-    sca_SetKeyPath((char *)key_volt);
-    void* file = fopen(key_volt , "r");
+    if (config_lookup_string(cfg, SCA_KEY_VAULT_DEPRECATED, &key_vault))
+    {
+      sca_debugLog(LOG_WARNING, "\"%s\" is DEPRECATED, use \"%s\" instead!\n",
+                   SCA_KEY_VAULT_DEPRECATED, SCA_KEY_VAULT);      
+    }
+  }
+  
+  if (key_vault != NULL)
+  {
+    sca_SetKeyPath((char *)key_vault);
+    void* file = fopen(key_vault , "r");
     if (!file)
     {
       sca_debugLog(LOG_WARNING, "%s - Invalid directory \"%s\"\n",
-                   SCA_KEY_VOLT, key_volt);
+                   SCA_KEY_VAULT, key_vault);
     }
     else
     {
       fclose(file);
-      sca_debugLog(LOG_INFO, "- %s=\"%s\"\n", SCA_KEY_VOLT, key_volt);
+      sca_debugLog(LOG_INFO, "- %s=\"%s\"\n", SCA_KEY_VAULT, key_vault);
     }
   }
-
+  
   // Set the default extension for private key.
   const char* ext_priv;
   if (config_lookup_string(cfg, SCA_KEY_EXT_PRIV, &ext_priv))
@@ -1313,7 +1327,7 @@ void sca_debugLog( int level, const char *format, ...)
 }
 
 /**
- * Load the key from the key volt location configured within the API. The key
+ * Load the key from the key vault location configured within the API. The key
  * needs the SKI specified in binary format.
  * The returned key is in DER format. The parameter fPrivate is used to
  * indicate if the private or public key will be returned. This is of importance

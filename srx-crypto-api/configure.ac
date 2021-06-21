@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRxCryptoAPI], [0.3.0.2], [itrg-contact@list.nist.gov])
+AC_INIT([SRxCryptoAPI], [0.3.0.3], [itrg-contact@list.nist.gov])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -339,6 +339,7 @@ AC_SUBST([DOLLAR_SIGN],[$])
 
 # Use this if one of the 'Makefile.am ' files are modified prior autoreconf -i
 AC_CONFIG_FILES([Makefile bgpsec_openssl/Makefile crypto_testlib/Makefile \
+                 srxcryptoapi.conf \
                  srxcryptoapi-$PACKAGE_VERSION.spec:srxcryptoapi.spec.in \
                  srxcryptoapi-devel-$PACKAGE_VERSION.spec:srxcryptoapi-devel.spec.in \
                  srxcryptoapi_lib$CPU_ARCH.conf:srxcryptoapi_lib.conf.in])

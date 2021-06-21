@@ -1,5 +1,10 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.3.0.3 - May 2021
+  - Moved the configuration from from hard coded to be a template
+    file that is configured the build process. This allows to point
+    to the proper key vault folder.
+  - Properly deprecated option -t in crypto tester
 Version 0.3.0.2 - March 2021
   - Updated project email address.
 Version 0.3.0.1 - July 2020

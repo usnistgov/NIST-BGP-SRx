@@ -1,0 +1,15 @@
+echo "This is the BGP-SRx RPKI Cache Test Harness"
+echo "==========================================="
+
+echo "Add ROA configurations"
+
+add 10.5.0.0/20  24 65005
+add 10.10.0.0/18 20 65010
+add 10.15.0.0/20 24 65015
+add 10.20.0.0/20 24 65020
+add 10.25.0.0/22 24 65025
+add 10.30.0.0/20 22 65030
+add 10.40.0.0/20 24 65040
+
+echo "Cache Contents:"
+cache

@@ -20,10 +20,18 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.4
+ * @version 0.2.1.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.5 - 2021/05/20 - oborchert
+ *            * Fixed bug in preparation for storing the BGPsec Path Attribute 
+ *              data. The issue was that not the BGPsec Path data was handed to 
+ *              the store function but the address of the pointer to the data.
+ *            * For debug purpose the function __capiRegisterPublicKeys now 
+ *              returns the number of keys registered.
+ *            * Removed incorrect error message when registration of faulty key
+ *              fails in __capiProcessBGPSecAttr.
  *  0.2.1.4 - 2021/03/29 - oborchert
  *            * Changed naming from all uppercase to BGPsec-IO
  *  0.2.1.3 - 2021/03/26 - oborchert
@@ -668,19 +676,40 @@ static int __capiProcessBGPSecAttr(SRxCryptoAPI* capi, PrgParams* params,
   // Check if keys need to be registered
   if (bgpConf->algoParam.pubKeysStored > 0)
   {
-    int idx = 0; 
+    int idx = 0;
+    int skiIdx=0;
     sca_status_t keyStatus = API_STATUS_OK;
     int regResult = API_SUCCESS;
+    int expResult = API_SUCCESS;
     for (; idx < bgpConf->algoParam.pubKeysStored; idx++)
     {
+      expResult = (bgpConf->algoParam.pubKey[idx]->keyData 
+                   != bgpConf->algoParam.fake_key.keyData) ? API_SUCCESS 
+                                                            : API_FAILURE;
       regResult = capi->registerPublicKey(bgpConf->algoParam.pubKey[idx], 
                                           BIO_KEYSOURCE, &keyStatus);
-      if (regResult == API_FAILURE)
+      if (regResult != expResult)
       {
-        if ((keyStatus & API_STATUS_ERROR_MASK) > 0)
+        if (expResult == API_SUCCESS)
         {
-          printf("ERROR: Registering public key:\n");
-          sca_printStatus(keyStatus);
+          // It was expected that the registration is successful.
+          if ((keyStatus & API_STATUS_ERROR_MASK) > 0)
+          {
+            printf("ERROR: Registering public key:\n");
+            sca_printStatus(keyStatus);
+          }
+        }
+        else
+        {
+          // It was expected that the registration failed but it did not!!!
+          printf("ERROR: Registering public key was successful where it should"
+                 " have failed!!!:\n");
+          printf("SKI [");
+          for (skiIdx = 0; skiIdx < SKI_LENGTH; skiIdx++)
+          {
+            printf(" %02X", bgpConf->algoParam.pubKey[idx]->ski[skiIdx]);
+          }
+          printf("\n");
         }
       }      
     }
@@ -755,9 +784,11 @@ static void __cleanPubKeys(BGP_SessionConf* bgpConf)
  * 
  * @param capi The API module
  * @param ioBuff The keys.
+ * 
+ * @return the number of keys registered.
  */
-static void __capiRegisterPublicKeys(SRxCryptoAPI* capi, 
-                                     BGPSEC_IO_Buffer* ioBuff)
+static int __capiRegisterPublicKeys(SRxCryptoAPI* capi, 
+                                    BGPSEC_IO_Buffer* ioBuff)
 {
   u_int16_t* wordVal = (u_int16_t*)ioBuff->keys;
   u_int16_t  length = *wordVal;
@@ -766,6 +797,8 @@ static void __capiRegisterPublicKeys(SRxCryptoAPI* capi,
   BGPSEC_IO_KRecord* kRecord = NULL;
   BGPSecKey          bgpsec_key;
   sca_status_t       myStatus;
+  
+  int keysRegistered = 0;
   
   while (length != 0)
   {    
@@ -789,7 +822,10 @@ static void __capiRegisterPublicKeys(SRxCryptoAPI* capi,
       sca_printStatus(myStatus);
       break;
     }
+    keysRegistered++;
   }
+  
+  return keysRegistered;
 }
 
 /**
@@ -908,7 +944,7 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
         params->maxUpdates--;
         pathAttr  = (BGP_PathAttribute*)ioBuff.data;
         prefix    = (BGPSEC_PrefixHdr*)&record.prefix;
-        __capiRegisterPublicKeys(capi, &ioBuff);
+        int registered = __capiRegisterPublicKeys(capi, &ioBuff);
         
         elapsed       = 0;
         valStatus     = API_STATUS_OK;
@@ -1082,7 +1118,7 @@ static int _runGEN(PrgParams* params, u_int8_t type)
             case BGPSEC_IO_TYPE_BGPSEC_ATTR:
               store.dataLength   = getPathAttributeSize(
                                               bgpsecPathAttr[ONLY_BGPSEC_PATH]);
-              store.data         = (u_int8_t*)bgpsecPathAttr;
+              store.data         = (u_int8_t*)bgpsecPathAttr[ONLY_BGPSEC_PATH];
               if (!storeData(outFile, BGPSEC_IO_TYPE_BGPSEC_ATTR, 
                              bgpConf->asn, bgpConf->peerAS, &store))
               {

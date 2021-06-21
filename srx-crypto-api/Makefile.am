@@ -50,8 +50,8 @@ dist_sbin_SCRIPTS = tools/qsrx-make-cert tools/qsrx-make-key \
 	tools/qsrx-view-csr tools/qsrx-view-subject
 
 # Configuration files
-dist_sysconf_DATA = srxcryptoapi.conf.sample \
-                    tools/qsrx-router-key.cnf.sample
+dist_sysconf_DATA = srxcryptoapi.conf \
+                    tools/qsrx-router-key.conf
 
 
 # SRxCryptoAPI Test program

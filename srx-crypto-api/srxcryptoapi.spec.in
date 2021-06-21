@@ -9,7 +9,7 @@
 %define lib_ver_info @VER_INFO@
 %define srxdir       @SRX_DIR@
 
-%define keyvolt      /var/lib/bgpsec-keys
+%define keyvault      /var/lib/bgpsec-keys
 
 %define lib_version_info %{lib_ver_info}
 %define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
@@ -88,13 +88,13 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %post
-mkdir -p %{keyvolt}
-if [ ! -e %{keyvolt}/ski-list.txt ]; then
-  touch %{keyvolt}/ski-list.txt
+mkdir -p %{keyvault}
+if [ ! -e %{keyvault}/ski-list.txt ]; then
+  touch %{keyvault}/ski-list.txt
 fi
 
-if [ ! -e %{keyvolt}/priv-ski-list.txt ]; then
-  touch %{keyvolt}/priv-ski-list.txt
+if [ ! -e %{keyvault}/priv-ski-list.txt ]; then
+  touch %{keyvault}/priv-ski-list.txt
 fi
 
 if [ ! -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
@@ -117,17 +117,17 @@ touch %{_sysconfdir}/srxcryptoapi.conf.sample
 touch %{_sysconfdir}/qsrx-router-key.cnf.sample
 
 %postun
-if [ -e %{keyvolt} ] ; then
-  if [ ! -s %{keyvolt}/ski-list.txt ]; then
-    rm -rf %{keyvolt}/ski-list.txt
+if [ -e %{keyvault} ] ; then
+  if [ ! -s %{keyvault}/ski-list.txt ]; then
+    rm -rf %{keyvault}/ski-list.txt
   fi
 
-  if [ ! -s %{keyvolt}/priv-ski-list.txt ]; then
-    rm -rf %{keyvolt}/priv-ski-list.txt
+  if [ ! -s %{keyvault}/priv-ski-list.txt ]; then
+    rm -rf %{keyvoault}/priv-ski-list.txt
   fi
 
-  if [ "x$(ls -A %{keyvolt})" = "x" ]; then
-    rmdir %{keyvolt} >> /dev/null
+  if [ "x$(ls -A %{keyvault})" = "x" ]; then
+    rmdir %{keyvault} >> /dev/null
   fi
 fi
 # in case a .rpmnew exists remove it. In this case don't move .cnf or .conf into

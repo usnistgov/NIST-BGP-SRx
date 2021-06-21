@@ -15,8 +15,13 @@ EXT_CERT="cert"
 EXT_CSR="csr"
 
 if [ "$1" == "--cnf" ] ; then
+  echo "Parameter changed to be --conf instead."
+  exit 1
+fi
+
+if [ "$1" == "--conf" ] ; then
   shift
-  echo "Set home for qsrx-router-key.cnf to '$1'"
+  echo "Set home for qsrx-router-key.conf to '$1'"
   QSRX_CONF_HOME="$1"
   shift
 fi
@@ -26,7 +31,7 @@ if [ "$QSRX_CONF_HOME" == "" ] ; then
   QSRX_CONF_HOME="/etc"
 fi
 
-QSRX_CONF_FILE=$QSRX_CONF_HOME/qsrx-router-key.cnf
+QSRX_CONF_FILE=$QSRX_CONF_HOME/qsrx-router-key.conf
 QSRX_VIEW=qsrx-view-subject
 QSRX_MAKE_KEY=qsrx-make-key
 QSRX_SERIAL=20140220001
@@ -35,7 +40,7 @@ if [ "$1" == "" ] || [ ! -e $QSRX_CONF_FILE ] ; then
   if [ ! -e $QSRX_CONF_FILE ] ; then
     echo "File $QSRX_CONF_FILE not found!"
   fi
-  echo "call $0 [--cnf <location of qsrx-router-key.cnf> ] <keyname>"
+  echo "call $0 [--conf <location of qsrx-router-key.conf> ] <keyname>"
   exit 1
 fi
 

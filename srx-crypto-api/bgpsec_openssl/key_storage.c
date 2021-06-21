@@ -27,10 +27,12 @@
  * Known Issue:
  *   At this time only PEM formated private keys can be loaded.
  * 
- * @version 0.3.0.0
+ * @version 0.3.0.3
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.3 - 2021/05/08 - oborchert
+ *            * Renamed all instances of volt to vault
  *  0.3.0.0 - 2017/09/13 - oborchert
  *            * Removed unused code.
  *            * Fixed timestamp in Version control
@@ -692,7 +694,7 @@ void ks_empty(KeyStorage* storage)
  * API_STATUS_ERR_USER1: Wrong algorithmID
  * API_STATUS_INFO_USER1: Duplicate Key
  * API_STATUS_INFO_KEY_NOT_FOUND: In case the real key is supposed to be located
- *                                in the srx-crypto-api's key volt but could not
+ *                                in the srx-crypto-api's key vault but could not
  *                                be found there.
  * 
  * @param storage The storage where the key is stored in

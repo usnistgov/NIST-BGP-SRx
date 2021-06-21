@@ -1,6 +1,6 @@
 #!/bin/sh
 
-version="1.2"
+version="3.0"
 
 # Show the tools syntax and exit 
 function syntax()
@@ -17,7 +17,7 @@ function syntax()
   echo "    -days <valid>       valid: number of days this certificate will be valid"
   echo "                        default is 365 days"
   echo "    -c <openssl-config> The openssl configuration."
-  echo "                        Default: qsrx-router-key.cnf.tpl"
+  echo "                        Default: qsrx-router-key.conf.tpl"
   echo "    -date <date>        The date from when the certificate will be valid."
   echo "                        Default: current date/"
   echo "                        Format: Allows all formates accepted using local 'date -s <format>'"
@@ -28,7 +28,7 @@ function syntax()
   echo "    -serial <0xNum>     Allows to set a serial number (not recommended though)"
   echo
   echo "This script is part of the BGP-SRx Software Suite"
-  echo "2017 Oliver Borchert (oliver.borchert@nist.gov)"
+  echo "2017-2021 NIST/ANTD (itrg-contact@list.nist.gov)"
 
   exit 0
 }
@@ -163,7 +163,7 @@ CERT_VALIDITY=365
 # By default use the current time
 START_TIME=$(date +%Y%m%d%H%M%S%Z)
 # use template file
-CFGFILE=qsrx-router-key.cnf.tpl
+CFGFILE=qsrx-router-key.conf.tpl
 
 # The number of required parameters - will be decreased by each required 
 # parameter

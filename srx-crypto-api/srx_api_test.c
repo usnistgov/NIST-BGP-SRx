@@ -22,10 +22,12 @@
  *
  * File contains methods to test API.
  * 
- * @version 0.3.0.0
+ * @version 0.3.0.3
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.3.0.3 - 2021/05/08 - oborchert
+ *             * Cleaned up the syntax.
  *   0.3.0.0 - 2018/11/29 - oborchert
  *             * Removed all "merged" comments to make future merging easier
  *           - 2017/09/06 - oborchert
@@ -235,14 +237,14 @@ static void __syntax()
   printf ("    -f <cfg-file>    Use the provided configuration file!\n");
   printf ("    -k <pub|priv> <asn> <20-byte ski as HEX VALUE>\n");
   printf ("                     Add the particular key to the tests.\n");
+  printf ("                     Uses Test 1 by default!\n");
   printf ("    -t <1|2>         Run Test 1 or Test 2.\n");
   printf ("             Test 1: Read configuration and then attempt to register\n");
-  printf ("                     the incomplete key. followed by unregister, ");
+  printf ("                     the incomplete key. followed by unregister,\n");
   printf ("                     followed by a registration with der key loaded.\n");
   printf ("             Test 2: Just load the keys in the order specified.\n");
-  printf ("    -t <1|2>         Run Test 1 or Test 2.\n");
   printf ("\n");
-  printf ("2017 Advanced Network Technologies Division (NIST)!\n");
+  printf ("2017/2021 NIST (itrg-contact@nist.list.gov)\n");
 }
 
 /**
@@ -292,7 +294,7 @@ static int _checkParams(int argc, char** argv, SRxCryptoAPI* crypto)
               {
                 printf ("ERROR: Insufficient data for '-k'!\n");                
                 __syntax();
-                retVal = 1;
+                retVal = 0;
                 idx = argc;
               }
               break;
@@ -304,13 +306,14 @@ static int _checkParams(int argc, char** argv, SRxCryptoAPI* crypto)
                 {
                   case TEST_1:
                   case TEST_2:
+                    // This is just used to check the test value.                    
                     break;
                   default:
                     __syntax();
-                    retVal = 1;
+                    retVal = 0;
+                    idx = argc;
                 }
-              }
-              
+              }              
               break;
             case 'c' : 
               printf ("WARNING: Parameter -c is deprecated, please use -f "
@@ -550,6 +553,9 @@ int main(int argc, char** argv)
         {
           case TEST_1 : 
             printf ("Run TEST 1\n");
+            printf ("  First do attempt to store the key incomplete without "
+                    "der information!\n");
+            printf ("  Then properly load ad store the key!\n");
             _doKeyTest_1(&key, &keySpec, crypto, keyName, &status);
             break;
           case TEST_2:

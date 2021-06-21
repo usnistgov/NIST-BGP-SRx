@@ -6,6 +6,9 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.4.2.10 - May 2021
+    * Fixed diaplsy of Local ID and Update ID in detailed printout when calling
+      'show ip bgp a.b.c.d'
   0.4.2.9 - August 2020
     * Fixed sections in configure.ac that did not properly check for the 
       existence of needed tools depending on configured settings.

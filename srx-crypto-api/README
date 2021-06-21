@@ -30,8 +30,8 @@ File: srxcryptoapi.conf
 #library_conf="bgpsec_openssl";
 library_conf="testlib";
 
-# Allows to specify the default key volt. Can be overwritten programatically.
-key_volt = "/";
+# Allows to specify the default key vault. Can be overwritten programmatically.
+key_vault = "/";
 
 # this is the mapping information of the library to be loaded
 bgpsec_openssl: {

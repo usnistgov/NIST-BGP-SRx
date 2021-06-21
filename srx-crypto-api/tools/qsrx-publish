@@ -66,8 +66,8 @@ if [ -e "$1.$EXT_CERT" ] ; then
       BIRD_FILE_PRIV=$1.$SUBJECT.key
 
       REPOSITORY=$REPO_ROOT/$DIR1/$DIR2
-      KEYVOLT=$REPO_ROOT/$DIR1/$DIR2
-      #KEYVOLT=$REPO_ROOT/keys
+      KEYVAULT=$REPO_ROOT/$DIR1/$DIR2
+      #KEYVAULT=$REPO_ROOT/keys
 
       DO_REGISTER=0
 
@@ -82,20 +82,20 @@ if [ -e "$1.$EXT_CERT" ] ; then
         DO_REGISTER=1
       fi
 
-      if [ -e $KEYVOLT/$FILE.$EXT_DER ] ; then
+      if [ -e $KEYVAULT/$FILE.$EXT_DER ] ; then
         echo " * private key $REPOSITORY/$FILE.$EXT_DER already installed!!"
       else
-        mkdir -p $KEYVOLT
-        cp $1.$EXT_DER  $KEYVOLT/$FILE.$EXT_DER
+        mkdir -p $KEYVAULT
+        cp $1.$EXT_DER  $KEYVAULT/$FILE.$EXT_DER
         cp $1.$EXT_DER  $BIRD_REPO/$BIRD_FILE_PRIV
         DO_REGISTER=1
       fi
 
       if [ $WITH_PEM -eq 1 ] ; then
-        if [ -e $KEYVOLT/$FILE.$EXT_PEM ] ; then
+        if [ -e $KEYVAULT/$FILE.$EXT_PEM ] ; then
           echo " * private key $REPOSITORY/$FILE.$EXT_PEM already installed!!"
         else
-          cp $1.$EXT_PEM  $KEYVOLT/$FILE.$EXT_PEM
+          cp $1.$EXT_PEM  $KEYVAULT/$FILE.$EXT_PEM
           DO_REGISTER=1
         fi
       fi

@@ -85,7 +85,8 @@ sbin_PROGRAMS = srx_crypto_tester$(EXEEXT)
 subdir = .
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
-	$(srcdir)/config.h.in $(srcdir)/srxcryptoapi.spec.in \
+	$(srcdir)/config.h.in $(srcdir)/srxcryptoapi.conf.in \
+	$(srcdir)/srxcryptoapi.spec.in \
 	$(srcdir)/srxcryptoapi-devel.spec.in \
 	$(srcdir)/srxcryptoapi_lib.conf.in $(dist_sbin_SCRIPTS) \
 	depcomp $(dist_libSRxCryptoAPI_libconfig_DATA) \
@@ -106,7 +107,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = srxcryptoapi.conf
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -459,8 +460,8 @@ dist_sbin_SCRIPTS = tools/qsrx-make-cert tools/qsrx-make-key \
 
 
 # Configuration files
-dist_sysconf_DATA = srxcryptoapi.conf.sample \
-                    tools/qsrx-router-key.cnf.sample
+dist_sysconf_DATA = srxcryptoapi.conf \
+                    tools/qsrx-router-key.conf
 
 srx_crypto_tester_LDFLAGS = $(LD_FLAGS) $(LIBS) $(OPENSSL_LDFLAGS) @OPENSSL_LIBS@
 srx_crypto_tester_SOURCES = srx_api_test.c
@@ -540,6 +541,8 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+srxcryptoapi.conf: $(top_builddir)/config.status $(srcdir)/srxcryptoapi.conf.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 
 install-pkglibLTLIBRARIES: $(pkglib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)

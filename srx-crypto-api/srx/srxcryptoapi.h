@@ -875,7 +875,7 @@ int sca_SetKeyPath (char* key_path);
 char* sca_FindDirInSKI (char* filenamebuf, size_t filenamebufLen, u_int8_t* ski);
 
 /**
- * Load the key from the key volt location configured within the API. The key
+ * Load the key from the key vault location configured within the API. The key
  * needs the SKI specified in binary format.
  * The returned key is in DER format. The parameter fPrivate is used to
  * indicate if the private or public key will be returned. This is of importance

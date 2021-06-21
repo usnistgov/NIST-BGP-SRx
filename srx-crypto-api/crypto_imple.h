@@ -27,10 +27,12 @@
  * Known Issue:
  *   At this time only pem formated private keys can be loaded.
  * 
- * @version 0.1.2.0
+ * @version 0.3.0.3
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *   0.3.0.3 - 2021/05/08 - oborchert
+ *             * Renamed volt to vault 
  *   0.1.2.0  - 2015/12/03 - oborchert
  *             * moved location of srxcryptoapi.h
  *           - September 23, 2015 - borchert
@@ -53,7 +55,7 @@
 #define SIZE_DER_PUBKEY  (0x59+2)
 
 /**
- * Load the key from the key volt location configured within the API. The key
+ * Load the key from the key vault location configured within the API. The key
  * needs the SKI specified in binary format.
  * The returned key is in DER format. The parameter fPrivate is used to
  * indicate if the private or public key will be returned. This is of importance

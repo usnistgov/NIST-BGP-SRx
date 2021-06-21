@@ -1,0 +1,106 @@
+# Contains the name of the library that will be loaded. By default SRxCryptoAPI
+# comes with two implementations:
+# testlib        - For testing purpose only
+# bgpsec_openssl - provides a crypto implementation based on OpenSSL (DEFAULT)
+library_conf="bgpsec_openssl";
+#library_conf="testlib";
+
+# Allows to specify the default key vault. Can be overwritten programmatically.
+key_vault = "@CFG_PREFIX@/opt/bgp-srx-examples/bgpsec-keys/";
+
+# Specify the key file extensions fir private keys DER encoded and public keys 
+# embedded in X509
+key_ext_private="der";
+key_ext_public="cert";
+
+# Specify the debugging type which indicates only information that matches 
+# the debugging type or are less in its numerical value are displayed. 
+# The following debugging types are available:
+#     0: LOG_EMERG   - system is unusable
+#     1: LOG_ALERT   - action must be taken immediately 
+#     2: LOG_CRIT    - critical conditions
+#     3: LOG_ERR     - error conditions
+#     4: LOG_WARNING - warning conditions
+#     5: LOG_NOTICE  - normal but significant condition
+#     6: LOG_INFO    - informational (DEFAULT)
+#     7: LOG_DEBUG   - debug-level messages
+#debug-type = 6;
+
+# this is the mapping information of the library to be loaded
+bgpsec_openssl: {
+  library_name = "libSRxBGPSecOpenSSL.so";
+
+# In case the library can not be found use path to library
+#  library_name = "@CFG_PREFIX@/lib64/srx/libSRxBGPSecOpenSSL.so";
+
+#
+# The following method mappings allow to customize the mapping. In case the 
+# mapping is disabled using the hash tag, misspelled, or missing at all the 
+# default mapping of method names as specified in the header file will be used.
+# In case the default specified method names are not implemented, the 
+# SRxCryptoAPI wrapper functions are mapped.
+#
+
+# A String "PUB:<filename>;PRIV:<filename>" or "NULL" as initialization parameter.
+  init_value                  = "PUB:@CFG_PREFIX@/opt/bgp-srx-examples/bgpsec-keys/ski-list.txt;PRIV:@CFG_PREFIX@/opt/bgp-srx-examples/bgpsec-keys/priv-ski-list.txt";
+  method_init                 = "init";
+  method_release              = "release";
+
+  method_freeHashMessage      = "freeHashMessage";
+  method_freeSignature        = "freeSignature";
+
+  method_getDebugLevel        = "getDebugLevel";
+  method_setDebugLevel        = "setDebugLevel";
+
+  method_isAlgorithmSupported = "isAlgorithmSupported";
+
+  method_sign                 = "sign";
+  method_validate             = "validate";
+
+  method_registerPublicKey    = "registerPublicKey";
+  method_unregisterPublicKey  = "unregisterPublicKey";
+
+  method_registerPrivateKey   = "registerPrivateKey";
+  method_unregisterPrivateKey = "unregisterPrivateKey";
+
+  method_cleanKeys            = "cleanKeys";
+  method_cleanPrivateKeys     = "cleanPrivateKeys";
+};
+
+# Some other example configuration 
+testlib: {
+  library_name="libSRxCryptoTestlib.so";
+
+# In case the library can not be found use path to library
+#  library_name = "../lib64/srx/libSRxCryptoTestlib.so";
+
+# A String "0|1;0|1;0|1" or "NULL" as initialization parameter.
+# This initialization value is as follows: (each value 0 or 1)
+#
+#    validation_result;parse-bgpec;print-ski-and-signatures
+#
+# with print-ski-and-signatures only if parse-bgpec is enabled.
+  init_value                  = "1;1;1";
+  method_init                 = "init";
+  method_release              = "release";
+
+  method_freeHashMessage      = "freeHashMessage";
+  method_freeSignature        = "freeSignature";
+
+  method_getDebugLevel        = "getDebugLevel";
+  method_setDebugLevel        = "setDebugLevel";
+
+  method_isAlgorithmSupported = "isAlgorithmSupported";
+
+  method_sign                 = "sign";
+  method_validate             = "validate";
+
+  method_registerPublicKey    = "registerPublicKey";
+  method_unregisterPublicKey  = "unregisterPublicKey";
+
+  method_registerPrivateKey   = "registerPrivateKey";
+  method_unregisterPrivateKey = "unregisterPrivateKey";
+
+  method_cleanKeys            = "cleanKeys";
+  method_cleanPrivateKeys     = "cleanPrivateKeys";
+};

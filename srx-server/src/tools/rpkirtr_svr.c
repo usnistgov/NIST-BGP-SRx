@@ -28,10 +28,13 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.5.1.0
+ * @version 0.5.1.2
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.2  - 2021/10/20 - oborchert
+ *            * Added a secondary key location to make the example creation
+ *              easier.
  * 0.5.1.0  - 2018/06/09 - oborchert
  *            * Added command 'echo' to allow printing messaged from a script
  *              to the console. CMD_ID_ECHO
@@ -291,8 +294,11 @@ uint16_t     sessionID = 0;
 bool         inWait    = false;
 /** Indicates if the ctrl+c combination was pressed.  */
 bool         ctrl_c    = false;
-/** Location (directory) where the key files are stored. */
-char keyLocation[LINE_BUF_SIZE];
+/** Location (directory) where the key files are stored. Allow a primary and 
+ * secondary location. */
+#define PRIMARY_KEY_LOC   0
+#define SECONDARY_KEY_LOC 1
+char keyLocation[2][LINE_BUF_SIZE];
 
 /*---------------
  * Utility macros
@@ -1428,8 +1434,9 @@ int showHelp(char* command)
            "\n"
            "Cache Commands:\n"
            "-----------------\n"
-           "  - keyLoc <location>\n"
-           "                 The key volt location.\n"
+           "  - keyLoc <primary-location> [<secondary-location>]\n"
+           "                 The key volt location. If two locations are\n"
+           "                 provided the system tries first the primary!\n"
            "  - empty\n"
            "                 Empties the cache\n"
            "  - sessionID <number>\n"
@@ -1736,13 +1743,27 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
   }
 
   char certFile[512];
-  snprintf(certFile, 512, "%s/%s", keyLocation, _certFile);
-
-  // to read certificate file
-  fpKey = fopen (certFile, "rb");
+  bool keyFound = false;
+  int keyLoc    = PRIMARY_KEY_LOC;
+  while (!keyFound)
+  {
+    fpKey = NULL;
+    if (strlen(keyLocation[keyLoc]) != 0)
+    {
+      snprintf(certFile, 512, "%s/%s", keyLocation[keyLoc], _certFile);
+      // to read certificate file
+      fpKey = fopen (certFile, "rb");
+    }
+    if ((fpKey != NULL) || (keyLoc == SECONDARY_KEY_LOC))
+    {
+      break;
+    }
+    keyLoc = SECONDARY_KEY_LOC;
+  }
   if (fpKey == NULL)
   {
-    ERRORF("Error: Failed to open '%s'\n", certFile);
+    ERRORF("Error: Failed to open '%s' in neither primary nor secondary key " \
+           "location\n", _certFile);
     return false;
   }
   // to read a certificate and
@@ -1926,8 +1947,20 @@ int setKeyLocation(char* line)
   {
     line = ".\0";
   }
-  snprintf(keyLocation, LINE_BUF_SIZE, "%s", line);
-
+  char* ch = strchr(line, ' ');
+  int charPos = (ch != NULL) ? (ch-line) : 0; 
+  if ((charPos > 0) && (charPos < LINE_BUF_SIZE))
+  {
+    snprintf(keyLocation[PRIMARY_KEY_LOC], charPos, "%s", line);
+    line += charPos+1;
+    snprintf(keyLocation[SECONDARY_KEY_LOC], LINE_BUF_SIZE, "%s", line);
+  }
+  else
+  {
+    snprintf(keyLocation[PRIMARY_KEY_LOC], LINE_BUF_SIZE, "%s", line);
+    snprintf(keyLocation[SECONDARY_KEY_LOC], LINE_BUF_SIZE, "%s", "\0");
+  }
+  
   return CMD_ID_KEY_LOC;
 }
 

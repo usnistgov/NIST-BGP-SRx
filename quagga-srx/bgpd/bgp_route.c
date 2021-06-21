@@ -7256,7 +7256,10 @@ static void srx_route_vty_out_detail(struct vty *vty, struct bgp *bgp,
   };
 
   vty_out (vty, "    SRx Information:%s", VTY_NEWLINE);
-  vty_out (vty, "      Update ID: 0x%08X%s", binfo->updateID, VTY_NEWLINE);
+  if (binfo->updateID != 0)
+    vty_out (vty, "      Update ID: 0x%08X%s", binfo->updateID, VTY_NEWLINE);
+  else
+    vty_out (vty, "      Local ID: 0x%08X%s", binfo->localID, VTY_NEWLINE);    
   if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_ORIGIN))
   {
     if (CHECK_FLAG (binfo->flags, BGP_INFO_IGNORE))

@@ -99,13 +99,15 @@ it is stored in. This folder functions as a sandbox.
 Furthermore this script allows to build, configure, install, or clean 
 not only the complete project but also separately sub components.
 
-**SCA:**     SRx Crypto API
+**SCA:**       SRx Crypto API
 
-**SRxSnP:**  SRx-Server and SRx-Proxy
+**SRxSnP:**    SRx-Server and SRx-Proxy
 
-**QSRx:**    Quagga SRx
+**QSRx:**      Quagga SRx
 
-**BIO:**     BGPsec traffic generator and crypto module tester.
+**BIO:**       BGPsec traffic generator and crypto module tester.
+
+**EXAMPLES:**  Examples and test scripts the  BGP-SRx modules.
 
 ### Manual Building
 
@@ -202,8 +204,8 @@ echo "./buildBGP-SRx.sh -A"
 ./buildBGP-SRx.sh -A
 
 # Call the quick tester
-echo "./testBGP-SRx.sh"
-./testBGP-SRx.sh
+echo "./buildBGP-SRx.sh -R"
+./buildBGP-SRx.sh -R
 
 # Display the compiled and installed software 
 echo "The installed software can be found at:"
@@ -214,24 +216,26 @@ To use this script, create a folder and create an empty file. Copy
 the above content into the file and call 'sh <your-file>'
 
 To install the binaries outside of the "sandbox" folder where the code is
-located, call the build script 
-```buildBGP-SRx.sh -P <absolute-path> [<more parameters>]```
+located, call the build script ```buildBGP-SRx.sh -P <absolute-path> [<more parameters>]```
 and the binaries will will be installed inthe given ```<absolute-path>```
 folder. Make sure the build script has access to either create the path 
 and or create the binaries in the  given path.
 
 ### Quick Functional Test / Demo
 
-The BGP-SRx software suite does provide a simple system test in form of a test 
+The BGP-SRx software suite does provide a test system integrated in the build  
 script. The script does test proper functionality of the srx-crypto-api as well 
 as the integration into BGPsec-IO.
 
-Furthermore the script creates QuaggaSRx configuration scripts that can be used
-to test QuaggaSRx together with BGPsec-IO
-
-```
-./testBGP-SRx.sh
-```
+Furthermore BGP-SRx provides a complete set of examples, demos which are
+located in the examples folder but will be compiled for the host system 
+uding the buildBGP-SRx.sh script. 
+The examples will be installed in the folder ```opt/bgp-srx-examples/``` folder.
+Each example does have it's own example starter script which allows to easily
+start all needed components eiterh usinf the ```screen``` tool (default) or
+the ```gnome-terminal``` using ```-t```. 
+Furthermore the test folders contain an appropriate run/sh script.
+All scripts provide a help which will be printed by using the ```-?``` switch.
 
 ### Unit Test
 
@@ -241,7 +245,8 @@ API's for other components within the package. The development though is
 performed separately. 
 
 For this reason each component will have its own unit tests if at all. These
-will if available be located within the appropriate source folder. Please
+will if available be located within the appropriate source folder or the newly 
+added EXAMPLES project which will be installed in ```opt/bgp-srx-examples```. Please
 consult the README files located in each component directory for more information.
 
 ### Performance Test
@@ -273,4 +278,4 @@ For license information see the [LICENSE](LICENSE) file.
 ## Contacts
 
 For information, questions, or comments, contact by sending
-an email to bgpsrx-dev@nist.gov.
+an email to itrg-contact@list.nist.gov.

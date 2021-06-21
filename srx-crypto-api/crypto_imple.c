@@ -23,10 +23,12 @@
  *   At this time only PEM formated private keys can be loaded and the keys must
  *   fir CURVE_ECDSA_P_256
  *
- * @version 0.2.0.7
+ * @version 0.3.0.3
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *   0.3.0.3 - 2021/05/08 - oborchert
+ *             * Renamed volt to vault 
  *   0.2.0.7 - 2018/11/27 - oborchert
  *             * Replaced OpenSSL deprecated code with new functions or other 
  *               ones.
@@ -377,7 +379,7 @@ static bool _loadPubKey(char* fName, BGPSecKey* key)
 
 
 /**
- * Load the key from the key volt location configured within the API. The key
+ * Load the key from the key vault location configured within the API. The key
  * needs the SKI specified in binary format.
  * The returned key is in DER format. The parameter fPrivate is used to
  * indicate if the private or public key will be returned. This is of importance

@@ -22,10 +22,13 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.3
+ * @version 0.2.1.5
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.5 - 2021/05/10 - oborchert
+ *            * Updated changes from 0.2.1.3 to point into /opt/bgp-srx-examples
+ *            * Modified SRX_DEV_TOYEAR to reflect 2021
  *  0.2.1.3 - 2021/03/26 - oborchert
  *            * Changed DEF_KEYLOCATION and DEF_SKIFILE from /var/lib/key-volt 
  *              to /var/lib/key-vault 
@@ -151,16 +154,16 @@
 
 // Can be overwritten in configure.ac if needed.
 #ifndef SRX_DEV_TOYEAR
-#define SRX_DEV_TOYEAR "2020"
+#define SRX_DEV_TOYEAR "2021"
 #endif
 
 /******************************************************************************/
 /***  Defines for default BGP session configuration  **************************/
 /******************************************************************************/
 // The default location where to find the keys
-#define DEF_KEYLOCATION        "/var/lib/key-vault/\0"
+#define DEF_KEYLOCATION        "/opt/bgp-srx-examples/bgpsec-keys/\0"
 // The default file containing the list of public keys
-#define DEF_SKIFILE            "/var/lib/key-vault/ski-list.txt\0"
+#define DEF_SKIFILE            "/opt/bgp-srx-examples/bgpsec-keys/ski-list.txt\0"
 // The default port of the peer
 #define DEF_PEER_PORT          179
 // The default BGP hold time

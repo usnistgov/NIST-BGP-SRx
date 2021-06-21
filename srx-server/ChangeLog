@@ -1,4 +1,5 @@
 Changelog for Version 0.5.1
+- Added a secondary key location to the rpki rtr server.
 - Cleaned up leftover settings for SVN revision management settings in Makefile.am
 - Updated spec files.
 - Added additional tool requirement for compilation into configure.ac

@@ -21,10 +21,15 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.2
+ * @version 0.2.1.6
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.6 - 2021/05/21 - oborchert
+ *            * Fixed a segmentation fault in update processing
+ *  0.2.1.5 - 2021/05/10 - oborchert
+ *            * Fixed document output when called using -?
+ *            * Modified output to use defines rather than hard coded text.
  *  0.2.1.2 - 2020/09/14 - oborchert
  *            * Fixed segmentation fault in postProcessUpdateStack.
  *  0.2.1.1 - 2020/07/31 - oborchert
@@ -252,9 +257,12 @@ void printSyntax()
   // type
   printf ("  -%c <type>, %s <type>\n", P_C_TYPE, P_TYPE);
   printf ("          Enable the operational mode:\n");
-  printf ("          type BGP: run BGP player\n");
-  printf ("          type CAPI: run as SRxCryptoAPI tester.\n");
-  printf ("          type GEN: Generate the binary data.\n");
+  printf ("          type %s: run BGP player\n", P_TYPE_BGP);
+  printf ("          type %s: run as SRxCryptoAPI tester.\n", P_TYPE_CAPI);
+  printf ("          type %s: Generate the binary data of BGPsec "
+                     "UPDATES.\n", P_TYPE_GENB);
+  printf ("          type %s: Generate the binary data of BGPsec Path "
+                     "Attributes.\n", P_TYPE_GENC);
   
   // ASN  
   printf ("  -%c <asn>, %s <asn>\n", P_C_MY_ASN, P_MY_ASN);
@@ -805,7 +813,7 @@ UpdateData* createUpdate(char* prefix_path, PrgParams* params)
     else
     {
       char str[STR_MAX];
-      snprintf(str, STR_MAX, "Invalid path specification '%s'!", pathStr);
+      snprintf(str, STR_MAX, "Invalid path specification '%s'!", prefix_path);
       _setErrMsg(params, str);
     }    
   }
@@ -898,12 +906,15 @@ UpdateData* createUpdate(char* prefix_path, PrgParams* params)
           *valstate = ' ';
         }      
       }
-    }
+    }    
+  }
+  
+  if (update != NULL)
+  {
+        // Specify if this is a BGP4 only update
+    update->bgp4_only = bgp4_only || update->asSetStr != NULL;
   }
 
-  // Specify if this is a BGP4 only update
-  update->bgp4_only = bgp4_only;
-  
   return update;  
 }
 
@@ -934,6 +945,11 @@ bool _readUpdates(const config_setting_t* updates, Stack* stack,
       UpdateData* updateData = createUpdate(strVal, params);
       if (updateData)
       {
+        printf ("\nUPATE: %s\n", strVal);
+        if (updateData->asSetStr != NULL)
+          printf("AS_SET: %s\n", updateData->asSetStr);
+        if (updateData->pathStr != NULL)
+          printf("AS_SEQUENCE: %s\n", updateData->pathStr);
         fifoPush(stack, updateData);      
       }
       else if (params->errMsgBuff[0] != '\0')
