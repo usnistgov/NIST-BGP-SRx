@@ -1,0 +1,83 @@
+version: '3'
+services:
+    srx_server:
+        container_name: srx_server
+        image: nist/bgp-srx
+        build:
+            dockerfile: Dockerfile
+            context: ./
+        volumes: 
+            - ./examples/bgpsec-keys/:/usr/opt/bgp-srx-examples/bgpsec-keys
+            - ./srx-server/src/server/srx_server.conf:/usr/etc/srx_server.conf
+        ports:
+            - 17900:17900
+            - 17901:17901
+        depends_on: 
+            - rpkirtr_server
+        command:
+            - /bin/sh
+            - -c
+            - |
+              sed "s/localhost/172.37.0.101/g"  /usr/etc/srx_server.conf > /tmp/srx_server.conf
+              srx_server -f /tmp/srx_server.conf
+        tty: true
+        networks:
+            bgp_net:
+                ipv4_address: 172.37.0.100
+
+
+
+    rpkirtr_server:
+        container_name: rpkirtr_server
+        image: nist/bgp-srx
+        build:
+            dockerfile: Dockerfile
+            context: ./
+        ports:
+            - 323:323
+        command: 
+            - /bin/sh 
+            - -c 
+            - | 
+              rpkirtr_svr 
+        privileged: true
+        tty: true
+        networks:
+            bgp_net:
+                ipv4_address: 172.37.0.101
+
+
+    quaggasrx:
+        container_name: quaggasrx
+        image: nist/bgp-srx
+        build:
+            dockerfile: Dockerfile
+            context: ./
+        volumes: 
+            - ./examples/bgpsec-keys/:/usr/opt/bgp-srx-examples/bgpsec-keys
+            - ./quagga-srx/bgpd/bgpd.conf.sampleSRx:/usr/etc/bgpd.conf
+        ports:
+            - 179:179
+            - 2605:2605
+        privileged: true
+        command:
+            - /bin/sh
+            - -c
+            - |
+              sed "s/srx connect/srx connect 172.37.0.100 17900/g" /usr/etc/bgpd.conf > /etc/bgpd.conf
+              bgpd -u root -f /etc/bgpd.conf
+        depends_on: 
+            - srx_server
+        networks:
+            bgp_net:
+                ipv4_address: 172.37.0.4
+
+
+networks:
+    bgp_net:
+        ipam:
+            driver: default
+            config: 
+                - subnet: 172.37.0.0/16
+
+        
