@@ -1,11 +1,18 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 5.1.6
+ * quagga-srx V0.99.22.srx.0.4.2.10_release
+ * srx-server V0.5.1.2_release
+ * srx-crypto-api V0.3.0.3_release
+ * bgpsec-io version_0.2.1.6
+ * examples 0.5.1.12_release (Improved configuration)
+ * Improved build script and added ip_tool library
 Version 5.1.5
  * quagga-srx V0.99.22.srx.0.4.2.10_release
  * srx-server V0.5.1.2_release
  * srx-crypto-api V0.3.0.3_release
  * bgpsec-io version_0.2.1.6 (Moved demo keys to examples) 
- * examples 0.5.1.8_release
+ * examples 0.5.1.8_release  (Added examples and more tests)
 Version 5.1.4
  * quagga-srx V0.99.22.srx.0.4.2.9_release
  * srx-server V0.5.1.1_release
