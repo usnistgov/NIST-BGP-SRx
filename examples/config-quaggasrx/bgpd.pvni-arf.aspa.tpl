@@ -2,14 +2,11 @@
 !
 ! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sampleSRx,v 5.1 2021/05/20 12:00:00 ob Exp $
+! $Id: bgpd.conf.sampleSRx,v 6.0 2021/04/12 14:55:38 ob Exp $
 !
 hostname bgpd
 password zebra
 
-!
-!bgp multiple-instance
-!
 router bgp 65000
   bgp router-id 10.0.0.65
 
@@ -20,23 +17,21 @@ router bgp 65000
   srx connect
   no srx extcommunity
 
-  srx evaluation bgpsec distributed
+  srx evaluation aspa
 
-  srx set-origin-value undefined
-  srx set-path-value undefined
+  srx set-aspa-value undefined
 
 !
 ! Configure "Prefer Valid" using local preference
 ! Increase the local preference if route is valid.
 !
 
-  srx policy local-preference valid 20 add
+  srx policy aspa local-preference valid        add      20
+  srx policy aspa local-preference invalid      subtract 20 
+  srx policy aspa local-preference unknown      add      10 
+  srx policy aspa local-preference unverifiable subtract 5 
 
-  no srx policy ignore-undefined
-
-srx bgpsec ski 0 1 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
-srx bgpsec active 0
-
+  no srx policy aspa   ignore undefined
 
 ! Specify Neighbors
 ! =================
@@ -44,12 +39,12 @@ srx bgpsec active 0
   neighbor {IP_AS_65005} remote-as 65005
   neighbor {IP_AS_65005} ebgp-multihop
   neighbor {IP_AS_65005} passive
-  neighbor {IP_AS_65005} bgpsec both
- 
+  neighbor {IP_AS_65005} aspa provider
+
   ! neighbor AS 65010
   neighbor {IP_AS_65010} remote-as 65010
   neighbor {IP_AS_65010} ebgp-multihop
   neighbor {IP_AS_65010} passive
-  neighbor {IP_AS_65010} bgpsec both
+  neighbor {IP_AS_65010} aspa lateral
 
 log stdout

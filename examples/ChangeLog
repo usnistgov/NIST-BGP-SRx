@@ -1,0 +1,19 @@
+Version 0.5.1.11
+  * Removed sudo test - it is just annoying when not needed.
+  * Fixed bug for where configuration prematurely stops when the number
+    of available IP addresses is enough.
+Version 0.5.1.10
+  * Added "t" to list of interfaces not to use for alias generation.
+Version 0.5.1.9
+  * Fixed minor bug in configuration script
+  * Added proper IP configuration to configuration script
+  * Added lib/ip_tools.sh providing helper functions for configuration
+  * Added files AUTHORS, COPYING, and ChangeLog
+Version 0.5.1.8
+  * Fixed all examples and synchronized them with the latest topology used.
+Version 0.5.1.7
+  * Updated README.md
+Version 0.5.1.6
+  * Fixed error in prefix Announcement for AS65005
+Version 0.5.1.5
+  * Project Added to BGP-SRx Software Suite V5.1.

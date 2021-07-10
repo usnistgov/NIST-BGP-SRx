@@ -180,7 +180,8 @@ am_srx_server_OBJECTS = bgpsec_handler.$(OBJEXT) \
 	rpki_handler.$(OBJEXT) rpki_router_client.$(OBJEXT) \
 	rpki_queue.$(OBJEXT) rpki_packet_printer.$(OBJEXT) \
 	server_connection_handler.$(OBJEXT) \
-	srx_packet_sender.$(OBJEXT) update_cache.$(OBJEXT)
+	srx_packet_sender.$(OBJEXT) update_cache.$(OBJEXT) \
+	aspa_trie.$(OBJEXT) aspath_cache.$(OBJEXT)
 srx_server_OBJECTS = $(am_srx_server_OBJECTS)
 am__DEPENDENCIES_1 =
 srx_server_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -527,7 +528,9 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/rpki_packet_printer.c \
 		     $(SERVER_DIR)/server_connection_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
-		     $(SERVER_DIR)/update_cache.c 
+		     $(SERVER_DIR)/update_cache.c \
+		     $(SERVER_DIR)/aspa_trie.c \
+		     $(SERVER_DIR)/aspath_cache.c 
 
 srx_server_LDADD = $(LIB_PATRICIA) $(SCA_LIBS) \
 		   libsrx_shared.la \
@@ -603,6 +606,8 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SERVER_DIR)/srx_packet_sender.h \
 		 $(SERVER_DIR)/srx_server.h \
 		 $(SERVER_DIR)/update_cache.h \
+		 $(SERVER_DIR)/aspa_trie.h \
+		 $(SERVER_DIR)/aspath_cache.h \
 		 \
 		 $(SHARED_DIR)/srx_packets.h \
 		 $(SHARED_DIR)/srx_defs.h \
@@ -937,6 +942,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aspa_trie.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aspath_cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsec_handler.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bgpsec_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_connection_handler.Plo@am__quote@
@@ -1415,6 +1422,34 @@ update_cache.obj: $(SERVER_DIR)/update_cache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(SERVER_DIR)/update_cache.c' object='update_cache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o update_cache.obj `if test -f '$(SERVER_DIR)/update_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/update_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/update_cache.c'; fi`
+
+aspa_trie.o: $(SERVER_DIR)/aspa_trie.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT aspa_trie.o -MD -MP -MF $(DEPDIR)/aspa_trie.Tpo -c -o aspa_trie.o `test -f '$(SERVER_DIR)/aspa_trie.c' || echo '$(srcdir)/'`$(SERVER_DIR)/aspa_trie.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/aspa_trie.Tpo $(DEPDIR)/aspa_trie.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(SERVER_DIR)/aspa_trie.c' object='aspa_trie.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o aspa_trie.o `test -f '$(SERVER_DIR)/aspa_trie.c' || echo '$(srcdir)/'`$(SERVER_DIR)/aspa_trie.c
+
+aspa_trie.obj: $(SERVER_DIR)/aspa_trie.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT aspa_trie.obj -MD -MP -MF $(DEPDIR)/aspa_trie.Tpo -c -o aspa_trie.obj `if test -f '$(SERVER_DIR)/aspa_trie.c'; then $(CYGPATH_W) '$(SERVER_DIR)/aspa_trie.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/aspa_trie.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/aspa_trie.Tpo $(DEPDIR)/aspa_trie.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(SERVER_DIR)/aspa_trie.c' object='aspa_trie.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o aspa_trie.obj `if test -f '$(SERVER_DIR)/aspa_trie.c'; then $(CYGPATH_W) '$(SERVER_DIR)/aspa_trie.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/aspa_trie.c'; fi`
+
+aspath_cache.o: $(SERVER_DIR)/aspath_cache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT aspath_cache.o -MD -MP -MF $(DEPDIR)/aspath_cache.Tpo -c -o aspath_cache.o `test -f '$(SERVER_DIR)/aspath_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/aspath_cache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/aspath_cache.Tpo $(DEPDIR)/aspath_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(SERVER_DIR)/aspath_cache.c' object='aspath_cache.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o aspath_cache.o `test -f '$(SERVER_DIR)/aspath_cache.c' || echo '$(srcdir)/'`$(SERVER_DIR)/aspath_cache.c
+
+aspath_cache.obj: $(SERVER_DIR)/aspath_cache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT aspath_cache.obj -MD -MP -MF $(DEPDIR)/aspath_cache.Tpo -c -o aspath_cache.obj `if test -f '$(SERVER_DIR)/aspath_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/aspath_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/aspath_cache.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/aspath_cache.Tpo $(DEPDIR)/aspath_cache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(SERVER_DIR)/aspath_cache.c' object='aspath_cache.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o aspath_cache.obj `if test -f '$(SERVER_DIR)/aspath_cache.c'; then $(CYGPATH_W) '$(SERVER_DIR)/aspath_cache.c'; else $(CYGPATH_W) '$(srcdir)/$(SERVER_DIR)/aspath_cache.c'; fi`
 
 srxsvr_client.o: $(TOOLS_DIR)/srxsvr_client.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT srxsvr_client.o -MD -MP -MF $(DEPDIR)/srxsvr_client.Tpo -c -o srxsvr_client.o `test -f '$(TOOLS_DIR)/srxsvr_client.c' || echo '$(srcdir)/'`$(TOOLS_DIR)/srxsvr_client.c

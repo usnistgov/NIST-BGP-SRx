@@ -23,10 +23,19 @@
  * Provides a printer for RPKI Router to Cache Protocol Packages. 
  * Supports RFC6810 and RFC8210 package formats.
  *
- * @version 0.5.0.6
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Renamed version labeled as version 0.5.2.0 to 0.6.0.0 
+ *              (0.5.2.0 was skipped)
+ *            * Cleaned up some merger left overs and synchronized with naming 
+ *              used conventions.
+ *          - 2021/02/16 - oborchert
+ *            * Fixed a bug in printing ASPA objects.
+ *            2021/02/08 - oborchert
+ *            * Added ASPA processing.
  *  0.5.0.6 - 2018/11/20 - oborchert
  *            * Fixed incorrect printing of a string.
  *  0.5.0.4 - 2018/03/06 - oborchert
@@ -163,12 +172,13 @@ static bool _u8(u_int8_t** ptr, u_int8_t* result8, u_int32_t* length)
 }
 
 /**
- * Print the flags attribtue
+ * Print the flags attribute
  * 
- * @param tab The tanb to be used for each line
- * @param u8 The one octed flag value
+ * @param tab The tab character to be used for each line
+ * @param u8 The one octet flag value
+ * @param isASPA Indicates if this flag belongs to the ASPA PDU
  */
-static void _printFlags(char* tab, u_int8_t u8)
+static void _printFlags(char* tab, u_int8_t u8, bool isASPA)
 {
   #define  U_ZERO   (u_int8_t)0
   #define  U_ONE    (u_int8_t)1
@@ -176,8 +186,26 @@ static void _printFlags(char* tab, u_int8_t u8)
   #define  _UNKNOWN_ONE  "(UNDEFINED)"
 
   tab = (tab != NULL) ? tab : " ";
-  printf ("%s+---Flags: 0x%02x (%s)\n", tab, u8, (u8 & 0x01) ? "announcement"
-                                                             : "withdrawal");
+  
+  if ((u8 & 0x03) != 0)
+  {
+    switch (u8 & 0x03)
+    {
+      case 0:
+        printf ("%s+---Flags: 0x00 (%s)\n", tab, "ann/IPv4");
+        break;
+      case 1:
+        printf ("%s+---Flags: 0x01 (%s)\n", tab, "with/IPv4");
+        break;
+      case 2:
+        printf ("%s+---Flags: 0x10 (%s)\n", tab, "ann/IPv6");
+        break;
+      case 3:
+      default:
+        printf ("%s+---Flags: 0x11 (%s)\n", tab, "with/IPv6");
+        break;
+    }
+  }
   printf ("%s|     8421 8421\n", tab);
   printf ("%s|     %u... .... %s\n", tab, (u8 & 0x80) ? U_ONE : U_ZERO, 
                                     (u8 & 0x80) ? T4_FLAG_80_1 : T4_FLAG_80_0);
@@ -192,7 +220,8 @@ static void _printFlags(char* tab, u_int8_t u8)
   printf ("%s|     .... .%u.. %s\n", tab, (u8 & 0x04) ? U_ONE : U_ZERO, 
                                     (u8 & 0x04) ? T4_FLAG_04_1 : T4_FLAG_04_0);
   printf ("%s|     .... ..%u. %s\n", tab, (u8 & 0x02) ? U_ONE : U_ZERO, 
-                                    (u8 & 0x02) ? T4_FLAG_02_1 : T4_FLAG_02_0);
+                          !isASPA ? (u8 & 0x02) ? T4_FLAG_02_1 : T4_FLAG_02_0
+                                  : (u8 & 0x02) ? TA_FLAG_02_1 : TA_FLAG_02_0);
   printf ("%s|     .... ...%u %s\n", tab, (u8 & 0x01) ? U_ONE : U_ZERO, 
                                     (u8 & 0x01) ? T4_FLAG_01_1 : T4_FLAG_01_0);
 }
@@ -208,9 +237,9 @@ static void _printFlags(char* tab, u_int8_t u8)
  * @param name Name of the field.
  * @param useHex Indicates if the value should be printed as a hex value.
  * @param convert Indicate if the value should be converted from network 
- *                presentation into host presentaton.
+ *                presentation into host presentation.
  * 
- * @return false is an error occured, otherwise true. 
+ * @return false is an error occurred, otherwise true. 
  */
 static bool _printField(u_int8_t **pduPtr, u_int8_t octets, u_int32_t* remaining,
                         char* tab, char* name, bool useHex, bool convert)
@@ -289,6 +318,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
   u_int8_t  u8;
   u_int16_t u16;
   u_int32_t u32;
+  u_int16_t provASCount = 0;
   bool  retVal    = false;
   char* typeName  = NULL;
   char* mixedName = NULL;
@@ -335,7 +365,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
       printf (" +---Length: %u\n", ntohl(u32));      
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
-      _printFlags(" ", u8);
+      _printFlags(" ", u8, false);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
       printf (" +---Prefix Length: %u\n", u8);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
@@ -393,7 +423,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
     case PDU_TYPE_ROUTER_KEY:
       printf (" +---type: %u (%s)\n", pdu->type, "Router Key");
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
-      _printFlags(" ", u8);
+      _printFlags(" ", u8, false);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
       printf (" +---zero: 0x%02x\n", u8);
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
@@ -499,6 +529,30 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       }
       break;
 
+    case PDU_TYPE_ASPA:
+      printf (" +---type: %u (%s)\n", pdu->type, "ASPA");
+      retVal = _u16(&pduPtr, &u16, &length); if (!retVal) break;
+      printf (" +---Reserved: 0x%04x (%u)\n", ntohs(u16), ntohs(u16));      
+      retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+      printf (" +---Length: %u\n", ntohl(u32));      
+      // Flags
+      retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
+      _printFlags(" ", u8, true);
+      retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
+      printf (" +---zero: 0x%02x\n", u8);
+      retVal = _u16(&pduPtr, &u16, &length); if (!retVal) break;
+      provASCount = ntohs(u16);
+      printf (" +---Provider AS Count: %u 0x%04x\n", provASCount, provASCount);      
+      retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+      printf (" +---Customer ASN: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+      while (provASCount > 0)
+      {
+        retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+        printf (" +---Provider ASN: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+        provASCount--;
+      }
+      break;
+      
     case PDU_TYPE_RESERVED:
       mixedName = "Reserved";
     default:

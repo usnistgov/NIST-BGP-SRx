@@ -58,10 +58,16 @@ Configuration:
 The current configuration has three parameters:
 srx evaluation bgpsec                     : Use bgpsec path validation result in 
                                             update validation
+srx evaluation aspa                       : Use ASPA validation result
 srx bgpsec ski (0|1) <1..254> <key>       : Private key
 srx bgpsec active (0|1)                   : Select active private key
+
 neighbor A.B.C.D bgpsec (snd|rec|both)    : This session performs BGPSEC
 neighbor (A.B.C.D|X:X::X:X|WORD) extended : Allow BGP updates > 4096 bytes
+neighbor A.B.C.D aspa <customer|provider> : Specify Upstream or Downstream
+                                            peering relationship for ASPA
+                                            validation 
+                        
 
 For Key Generation and setup see SRxCryptoAPI
 

@@ -16,10 +16,14 @@ SYS_IP_LBL_PFX="<"
 # Suffix used when printing IP label
 SYS_IP_LBL_SFX=">"
 
+## Used by the function fill_SYS_IP to indicate how many
+## IP addresses are missing, if any.
+SYS_MISSING_IPS=0
+
 READ_TAB=""
 GLOBAL_YN=""
 
-FUNCTION_LIB_VER=0.5.1.5.1
+FUNCTION_LIB_VER=0.5.1.9
 
 ## 
 ## This function resets the arrays associated with IP selection
@@ -165,6 +169,7 @@ function fill_SYS_IP()
     fi
     echo "$SYS_IP_TAB""Not enough IP addresses available!"
     echo "$SYS_IP_TAB$missing IP address$plural are missing!"
+    SYS_MISSING_IPS=$missing
     retVal=1
   elif [ $requested -eq 0 ] ; then
     echo "$SYS_IP_TAB""At least one single request must be made!"

@@ -22,10 +22,22 @@
  *
  * RPKI/Router definitions.
  *
- * @version 0.5.0.4
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Changed version label 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *            * Cleaned up some merger left overs and synchronized with naming 
+ *              used conventions.
+ *          - 2021/02/30 - oborchert
+ *            * Fixed Version control for 0.6.0.0
+ *          - 2021/02/09 - oborchert
+ *            * Added define PREFIX_FLAG_AFI_V6
+ *          - 2020/11/24 - oborchert
+ *            * Added Experimental ASPA (see RFC 8210bis-01)
+ *              Enumeration value PDU_TYPE_ASPA as well as the 
+ *              structure RPKIASPAHeader
  * 0.5.0.4  - 2018/03/07 - oborchert
  *            * Added new error code of RFC 8210
  *            * Added error string defines.
@@ -71,7 +83,10 @@
 #define PREFIX_FLAG_ANNOUNCEMENT  0x01
 
 /** The current protocol implementation. */
-#define RPKI_RTR_PROTOCOL_VERSION 1
+#define RPKI_RTR_PROTOCOL_VERSION 2
+/** Bit number 2 specifies the Address Family, 0 for IPv4, 1 for IPv6*/
+#define PREFIX_FLAG_AFI_V6        0x02
+
 /** The default RPKI server port */
 #define RPKI_DEFAULT_CACHE_PORT 323
 /** The default address for a RPKI validation cache */
@@ -104,6 +119,7 @@ typedef enum {
   PDU_TYPE_CACHE_RESET    = 8,  // 5.9
   PDU_TYPE_ROUTER_KEY     = 9,  // 5.10
   PDU_TYPE_ERROR_REPORT   = 10, // 5.11
+  PDU_TYPE_ASPA           = 11, // 5.12
   PDU_TYPE_RESERVED       = 255 // 14
 } RPKIRouterPDUType;
 
@@ -265,6 +281,21 @@ typedef struct {
   // message size
   // message
 } __attribute__((packed)) RPKIErrorReportHeader;
+
+/**
+ * PDU ASPA
+ */
+typedef struct {
+  uint8_t     version;     // Version
+  uint8_t     type;        // TYPE_ASPA
+  uint16_t    zero_1;      // zero
+  uint32_t    length;      // 160+ Bytes
+  uint8_t     flags;
+  uint8_t     zero_2;      // zero
+  uint16_t    provider_as_count; // Must be at least 1
+  uint32_t    customer_asn;
+  // followed by list of provider_asn (4 * provider_as_count))
+} __attribute__((packed)) RPKIASPAHeader;
 
 /**
  * A common structure used to determine the packet size and type while sending

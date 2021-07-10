@@ -1,0 +1,12 @@
+# This file is used to fill the rpki-rtr-srv with 
+# sample ROA data
+# 1st some ROA information
+echo "Adding 6 ROA entries..."
+add 10.10.0.0/16 24 10
+add 10.20.0.0/16 20 20
+add 10.20.0.0/24 24 20
+add 10.30.0.0/16 18 30
+add 10.40.0.0/16 24 40
+add 10.50.0.0/16 22 50
+
+cache

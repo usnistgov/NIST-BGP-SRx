@@ -12,7 +12,7 @@ console: {
 rpki: {
   host = "localhost";
   port = 50000;
-  router_protocol = 1;
+  router_protocol = 2;
 };
 
 bgpsec: {

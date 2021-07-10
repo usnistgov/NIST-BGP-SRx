@@ -1,0 +1,35 @@
+# This file contains SKI's to DEMO keys generated
+# for the sole purpose of demonstrating the 
+# capabilities of the NIST-BGP-SRx software. the
+# public key certificates do not follow the format
+# specified in RFC 8208, they are not meant to 
+# expire. The certificates used are simple OpenSSL 
+# generated certificates with the sole purpose of 
+# injecting the public key into the system.
+# Proper formatted certificates do work as well!
+
+# The AS numbers used here are taken from the private
+# pool as specified in RFC 6996 as well as the pool
+# of AS numbers for documentation purpose as specified
+# in RFC 5398
+
+# Keys used in RFC 8208 example (1x16-bit, 2x32-bit)
+64496-SKI: AB4D910F55CAE71A215EF3CAFE3ACC45B5EEC154
+65536-SKI: 47F23BF1AB2F8A9D26864EBBD8DF2711C74406EC
+65537-SKI: 3A7C104909B37C7177DF8F29C800C7C8E2B8101E
+
+# Keys for DEMO and debugging purpose (16-bit ASN)
+65000-SKI: 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
+65005-SKI: 8BE8CA6579F8274AF28B7C8CF91AB8943AA8A260
+65010-SKI: FB5AA52E519D8F49A3FB9D85D495226A3014F627
+65015-SKI: FDFEE7854889F25BF6ECB88AFAF39CE0EBC41E08
+65020-SKI: 7BEE8A35FD78325932ADEF853A6B1F340C1F3DEF
+65025-SKI: C38D869FF91E6307F1E0ABA99F3DA7D35A106E7F
+65030-SKI: 18494DAA1B2DFD80636AE943D9DC9FF42C1AF9D9
+65040-SKI: 63729E346F7D10E3D037BCF365F9D19E074884E6
+
+# Key for DEMO and debugging purpose (32-bit ASN)
+# normal notation
+4200000000-SKI: A85B22DB3471890155F66B78EB835E4F504D56F4
+# asdot notation:
+64086.59904-SKI: A85B22DB3471890155F66B78EB835E4F504D56F4

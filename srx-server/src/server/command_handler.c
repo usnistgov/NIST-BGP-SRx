@@ -25,10 +25,23 @@
  * queue is fed by the srx-proxy communication thread.
  *
  *
- * @version 0.5.0.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0 - 2021/03/31 - oborchert
+ *           * Modified loops to be C99 compliant 
+ *         - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Added AspathCache to command handler initialization.
+ *            * Added function reverse for array reversals
+ *            * Added function validateASPA(...)
+ *            * Added ASPA validation _processUpdateValidation
+ *            * Added ASPA validation signaling to broadcastResult()
+ *          - 2020/09/26 - oborchert
+ *            * Fixed some incorrect function description.
  * 0.5.0.0  - 2017/07/07 - oborchert
  *            * Moved update path validation into BGPsec handler.
  *            * Also modified validation request handling. (Cleaned it up a bit)
@@ -47,11 +60,13 @@
  * 0.1.0    - 2012/05/15 - pgleichm
  *            * Code Created.
  */
+#include <ctype.h>
 #include "server/command_handler.h"
 #include "shared/srx_defs.h"
 #include "shared/srx_identifier.h"
 #include "shared/srx_packets.h"
 #include "server/srx_packet_sender.h"
+#include "server/rpki_queue.h"
 #include "util/log.h"
 #include "util/math.h"
 #include "util/prefix.h"
@@ -61,6 +76,7 @@
 
 // Forward declaration
 static void* handleCommands(void* arg);
+extern RPKI_QUEUE* getRPKIQueue();
 
 /**
  * Registers a BGPSec Handler, RPKI Handler and Update Cache.
@@ -76,13 +92,15 @@ static void* handleCommands(void* arg);
 bool initializeCommandHandler(CommandHandler* self, Configuration* cfg,
                               ServerConnectionHandler* svrConnHandler,
                               BGPSecHandler* bgpsecHandler,
-                              RPKIHandler* rpkiHandler, UpdateCache* updCache)
+                              RPKIHandler* rpkiHandler, UpdateCache* updCache, 
+                              AspathCache* aspathCache)
 {
   self->sysConfig = cfg;
   self->svrConnHandler = svrConnHandler;
   self->bgpsecHandler = bgpsecHandler;
   self->rpkiHandler = rpkiHandler;
   self->updCache = updCache;
+  self->aspathCache = aspathCache;
 
   // Queue can be changed every time 'start' is called
   self->queue = NULL;
@@ -316,6 +334,222 @@ bool _isSet(uint32_t bitmask, uint32_t bits)
 }
 
 /**
+ * This function reverses an array using recursion
+ * 
+ * @param arr The array to be reversed
+ * @param i The array element to be reordered
+ * @param n The length of the array
+ * 
+ * @since 0.6.0.0
+ */
+void reverse(int arr[], int i, int n)
+{
+    // base case: end of array is reached or array index out-of-bounds
+    if (i >= n)
+        return;
+ 
+    // store next element of the array
+    int value = arr[i];
+ 
+    // reach end of the array using recursion
+    reverse(arr, i + 1, n);
+ 
+    // put elements in the call stack back into the array
+    // in correct order
+    arr[n - i - 1] = value;
+}
+
+/**
+ * This function performs the ASPA validation.
+ * 
+ * @param asPathList
+ * @param length
+ * @param asType
+ * @param direction
+ * @param afi
+ * @param aspaDBManager
+ * 
+ * @return the ASPA validation result
+ */
+uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType, 
+                      AS_REL_DIR direction, uint8_t afi, 
+                      ASPA_DBManager* aspaDBManager)
+{
+  LOG(LEVEL_INFO, FILE_LINE_INFO " ASPA Validation Starts");
+  uint16_t result = ASPA_RESULT_NIBBLE_ZERO; // for being distinguished with 0 (ASPA_RESULT_VALID)
+
+  uint32_t customerAS, providerAS, startId=0;
+  bool swapFlag = false;
+  // index for for loops
+  int idx = 0;
+
+  // 
+  // Initial Check for direct neighbor
+  // Issue: how to figure out Router1 and Router2 are direct neighbor in SRx server side
+  //   
+  //    1. Direct neight decision should be taken place in a router 
+  //        This means if a router detects a first ASN in AS path doesn't belong to the list of peering routers,
+  //        do not proceed to do ASPA validation. 
+  //
+  //    2. Otherwise, SRx server needs router's peering information
+  //       It needs to have all peering router information and compare those info to the proxy client 
+  //
+  // 
+  //        Direct Neighbor Check will take place in a router. And if that case happens, 
+  //        the router sends a flag unset for ASPA validation.
+  
+
+  //
+  // AS Set check routine
+  //
+  ASPA_ValidationResult hopResult[length];  
+
+  // initialize
+  for (idx = 0; idx < length; idx++)
+  {
+    hopResult[idx] = 0;
+  }
+
+  LOG(LEVEL_INFO, "AS path type: %d AS length: %d AS Direction: %d (1:up, 2:down)", asType, length, direction);
+  if (asType == AS_SET || asType != AS_SEQUENCE)
+  {
+    hopResult[0] = ASPA_RESULT_UNVERIFIABLE; 
+    result |= hopResult[0];
+    LOG(LEVEL_INFO, "validation  - Unverifiable detected");
+  }
+
+  // revert asPathList to a new array variable
+  PATH_LIST list[length];
+  memcpy(list, asPathList, sizeof(PATH_LIST) * length);
+  reverse(list, 0, length);
+
+
+  ASPA_ValidationResult currentResult;
+  bool isUpStream;
+  
+  if (direction == ASPA_UNKNOWNSTREAM || direction == ASPA_UPSTREAM) 
+    isUpStream = true;
+  else if (direction == ASPA_DOWNSTREAM)
+    isUpStream = false;
+
+  /*
+   *    Up Stream Validation 
+   */
+  if (isUpStream)
+  {
+    LOG(LEVEL_INFO, "Upstream Validation start");
+    LOG(LEVEL_INFO, "Lookup Result Index (0:valid, 1:Invalid, 2:Undefined 4:Unknown, 8:Unverifiable)");
+    for (idx = 0; idx < length-1; idx++)
+    {
+      /*
+      if (asType == AS_SET) // if AS_SET, skip
+      {
+        hopResult[idx+1] = ASPA_RESULT_UNVERIFIABLE;
+        LOG(LEVEL_INFO, "validation  - Unverifiable detected");
+        continue;
+      }
+      */
+
+      customerAS = list[idx];
+      providerAS = list[idx+1];
+      LOG(LEVEL_INFO, "customer AS: %d\t provider AS: %d", customerAS, 
+                      providerAS);
+
+      currentResult = hopResult[idx+1] = 
+                     ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+
+      result |= currentResult;
+      LOG(LEVEL_INFO, "current lookup result: %x Accured Result: %x", 
+                      currentResult, result);
+
+      if (   currentResult == ASPA_RESULT_VALID 
+          || currentResult == ASPA_RESULT_UNKNOWN)
+        continue;
+
+      if (currentResult == ASPA_RESULT_INVALID)
+        return SRx_RESULT_INVALID;
+
+    }
+  } // end of UpStream
+
+  /*
+   *    Down Stream Validation 
+   */
+  else 
+  {
+    LOG(LEVEL_INFO, "Downstream Validation start");
+    uint32_t temp;
+    for (idx = 0; idx < length-1; idx++)
+    {
+      /*
+      if (asType == AS_SET) // if AS_SET, skip
+      {
+        hopResult[idx+1] = ASPA_RESULT_UNVERIFIABLE;
+        LOG(LEVEL_INFO, "validation  - Unverifiable detected");
+        continue;
+      }
+      */
+
+      customerAS = list[idx];
+      providerAS = list[idx+1];
+
+      if (swapFlag)
+      {
+        temp       = customerAS;
+        customerAS = providerAS;
+        providerAS = temp;
+        LOG(LEVEL_INFO, "customer provider ASN swapped ");
+      }
+      LOG(LEVEL_INFO, "customer AS: %d\t provider AS: %d", 
+                      customerAS, providerAS);
+
+      currentResult = hopResult[idx+1] = 
+                     ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+
+      result |= currentResult;
+      LOG(LEVEL_INFO, "current lookup result: %x Accured Result: %x", 
+                      currentResult, result);
+      
+      if (   currentResult == ASPA_RESULT_VALID 
+          || currentResult == ASPA_RESULT_UNKNOWN)
+        continue;
+
+      if (currentResult == ASPA_RESULT_INVALID && !swapFlag)
+      {
+        swapFlag = true;
+        result ^= currentResult;
+        LOG(LEVEL_INFO, "INVALID and swap flag set (modified Accured Result: 0x%x)", result);
+        continue;
+      }
+      else
+      {
+        return SRx_RESULT_INVALID;
+      }
+    } 
+  } // end of DownStream
+
+
+  /* 
+   * Final result return
+   */
+  result = result & 0x0f; // filter out
+  if (result == ASPA_RESULT_VALID)
+    return SRx_RESULT_VALID;
+
+  if ( (result & ASPA_RESULT_UNKNOWN) && !(result & ASPA_RESULT_UNVERIFIABLE))
+    return SRx_RESULT_UNKNOWN;
+
+  if ( (result & ASPA_RESULT_UNVERIFIABLE) && !(result & ASPA_RESULT_UNKNOWN))
+    return SRx_RESULT_UNVERIFIABLE;
+  
+  if ( (result & ASPA_RESULT_UNVERIFIABLE) && (result & ASPA_RESULT_UNKNOWN))
+    return SRx_RESULT_UNVERIFIABLE;
+
+  return SRx_RESULT_UNDEFINED;
+}
+
+
+/**
  * This method is used to verify an update it is called by the command handlers
  * loop method that works through the command queue!
  *
@@ -341,9 +575,10 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
   // 1. get an idea what validations are requested:
   bool originVal = _isSet(bhdr->flags, SRX_PROXY_FLAGS_VERIFY_PREFIX_ORIGIN);
   bool pathVal   = _isSet(bhdr->flags, SRX_PROXY_FLAGS_VERIFY_PATH);
+  bool aspaVal   = _isSet(bhdr->flags, SRX_PROXY_FLAGS_VERIFY_ASPA);
   SRxUpdateID updateID = (SRxUpdateID)item->dataID;
 
-  if (!originVal && !pathVal)
+  if (!originVal && !pathVal && !aspaVal)
   {
     RAISE_SYS_ERROR("Invalid call to process update validation, flags are not "
                     "set properly");
@@ -354,8 +589,9 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
   SRxDefaultResult defRes;
   SRxResult srxRes;
 
+  uint32_t pathId= 0;
   if(!getUpdateResult(cmdHandler->updCache, &item->dataID, 0, NULL,
-                      &srxRes, &defRes))
+                      &srxRes, &defRes, &pathId))
   {
     RAISE_SYS_ERROR("Command handler attempts to start validation for update"
                     "[0x%08X] but it does not exist!", updateID);
@@ -368,6 +604,7 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
   SRxResult srxRes_mod;
   srxRes_mod.bgpsecResult = SRx_RESULT_DONOTUSE;
   srxRes_mod.roaResult    = SRx_RESULT_DONOTUSE; // Indicates this
+  srxRes_mod.aspaResult   = SRx_RESULT_DONOTUSE; // Indicates this
 
     
   // Only do bgpdsec path validation if not already performed
@@ -421,12 +658,97 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
     free(prefix);
   }
   
+  //
+  // ASPA validation
+  //
+  if (aspaVal && (srxRes.aspaResult == SRx_RESULT_UNDEFINED) 
+              && (defRes.result.aspaResult != SRx_RESULT_INVALID))
+                  // if defRes result aspaResult is invalid, this means that a 
+                  // client router put this result in due to the failure 
+                  // of Direct neighbor check or any other reason.
+  {
+    // ----------------------------------------------------------------
+    // 
+    // 1. fetch validation task for Aspath from AspathCache 
+    // 2. relate this job to ASPA object DB
+    // 3. validation work
+    // 4. notification
+    //
+    // ----------------------------------------------------------------
+    RPKIHandler* handler = (RPKIHandler*)cmdHandler->rpkiHandler;
+    ASPA_DBManager* aspaDBManager = handler->aspaDBManager;
+    TrieNode *root = aspaDBManager->tableRoot;
+
+
+    // -------------------------------------------------------------------
+    // Retrieve data from aspath cache with crc Key, path ID, here
+    //
+    LOG(LEVEL_INFO, "Path ID: 0x%X", pathId);
+    AS_PATH_LIST *aspl = getAspathListFromAspathCache (cmdHandler->aspathCache, pathId, &srxRes);
+    printAsPathList(aspl);
+
+    if (aspl)
+    {
+      // call ASPA validation
+      //
+      uint8_t afi = aspl->afi;  
+      if (aspl->afi == 0 || aspl->afi > 2) // if more than 2 (AFI_IP6)
+        afi = AFI_IP;                      // set default
+
+      uint8_t valResult = validateASPA (aspl->asPathList, 
+          aspl->asPathLength, aspl->asType, aspl->asRelDir, afi, aspaDBManager);
+
+      LOG(LEVEL_INFO, FILE_LINE_INFO "\033[92m"" Validation Result: %d "
+          "(0:v, 2:Iv, 3:Ud 4:DNU 5:Uk, 6:Uf)""\033[0m", valResult);
+
+      // modify Aspath Cache with the validation result
+      //
+      if (valResult != aspl->aspaValResult)
+      {
+        time_t cTime = time(NULL);
+        aspl->lastModified = cTime;
+        modifyAspaValidationResultToAspathCache (cmdHandler->aspathCache, pathId, 
+            valResult, aspl);
+        aspl->aspaValResult = valResult;
+      }
+
+      // modify Update Cache
+      srxRes_mod.aspaResult = aspl->aspaValResult;
+          
+    }
+    else
+    {
+      LOG(LEVEL_WARNING, "Something went wrong... path list was not registered");
+    }
+
+    // release memory
+    //if (aspl->asType == AS_SET)
+     // deleteAspathCache(cmdHandler->aspathCache, pathId, aspl);
+
+    if (aspl)
+      deleteAspathListEntry (aspl);
+  }
+
+
+  //
+  // in case, path id already exists in AS Path Cache and srx result already 
+  // has the validation result which was generated previously with the same path list 
+  //
+  if (aspaVal && srxRes.aspaResult != SRx_RESULT_UNDEFINED
+              && (defRes.result.aspaResult != SRx_RESULT_INVALID))
+  {
+    // modify Update Cache
+    srxRes_mod.aspaResult = srxRes.aspaResult; // srx Res came from UpdateCache (cEntry)
+  }
+
+
   // Now check if the update changed - In a future version check if bgpsecResult
   // is not DONOTUSE and  not originVal - in a future version the origin 
   // validation will get the validation result handed down to store and it will
   // be send there as well. Not yet though.
   if (   (srxRes_mod.bgpsecResult != SRx_RESULT_DONOTUSE)
-      || (srxRes_mod.roaResult    != SRx_RESULT_DONOTUSE))
+      || (srxRes_mod.roaResult    != SRx_RESULT_DONOTUSE)
+      || (srxRes_mod.aspaResult   != SRx_RESULT_DONOTUSE))
   {
     if (!modifyUpdateResult(cmdHandler->updCache, &item->dataID, &srxRes_mod, 
                             false))
@@ -638,11 +960,12 @@ static void* handleCommands(void* arg)
 
 
 /**
- * Sends a (new) result to all connected clients.
+ * Sends a (new) result to all connected clients of the provided update.
+ * The UpdateID is embedded in the SRxValidationResult data.
  *
  * @param self Instance
- * @param updId Update identifier
- * @param res Result
+ * @param valResult The validation result including the UpdateID the result
+ *                  is for.
  * @return true if at least one broadcast could be successfully send to any
  *              registered client
  */
@@ -674,9 +997,10 @@ bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult)
     pdu = malloc(pduLength);
     memset(pdu,0,pduLength);
     pdu->type         = PDU_SRXPROXY_VERI_NOTIFICATION;
-    pdu->resultType   = (valResult->valType & SRX_FLAG_ROA_AND_BGPSEC);
+    pdu->resultType   = (valResult->valType & SRX_FLAG_ROA_BGPSEC_ASPA);
     pdu->roaResult    = valResult->valResult.roaResult;
     pdu->bgpsecResult = valResult->valResult.bgpsecResult;
+    pdu->aspaResult   = valResult->valResult.aspaResult;
 
     pdu->length           = htonl(pduLength);
     pdu->updateID = htonl(valResult->updateID);

@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.5.1.1
+ * @version 0.6.0.0
  *
  * EXIT Values:
  *
@@ -39,6 +39,8 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Changed SRXPROXY_GOODBYE->zero to SRXPROXY_GOODBYE->zero32
  * 0.5.1.1  - 2020/07/22 - oborchert
  *            * Fixed a speller
  *            * Fixed error message when unknown parameter is provided.
@@ -99,6 +101,8 @@
 #include "server/srx_server.h"
 #include "server/srx_packet_sender.h"
 #include "server/update_cache.h"
+#include "server/aspath_cache.h"
+#include "server/aspa_trie.h"
 #include "util/directory.h"
 #include "util/log.h"
 
@@ -139,6 +143,10 @@ static SKI_CACHE*    skiCache  = NULL;
 /** The RPKI queue that is used to manage changes in the RPKI.
  * @since 0.5.0.0 */
 static RPKI_QUEUE*   rpkiQueue = NULL;
+
+static AspathCache  aspathCache;
+static TrieNode     aspaTrie;
+static ASPA_DBManager aspaDBManager;
 
 /** The cache that manages keys for bgpsec. 
  * @deprecated  MIGHT BE NOT USED
@@ -304,6 +312,8 @@ static bool setupCaches()
     RAISE_ERROR("Failed to setup a cache - stopping");    
     return false;
   }
+  initializeAspaDBManager(&aspaDBManager, &config);    // ASPA: ASPA object DB
+  createAspathCache(&aspathCache, &aspaDBManager); // ASPA: AS path DB 
 
   LOG(LEVEL_INFO, "- SRx Caches and RPKI Queue created");
   return true;
@@ -319,7 +329,7 @@ static bool setupHandlers()
   uint8_t handlers = 0;
   bool retVal = true;
 
-  if (!createRPKIHandler (&rpkiHandler, &prefixCache,
+  if (!createRPKIHandler (&rpkiHandler, &prefixCache, &aspathCache, &aspaDBManager,
                           config.rpki_host, config.rpki_port, 
                           config.rpki_router_protocol))
   {
@@ -335,7 +345,7 @@ static bool setupHandlers()
     else
     {
       handlers |= SETUP_BGPSEC_HANDLER;
-      if (!createServerConnectionHandler (&svrConnHandler, &updCache, &config))
+      if (!createServerConnectionHandler (&svrConnHandler, &updCache, &aspathCache, &config))
       {
         RAISE_ERROR("Failed to create Server Connection Handler.");
       }
@@ -343,7 +353,7 @@ static bool setupHandlers()
       {
         handlers |= SETUP_CONNECTION_HANDLER;
         if (!initializeCommandHandler (&cmdHandler, &config, &svrConnHandler,
-                                       &bgpsecHandler, &rpkiHandler, &updCache))
+                                       &bgpsecHandler, &rpkiHandler, &updCache, &aspathCache))
         {
           RAISE_ERROR("Failed to create Command Handler.");
         }
@@ -560,7 +570,7 @@ void shutDown()
   uint32_t length = sizeof(SRXPROXY_GOODBYE);
   pdu.type = PDU_SRXPROXY_GOODBYE;
   pdu.keepWindow = 0;
-  pdu.zero = 0;
+  pdu.zero32 = 0;
   pdu.length = htonl(length);
   broadcastPacket(cmdHandler.svrConnHandler, &pdu, length);
 

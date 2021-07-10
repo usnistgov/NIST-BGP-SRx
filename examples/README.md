@@ -98,10 +98,16 @@ following parameter is supported:
   be found by looking into the file IP-Address.cfg. In case all experiments are started 
   on the same system, either 3 network cards are needed or network aliases need to be configured.
   The internet provides plenty of examples on how to configure multiple IP addresses on a single 
-network interface. ```ifconfig eth0:0 <IP-ADDRESS> up``` does temporarily add an alias but only 
-until the next reboot. 
-For a more persistent solution configuration files are needed. But as mentioned above, the internet 
-has plenty of examples on how to configure this.
+  network interface. ```ifconfig eth0:0 <IP-ADDRESS> up``` does temporarily add an alias but only 
+  until the next reboot. 
+  For a more persistent solution configuration files are needed. But as mentioned above, the internet 
+  has plenty of examples on how to configure this.
+
+  With the latest update the configuration script received 3 more settings: 
+  * '-I' : Automatically add unused IP addresses to the system interfaces.
+  * '-A' : Reinstall the alias configurations after system reboot.
+  * '-RA': Uninstall the added alias configurations. (Only if they match the installed ones.)
+  The alias configuration is added to the IP-Address.cfg configuration file during alias configurations.
 
   IMPORTANT: 
   ==========

@@ -16,9 +16,7 @@ Please see the documentation for each tool or use the help command on
 the command line.
 The srx server itself can be accessed using a telnet clinet. 
 
-For questions please contact the developers at bgpsrx-dev@nist.gov.
-To be informed for new releases or minor bug fixes, register with 
-bgpsrx-users@nist.gov.
+For questions please contact the developers at itrg-contact@list.nist.gov.
 
 
 `srx server and proxy' installation

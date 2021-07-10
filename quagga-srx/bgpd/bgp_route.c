@@ -88,6 +88,25 @@ struct SRxThread* srx_thread_arg_new(void)
     return rq;
 }
 
+/**
+ * Determines if SRx evaluation is enabled. The code of this function was 
+ * extracted from the decision process.
+ * 
+ * @param bgp Pointer to the bgp instance.
+ * 
+ * @return true if at least one evaluation modes is enabled, otherwise false
+ * 
+ * @since 0.6.0.0 before that it was part if the decision process.
+ */
+bool srx_use_evaluation(struct bgp* bgp)
+{
+  bool use_evaluation =    srx_config_check(bgp, SRX_CONFIG_EVAL_ORIGIN)
+                        || srx_config_check(bgp, SRX_CONFIG_EVAL_PATH)
+                        || srx_config_check(bgp, SRX_CONFIG_EVAL_ASPA);
+  
+  return use_evaluation;
+}
+
 int checkClientConnection(struct thread *t)
 {
     zlog_debug (" %s called", __FUNCTION__);
@@ -651,70 +670,122 @@ bgp_info_unset_flag (struct bgp_node *rn, struct bgp_info *ri, u_int32_t flag)
  */
 int bgp_info_set_ignore_flag (struct bgp_info* info)
 {
-  int ignore;
+  bool ignore;
   struct bgp *bgp;
-  int valRes;
 
-  ignore = 0;
+  ignore = false;
   bgp = info->peer->bgp;
-  valRes = srx_calc_validation_state(bgp, info);
 
-  // check the setting ignore-invalid according to the result value
-  if (bgp->srx_config & SRX_CONFIG_EVALUATE)
+  if (BGP_DEBUG (aspa, ASPA))
   {
-    switch (valRes)
+    zlog_debug ("[ ASPA ] %s called [uID:%08X]- ROA: %d BGPSEC:%d ASPA:%d (0:V 1:NF 2:Iv 3:Ud 4:DNU 5:Uk 6:Uv)", 
+        __FUNCTION__, info->updateID, info->val_res_ROA, info->val_res_BGPSEC, info->val_res_ASPA);
+  }
+  
+  // 1. Check if Origin Validation is enabled and if then check the ignore policy
+  // towards the validation result
+  if (bgp->srx_config & SRX_CONFIG_EVAL_ORIGIN)
+  {
+    switch (info->val_res_ROA) 
     {
       case SRx_RESULT_INVALID:
-        if (bgp->srx_val_policy & SRX_VAL_POLICY_IGNORE_INVALID)
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ORIGIN_IGNORE_INVALID)
         {
-          ignore = 1;
+          ignore = true;
         }
         break;
       case SRx_RESULT_NOTFOUND:
-        if (bgp->srx_val_policy & SRX_VAL_POLICY_IGNORE_NOTFOUND)
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ORIGIN_IGNORE_NOTFOUND)
         {
-          ignore = 1;
+          ignore = true;
         }
         break;
       case SRx_RESULT_UNDEFINED:
-        if (bgp->srx_val_policy & SRX_VAL_POLICY_IGNORE_UNDEFINED)
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ORIGIN_IGNORE_UNDEFINED)
         {
-          ignore = 1;
+          ignore = true;
         }
+      default:
+        break;
+    }    
+  }
+  
+  // 2. Check the path validation ignore policy, only if not ignored yet.
+  if (!ignore && (bgp->srx_config & SRX_CONFIG_EVAL_PATH))
+  {
+    switch (info->val_res_BGPSEC) 
+    {
+      case SRx_RESULT_INVALID:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_BGPSEC_IGNORE_INVALID)
+        {
+          ignore = true;
+        }
+        break;
+      case SRx_RESULT_UNDEFINED:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_BGPSEC_IGNORE_UNDEFINED)
+        {
+          ignore = true;
+        }
+        break;
       default:
         break;
     }
   }
-  else
+
+  // 3. Check the path validation ignore policy, only if not ignored yet.
+  if (!ignore && (bgp->srx_config & SRX_CONFIG_EVAL_ASPA))
   {
-    if (ignore)
+    switch (info->val_res_ASPA)
     {
-      zlog_debug ("Evaluation disabled do not set ignore flag for update "
-                  "[0x%08X]!", info->updateID);
-      ignore = 0;
+      case SRx_RESULT_INVALID:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ASPA_IGNORE_INVALID)
+        {
+          ignore = true;
+        }
+        break;
+      case SRx_RESULT_UNKNOWN:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ASPA_IGNORE_UNKNOWN)
+        {
+          ignore = true;
+        }
+        break;
+      case SRx_RESULT_UNVERIFIABLE:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ASPA_IGNORE_UNVERIFIABLE)
+        {
+          ignore = true;
+        }
+      case SRx_RESULT_UNDEFINED:
+        if (bgp->srx_val_policy & SRX_VAL_POLICY_ASPA_IGNORE_UNDEFINED)
+        {
+          ignore = true;
+        }
+        break;
+      default:
+        break;
     }
   }
 
+  // @CHECK: I am not sure anymore what to do with this. I believe the question 
+  //         was what if the update was originally ignored elsewhere. Here we
+  //         accidently could unset the ignore flag. But this is an issue with
+  //         other policies that might reset the flag as well.
+  
   /* Adjust 'ignore' flag */
   // Is this flag an original Quagga flag? if so is it possible that we
   // overwrite a set flag by un-setting it? Should we use
   if (CHECK_FLAG (info->flags, BGP_INFO_IGNORE))
   {
-    if (ignore == 0)
+    if (!ignore)
     {
-     // zlog_debug ("Remove 'Ignore' flag for update [0x%08X]!",
-     //             info->updateID);
       bgp_info_unset_flag (info->node, info, BGP_INFO_IGNORE);
     }
   }
-  else if (ignore == 1)
+  else if (ignore)
   {
-    //zlog_debug ("Setting 'Ignore' flag for update [0x%08X]!",
-    //            info->updateID);
     bgp_info_set_flag (info->node, info, BGP_INFO_IGNORE);
   }
 
-  return ignore;
+  return ignore ? 1 : 0;
 }
 
 /**
@@ -756,6 +827,9 @@ int srx_calc_validation_state(struct bgp *bgp, struct bgp_info *info)
 {
   int result;
 
+  zlog_err("DEPRECATED FUNCTION srx_calc_validation_state MUST not be used "
+           "anymore in BGP-SRx Version 0.6.0.0\n");
+  
   result = SRx_RESULT_DONOTUSE;
 
   if (srx_config_check(bgp, SRX_CONFIG_EVAL_PATH))
@@ -787,6 +861,58 @@ int srx_calc_validation_state(struct bgp *bgp, struct bgp_info *info)
   }
 
   return result;
+}
+
+/**
+ * Retrieve the BGP route's validation information
+ * 
+ * @param info The BGP route information structure.
+ * 
+ * @return The validation results stored inside a validation object.  
+ * 
+ * @since 0.6.0.0
+ */
+SRxResult getInfoToSrxVal (struct bgp_info *info)
+{
+  SRxResult resVals;
+
+  if (info)
+  {
+    resVals.roaResult    = info->val_res_ROA;
+    resVals.bgpsecResult = info->val_res_BGPSEC;
+    resVals.aspaResult   = info->val_res_ASPA;
+  }
+  else
+  {
+    resVals.roaResult    = SRx_RESULT_UNDEFINED;
+    resVals.bgpsecResult = SRx_RESULT_UNDEFINED;
+    resVals.aspaResult   = SRx_RESULT_UNDEFINED;
+  }
+
+  return resVals;
+}
+
+/**
+ * Verify if any validation state changed
+ * 
+ * @param old The SRx-Result information of the old validation state
+ * @param new The SRx-Result information of the new validation state
+ * 
+ * @since 0.6.0.0
+ */
+bool isSrxValChanged (SRxResult old, SRxResult new)
+{
+  bool ret = false;
+  if (old.roaResult != new.roaResult)
+    return true;
+
+  if (old.bgpsecResult != new.bgpsecResult)
+    return true;
+  
+  if (old.aspaResult != new.aspaResult)
+    return true;
+
+  return ret;
 }
 
 /**
@@ -903,12 +1029,15 @@ int checkEcomSRxValid(struct attr* attr)
  */
 void bgp_info_set_validation_result (struct bgp_info *info,
                                      ValidationResultType resType,
-                                     uint8_t roaResult, uint8_t bgpsecResult)
+                                     uint8_t roaResult, uint8_t bgpsecResult,
+                                     uint8_t aspaResult)
+
 {
   /* An internal error occurred */
-  if ((resType & SRX_FLAG_ROA_AND_BGPSEC) == 0)
+  if ((resType & SRX_FLAG_ROA_BGPSEC_ASPA) == 0)
   {
-    zlog_debug ("No SRx result provided! - Update [0x%08X]", info->updateID);
+    zlog_debug ("No SRx result provided! - type [0x%X], Update [0x%08X]", 
+        resType, info->updateID);
   }
   else
   {
@@ -916,7 +1045,7 @@ void bgp_info_set_validation_result (struct bgp_info *info,
     int requeue       = 0;
 
     // First store the current status
-    uint8_t oldResult = srx_calc_validation_state(bgp, info);
+    SRxResult oldValResult = getInfoToSrxVal(info);
     uint8_t oldIgnore = CHECK_FLAG (info->flags, BGP_INFO_IGNORE) ? 1 : 0;
 
     // Now store the new results.
@@ -928,11 +1057,15 @@ void bgp_info_set_validation_result (struct bgp_info *info,
     {
       info->val_res_BGPSEC = bgpsecResult;
     }
+    if ((resType & SRX_FLAG_ASPA) == SRX_FLAG_ASPA)
+    {
+      info->val_res_ASPA = aspaResult;  // it came from resCallback()
+    }
 
     // Check if it is fully valid and if not decide if the update has to be
     // ignored
     bool ignoreChanged = bgp_info_set_ignore_flag(info) != oldIgnore;
-    bool resultChanged = oldResult != srx_calc_validation_state(bgp, info);
+    bool resultChanged = isSrxValChanged(oldValResult, getInfoToSrxVal(info));
 
     // Only re-queue if the ignore state changed or if the result changed.
     requeue = ignoreChanged || resultChanged;
@@ -964,57 +1097,295 @@ bgp_med_value (struct attr *attr, struct bgp *bgp)
 #ifdef USE_SRX
 
 /**
- * This method caclulated the new local pref.
- *
- * @param prefPol The local preference policy for the given result value.
- * @param locPref The current local pref that needs to be modified.
- *
- * @return The modified local preference (0 in case of an underflow).
+ * This function returns the local preference value provided by the given
+ * local preference data structure.
+ * 
+ * In case either parameters experience an overflow the values will be reset to
+ * 0xFFFFFFFF.
+ * 
+ * @param locPref The local preference policy data
+ * @param incVal Pointer to the value used to increase the local preference by
+ * @param decVal Pointer to the value used to decrease the local preference by
+ * 
+ * @since 0.6.0.0
  */
-static u_int32_t srx_loc_prev_value(struct bgp* bgp, u_int32_t locPref,
-                                    int valResult)
+static void _srx_policy_getLocPrevValue(struct srx_local_pref* locPref,
+                                        uint32_t* incVal, uint32_t* decVal)
 {
-  struct srx_local_pref* prefPolicy;
-  bool isSet;
-
-  switch (valResult)
-  {
-    case SRx_RESULT_VALID:
-      prefPolicy = &bgp->srx_val_local_pref[VAL_LOCPRF_VALID];
-      isSet = prefPolicy->is_set > 0;
-      break;
-    case SRx_RESULT_NOTFOUND:
-      prefPolicy = &bgp->srx_val_local_pref[SRx_RESULT_NOTFOUND];
-      isSet = prefPolicy->is_set > 0;
-      break;
-    case SRx_RESULT_INVALID:
-      prefPolicy = &bgp->srx_val_local_pref[VAL_LOCPRF_INVALID];
-      isSet = prefPolicy->is_set > 0;
-      break;
-    default:
-      prefPolicy = NULL;
-      isSet = false;
-  }
-
-  if (isSet)
-  {
-    if (prefPolicy->relative == 0)
+  uint32_t prevInc = *incVal;
+  uint32_t prevDec = *decVal;
+  
+  if (locPref->enable)
+  {  
+    // Add or delete the values.
+    if (locPref->add)
     {
-      locPref = prefPolicy->value;
-    }
-    else if (prefPolicy->relative == -1)
-    {
-      locPref = (locPref > prefPolicy->value) ? (locPref - prefPolicy->value)
-                                              : 0; // underflow
+      *incVal += locPref->value;
     }
     else
     {
-      locPref += prefPolicy->value;
+      *decVal += locPref->value;
+    }
+    // Check for overflow
+    if (*incVal < prevInc)
+    {
+      *incVal = 0xFFFFFFFF;
+      zlog_err("Overflow for local preference add policy detected. Adjust to " \
+               "0xFFFFFFFF!\n");
+    }
+    if (*decVal < prevDec)
+    {
+      *decVal = 0xFFFFFFFF;
+      zlog_err("Overflow for local preference subtract policy detected. Adjust " \
+               "value to 0xFFFFFFFF!\n");
+    }
+  }
+}
+
+/**
+ * This function calculates the new local preference depending on the configured
+ * validation mode and the configured policy. This means, policies for local 
+ * preference regarding origin validation will only be applied if origin 
+ * validation is enabled. Same for bgpsec and aspa
+ *
+ * @param bgp The BGP session
+ * @param valResult The validation results for origin, bgpsec, and 
+ *                  aspa validation
+ * @param delta Pointer to an unsigned 32-bit value where the absolute value
+ *              of the local pref modifier will be stored in.
+ * 
+ * @return true if the delta value has to be added, otherwise false.
+ */
+static bool srx_calc_loc_prev_delta_value(struct bgp* bgp, SRxResult valResult,
+                                          uint32_t* delta)
+{
+  // This values are used to pre-calculate the local preference modification. 
+  // Because local pref is a 4 byte unsigned value we cannot assume that we will
+  // not run into an over or underflow. Hence we first calculate both sides of
+  // the local preference and add them up properly at the end.
+  uint32_t incVal = 0;
+  uint32_t decVal = 0;
+   
+  // ROA result - Only add if ROA validation is enabled.
+  if ((bgp->srx_config & SRX_CONFIG_EVAL_ORIGIN) != 0)
+  {    
+    switch (valResult.roaResult)
+    {
+      case SRx_RESULT_VALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_roa[VAL_LOCPRF_VALID], 
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_NOTFOUND:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_roa[VAL_LOCPRF_NOTFOUND], 
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_INVALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_roa[VAL_LOCPRF_INVALID], 
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_UNDEFINED:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_roa[VAL_LOCPRF_UNDEFINED],
+                                    &incVal, &decVal);
+        break;
+      default:
+        zlog_err("Invalid validation result type %02X provided for " \
+                 "origin validation!\n", valResult.roaResult);
+        break;
     }
   }
 
+  // BGPsec result  - Only add if BGPSEC validation is enabled.
+  if ((bgp->srx_config & SRX_CONFIG_EVAL_PATH) != 0)
+  {    
+    switch (valResult.bgpsecResult)
+    {
+      case SRx_RESULT_VALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_bgpsec[VAL_LOCPRF_VALID],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_INVALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_bgpsec[VAL_LOCPRF_INVALID],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_UNDEFINED:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_bgpsec[VAL_LOCPRF_UNDEFINED],
+                                    &incVal, &decVal);
+        break;
+      default:
+        zlog_err("Invalid validation result type %02X provided for " \
+                 "bgpsec validation!\n", valResult.bgpsecResult);
+        break;
+    }
+  }
+
+  // ASPA result - Only add if ASPA validation is enabled.
+  if ((bgp->srx_config & SRX_CONFIG_EVAL_ASPA) != 0)
+  {    
+    switch (valResult.aspaResult)
+    {
+      case SRx_RESULT_VALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_aspa[VAL_LOCPRF_VALID],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_UNKNOWN:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_aspa[VAL_LOCPRF_UNKNOWN],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_INVALID:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_aspa[VAL_LOCPRF_INVALID],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_UNVERIFIABLE:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_aspa[VAL_LOCPRF_UNVERIFIABLE],
+                                    &incVal, &decVal);
+        break;
+      case SRx_RESULT_UNDEFINED:
+        _srx_policy_getLocPrevValue(&bgp->srx_loc_pref_aspa[VAL_LOCPRF_UNDEFINED],
+                                    &incVal, &decVal);
+        break;
+      default:
+        zlog_err("Invalid validation result type %02X provided for " \
+                 "aspa validation!\n", valResult.aspaResult);
+        break;
+    }
+  }
+  
+  // Now recalculate the new local preference value
+  // First check if the total modification produces an underflow or 
+  bool doAdd = (incVal >= decVal);
+  *delta = doAdd ? incVal - decVal : decVal - incVal;
+                    
+  return doAdd;
+}
+
+/**
+ * Scan through the appropriate local pref policies and return true if at least
+ * a single one is enabled. This function does not verify if the evaluation is 
+ * enabled, it just checks the policy configuration.
+ * 
+ * @param srx_loc_pref Pointer to the local preference setting
+ * @param validationType Either LOCPRF_TYPE_ROA, LOCPRF_TYPE_BGPSEC, 
+ *                       or LOCPRF_TYPE_ASPA
+ * 
+ * @return true if the local preference processing is enabled in at least a 
+ *              single policy for the given type.
+ * 
+ * @since 0.6.0.0
+ */
+static bool _srx_is_localPrefEnabled (struct bgp* bgp, int validationType)
+{
+  bool retVal = false;
+  int idx, maxIdx;
+  struct srx_local_pref* locPref;
+  
+  switch (validationType)
+  {
+    case LOCPRF_TYPE_ROA:
+      maxIdx       = VAL_LOCPRF_CT_ROA;
+      locPref      = bgp->srx_loc_pref_roa;
+      break;
+    case LOCPRF_TYPE_BGPSEC:
+      maxIdx = VAL_LOCPRF_CT_BGPSEC;
+      locPref      = bgp->srx_loc_pref_bgpsec;
+      break;
+    case LOCPRF_TYPE_ASPA:
+      maxIdx = VAL_LOCPRF_CT_ASPA;
+      locPref      = bgp->srx_loc_pref_aspa;
+      break;
+    default:
+      maxIdx = 0;
+  }
+  
+  for (idx = 0; !retVal && (idx < maxIdx); idx++ )
+  {
+    retVal = locPref[idx].enable;
+  }
+  
+  return retVal;
+}
+
+/**
+ * Check if evaluation is enabled for any of origin, bgpsec, or aspa validation 
+ * and if it is enabled then check if at least one single local preference 
+ * policy is enabled.
+ * 
+ * @param bgp The BGP instance
+ * 
+ * @return true is any local pref policy is active and used.
+ * 
+ * @since 0.6.0.0
+ */
+bool isSetPrefPolicy(struct bgp* bgp)
+{
+  bool doValidation = false;
+  int idx;
+  //@CHECK This might be deleted or determined differently
+  // Here he went through all policies and checked if any is enabled.
+  if ((bgp->srx_config & SRX_CONFIG_EVAL_ORIGIN) != 0)
+  {
+    doValidation = _srx_is_localPrefEnabled(bgp, LOCPRF_TYPE_ROA);
+  }
+  if (!doValidation && ((bgp->srx_config & SRX_CONFIG_EVAL_PATH) != 0))
+  {
+    doValidation = _srx_is_localPrefEnabled(bgp, LOCPRF_TYPE_BGPSEC);
+  }
+  if (!doValidation && ((bgp->srx_config & SRX_CONFIG_EVAL_ASPA) != 0))
+  {
+    doValidation = _srx_is_localPrefEnabled(bgp, LOCPRF_TYPE_BGPSEC);
+  }
+  
+  return doValidation;
+}
+
+/**
+ * This function adds/subtracts a delta value to/from the the given local 
+ * preference. For underflow the return value will be 0, for overflow the return
+ * value will ve 0xFFFFFFFF
+ * 
+ * @param locPref The local preference value that is to be manipulated.
+ * @param delta The delta value.
+ * @param add if true, add delta, otherwise subtract delta.
+ * 
+ * @return The newly calculated local preference.
+ * 
+ * @since 0.6.0.0
+ */
+static u_int32_t _srx_combine_local_preference(u_int32_t locPref, 
+                                               u_int32_t delta, bool add)
+{
+  if (add)
+  {
+    // Add the delta - if adding delta produces a smaller number we encountered
+    // an overflow
+    if (((u_int32_t)(locPref + delta)) < locPref)
+    {
+      zlog_err("Overflow in local pref detected (%u + %u), use 0xFFFFFFFF" \
+               "instead\n", locPref, delta);
+      locPref = 0xFFFFFFFF;
+    }
+    else
+      locPref += delta;
+  }
+  else
+  {
+    // subtract the delta - if subtracting the delta produces a larger number 
+    // we encountered an underflow.
+    if (((u_int32_t)(locPref-delta)) > locPref)
+    {
+      zlog_err("Underflow in local pref detected (%u - %u), use 0 instead\n",
+               locPref, delta);
+      locPref = 0;
+    }
+    else
+    {
+      locPref -= delta;
+    }  
+  }
+  
   return locPref;
 }
+
+
 #endif /* USE_SRX */
 
 /* Compare two bgp route entity.  br is preferable then return 1. */
@@ -1041,10 +1412,11 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
   int confed_as_route;
   int ret;
 #ifdef USE_SRX
-  int use_evaluation =    srx_config_check(bgp, SRX_CONFIG_EVAL_ORIGIN)
-                       || srx_config_check(bgp, SRX_CONFIG_EVAL_PATH);
+  bool use_evaluation = srx_use_evaluation(bgp);
   int new_result = 0;
   int exist_result = 0;
+  SRxResult exist_SrxVal;
+  SRxResult new_SrxVal;
 #endif /* USE_SRX */
 
   *paths_eq = 0;
@@ -1069,8 +1441,8 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
     }
 
     // Retrieve Result
-    exist_result = srx_calc_validation_state(bgp, exist);
-    new_result   = srx_calc_validation_state(bgp, new);
+    exist_SrxVal = getInfoToSrxVal(exist);
+    new_SrxVal   = getInfoToSrxVal(new);
   }
 #endif /* USE_SRX */
 
@@ -1101,11 +1473,15 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
     exist_pref = existattr->local_pref;
 
 #ifdef USE_SRX
-  if (use_evaluation)
+  if (use_evaluation && isSetPrefPolicy(bgp))
   {
-    /* Apply srx policy for local pref manipulation if applicable */
-    new_pref   = srx_loc_prev_value(bgp, new_pref, new_result);
-    exist_pref = srx_loc_prev_value(bgp, exist_pref, exist_result);
+    uint32_t delta = 0;
+    bool doAdd = srx_calc_loc_prev_delta_value(bgp, new_SrxVal, &delta);
+    new_pref = _srx_combine_local_preference(new_pref, delta, doAdd);
+    
+    delta = 0;
+    doAdd = srx_calc_loc_prev_delta_value(bgp, exist_SrxVal, &delta);
+    exist_pref = _srx_combine_local_preference(exist_pref, delta, doAdd);
   }
 #endif /* USE_SRX */
 
@@ -1113,24 +1489,6 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
     return 1;
   if (new_pref < exist_pref)
     return 0;
-
-#ifdef USE_SRX
-  if (use_evaluation && CHECK_FLAG (bgp->srx_val_policy,
-                                    SRX_VAL_POLICY_PREFER_VALID))
-  {
-    /* 2.5. Prefer valid > everything else*/
-
-    // Prefer VALID over Everything else!
-    if ((new_result == SRx_RESULT_VALID) && (exist_result != SRx_RESULT_VALID))
-    {
-      return 1;
-    }
-    if ((new_result != SRx_RESULT_VALID) && (exist_result == SRx_RESULT_VALID))
-    {
-      return 0;
-    }
-  }
-#endif /* USE_SRX */
 
   /* 3. Local route check. We prefer:
    *  - BGP_ROUTE_STATIC
@@ -2870,9 +3228,9 @@ static BGPSecData* srx_create_bgpsec_data (struct bgp *bgp, struct bgp_info* inf
     int size = (pa->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) > 0
                ? ntohs(((SCA_BGPSEC_ExtPathAttribute*)pa)->attrLength)
                : ((SCA_BGPSEC_NormPathAttribute*)pa)->attrLength;
-    if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+    if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
     {
-    size += 4; // add flag, type, attribute length itself
+      size += 4; // add flag, type, attribute length itself
     }
     if (bgpsec->bgpsec_path_attr == NULL)
     {
@@ -2883,14 +3241,14 @@ static BGPSecData* srx_create_bgpsec_data (struct bgp *bgp, struct bgp_info* inf
       bgpsec->bgpsec_path_attr = realloc(bgpsec->bgpsec_path_attr, size);
     }
     bgpsec->attr_length = size;
-    if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+    if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
     {
-    bgpsec->afi  = ((SCA_Prefix*)attr->bgpsec_validationData->nlri)->afi;
-    bgpsec->safi = ((SCA_Prefix*)attr->bgpsec_validationData->nlri)->safi;
-    bgpsec->local_as = info->peer->local_as;
+      bgpsec->afi  = ((SCA_Prefix*)attr->bgpsec_validationData->nlri)->afi;
+      bgpsec->safi = ((SCA_Prefix*)attr->bgpsec_validationData->nlri)->safi;
+      bgpsec->local_as = info->peer->local_as;
     }
     memcpy(bgpsec->bgpsec_path_attr, attr->bgpsec_validationData->bgpsec_path_attr,
-          size);
+           size);
   }
 
   return bgpsec;
@@ -3001,6 +3359,10 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
   {
     info->val_res_BGPSEC = defResult->result.bgpsecResult;
   }
+  if (defResult->result.aspaResult != SRx_RESULT_DONOTUSE)
+  {
+    info->val_res_ASPA = defResult->result.aspaResult;
+  }
 
 
   // If this update has a local ID it might need to be registered. This will be
@@ -3022,6 +3384,80 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
     {
       // let SRx proxy initiate validation and get the update id */
       oas = aspath_origin_as (info->attr->aspath);
+      SRxASPathList asPathList;
+      memset(&asPathList, 0x0, sizeof(asPathList));
+
+      //
+      // check peering relationship with peer's flags, PEER_FLAG_ASPA_RELATIONSHIP_{PROV|CUST}
+      //
+      struct peer *peer = NULL;
+      peer = info->peer;
+
+      if( CHECK_FLAG (peer->flags, PEER_FLAG_ASPA_RELATIONSHIP_PROV))
+      {
+        asPathList.asRelationship = AS_REL_PROVIDER;        
+      }
+      else if ( CHECK_FLAG (peer->flags, PEER_FLAG_ASPA_RELATIONSHIP_CUST))
+      {
+        asPathList.asRelationship = AS_REL_CUSTOMER;        
+      }
+      else if ( CHECK_FLAG (peer->flags, PEER_FLAG_ASPA_RELATIONSHIP_SIBL))
+      {
+        asPathList.asRelationship = AS_REL_SIBLING;        
+      }
+      else if ( CHECK_FLAG (peer->flags, PEER_FLAG_ASPA_RELATIONSHIP_LATL))
+      {
+        asPathList.asRelationship = AS_REL_LATERAL;        
+      }
+      else
+      {
+        asPathList.asRelationship = AS_REL_UNKNOWN;        
+      }
+
+      struct assegment* cseg = NULL, *asset_seg=NULL;
+      bool bAsset = false;
+      if(info->attr->aspath && info->attr->aspath->segments)
+      {
+        // AS-set check
+        for (cseg = info->attr->aspath->segments; cseg; cseg = cseg->next)
+        {
+          if (cseg->type == AS_SET)
+          {
+            asset_seg = cseg;
+            bAsset = true;
+            break;
+          }
+        }
+
+        if (!bAsset) // no as-set
+        {
+          cseg = info->attr->aspath->segments;
+        }
+        else
+        {
+          cseg = asset_seg; 
+        }
+
+        asPathList.length = cseg->length;
+        asPathList.asType = cseg->type;
+        asPathList.segments = (ASSEGMENT*)calloc(asPathList.length, sizeof(ASSEGMENT));
+            
+        zlog_debug ("[ ASPA ] AS PathList Info - AS Length: %d  Type: %s  AS relationship: %s", 
+                asPathList.length, asPathList.asType==2 ? "AS_SEQUENCE": (asPathList.asType==1 ? "AS_SET": "ETC"), 
+                asPathList.asRelationship == 2 ? "provider" : (asPathList.asRelationship == 1 ? "customer": \
+                (asPathList.asRelationship == 3 ? "sibling": (asPathList.asRelationship == 4 ? "lateral" : "unknown"))));
+
+        int csedIdx;
+        for (csedIdx=0; cseg && csedIdx < cseg->length; csedIdx++)
+        {
+          asPathList.segments[csedIdx].asn =  cseg->as[csedIdx]; 
+          if (BGP_DEBUG (aspa, ASPA))
+          {
+            zlog_debug ("[ ASPA ] asPathList.segment[%d].asn: %6d type:%d AS relationship: %d", 
+                csedIdx, cseg->as[csedIdx], asPathList.asType, asPathList.asRelationship);
+          }
+        }
+      }
 
       // Prepare the prefix
       IPPrefix* prefix = malloc(sizeof(IPPrefix));
@@ -3031,16 +3467,31 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
       // to add at least the AS path
       BGPSecData* bgpsec = srx_create_bgpsec_data(bgp, info);
 
-
-      bool usePathVal = false;
-      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+      bool useOriginVal = false;
+      bool usePathVal   = false;
+      bool useAspaVal   = false;
+      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_ORIGIN))
       {
+        useOriginVal = true;
+      }
+      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
+      {
+        // PATH_DISTR is only set when path validation is also enabled. Here
+        // we check for remote validation.
         usePathVal = true;
       }
+      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_ASPA))
+      {
+        useAspaVal = true;
+      }
 
-      verifyUpdate(bgp->srxProxy, info->localID, true, usePathVal, defResult,
-                   prefix, oas, bgpsec);
+      verifyUpdate(bgp->srxProxy, info->localID, useOriginVal, usePathVal, 
+                   useAspaVal, defResult, prefix, oas, bgpsec, asPathList);
 
+      if(asPathList.segments)
+      {
+        free(asPathList.segments);
+      }
       srx_free_bgpsec_data(bgpsec);
       free(prefix);
     }
@@ -3213,11 +3664,11 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
 
 	  bgp_unlock_node (rn);
 #ifdef USE_SRX
-          if (attr_new->bgpsecPathAttr && (attr_new->flag & ATTR_FLAG_BIT (BGP_ATTR_BGPSEC)) )
-          {
-            UNSET_FLAG(attr_new->flag, BGP_ATTR_BGPSEC);
-            bgpsec_path_free (attr_new->bgpsecPathAttr);
-          }
+    if (attr_new->bgpsecPathAttr && (attr_new->flag & ATTR_FLAG_BIT (BGP_ATTR_BGPSEC)) )
+    {
+      UNSET_FLAG(attr_new->flag, BGP_ATTR_BGPSEC);
+      bgpsec_path_free (attr_new->bgpsecPathAttr);
+    }
 #endif
 	  bgp_attr_unintern (&attr_new);
 
@@ -3345,6 +3796,10 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
       defRes->result.roaResult    = bgp->srx_default_roaVal;
       defRes->result.bgpsecResult = bgp->srx_default_bgpsecVal;
 
+      // ASPA default value
+      defRes->resSourceASPA     = SRxRS_ROUTER;
+      defRes->result.aspaResult = bgp->srx_default_aspaVal;
+
       verify_update (bgp, ri, defRes, true);
       free(defRes);
 #endif /* USE_SRX */
@@ -3418,17 +3873,20 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
   new->localID = getNextLocalID();
   new->val_res_ROA     = bgp->srx_default_roaVal;
   new->val_res_BGPSEC  = bgp->srx_default_bgpsecVal;
+  new->val_res_ASPA   = bgp->srx_default_aspaVal;
 
   // Here use the value of community String
   SRxDefaultResult* defRes = malloc(sizeof(SRxDefaultResult));
   // Here fill with community string value if possible, the use as source
   // SRxRS_IGP or a source provided by community string.
 
-  // TODO: Use Community String value if available
+  // TODO: Use Community String value if available for ROA
   defRes->resSourceROA        = SRxRS_ROUTER;
   defRes->resSourceBGPSEC     = SRxRS_ROUTER;
+  defRes->resSourceASPA       = SRxRS_ROUTER;
   defRes->result.roaResult    = bgp->srx_default_roaVal;
   defRes->result.bgpsecResult = bgp->srx_default_bgpsecVal;
+  defRes->result.aspaResult   = bgp->srx_default_aspaVal;
 
   verify_update (bgp, new, defRes, true);
   free(defRes);
@@ -6723,6 +7181,12 @@ static void srx_validation_vty_short_out(struct vty *vty, int state)
     case SRx_RESULT_UNDEFINED:
       vty_out (vty, "?");
       break;
+    case SRx_RESULT_UNKNOWN:
+      vty_out (vty, "u");
+      break;
+    case SRx_RESULT_UNVERIFIABLE:
+      vty_out (vty, "f");
+      break;
     default:
       vty_out (vty, "-");
   }
@@ -6739,8 +7203,13 @@ static void srx_route_vty_validation_out(struct vty *vty,
 {
   struct bgp *bgp;
   bgp = binfo->peer->bgp;
-  int valState = SRx_RESULT_UNDEFINED;
   int locPrefPol = -1;
+
+  SRxResult srxVal; 
+  srxVal = getInfoToSrxVal(binfo);
+  u_int32_t new_pref = 0;
+  uint8_t bSrxResult;
+  uint8_t *srxValPtr = (uint8_t*) &srxVal;
 
   if ((bgp->srx_config & SRX_CONFIG_DISPLAY_INFO) != 0)
   {
@@ -6761,9 +7230,7 @@ static void srx_route_vty_validation_out(struct vty *vty,
       vty_out (vty, "%08X ", binfo->updateID);
     }
     // Calculate the total validation state
-    valState = srx_calc_validation_state(bgp, binfo);
     // Print the total validation result depending on the validation mode
-    srx_validation_vty_short_out(vty, valState);
     vty_out (vty, "(");
     if ((bgp->srx_config & SRX_CONFIG_EVAL_ORIGIN) != 0)
     {
@@ -6784,61 +7251,46 @@ static void srx_route_vty_validation_out(struct vty *vty,
     {
       vty_out (vty, "-");
     }
-    vty_out (vty, ") ");
-
-    // Determine local pref policy
-    switch (valState)
+    vty_out (vty, ",");
+    if ((bgp->srx_config & SRX_CONFIG_EVAL_ASPA) != 0)
     {
-      case SRx_RESULT_VALID:
-        locPrefPol = VAL_LOCPRF_VALID;
-        break;
-      case SRx_RESULT_NOTFOUND:
-        locPrefPol = VAL_LOCPRF_NOTFOUND;
-        break;
-      case SRx_RESULT_INVALID:
-        locPrefPol = VAL_LOCPRF_INVALID;
-        break;
-      default:
-        locPrefPol = -1;
-    }
-    if (locPrefPol > -1)
-    {
-      if (bgp->srx_val_local_pref[locPrefPol].is_set)
-      {
-        switch (bgp->srx_val_local_pref[locPrefPol].relative)
-        {
-          case -1:
-            vty_out (vty, "-");
-            break;
-          case  1:
-            vty_out (vty, "+");
-            break;
-          default:
-            vty_out (vty, " ");
-        }
-        vty_out (vty, "%4d,", bgp->srx_val_local_pref[locPrefPol].value);
-      }
-      else
-      {
-        vty_out (vty, "      ");
-      }
+      // print ASPA validation.
+      srx_validation_vty_short_out(vty, binfo->val_res_ASPA);
     }
     else
     {
-      vty_out (vty, "      ");
+      vty_out (vty, "-");
     }
-    vty_out (vty, "   ");
+    vty_out (vty, ") ");
+
+    uint32_t deltaLocalPref = 0;
+    bool doAdd = srx_calc_loc_prev_delta_value(bgp, srxVal, &deltaLocalPref);
+    int iDelta = doAdd ? deltaLocalPref : (0-deltaLocalPref);
+
+    if (isSetPrefPolicy(bgp))
+    {
+      // The %s is used to modify the formating for a negative 5 digit number.
+      vty_out (vty, "%s%5d", (iDelta < -9999) ? "" : " ", iDelta);
+    }
+    else
+    {
+      vty_out (vty, "     ");
+    }
+    vty_out (vty, "    ");
+
+    int srxValidation = SRX_CONFIG_EVAL_ORIGIN | SRX_CONFIG_EVAL_PATH 
+                        | SRX_CONFIG_EVAL_ASPA;
     if (CHECK_FLAG (binfo->flags, BGP_INFO_IGNORE))
     {
       vty_out (vty, "I");
     }
-    else if ((bgp->srx_config & SRX_CONFIG_EVALUATE) == 0)
+    else if ((bgp->srx_config & srxValidation) != 0)
     {
-      vty_out (vty, "D");
+      vty_out (vty, " ");
     }
     else
     {
-      vty_out (vty, " ");
+      vty_out (vty, "D");
     }
     vty_out (vty, "   ");
   }
@@ -6910,7 +7362,7 @@ route_vty_out (struct vty *vty, struct prefix *p,
                      inet_ntoa (attr->extra->mp_nexthop_global_in));
 	  else
 	    vty_out (vty, "%-16s", inet_ntoa (attr->nexthop));
-	}
+    }
 #ifdef HAVE_IPV6
       else if (p->family == AF_INET6)
 	{
@@ -6925,75 +7377,93 @@ route_vty_out (struct vty *vty, struct prefix *p,
 	    vty_out (vty, "%s%*s", VTY_NEWLINE, 36, " ");
 	  else
 	    vty_out (vty, "%*s", len, " ");
-	}
+    }
 #endif /* HAVE_IPV6 */
 
       if (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_MULTI_EXIT_DISC))
-	vty_out (vty, "%10u", attr->med);
+vty_out (vty, "%10u ", attr->med);
       else
-	vty_out (vty, "          ");
+	vty_out (vty, "           ");
 
 #ifdef USE_SRX
       // Determine srx policy local pref
       struct bgp* bgp = binfo->peer->bgp;
-      int srxResult = srx_calc_validation_state(bgp, binfo);
-      struct srx_local_pref* srxLocPref;
-      int srxDoLocPref;
+      int  srxDoLocPref=0;
+      int  srxLocPrefDelta=0;
+      bool doAdd=true;
+
+      SRxResult srxVal; 
+      srxVal = getInfoToSrxVal(binfo);
+      u_int32_t new_pref = 0;
+      uint8_t bSrxResult;
+      uint8_t *srxValPtr = (uint8_t*) &srxVal;
 
       if (bgp != NULL)
       {
-        switch (srxResult)
+        int lp_type = 0;
+        for (lp_type=0; lp_type < NUM_LOCPREF_TYPE; lp_type++)
         {
-          case SRx_RESULT_VALID:
-            srxLocPref = &bgp->srx_val_local_pref[VAL_LOCPRF_VALID];
-            srxDoLocPref = 1; break;
-          case SRx_RESULT_NOTFOUND:
-            srxLocPref = &bgp->srx_val_local_pref[VAL_LOCPRF_NOTFOUND];
-            srxDoLocPref = 1; break;
-          case SRx_RESULT_INVALID:
-            srxLocPref = &bgp->srx_val_local_pref[VAL_LOCPRF_INVALID];
-            srxDoLocPref = 1; break;
-          default:
-            srxDoLocPref = 0;
-            srxLocPref = NULL;
+          bSrxResult = *(srxValPtr+lp_type);
+          switch (bSrxResult)
+          {
+            case SRx_RESULT_VALID:
+              srxDoLocPref = 1; break;
+            case SRx_RESULT_NOTFOUND:
+              srxDoLocPref = 1; break;
+            case SRx_RESULT_INVALID:
+              srxDoLocPref = 1; break;
+            default:
+              srxDoLocPref = 0;
+          }
+
+          if (srxDoLocPref)
+            break;
         }
       }
-     else
+      else
       {
         srxDoLocPref = 0;
-        srxLocPref = NULL;
+      }
+      
+      // Now calculate only the SRx Delta local pref
+      if (srxDoLocPref && isSetPrefPolicy(bgp))
+      {
+        doAdd = srx_calc_loc_prev_delta_value(bgp, srxVal, &srxLocPrefDelta);
       }
 #endif /* USE_SRX */
 
       if (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_LOCAL_PREF))
 #ifdef USE_SRX
       {
+        new_pref = _srx_combine_local_preference(attr->local_pref, 
+                                                 srxLocPrefDelta, doAdd);
         if (srxDoLocPref)
         {
-          vty_out (vty, "%7ua", srxLocPref->relative
-            ? attr->local_pref + srxLocPref->relative * srxLocPref->value
-            : srxLocPref->value);
+          vty_out (vty, "%7u", new_pref);
         }
         else
         {
-	      vty_out (vty, "%7u ", attr->local_pref);
-        }
-#else /* USE_SRX */
-	vty_out (vty, "%7u", attr->local_pref);
 #endif /* USE_SRX */
-
-#ifdef USE_SRX
+	vty_out (vty, "%7u", attr->local_pref);
+#ifdef USE_SRX        
+        }
       }
-      else if (srxDoLocPref && srxLocPref->is_set)
-      {
-        vty_out (vty, "%7us", srxLocPref->value);
+      else if (srxDoLocPref && isSetPrefPolicy(bgp))
+      {          
+        // Follow the algorithm of the decision process
+        uint32_t localPrefVal = bgp->default_local_pref;
+        if (attr->flag & ATTR_FLAG_BIT (BGP_ATTR_LOCAL_PREF))
+          localPrefVal = attr->local_pref;
+        new_pref = _srx_combine_local_preference(localPrefVal, srxLocPrefDelta, 
+                                                 doAdd);
+        vty_out (vty, "%7u", new_pref);
       }
 #endif /* USE_SRX */
       else
 #ifdef USE_SRX
-	vty_out (vty, "        ");
+	        vty_out (vty, "        ");
 #else /* USE_SRX */
-	vty_out (vty, "       ");
+	      vty_out (vty, "       ");
 #endif /* USE_SRX */
 
       vty_out (vty, "%7u ", (attr->extra ? attr->extra->weight : 0));
@@ -7004,7 +7474,7 @@ route_vty_out (struct vty *vty, struct prefix *p,
 
       /* Print origin */
       vty_out (vty, "%s", bgp_origin_str[attr->origin]);
-    }
+  }
   vty_out (vty, "%s", VTY_NEWLINE);
 }
 
@@ -7247,20 +7717,27 @@ flap_route_vty_out (struct vty *vty, struct prefix *p,
 static void srx_route_vty_out_detail(struct vty *vty, struct bgp *bgp,
                                      struct bgp_info *binfo)
 {
-  static const char *INDEX_STR[4] =
+  static const char *INDEX_STR[7] =
   {
     "valid",
     "notfound",
     "invalid",
-    "undefined"       // might be removed again
+    "undefined",       // might be removed again
+    "donot_use",
+    "unknown",
+    "unverifiable"
   };
 
+  bool originVal = (bgp->srx_config & SRX_CONFIG_EVAL_ORIGIN) != 0;
+  bool bgpsecVal = (bgp->srx_config & SRX_CONFIG_EVAL_PATH) != 0;
+  bool aspaVal   = (bgp->srx_config & SRX_CONFIG_EVAL_ASPA) != 0;
+  
   vty_out (vty, "    SRx Information:%s", VTY_NEWLINE);
   if (binfo->updateID != 0)
     vty_out (vty, "      Update ID: 0x%08X%s", binfo->updateID, VTY_NEWLINE);
   else
     vty_out (vty, "      Local ID: 0x%08X%s", binfo->localID, VTY_NEWLINE);    
-  if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_ORIGIN))
+  if (originVal | bgpsecVal | aspaVal)
   {
     if (CHECK_FLAG (binfo->flags, BGP_INFO_IGNORE))
     {
@@ -7274,20 +7751,34 @@ static void srx_route_vty_out_detail(struct vty *vty, struct bgp *bgp,
     else
     {
       vty_out (vty, "      Validation:%s", VTY_NEWLINE);
-      vty_out (vty, "        prefix-origin: %s%s", INDEX_STR[binfo->val_res_ROA],
-                                             VTY_NEWLINE);
-      if (CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH))
+      if (originVal)
+      {
+        vty_out (vty, "        prefix-origin: %s%s", 
+                      INDEX_STR[binfo->val_res_ROA], VTY_NEWLINE);
+      }
+      else
+      {
+        vty_out (vty, "        prefix-origin: processing disabled!%s",
+                      VTY_NEWLINE);
+      }
+      if (bgpsecVal)
       {
         vty_out (vty, "        path:   %s%s", INDEX_STR[binfo->val_res_BGPSEC],
                                         VTY_NEWLINE);
-        vty_out (vty, "        bgpsec: %s  (combination of prefix-origin and "
-                      "path validation)%s",
-                      INDEX_STR[srx_calc_validation_state(bgp, binfo)],
+      }
+      else
+      {
+        vty_out (vty, "        path:   processing disabled!%s",
+                      VTY_NEWLINE);
+      }
+      if (aspaVal)
+      {      
+        vty_out (vty, "        aspa:   %s%s", INDEX_STR[binfo->val_res_ASPA], 
                       VTY_NEWLINE);
       }
       else
       {
-        vty_out (vty, "        path:          processing disabled!%s",
+        vty_out (vty, "        aspa:   processing disabled!%s",
                       VTY_NEWLINE);
       }
     }
@@ -7496,11 +7987,27 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
       if (attr->flag & ATTR_FLAG_BIT(BGP_ATTR_MULTI_EXIT_DISC))
 	vty_out (vty, ", metric %u", attr->med);
 
+#ifdef USE_SRX
+      u_int32_t locPref = bgp->default_local_pref;
+      if (attr->flag & ATTR_FLAG_BIT(BGP_ATTR_LOCAL_PREF))
+        locPref = attr->local_pref;
+      vty_out (vty, ", localpref %u", locPref);
+      if (srx_use_evaluation(bgp) && isSetPrefPolicy(bgp))
+      {
+        uint32_t delta = 0;
+        SRxResult srxVal = getInfoToSrxVal(binfo);
+        bool doAdd = srx_calc_loc_prev_delta_value(bgp, srxVal, &delta);
+        vty_out (vty, "%c%u=", doAdd ? '+' : '-', delta);
+        locPref = _srx_combine_local_preference(locPref, delta, doAdd);
+        vty_out (vty, "%u", locPref);
+      }
+#else // USE_SRX
       if (attr->flag & ATTR_FLAG_BIT(BGP_ATTR_LOCAL_PREF))
 	vty_out (vty, ", localpref %u", attr->local_pref);
       else
 	vty_out (vty, ", localpref %u", bgp->default_local_pref);
-
+#endif // USE_SRX
+      
       if (attr->extra && attr->extra->weight != 0)
 	vty_out (vty, ", weight %u", attr->extra->weight);
 
@@ -7580,12 +8087,13 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
 }
 
 #ifdef USE_SRX
-#define BGP_SRX_SHOW_SCODE_HEADER "Validation:    v - valid, n - notfound, i - invalid, ? - undefined%s" \
+#define BGP_SRX_SHOW_SCODE_HEADER "Validation:    v - valid, i - invalid, n - notfound, u - unknown, f - unverifiable, ? - undefined%s" \
                                   "SRx Status:    I - route ignored, D - SRx evaluation deactivated%s" \
-                                  "SRxVal Format: validation result (origin validation, path validation)%s"
+                                  "SRxVal Format: origin validation, path validation, aspa validation%s"  \
+                                  "SRxLP:         Modifier of SRx local pref policies, applied to LocPref%s"
 //#define BGP_SRX_SHOW_HEADER       "   SRx Data      Network          Next Hop            Metric  LocPrf Weight Path%s"
-#define BGP_SRX_SHOW_HEADER       "   Ident    SRxVal SRxLP Status Network          Next Hop            Metric  LocPrf Weight Path%s"
-//                                    12345678 i(v,i) +1000   I
+#define BGP_SRX_SHOW_HEADER       "   Ident    SRxVal   SRxLP Status Network          Next Hop            Metric  LocPrf Weight Path%s"
+//                                    12345678 (v,i,v)    -10   I
 #endif /* USE_SRX */
 #define BGP_SHOW_SCODE_HEADER "Status codes: s suppressed, d damped, h history, * valid, > best, i - internal,%s              r RIB-failure, S Stale, R Removed%s"
 #define BGP_SHOW_OCODE_HEADER "Origin codes: i - IGP, e - EGP, ? - incomplete%s%s"
@@ -7800,7 +8308,7 @@ bgp_show_table (struct vty *vty, struct bgp_table *table, struct in_addr *router
     {
       displaySRX = 1;
       vty_out (vty, BGP_SRX_SHOW_SCODE_HEADER, VTY_NEWLINE, VTY_NEWLINE,
-                    VTY_NEWLINE);
+                    VTY_NEWLINE, VTY_NEWLINE);
     }
     else
     {
@@ -14639,3 +15147,135 @@ bgp_route_finish (void)
   bgp_table_unlock (bgp_distance_table);
   bgp_distance_table = NULL;
 }
+
+
+
+#if 0
+    // Determine local pref policy 'SRxLP'
+    bool isAnySet = isSetPrefPolicy(bgp);
+    int lp_type = 0
+    for (lp_type=0; lp_type < NUM_LOCPREF_TYPE; lp_type++)
+    {
+      bSrxResult = *(srxValPtr+lp_type);
+      switch (bSrxResult)
+      {
+        case SRx_RESULT_VALID:
+          locPrefPol = VAL_LOCPRF_VALID;
+          break;
+        case SRx_RESULT_NOTFOUND:
+          locPrefPol = VAL_LOCPRF_NOTFOUND;
+          break;
+        case SRx_RESULT_INVALID:
+          locPrefPol = VAL_LOCPRF_INVALID;
+          break;
+        default:
+          locPrefPol = -1;
+      }
+
+      if(isAnySet)
+        vty_out (vty, "(");
+
+      if (locPrefPol > -1)
+      {
+        if (bgp->srx_val_local_pref[lp_type][locPrefPol].is_set)
+        {
+          //vty_out (vty, (lp_type==0 ? "R": (lp_type==1 ? "P":"A")));
+          switch (bgp->srx_val_local_pref[lp_type][locPrefPol].relative)
+          {
+            case -1:
+              vty_out (vty, "-");
+              break;
+            case 0:
+            case 1:
+              vty_out (vty, "+");
+              break;
+            default:
+              vty_out (vty, " ");
+          }
+          vty_out (vty, "%2d", bgp->srx_val_local_pref[lp_type][locPrefPol].value);
+        }
+        else
+        {
+          vty_out (vty, "   ");
+        }
+      } 
+      else
+      {
+        vty_out (vty, "    "); // in case 
+      }
+
+      if (isAnySet && lp_type == NUM_LOCPREF_TYPE -1)
+        vty_out (vty, ")");
+      else if (isAnySet && lp_type < NUM_LOCPREF_TYPE -1)
+        vty_out (vty, ",");
+      else if (!isAnySet && lp_type < NUM_LOCPREF_TYPE)
+        vty_out (vty, " ");
+
+    } 
+    vty_out (vty, "  "); // space between "SRxLP and Status"
+#endif
+
+
+#if 0
+    bool isAnySet = isSetPrefPolicy(bgp);
+    for (lp_type=0; lp_type<NUM_LOCPREF_TYPE; lp_type++)
+    {
+      bSrxResult = *(srxValPtr+lp_type);
+      switch (bSrxResult)
+      {
+        case SRx_RESULT_VALID:
+          locPrefPol = VAL_LOCPRF_VALID;
+          break;
+        case SRx_RESULT_NOTFOUND:
+          locPrefPol = VAL_LOCPRF_NOTFOUND;
+          break;
+        case SRx_RESULT_INVALID:
+          locPrefPol = VAL_LOCPRF_INVALID;
+          break;
+        default:
+          locPrefPol = -1;
+      }
+
+
+      if(isAnySet)
+        vty_out (vty, "(");
+
+      if (locPrefPol > -1)
+      {
+        if (bgp->srx_val_local_pref[t][locPrefPol].is_set)
+        {
+          //vty_out (vty, (lp_type==0 ? "R": (lp_type==1 ? "P":"A")));
+          switch (bgp->srx_val_local_pref[lp_type][locPrefPol].relative)
+          {
+            case -1:
+              vty_out (vty, "-");
+              break;
+            case 0:
+            case 1:
+              vty_out (vty, "+");
+              break;
+            default:
+              vty_out (vty, " ");
+          }
+          vty_out (vty, "%2d", bgp->srx_val_local_pref[lp_type][locPrefPol].value);
+        }
+        else
+        {
+          vty_out (vty, "   ");
+        }
+      } 
+      else
+      {
+        vty_out (vty, "    "); // in case 
+      }
+
+      if(isAnySet && lp_type == NUM_LOCPREF_TYPE -1)
+        vty_out (vty, ")");
+      else if (isAnySet && lp_type < NUM_LOCPREF_TYPE -1)
+        vty_out (vty, ",");
+      else if (!isAnySet && lp_type < NUM_LOCPREF_TYPE)
+        vty_out (vty, " ");
+
+    } 
+    vty_out (vty, "  "); // space between "SRxLP and Status"
+#endif

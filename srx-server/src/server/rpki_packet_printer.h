@@ -23,10 +23,14 @@
  * Provides a printer for RPKI Router to Cache Protocol Packages. 
  * Supports RFC6810 and RFC8210 package formats.
  *
- * @version 0.5.0.3
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/02/17 - oborchert
+ *            * Fixed speller in T4_FLAG_01_1
+ *          - 2021/02/08 - oborchert
+ *            * Modified T4_FLAG... to accommodate ASPA processing
  * 0.5.0.3  - 2018/02/26 - oborchert
  *            * File created
  */
@@ -52,8 +56,10 @@
 #define T4_FLAG_04_1 T4_FLAG_1
 #define T4_FLAG_02_0 T4_FLAG_0
 #define T4_FLAG_02_1 T4_FLAG_1
+#define TA_FLAG_02_0 "(AFI IPv4)"
+#define TA_FLAG_02_1 "(AFI IPv6)"
 #define T4_FLAG_01_0 "(withdrawal)"
-#define T4_FLAG_01_1 "(addnounement)"
+#define T4_FLAG_01_1 "(announcement)"
 
 /**
  * Create a wireshark like printout of the received rpki-to-rtr PDU. This method

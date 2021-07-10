@@ -29,6 +29,14 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Removed aspaCallback.
+ *            * Added ASPA callback to RPKIRouterClientParam as cbHandleAspaPdu.
+ *          - 2021/02/16 - oborchert
+ *            * Added callback function aspaCallback for ASPA processing.
  * 0.5.1.0  - 2018/03/09 - oborchert 
  *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
  *              of 0.5.1.0.
@@ -136,6 +144,29 @@ typedef struct {
   void (*routerKeyCallback)(uint32_t valCacheID, uint16_t sessionID,
                             bool isAnn, uint32_t asn, const char* ski,
                             const char* keyInfo, void* user);
+  
+  /**
+   * This function is called for each prefix announcement / withdrawal received
+   * from the RPKI validation cache.
+   *
+   * @param valCacheID  This Id represents the cache. It is used to be able to
+   *                    later on identify the white-list / ROA entry in case the
+   *                    cache state changes.
+   * @param sessionID   The cache sessionID entry for this data. It is be useful
+   *                    for sessionID changes in case SRx is implementing a
+   *                    performance driven approach.
+   * @param isAnn       Indicates if this in an announcement or not.
+   * @param afi         (afi: 0=IPv4, 1=IPv6
+   * @param customerAS  The ASn of the customer.
+   * @param providerCt  Number of Providers in the providerList
+   * @param providerASList List of providerASs
+   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   */
+  /*
+  void (*aspaCallback)(uint32_t valCacheID, uint16_t sessionID, bool isAnn, 
+                       uint8_t afi, uint32_t customerAS, uint16_t providerCt, 
+                       uint32_t* providerASList, void* user);
+  */
   
   /**
    * This function is called each time end of data is received. This allows to
@@ -274,6 +305,10 @@ typedef struct {
    * negotiation. 
    * @since 0.5.0.3 */
   bool        allowDowngrade;
+
+  int (*cbHandleAspaPdu)(void* user, uint32_t cusAsn, uint16_t provAsCount, 
+                         uint32_t* provAsns, uint8_t addrFamilyType, uint8_t announce);
+
 } RPKIRouterClientParams;
 
 /**
@@ -390,8 +425,18 @@ bool sendSerialQuery(RPKIRouterClient* client);
  * @since 0.5.0.3
  */
 bool sendErrorReport(RPKIRouterClient* self, u_int16_t errCode,
-                            u_int8_t* erronPDU, u_int32_t lenErronPDU,
-                            char* errText, u_int32_t lenErrText);
+                     u_int8_t* erronPDU, u_int32_t lenErronPDU,
+                     char* errText, u_int32_t lenErrText);
+
+/**
+ * 
+ * @param client
+ * @param hdr
+ * @param length
+ * @return 
+ */
+bool handleReceiveAspaPdu(RPKIRouterClient* client,
+                          RPKIASPAHeader* hdr, uint32_t length);
 
 // @TODO: fix this not so nice work around
 int g_rpki_single_thread_client_fd;

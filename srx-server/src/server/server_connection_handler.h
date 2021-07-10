@@ -60,6 +60,7 @@
 #include "server/configuration.h"
 #include "server/command_queue.h"
 #include "server/update_cache.h"
+#include "server/aspath_cache.h"
 #include "util/server_socket.h"
 #include "util/slist.h"
 
@@ -124,6 +125,8 @@ typedef struct {
   // The internal receiver queue. NULL if not used. since 0.3.0
   //SCH_ReceiverQueue* receiverQueue;
   void*              receiverQueue;
+
+  AspathCache*      aspathCache;
 } ServerConnectionHandler;
 
 /**
@@ -140,6 +143,7 @@ typedef struct {
  */
 bool createServerConnectionHandler(ServerConnectionHandler* self, 
                                    UpdateCache* updCache, 
+                                   AspathCache* aspathCache, 
                                    Configuration* sysConfig);
 
 /**

@@ -908,7 +908,7 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
   // hashMessage will not be NULL. If it is null, the signature algorithm
   // assumes it is an origination.
   scaSignData.signature   = NULL;
-  if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+  if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
   {
   /* hash message for Distribution version */
   if (!tmpData) // in case, only if not origin for now
@@ -950,7 +950,7 @@ SCA_Signature* signBGPSecPathAttr(struct bgp* bgp, struct peer* peer,
     return 0;
   }
 
-  if ( !CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_DISTR))
+  if ( !CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
   {
   if (attr->bgpsec_validationData->hashMessage[BLOCK_0] != scaSignData.hashMessage)
   {

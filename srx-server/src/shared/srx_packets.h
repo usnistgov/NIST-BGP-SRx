@@ -18,16 +18,33 @@
  * Some data definitions are moved into shared/srx_defs.h This makes it easier
  * for integrating into quagga.
  *
- * Packet types and constants.
+ * Packet types, structures and constants. The reserved and zero fields are 
+ * not really used in the implementation, they are ignored on the sending and
+ * receiving side except the SRXPROXY_GOODBYE packet which is not dynamically
+ * allocated in main.c. Other than that the fields are initialized using the
+ * memory allocation initialization during writing and ignored during reading.
  *
  * This software might use libraries that are under GNU public license or
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/04/06 - oborchert
+ *            * Moved asType and asRelType to SRXRPOXY_BasicHeader_VerifyRequest
+ *              from struct SRXPROXY_VERIFY_V4_REQUEST and struct 
+ *              SRXPROXY_VERIFY_V6_REQUEST
+ *            * Changed both variables from enum type to uint8_t as in spec.
+ *          - 2021/03/30 - oborchert
+ *            * Renamed some zero padding and reserved flags according to 
+ *              SRx-Proxy-Protocol version 3.
+ *            * Added missing field asRelType to SRXPROXY_VERIFY_V6_REQUEST.
+ *          - 2021/02/24 - kyehwanl
+ *            * Updated SRx-Proxy-Protocol to protocol version 3
+ *              The new protocol includes modifications of the PDU's required
+ *              for ASPA validation.
  * 0.5.0.0  - 2017/06/16 - kyehwanl
  *            * added local as to BGPSEC_DATA_PTR
  * 0.4.0.0  - 2016/06/19 - oborchert
@@ -52,14 +69,15 @@
 #include "shared/srx_defs.h"
 #include "util/prefix.h"
 
-/** Version of the protocol listed in this document. */
-#define SRX_PROTOCOL_VER  2
+/** Version of the protocol. */
+#define SRX_PROTOCOL_VER  3
 
 #define SRX_ALGORITHM_UNITTEST 0xFFFF
 
 /** Flags Bits  */
 #define SRX_PROXY_FLAGS_VERIFY_PREFIX_ORIGIN   1
 #define SRX_PROXY_FLAGS_VERIFY_PATH            2
+#define SRX_PROXY_FLAGS_VERIFY_ASPA            4
 #define SRX_PROXY_FLAGS_VERIFY_RECEIPT       128
 
 /** Block Type Bits */
@@ -113,8 +131,9 @@ typedef void SRXPROXY_PDU;
 typedef struct {
   // The type of the SRx packet.
   uint8_t  type;
-  uint16_t reserved1;
-  uint8_t  reserved2;
+  uint16_t reserved16;
+  uint8_t  reserved8;
+  uint32_t reserved32;
   // The total length of this header in bytes.
   uint32_t length;
   // MUCH MORE DATA FOLLOWS, SEE srx_packet.h
@@ -131,8 +150,9 @@ typedef struct {
 typedef struct {
   uint8_t    type;              // 0
   uint16_t   version;
-  uint8_t    zero;
-  uint32_t   length;            // Variable 20(+) Bytes
+  uint8_t    reserved8;
+  uint32_t   zero32;
+  uint32_t   length;            // Variable 24(+) Bytes
   uint32_t   proxyIdentifier;
   uint32_t   asn;
   uint32_t   noPeers;
@@ -145,7 +165,8 @@ typedef struct {
 typedef struct {
   uint8_t   type;              // 1
   uint16_t  version;
-  uint8_t   zero;
+  uint8_t   reserved8;
+  uint32_t  zero32;
   uint32_t  length;            // 12 Bytes
   uint32_t  proxyIdentifier;
 } __attribute__((packed)) SRXPROXY_HELLO_RESPONSE;
@@ -156,7 +177,8 @@ typedef struct {
 typedef struct {
   uint8_t   type;              // 2
   uint16_t  keepWindow;
-  uint8_t   zero;
+  uint8_t   reserved8;
+  uint32_t  zero32;
   uint32_t  length;            // 8 Bytes
 } __attribute__((packed)) SRXPROXY_GOODBYE;
 
@@ -206,10 +228,14 @@ typedef struct {
   uint8_t       flags;
   uint8_t       roaResSrc;
   uint8_t       bgpsecResSrc;
+  uint8_t       aspaResSrc;   // reserved for ASPA validation
+  uint8_t       reserved8;
+  uint8_t       asType;
+  uint8_t       asRelType;
   uint32_t      length;
   uint8_t       roaDefRes;
   uint8_t       bgpsecDefRes;
-  uint8_t       zero;
+  uint8_t       aspaDefRes; // reserved for ASPA validation
   uint8_t       prefixLen;
   uint32_t      requestToken; // Added with protocol version 1.0
 } __attribute__((packed)) SRXRPOXY_BasicHeader_VerifyRequest;
@@ -218,7 +244,7 @@ typedef struct {
  * This struct specifies the Verify request IPv4 packet
  */
 typedef struct {
-  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 3
+  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 3, length=Variable 68+
   IPv4Address      prefixAddress;
   uint32_t         originAS;
   uint32_t         bgpsecLength;
@@ -229,7 +255,7 @@ typedef struct {
  * This struct specifies the Verify request IPv6 packet
  */
 typedef struct {
-  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 4
+  SRXRPOXY_BasicHeader_VerifyRequest common; // type = 4, length = 80+
   IPv6Address      prefixAddress;
   uint32_t         originAS;
   uint32_t         bgpsecLength;
@@ -243,7 +269,8 @@ typedef struct {
   uint8_t     type;            // 5
   uint16_t    algorithm;
   uint8_t     blockType;
-  uint32_t    length;          // 20 Bytes
+  uint32_t    zero32;
+  uint32_t    length;          // 24 Bytes
   uint32_t    updateIdentifier;
   uint32_t    prependCounter;
   uint32_t    peerAS;
@@ -257,7 +284,10 @@ typedef struct {
   uint8_t     resultType;
   uint8_t     roaResult;
   uint8_t     bgpsecResult;
-  uint32_t    length;          // 16 Bytes
+  uint8_t     aspaResult;
+  uint8_t     reserved8;
+  uint16_t    zero16;
+  uint32_t    length;          // 20 Bytes
   uint32_t    requestToken; // Added with protocol version 1.0
   SRxUpdateID updateID;
 } __attribute__((packed)) SRXPROXY_VERIFY_NOTIFICATION;
@@ -267,9 +297,10 @@ typedef struct {
  */
 typedef struct {
   uint8_t          type;            // 7
-  uint16_t         reserved;
-  uint8_t          zero;
-  uint32_t         length;          // 16(+) Bytes
+  uint16_t         reserved16;
+  uint8_t          reserved8;
+  uint32_t         zero32;
+  uint32_t         length;          // 20(+) Bytes
   uint32_t         updateIdentifier;
   uint32_t         bgpsecLength;
   BGPSECValResData bgpsecResData;
@@ -281,30 +312,33 @@ typedef struct {
 typedef struct {
   uint8_t     type;            // 8
   uint16_t    keepWindow;
-  uint8_t     zero;
-  uint32_t    length;          // 12 Bytes
+  uint8_t     reserved8;
+  uint32_t    zero32;
+  uint32_t    length;          // 16 Bytes
   uint32_t    updateIdentifier;
 } __attribute__((packed)) SRXPROXY_DELETE_UPDATE;
 
 /**
- * This struct specifies the synchronisation request packet
+ * This struct specifies the synchronization request packet
  */
 typedef struct {
   uint8_t     type;            // 9
-  uint16_t    reserved;
+  uint16_t    reserved16;
   uint8_t     changeType;
-  uint32_t    length;          // 8 Bytes
+  uint32_t    reserved32;
+  uint32_t    length;          // 16 Bytes
   uint32_t    peerAS;
 } __attribute__((packed)) SRXPROXY_PEER_CHANGE;
 
 /**
- * This struct specifies the synchronisation request packet
+ * This struct specifies the synchronization request packet
  */
 typedef struct {
   uint8_t     type;            // 10
-  uint16_t    reserved;
-  uint8_t     zero;
-  uint32_t    length;          // 8 Bytes
+  uint16_t    reserved16;
+  uint8_t     reserved8;
+  uint32_t    zero32;
+  uint32_t    length;          // 12 Bytes
 } __attribute__((packed)) SRXPROXY_SYNCH_REQUEST;
 
 /**
@@ -313,8 +347,9 @@ typedef struct {
 typedef struct {
   uint8_t     type;            // 11
   uint16_t    errorCode;
-  uint8_t     zero;
-  uint32_t    length;          // 8 Bytes
+  uint8_t     reserved8;
+  uint32_t    zero32;
+  uint32_t    length;          // 12 Bytes
 } __attribute__((packed)) SRXPROXY_ERROR;
 
 /**

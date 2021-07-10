@@ -6,9 +6,26 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
-  0.4.2.10 - May 2021
-    * Fixed diaplsy of Local ID and Update ID in detailed printout when calling
-      'show ip bgp a.b.c.d'
+  0.6.0.0 - May 2021
+    * Added missing local update ID to show up bgp a.b.c.e
+    * Fixed incorrect local pref display in all versions of show ip bgp
+    * Disabled default origin validation - must be enabled to function.
+    * Moved version and skipped version 5 to align with BGP-SRx Software Suite 
+      version 6 instead.
+    * Added ASPA processing
+    * Modified validation processing by using the validation result from each 
+      validation process (ROV, BGPSEC, ASPA) validation separately.s
+    * Added 'f' as validation result UNVERIFIABLE for ASPA path valiation in 
+      cli command 'show ip bgp'
+    * Added Peering relationships needed for ASPA.
+    * Added the following configuration settings:
+      - srx evaluation aspa
+      - srx neighbor A.B.C.D aspa (customer|provider)
+    * Split function  bgp_srx_evaluation into bgp_srx_set_evaluation and 
+      bgp_srx_unset_evaluation
+    * Changed evaluation setting allowing to enable/disable of each validation
+      method separately.
+
   0.4.2.9 - August 2020
     * Fixed sections in configure.ac that did not properly check for the 
       existence of needed tools depending on configured settings.

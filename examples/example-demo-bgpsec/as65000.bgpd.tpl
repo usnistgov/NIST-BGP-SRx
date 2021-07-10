@@ -2,7 +2,7 @@
 !
 ! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sampleSRx,v 4.1 2021/05/20 12:00:00 ob Exp $
+! $Id: bgpd.conf.sampleSRx,v 6.0 2021/04/12 14:55:38 ob Exp $
 !
 hostname bgpd
 password zebra
@@ -19,17 +19,12 @@ router bgp 65000
 
   srx evaluation bgpsec distributed
 
-  srx set-origin-value undefined
-  srx set-path-value undefined
+  srx set-bgpsec-value undefined
 
-  srx policy prefer-valid
+  srx policy bgpsec local-preference valid   add      20 
+  srx policy bgpsec local-preference invalid subtract 20 
 
-  srx policy local-preference valid  20 add
-  srx policy local-preference notfound 10 add 
-  srx policy local-preference invalid 20 subtract
-
-  no srx policy ignore-undefined
-  srx policy ignore-invalid
+  no srx policy bgpsec ignore undefined
 
   srx bgpsec ski 0 1 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
   srx bgpsec active 0
@@ -44,4 +39,4 @@ router bgp 65000
   neighbor {IP_AS_65010} passive
   neighbor {IP_AS_65010} bgpsec both
 
-  log stdout
+  log stdout notifications

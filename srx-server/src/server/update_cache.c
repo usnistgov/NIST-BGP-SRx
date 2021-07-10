@@ -120,6 +120,7 @@ typedef struct {
                                   // by the garbage collector.
 
   UC_UpdateData    pathData;      // This element replaces the blob.
+  uint32_t         aspathCacheID; // aspath cache key ID
 } CacheEntry;
 
 // Forward declarations
@@ -363,7 +364,7 @@ void releaseUpdateCache(UpdateCache* self)
  */
 bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
                      uint8_t clientID, void* clientMapping,
-                     SRxResult* srxRes, SRxDefaultResult* defaultRes)
+                     SRxResult* srxRes, SRxDefaultResult* defaultRes, uint32_t *pathId)
 {
   // The cache entry also need the addition of source and predefined result.
   CacheEntry* cEntry = NULL;
@@ -387,6 +388,14 @@ bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
     defaultRes->resSourceBGPSEC     = cEntry->defaultResult.resSourceBGPSEC;
     defaultRes->result.bgpsecResult = cEntry->defaultResult.result.bgpsecResult;
 
+    // ASPA Validation Result
+    srxRes->aspaResult            = cEntry->srxResult.aspaResult;
+    defaultRes->resSourceASPA     = cEntry->defaultResult.resSourceASPA;
+    defaultRes->result.aspaResult = cEntry->defaultResult.result.aspaResult;
+
+    if (pathId != NULL)
+      *pathId = cEntry->aspathCacheID; 
+
     if (clientID > 0)
     {
       // Register the update with the client!
@@ -406,6 +415,11 @@ bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
     srxRes->bgpsecResult            = SRx_RESULT_UNDEFINED;
     defaultRes->resSourceBGPSEC     = SRxRS_DONOTUSE;
     defaultRes->result.bgpsecResult = SRx_RESULT_DONOTUSE;
+
+    // ASPA Validation Values
+    srxRes->aspaResult            = SRx_RESULT_UNDEFINED;
+    defaultRes->resSourceASPA     = SRxRS_DONOTUSE;
+    defaultRes->result.aspaResult = SRx_RESULT_DONOTUSE;
   }
 
   return retVal;
@@ -527,7 +541,7 @@ bool _addClientReference(UpdateCache* self, CacheEntry* cEntry,
  */
 int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
                 SRxUpdateID* updateID, IPPrefix* prefix, uint32_t asn,
-                SRxDefaultResult* defRes, BGPSecData* bgpData)
+                SRxDefaultResult* defRes, BGPSecData* bgpData, uint32_t pathId)
 {
   CacheEntry* cEntry;
 
@@ -580,23 +594,29 @@ int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
 
     cEntry->updateID      = updID;
     cEntry->asn           = asn;
+    cEntry->aspathCacheID = pathId;
     cpyPrefix(&cEntry->prefix, prefix);
     cEntry->srxResult.bgpsecResult = SRx_RESULT_UNDEFINED;
     cEntry->srxResult.roaResult    = SRx_RESULT_UNDEFINED;
+    cEntry->srxResult.aspaResult   = SRx_RESULT_UNDEFINED;
 
     if (defRes != NULL)
     {
       cEntry->defaultResult.result.roaResult    = defRes->result.roaResult;
       cEntry->defaultResult.result.bgpsecResult = defRes->result.bgpsecResult;
+      cEntry->defaultResult.result.aspaResult   = defRes->result.aspaResult;
       cEntry->defaultResult.resSourceROA        = defRes->resSourceROA;
       cEntry->defaultResult.resSourceBGPSEC     = defRes->resSourceBGPSEC;
+      cEntry->defaultResult.resSourceASPA       = defRes->resSourceASPA;
     }
     else
     {
       cEntry->defaultResult.result.roaResult    = SRx_RESULT_UNDEFINED;
       cEntry->defaultResult.result.bgpsecResult = SRx_RESULT_UNDEFINED;
+      cEntry->defaultResult.result.aspaResult   = SRx_RESULT_UNDEFINED;
       cEntry->defaultResult.resSourceROA        = SRxRS_UNKNOWN;
       cEntry->defaultResult.resSourceBGPSEC     = SRxRS_UNKNOWN;
+      cEntry->defaultResult.resSourceASPA       = SRxRS_UNKNOWN;
     }
     // Other Update relates data
     // BGPSEC
@@ -718,6 +738,7 @@ bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
     valRes.valType  = VRT_NONE;
     valRes.valResult.roaResult    = cEntry->srxResult.roaResult;
     valRes.valResult.bgpsecResult = cEntry->srxResult.bgpsecResult;
+    valRes.valResult.aspaResult   = cEntry->srxResult.aspaResult;
     //valRes.clientID		  = cEntry->clientID;
 
     // Check if ROA results can be used.
@@ -742,12 +763,25 @@ bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
       }
     }
 
+    // Check if ASPA results can be used.
+    if (result->aspaResult != SRx_RESULT_DONOTUSE)
+    { 
+      valRes.valType |= VRT_ASPA;
+      valRes.valResult.aspaResult = result->aspaResult;
+
+      if (result->aspaResult != cEntry->srxResult.aspaResult)
+      {
+        cEntry->srxResult.aspaResult = result->aspaResult;
+      }
+    }
+
+
     // check if a validation result changed.
     if (!suppressNotification && (valRes.valType != VRT_NONE))
     {
       if (self->resChangedCallback != NULL)
       {
-        // Notify of the change of validation result.
+        // Notify of the change of validation result.(call handleUpdateResultChange)
         self->resChangedCallback(&valRes);
       }
       else
@@ -761,6 +795,40 @@ bool modifyUpdateResult(UpdateCache* self, SRxUpdateID* updateID,
     unlockMutex(&self->itemMutex);
   }
 
+  return retVal;
+}
+
+bool modifyUpdateCacheResultWithAspaVal(UpdateCache* self, SRxUpdateID* updateID,
+                        SRxResult* srxResult_aspa)
+{
+
+  CacheEntry* cEntry;
+  bool retVal = false;
+  SRxUpdateID updID = *updateID;
+
+  if (!tableFind(self, updID, &cEntry))
+  {
+    RAISE_SYS_ERROR("Does not exist in update cache, can not modify aspa result!");
+    retVal = false;
+  }
+  else
+  {
+    lockMutex(&self->itemMutex);
+
+    // Check if ASPA srxResult_aspas can be used.
+    if (srxResult_aspa->aspaResult != SRx_RESULT_DONOTUSE)
+    { // Check for changes in bgpsec srxResult_aspa
+      if (srxResult_aspa->aspaResult != cEntry->srxResult.aspaResult)
+      {
+        cEntry->srxResult.aspaResult = srxResult_aspa->aspaResult;
+        LOG(LEVEL_INFO, "\033[92m""cEntry(UpdateCache) updated with uID: %08X, ASPA result:%d ""\033[0m", 
+            *updateID, srxResult_aspa->aspaResult);
+        retVal = true;
+      }
+    }
+
+    unlockMutex(&self->itemMutex);
+  }
   return retVal;
 }
 
@@ -1510,3 +1578,24 @@ void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob)
   releaseXMLOut(&out);
 }
 
+
+
+void process_ASPA_EndOfData(UpdateCache* self, 
+                            int (*cb)(void* uCache, void* hldr, uint32_t uid, uint32_t pid, time_t ct), 
+                            void* rpkiHandler)
+{
+  time_t lastEndOfDataTime = time(NULL);
+  int count=0;
+  CacheEntry* cEntry, *tmp;
+    
+  LOG(LEVEL_DEBUG, "Last end of Data Time: %u", lastEndOfDataTime);
+  HASH_ITER(hh, (CacheEntry*)self->table, cEntry, tmp) 
+  {
+    LOG(LEVEL_DEBUG, "[%d] updateID: 0x%08X  pathID: 0x%08X", 
+        count++, cEntry->updateID, cEntry->aspathCacheID);
+
+    cb((void*)self, (void*)rpkiHandler, cEntry->updateID, cEntry->aspathCacheID, 
+        lastEndOfDataTime); // call process_ASPA_EndOfData_main
+  }
+
+}

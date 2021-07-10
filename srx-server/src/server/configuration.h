@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/06/26 - kyehwanl
+ *            * Added as_relationship_data to configuration
  * 0.5.0.0  - 2017/07/05 - oborchert
  *            * Modified the newly added parameter version to router_protocol
  *            * Added more SCA configuration settings
@@ -115,6 +117,7 @@ typedef struct {
    * REquires SCA to provide the capability to do so*/
   bool                  sca_sync_logging;
   
+  char*                 as_relationship_data; // for aspa direction
   
   /** The minimum expected number of expected proxy clients */
   uint8_t               expectedProxies;

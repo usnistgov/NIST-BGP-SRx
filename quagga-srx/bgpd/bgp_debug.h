@@ -79,6 +79,7 @@ extern unsigned long term_bgp_debug_normal;
 extern unsigned long term_bgp_debug_zebra;
 #ifdef USE_SRX
 extern unsigned long term_bgp_debug_bgpsec;
+extern unsigned long term_bgp_debug_aspa;
 #endif
 
 #define BGP_DEBUG_AS4                 0x01
@@ -98,6 +99,7 @@ extern unsigned long term_bgp_debug_bgpsec;
 #define BGP_DEBUG_BGPSEC              0x01 // alias of the bgpsec detail
 #define BGP_DEBUG_BGPSEC_IN           0x02
 #define BGP_DEBUG_BGPSEC_OUT          0x04
+#define BGP_DEBUG_ASPA                0x01
 #endif
 
 #define BGP_DEBUG_PACKET_SEND         0x01

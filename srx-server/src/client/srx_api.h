@@ -23,10 +23,13 @@
  * Secure Routing extension (SRx) client API - This API provides a fully 
  * functional proxy client to the SRx server.
  *
- * Version 0.5.0.2
+ * Version 0.6.0.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/02/26 - kyehwanl
+ *            * Added ASPA validation to verify request using the 
+ *              SRx-Proxy_Protocol version 2.
  * 0.5.0.2  - 2017/10/10 - oborchert
  *            * Removed ifdef __cplusplus.
  *            * Removed a comma from enum type
@@ -178,6 +181,7 @@ typedef bool (*ValidationReady)(SRxUpdateID          updateID,
                                 ValidationResultType valType,
                                 uint8_t              roaResult,
                                 uint8_t              bgpsecResult,
+                                uint8_t              aspaResult,
                                 void* userPtr);
 
 /**
@@ -434,10 +438,10 @@ bool reconnectWithSRx(SRxProxy* proxy);
  *         connected.
  */
 void verifyUpdate(SRxProxy* proxy, uint32_t localID,
-                  bool usePrefixOriginVal, bool usePathVal,
+                  bool usePrefixOriginVal, bool usePathVal, bool useAspaVal,
                   SRxDefaultResult* defaultResult,
                   IPPrefix* prefix, uint32_t as32,
-                  BGPSecData* bgpsec);
+                  BGPSecData* bgpsec, SRxASPathList asPathList);
 
 /**
  * This method generates a signature request. The signature will be returned

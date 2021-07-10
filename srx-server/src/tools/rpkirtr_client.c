@@ -22,10 +22,17 @@
  * Connects to an RPKI/Router Protocol server and prints all received
  * information on stdout.
  *
- * @version 0.5.1.1
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Removed aspaCallback.
+ *          - 2021/02/16 - oborchert
+ *            * Added aspaCallback.
  *  0.5.1.1 - 2020/07/31 - oborchert
  *            * Use define SRX_DEV_TOYEAR for year printout.
  *  0.5.0.4 - 2018/03/09 - oborchert
@@ -229,6 +236,31 @@ void handleRouterKey(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
 
   printf(" keyInfo[%p]: ", keyInfo);
   printHex(91, (u_int8_t*)keyInfo);
+}
+
+  /**
+   * This function is called for each prefix announcement / withdrawal received
+   * from the RPKI validation cache.
+   * 
+   * Here it just prints out the information received.
+   *
+   * @param valCacheID  This Id represents the cache. It is used to be able to
+   *                    later on identify the white-list / ROA entry in case the
+   *                    cache state changes.
+   * @param sessionID   The cache sessionID entry for this data. It is be useful
+   *                    for sessionID changes in case SRx is implementing a
+   *                    performance driven approach.
+   * @param isAnn       Indicates if this in an announcement or not.
+   * @param oas         The as number in network format
+   * @param ski         the ski buffer
+   * @param keyInfo     Pointer to the key in DER format.
+   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   */
+void handleASPA(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
+                uint8_t afi, uint32_t customerAS, uint16_t providerCt, 
+                uint32_t* providerASList, void* _u)
+{
+  
 }
 
 /**
@@ -575,6 +607,7 @@ int main(int argc, const char* argv[])
   params.resetCallback                = handleReset;
   params.errorCallback                = handleError;
   params.routerKeyCallback            = handleRouterKey;
+  //params.aspaCallback                 = handleASPA;
   params.connectionCallback           = handleConnection;
   params.endOfDataCallback            = handleEndOfData;
   params.sessionIDChangedCallback     = sessionIDChanged;
@@ -604,7 +637,8 @@ int main(int argc, const char* argv[])
       {
         if (timeoutCt <= 0)
         {
-          printf ("timeout\n");
+          printf ("** timeout **\n");
+          // For development of Experimental ASPA we do not want to stop polling
           doRun = false;
           exitVal = 1;
           break;

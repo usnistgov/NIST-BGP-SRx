@@ -20,11 +20,20 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  * 
- *
- * @version 0.3.0.10
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+  * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Added AspathCache to CommandHandler structure.
+ *            * Modified appropriate functions to include ASPA processing.
+ *            * Added function validateASPA(...)
+ *          - 2020/09/27 - oborchert
+ *            * Synchronized the documentation of broadcastResult with the 
+ *              the implementation ".c" file.
  * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Removed types.h
  * 0.3.0    - 2013/01/28 - oborchert
@@ -44,6 +53,7 @@
 #include "server/rpki_handler.h"
 #include "server/server_connection_handler.h"
 #include "server/update_cache.h"
+#include "server/aspath_cache.h"
 #include "shared/srx_packets.h"
 #include "util/packet.h"
 #include "util/server_socket.h"
@@ -63,6 +73,7 @@ typedef struct {
   BGPSecHandler*            bgpsecHandler;
   RPKIHandler*              rpkiHandler;
   UpdateCache*              updCache;
+  AspathCache*              aspathCache;
 
   // The system configuration.
   Configuration*            sysConfig;
@@ -89,7 +100,8 @@ typedef struct {
 bool initializeCommandHandler(CommandHandler* self, Configuration* cfg,
                               ServerConnectionHandler* svrConnHandler,
                               BGPSecHandler* bgpsecHandler, 
-                              RPKIHandler* rpkiHandler, UpdateCache* updCache);
+                              RPKIHandler* rpkiHandler, UpdateCache* updCache,
+                              AspathCache* aspathCache);
 
 /**
  * Frees all allocated resources.
@@ -119,14 +131,34 @@ bool startProcessingCommands(CommandHandler* self, CommandQueue* cmdQueue);
 void stopProcessingCommands(CommandHandler* self);
 
 /**
- * Sends a (new) result to all connected clients.
+ * Sends a (new) result to all connected clients of the provided update.
+ * The UpdateID is embedded in the SRxValidationResult data.
  *
  * @param self Instance
- * @param valResult The validation result containing all information needed 
- *                  to broadcast the result.
- * @return true if the broadcast could be successfully send.
+ * @param valResult The validation result including the UpdateID the result
+ *                  is for.
+ * @return true if at least one broadcast could be successfully send to any
+ *              registered client
  */
 bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult);
 
+
+/**
+ * This function performs the ASPA validation.
+ * 
+ * @param asPathList
+ * @param length
+ * @param asType
+ * @param direction
+ * @param afi
+ * @param aspaDBManager
+ * 
+ * @return the ASPA validation result
+ * 
+ * @since 0.6.0.0
+ */
+uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType, 
+                      AS_REL_DIR direction, uint8_t afi, 
+                      ASPA_DBManager* aspaDBManager);
 #endif // !__COMMAND_HANDLER_H__
 

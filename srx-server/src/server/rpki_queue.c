@@ -277,7 +277,7 @@ void rq_queue(RPKI_QUEUE* queue,
             {
               // Set it to both if the reason is different. If in the future more
               // reasons are added then this needs to be modified.
-              listElem->elem.reason = RQ_BOTH;
+              listElem->elem.reason = RQ_ALL;
             }
           }
         }

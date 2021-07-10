@@ -192,7 +192,7 @@ void releaseUpdateCache(UpdateCache* self);
  */
 bool getUpdateResult(UpdateCache* self, SRxUpdateID* updateID, 
                      uint8_t clientID, void* clientMapping,
-                     SRxResult* srxRes, SRxDefaultResult* defaultRes);
+                     SRxResult* srxRes, SRxDefaultResult* defaultRes, uint32_t *pathID);
 
 /**
  * This function returns the update signature if already existent. It will NOT
@@ -278,7 +278,7 @@ UC_UpdateData* getUpdateData(UpdateCache* self, SRxUpdateID* updateID);
 int storeUpdate(UpdateCache* self, uint8_t clientID, void* clientMapping,
                 SRxUpdateID* updateID, IPPrefix* prefix, 
                 uint32_t asn, SRxDefaultResult* defRes,
-                BGPSecData* bgpData);
+                BGPSecData* bgpData, uint32_t pathID);
 
 /**
  * Removes the update data from the list and releases all memory associated to 
@@ -435,4 +435,13 @@ bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
  * 
  */
 void outputUpdateCacheAsXML(UpdateCache* self, FILE* stream, int maxBlob);
+
+bool modifyUpdateCacheResultWithAspaVal(UpdateCache* self, SRxUpdateID* updateID,
+                        SRxResult* srxResult_aspa);
+
+void process_ASPA_EndOfData(UpdateCache* self, 
+                            int (*cb)(void* uCache, void* hldr, uint32_t uid, uint32_t pid, time_t), 
+                            void* rpkiHandler);
 #endif // !__UPDATE_CACHE_H__
+
+

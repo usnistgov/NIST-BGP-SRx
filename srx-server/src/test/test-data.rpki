@@ -1,0 +1,33 @@
+# This file is used to fill the rpki-rtr-srv with 
+# sample data
+# 1st some ROA information
+echo "Adding 6 ROA entries..."
+add 10.10.0.0/16 24 10
+add 10.20.0.0/16 20 20
+add 10.20.0.0/24 24 20
+add 10.30.0.0/16 18 30
+add 10.40.0.0/16 24 40
+add 10.50.0.0/16 22 50
+
+# Now add some BGPsec Keys
+# This script assumes that the current working folder is the srx-server root 
+# folder. Keys are located in the BGPsec-IO project which is assumed to be 
+# available as well. In case the location is different, modify the keyLoc
+# appropriately
+echo "Setting key location and loading 5 key certificates..."
+keyLoc ../bgpsec-io/data/raw-keys
+addKey 10 10.cert
+addKey 20 20.cert
+addKey 30 30.cert
+addKey 40 40.cert
+addKey 50 50.cert
+
+# Now Add some ASPA Objects
+echo "adding 4 ASPA objects"
+addASPA 0 10 20 25
+addASPA 0 20 30 40 50
+addASPA 1 10 20 25
+addASPA 1 20 40 50
+
+# Now printing out the cache content.
+cache

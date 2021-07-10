@@ -22,10 +22,27 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.5.1.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0 - 2021/03/31 - oborchert
+ *           * Modified loops to be C99 compliant 
+ *         - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *            * Cleaned up some merger left overs and synchronized with naming 
+ *              used conventions.
+ *          - 2021/02/26 - kyehwanl
+ *            * Removed function handlePDUASPA
+ *          - 2021/02/16 - oborchert
+ *            * Added ERROR logging in case of invalid ASPA provider count.
+ *            * Fixed bug in handlePDUASPA by converting also the providerAS to
+ *              host format.
+ *          - 2021/02/12 - oborchert
+ *            * Fixed function _getPacket that did not resize the buffer 
+ *              correctly if not of required length. 
+ *            * Added some variable initialization to NULL where warranted.
  * 0.5.1.0  - 2018/03/09 - oborchert 
  *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
  *              of 0.5.1.0.
@@ -250,6 +267,57 @@ static bool handlePDURouterKey(RPKIRouterClient* client,
   return true;
 }
 
+
+/**
+ * Processes the ASPA PDU
+ *
+ * @param client The client connection
+ * @param hdr The header with the information
+ *
+ * @return true
+ */
+/*
+static bool handlePDUASPA(RPKIRouterClient* client,
+                          RPKIASPAHeader* hdr)
+{
+  bool      isAnn;
+  uint32_t  clientID;
+  uint16_t  sessionID;
+
+  uint8_t  afi;
+  uint32_t customerAS;
+  uint16_t providerCount;
+  uint8_t* providerASBuffer;
+  uint8_t* srcPtr;
+  uint32_t* srcData;
+  uint32_t* providerAS;
+  int idx = 0;
+
+  isAnn         = (hdr->flags & PREFIX_FLAG_ANNOUNCEMENT);
+  afi           = (hdr->flags & PREFIX_FLAG_AFI_V6);
+  clientID      = client->routerClientID;
+  sessionID     = client->sessionID;
+  customerAS    = ntohl(hdr->customer_asn);
+  providerCount = ntohs(hdr->provider_as_count);
+  providerASBuffer = malloc(providerCount * 4);
+  srcPtr           = (uint8_t*)hdr + sizeof(RPKIASPAHeader);
+
+  providerAS = (uint32_t*)providerASBuffer;
+  srcData    = (uint32_t*)srcPtr;
+  for (; idx < providerCount; idx++, providerAS++, srcData++)
+  {
+    *providerAS = ntohl(*srcData);
+  }
+
+  client->params->aspaCallback(clientID, sessionID, isAnn, afi, customerAS,
+                               providerCount, (uint32_t*)providerASBuffer,
+                               client->user);
+  return true;
+}
+
+*/
+
+
 /**
  * Process the End Of Data PDU
  * 
@@ -343,12 +411,12 @@ static bool checkSessionID(RPKIRouterClient* client, uint32_t sessionID)
  * 
  * In case of an internal error receiving the PDU the returned length can be 
  * less then the length field of the PDU indicates. In this case the errCode
- * contains an erorr.
+ * contains an error.
  * 
  * The following errors can be reported:
  * 
  *     RRC_RCV_PDU_NO_ERROR:       No error
- *     RRC_RCV_PDU_SOCKET_ERROR:   Somehwo not all data could be loaded.
+ *     RRC_RCV_PDU_SOCKET_ERROR:   Somehow not all data could be loaded.
  * 
  * @param client The client session
  * @param errCode Returns the error code.
@@ -398,14 +466,14 @@ static u_int32_t _getPacket(RPKIRouterClient* client, int* errCode,
     if (bytesMissing > 0)
     {
       // Check if the current buffer is big enough
-      if (bytesMissing > *buffSize)
+      if (pduLen > *buffSize)
       {
         // The current buffer is to small -> try to increase it.
-        uint8_t* newBuffer = realloc(*buffer, *buffSize);
+        uint8_t* newBuffer = realloc(*buffer, pduLen);
         if (newBuffer)
         {
           *buffer   = newBuffer; // reset to the bigger space
-          *buffSize = bytesMissing;
+          *buffSize = pduLen;
           bufferPtr = (*buffer + sizeof(RPKICommonHeader));
         }
         else
@@ -468,10 +536,10 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
   RPKICommonHeader* hdr        = NULL;  // A pointer to the Common header.
   uint32_t          pduLen     = 0;
   // Use the "maximum" header. It can grow in case an error pdu is received
-  // with a large error message or a PDU included or both. In this case the
-  // memory will be extended to the space needed. In case the space can not be
-  // extended, the PDU will be loaded as much as possible and the rest will be
-  // skipped.
+  // with a large error message or an ASPA PDU with a large number of 
+  // providerASs. In this case the memory will be extended to the space needed. 
+  // In case the space can not be extended as needed, the PDU will be loaded as 
+  // much as possible and the remainder will be skipped.
   uint32_t         bytesAllocated = sizeof(RPKIRouterKeyHeader);
   uint8_t*         byteBuffer = malloc(bytesAllocated);
   // Keep going is used to keep the received thread up and running. It will be
@@ -637,7 +705,7 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
           keepGoing = false;
         }
         break;
-      case PDU_TYPE_CACHE_RESET :
+      case PDU_TYPE_CACHE_RESET:
         // Reset our cache
         client->params->resetCallback(client->routerClientID, client->user);
         // Respond with a cache reset
@@ -647,6 +715,19 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
         // Switched from client-stop to keepGoing
         keepGoing = !handleErrorReport(client, 
                                        (RPKIErrorReportHeader*)byteBuffer);
+        break;
+      case PDU_TYPE_ASPA :
+        if (client->version > 1)
+        {
+          LOG(LEVEL_INFO, FILE_LINE_INFO "ASPA PDU received from Rpki rtr server");
+          // ASPA validation  
+          handleReceiveAspaPdu(client, (RPKIASPAHeader*)byteBuffer, pduLen);
+        }
+        else
+        {
+          *errCode = RPKI_EC_UNSUPPORTED_PDU;
+          keepGoing = false;
+        }
         break;
       case PDU_TYPE_RESERVED :
         LOG(LEVEL_ERROR, "Received reserved RPKI-PDU Type %u", 
@@ -754,6 +835,7 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
   
   // Release the buffer again.
   free(byteBuffer);
+  byteBuffer = NULL;
   
   return *errCode == RRC_RCV_PDU_NO_ERROR;
 }
@@ -842,7 +924,8 @@ static void* manageConnection (void* clientPtr)
           }
           break;
         default:
-          RAISE_ERROR("Unexpected protocol behavior!");
+          RAISE_ERROR("Unexpected protocol behavior, type=%u!", 
+                      client->lastRecv);
           client->stop = true;
       }
     }
@@ -1220,3 +1303,54 @@ void generalSignalProcess(void)
   sigaction(SIGPIPE, &act, NULL);
   pthread_sigmask(SIG_UNBLOCK, &errmask, NULL);
 }
+
+
+bool handleReceiveAspaPdu(RPKIRouterClient* client, RPKIASPAHeader* hdr, 
+                          uint32_t pduLen)
+{
+  // 
+  // figure out the numbers how many provider ASes are in the received  pdu
+  //
+  //     1. parsing
+  //     2. memcpy for providerASNs if providerAsCount is greater than 1
+  //     3. inside hdr, there might have multiple provider asns
+  //
+
+  uint32_t customerAsn = ntohl(hdr->customer_asn);
+  uint16_t providerAsCount = ntohs(hdr->provider_as_count);
+  uint32_t *providerAsns;
+  uint8_t  flags = hdr->flags;
+
+  uint8_t announce       = flags & 0x01; // bit 0: 1 == announce, 0 == withdraw
+  uint8_t addrFamilyType = flags & 0x02; // bit 1: AFI (IPv4 == 0, IPv6 == 1)
+
+  uint8_t *byteHdr = (uint8_t*)hdr;
+  uint32_t *startp_providerAsns = (uint32_t*)(byteHdr + sizeof(RPKIASPAHeader));
+  
+  // Index counter for loops
+  int idx = 0;
+
+  providerAsns = (uint32_t*)calloc(providerAsCount, sizeof(uint32_t));
+
+  LOG(LEVEL_INFO, "---" FILE_LINE_INFO " receive ASPA Object PDU from rpki cache ---");
+  LOG(LEVEL_INFO, "customer asn: %d", customerAsn);
+  LOG(LEVEL_INFO, "provider as count: %d", providerAsCount);
+
+  // 3. inside hdr, there might have multiple provider ASNs
+  for (idx = 0; idx < providerAsCount; idx++)
+  {
+    providerAsns[idx] = ntohl(startp_providerAsns[idx]);
+    LOG(LEVEL_INFO, "provider asn[%d]: %d", idx, providerAsns[idx]);
+  }
+
+  LOG(LEVEL_INFO, "afi : %d (0 == AFI_IP, 1 == AFI_IP6)", addrFamilyType);
+  LOG(LEVEL_INFO, "flag: %s ", announce == 1 ? "Announce": 
+                              (announce == 0 ? "Withdraw": "None"));
+
+  // this calls 'handleAspaPdu()' in rpki_handler module
+  client->params->cbHandleAspaPdu(client->user, customerAsn, providerAsCount, 
+                                  providerAsns, addrFamilyType, announce); 
+  return true;
+}
+
+

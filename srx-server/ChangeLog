@@ -1,5 +1,15 @@
+ChangeLog for Version 0.6.0.0
+- Added ASPA processing as specified in draft-ietf-sidrops-aspa-verification-07
+- Added an ASPA trie to maintain ASPA information.
+- Added a new cache to store AS-Path information needed for ASPA processing.as
+- Added ASPA processing to CommandHandler.
+- Added inplementation for draft-8210bis which provides ASPA objects for the 
+  router to cache protocol. This is an early adoption of the draft currently
+  active in the IETF SIDROPS working group.
+- Added ASPA PDU processing to RPKI-Hanlder.
+- Modified SRx-Proxy-Protocol to version 3
+- Modified project email and website
 Changelog for Version 0.5.1
-- Added a secondary key location to the rpki rtr server.
 - Cleaned up leftover settings for SVN revision management settings in Makefile.am
 - Updated spec files.
 - Added additional tool requirement for compilation into configure.ac

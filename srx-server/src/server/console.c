@@ -20,10 +20,14 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.6
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0 - 2021/02.26 - kyehwanl
+ *           * Added CST_VERSION, CST_ASPATH, and CST_ASPA to ConsoleShowType.
+ *           * Added commands "show-aspa" and "show-aspath".
+ *           * Added CON_SHASPATH_CMD and CON_SHASPA_OBJ_CMD to console.
  * 0.5.0.6 - 2018/11/20 - oborchert
  *           * Added missing header file.
  * 0.5.0.3  - 2018/02/23 - oborchert
@@ -113,7 +117,9 @@ typedef enum {
   CST_RPKI    = 1,
   CST_SRXCFG  = 2,
   CST_PROXIES = 3,
-  CST_VERSION = 4
+  CST_VERSION = 4,
+  CST_ASPATH  = 5,
+  CST_ASPA    = 6,
 } ConsoleShowType;
 
 static void* consoleLoop(void* selfPtr);
@@ -225,7 +231,11 @@ char* CON_HELP_RESP= "\r\nAvailable commands are:\r\n"
 #endif
                  " !! [<parameter>]      Repeat last command with optional new"
                  "\r\n                       parameter if specified, otherwise"
-                 "\r\n                       old parameter!"
+                 "\r\n                       old parameter!\r\n"
+                 " show-aspa             Show ASPA object registered in object"
+                 "\r\n                       cache db \r\n"
+                 " show-aspath           Show AS path list received from the"
+                 "\r\n                       clients \r\n"
                  "\r\n\r\n";
 
 char* CON_VERSION_CMD  = "show-version";
@@ -259,6 +269,9 @@ char* CON_NOPROXY_CMD  = "num-proxies";
 char* CON_COMMAND_QUEUE   = "command-queue";
 char* CON_DUMP_PCACHE_CMD = "dump-pcache";
 char* CON_DUMP_UCACHE_CMD = "dump-ucache";
+
+char* CON_SHASPATH_CMD = "show-aspath";
+char* CON_SHASPA_OBJ_CMD = "show-aspa";
 
 char* CON_NOTSUPPORTED_CMD = "Command not supported yet!\r\n";
 char* CON_UNKNOWN_CMD = "I don\'t understand the command "
@@ -821,6 +834,20 @@ static bool doProcessCommand(SRXConsole* self)
     doDumpUCache(self, cmd, param);
   }
 
+  // show AS path cache 
+  else if (    (cmdLen == strlen(CON_SHASPATH_CMD))
+            && (strncmp(CON_SHASPATH_CMD, cmd, cmdLen)==0))
+  {
+    doShow(self, cmd, param, CST_ASPATH);
+
+  }
+  // show ASPA object DB
+  else if (    (cmdLen == strlen(CON_SHASPA_OBJ_CMD))
+            && (strncmp(CON_SHASPA_OBJ_CMD, cmd, cmdLen)==0))
+  {
+    doShow(self, cmd, param, CST_ASPA);
+  }
+
   else
   {
     sendToConsoleClient(self, CON_UNKNOWN_CMD, true);
@@ -865,6 +892,36 @@ static void doShowVersion(SRXConsole* self, char* cmd, char* param)
   sprintf (out, "SRx-Server Version%s\r\n", SRX_SERVER_FULL_VER);
   sendToConsoleClient(self, out, true);
 }
+
+
+
+static void doShowAsPath(SRXConsole* self, char* cmd, char* param)
+{
+  LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
+  char out[256];
+  memset(out, '\0', 256);
+  sprintf (out, "AS Path list printing ...\r\n");
+  printAllAsPathCache(self->commandHandler->aspathCache);
+  sendToConsoleClient(self, out, true);
+}
+
+
+static void doShowASPA(SRXConsole* self, char* cmd, char* param)
+{
+  LOG(LEVEL_DEBUG, CP1 CP2 "%s %s", self->clientSockFd, cmd, param);
+  char out[256];
+  memset(out, '\0', 256);
+  sprintf (out, "ASPA Object DB printing ...\r\n");
+
+  RPKIHandler* handler = self->rpkiHandler;
+  ASPA_DBManager* aspaDBManager = handler->aspaDBManager;
+  TrieNode *root = aspaDBManager->tableRoot;
+  printAllLeafNode(root);
+
+  sendToConsoleClient(self, out, true);
+}
+
+
 
 /**
  * The console closes, send a goodbye.
@@ -1738,6 +1795,12 @@ static void doShow(SRXConsole* self, char* cmd, char* param,
       break;
     case CST_VERSION:
       doShowVersion(self, cmd, param);
+      break;
+    case CST_ASPATH:
+      doShowAsPath(self, cmd, param);
+      break;
+    case CST_ASPA:
+      doShowASPA(self, cmd, param);
       break;
     default:
       break;
