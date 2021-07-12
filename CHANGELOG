@@ -1,5 +1,7 @@
 For more detailed CHANGELOG information check each module folder.
 
+Pre Release 6.0.1
+ * Update to the README.md file
 Pre Release 6.0.0
  * quagga-srx V0.99.22.srx.0.6.0.0_release 
    (Added ASPA processing - Rewrote SRx policy engine)
