@@ -36,19 +36,20 @@ and once the release version 6 will be available we will add it to the master br
 
 ## Branching
 
-The main branch of the repository will still deliver NIST-BGP-SRx version 5. 
+The main branch of the repository will still deliver NIST-BGP-SRx version 5.
 Branch: 
 * **version5**: This branch is synchronized with the master branch. Implementations
             can easily switch between version5 and master back and forth, both deliver
             the same content.
-* **pre-release-6**: This branch is a "sneak preview" of the upcoming version 6. 
-            Once version 6 is stable and all expected modifications to ASPA are implemented
-            we will give up on this branch and push NIST-BGP-SRx into the master branch.
-            From this moment on master will provide version 6 and the branch version5 will
-            provide all version5 code.
-* **master**: This branch provides the current recommended version of NIST-BGP-SRx. All modifications
-          to this branch will be merged into the version5 branch. Once version 6 is released,
-          the master will hold version6. At this point changes to version5 are ignores.
+* **pre-release-6**: This branch is a "sneak preview" of the upcoming version 6.
+            The ASPA implementation follows the IETF draft draft-ietf-sidrops-aspa-verification-07
+            but some modifications within the algorithm are expected to come in the next
+            version of the draft. Once the new updates are implemented, we will release version 6.
+            From that moment on, master will provide the version 6 code base.
+* **master**: This branch provides the current recommended version of NIST-BGP-SRx (version5).
+            All modifications to this branch will be merged into the version5 branch only.
+            Once version 6 is released, master will hold version6.
+            At that point changes to version5 are only applied to branch version5.
 
 ## Testing
 

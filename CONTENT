@@ -1,4 +1,4 @@
-This folder contains NIST BGP-SRx Software Suite V5.1.6
+This folder contains NIST BGP-SRx Software Suite V5.1.7
  * quagga-srx V0.99.22.srx.0.4.2.10_release
  * srx-server V0.5.1.2_release
  * srx-crypto-api V0.3.0.3_release
@@ -40,4 +40,4 @@ Comments for this software package:
   - optional gnome-terminal (to start all modules in terminals)
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V5.4
+Packaged by BGP-SRx Software Suite Bundler V5.5
