@@ -513,7 +513,7 @@ In order to edit QuaggaSRx, SRx Server and Rpkirtr server's configuration files 
   ```
   Use the learned IP address and update the QuaggaSRx configuration
   ```
-  sed "s/srx connect/srx connect srx_server 17900/g" ./quagga-srx/bgpd/bgpd.conf.sampleSRx > /tmp/bgpd.conf
+  sed "s/srx connect/srx connect 172.17.0.3 17900/g" ./quagga-srx/bgpd/bgpd.conf.sampleSRx > /tmp/bgpd.conf
   ```
   Finally start the QuaggaSRx server
   ```
