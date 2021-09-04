@@ -32,7 +32,7 @@ only, we did add an experimentation part to this version.
 The second version available in this repository will be version 6 which provides
 an overhaul of the QuaggaSRx implementation by separating path and origin validation
 as well as adding ASPA validation. Version 6 is currently only in pre-release available
-and once the release version 6 will be available we will add it to the master branch,
+and once the release version 6 will be available we will add it to the master branch.
 
 ## Branching
 
@@ -57,6 +57,7 @@ The software was continuously tested during development. We performed
 interoperability test and published them at IETF SIDR meetings as well as
 IETF SIDROPS meetings.
 The codebase itself provides a simple testing to test basic functionality.
+The developement was doneusing CentOS 7 though we compiled the project on CentOS 8 and successfullly executed the test suite provided in this release.
 
 ### Unit Test
 
@@ -93,7 +94,7 @@ See Installing for notes on how to deploy the project on a live system.
 
 It is recommended to install the "Development Tools" which contain
 a full set of libraries and tools to build the software. For a list
-of the required developer (*-devel) packages in CENTOS please see
+of the required developer (*-devel) packages in CentOS please see
 the [CONTENT](CONTENT) file.
 
 For minimal installs without the "Development Tools" the following
@@ -120,7 +121,7 @@ This archive provides two forms of building and installing the software.
 ### Building & Installing (Single System Install - Physical system, VM, other)
 
 The CONTENT file does specify what development libraries are required
-to be for a successful installation. This is based upon a fresh CENTOS 7
+to be for a successful installation. This is based upon a fresh CentOS 7
 install.
 Other distributions might require additional or different packages.
 
@@ -130,7 +131,7 @@ build script allows different modes of operation which are explained
 in detail by calling
 
 ```
-./buildBG_SRx.sh -h
+./buildBGP_SRx.sh -h
 ```
 
 #### Automated Building
@@ -190,16 +191,25 @@ To build and install only the SRx Crypto API use the SCA option.
 
 #### Using Bootstrap Install Script
 
-This section provides a script that can be used for a CENTOS 7 minimal
-install. Copy the script below into a new install script file and run 
-it. The script is tested and should be free of bugs but regardless
-it is to be used on your on risk!
+This section provides a script that can be used for a CentOS 7 and 
+CentOS 8 minimal install. Copy the script below into a new install 
+script file and run it. The script is tested and should be free of 
+bugs but regardless it is to be used on your on risk!
+
+The script functions works with default CentOS 7 and CentOS 8 Docker 
+containers, though the configuration of the experiments does fail if 
+not enough interfaces are provided to the container itself. Due to 
+security restrictions, this script is not able to generate alias 
+interfaces from within a docker container as it is possible from within
+virtual machines, [ProxMox](https://www.proxmox.com/en/) containers, 
+and physical systems. The script is configured for CentOS 7 distributions
+but also can operate under CentOS 8 distributions using the switch 'c8'.
 
 ```
 #!/bin/bash
 
-#Install Script for BGP-SRx on clean CentOS-7 install
-echo "Install Script for BGP-SRx on clean CentOS-7 install"
+#Install Script for BGP-SRx on clean CentOS 7 and CentOS 8 install
+echo "Install Script for BGP-SRx on clean CentOS 7 and CentOS 8 install"
 
 # wget:   needed to retrieve the GitHub repo via zip file
 # unzip:  needed to extract the repo
@@ -223,8 +233,10 @@ select_repo=0
 select_file=$(($select_repo+1))
 version=0
 zip_start=0
+use_c8=0
 switches=( "master" "v5" "pr6" )
 sw_str=$(echo ${switches[@]} | sed -e "s/ /|/g")
+in_docker_image="$(cat /proc/1/cgroup | grep 'docker/' | tail -1 | sed 's/^.*\///' | cut -c 1-12)"
 
 for item in ${repo[@]} ; do
   echo $item | grep -e "\.zip$" > /dev/null
@@ -238,13 +250,14 @@ mode=""
 while [ "$1" != "" ]
 do
   case "$1" in 
-    "git") mode="git"; select_repo=0; tool_pkg="git" ;;
-    "zip") mode="zip"; select_repo=zip_start ; tool_pkg="wget unzip" ;;
+    "git") mode="git"; select_repo=0; tool_pkg="$(echo $tool_pkg) git" ;;
+    "zip") mode="zip"; select_repo=zip_start ; tool_pkg="$(echo $tool_pkg) wget unzip" ;;
     "-I")  config_iface='-X examples 1 -I' ;;
     "-h" | "-?" | "?" | "h") 
-           echo "$0 <git|zip> <$sw_str> [-I]"; 
+           echo "$0 <git|zip> <$sw_str> [c8] [-I]"; 
            echo "  git  Retrieve the git repository"
            echo "  zip  Download and install the zip file"  
+           echo "  c8   Install on CentOS 8 system"
            echo "  -I   Allow script to install ALIAS interfaces for experiments"
            echo "       if needed. See ./buildBGP-SRx.sh -? for more information!"
            exit 
@@ -253,6 +266,11 @@ do
     "master") select=0; version="GitHub master" ;;
     "v5")     select=1; version="GitHub V5" ;;
     "pr6")    select=2; version="GitHub PR 6" ;;
+    "c8") echo "Prepare for CentOS 8"
+          tool_pkg="$(echo $tool_pkg) dnf-plugins-core"
+          devel_pkg="$(echo $devel_pkg) make tar patch"
+          use_c8=1
+          ;;
     *) echo "Unknown parameter '$1'"; exit ;; 
   esac
   shift
@@ -260,7 +278,7 @@ done
 
 if [ "$version" == "0" ] ; then
   echo "You must select an install version."
-  echo "$0 <git|zip> <$sw_str> [-I]"
+  echo "$0 <git|zip> <$sw_str> [c8] [-I]"
   exit 1
 else
   echo "Install version $version!"
@@ -268,7 +286,7 @@ fi
 
 if [ "$mode" == "" ] ; then
   echo "You must select an install mode."
-  echo "$0 <git|zip> <$sw_str> [-I]"
+  echo "$0 <git|zip> <$sw_str> [c8] [-I]"
   exit 1
 else
   echo "Use $mode mode"
@@ -280,13 +298,43 @@ select_fldr=$(( $select_repo+1 ))
 repo_name="$(echo ${repo[$select_repo]} | sed -e "s/__/ /g")"
 repo_fldr="${repo[$select_fldr]}"
 
-tool_pkg="$(echo $tool_pkg) gcc patch openssl epel-release autoconf net-tools bind-utils sudo which sed screen telnet"
-devel_pkg="libconfig-devel openssl-devel uthash-devel readline-devel net-snmp-devel"
+tool_pkg="$(echo $tool_pkg) gcc patch openssl epel-release autoconf net-tools bind-utils sudo which sed telnet"
+devel_pkg="$(echo $devel_pkg) file screen libconfig-devel openssl-devel uthash-devel readline-devel net-snmp-devel"
 echo "yum -y install $tool_pkg"
 yum -y install $tool_pkg
-# $devel_pkg requires one package from the epel-release repo. Therefore 2 steps of install.
+if [ ! $? -eq 0 ] ; then
+  echo
+  echo "An error occurred installing one or more of the required packages!"
+  echo
+  exit 1
+fi
+# $devel_pkg requires one package from the epel-release repo and for C8 from CentOS8-PowerTools. 
+# Therefore 2 steps of install.
+if [ $use_c8 -eq 1 ] ; then
+  if [ "$in_docker_image" == "" ] ; then
+    # In VM or real system
+    echo "Enable CentOS-PowerTools"
+    yum config-manager --set-enabled PowerTools
+  else
+    # In docker container
+    echo "Enable CentOS-Linux-PowerTools"
+    yum config-manager --set-enabled powertools
+  fi
+  if [ ! $? -eq 0 ] ; then
+    echo
+    echo "An error occurred during enabling the PowerTools repository!"
+    echo
+    exit 1
+  fi
+fi
 echo “yum -y install $devel_pkg”
 yum -y install $devel_pkg
+if [ ! $? -eq 0 ] ; then
+  echo
+  echo "An error occurred installing one or more of the required packages!";
+  echo
+  exit 1
+fi
 
 if [ "$mode" == "zip" ] ; then
   # Now get the repository and unpack it
@@ -344,27 +392,32 @@ if [ $errCode -gt 10 ] && [ $errCode -lt 20 ] ; then
   echo "Error during install of SRx Crypto API (SCA)!"
 fi
 if [ $errCode -gt 20 ] && [ $errCode -lt 30 ] ; then
-  errCode=$(( $errCode - 10 ))
+  errCode=$(( $errCode - 20 ))
   echo "Error during install of SRx Server and Proxy (SRxSnP)!"
 fi
 if [ $errCode -gt 30 ] && [ $errCode -lt 40 ] ; then
-  errCode=$(( $errCode - 10 ))
+  errCode=$(( $errCode - 30 ))
   echo "Error during install of QuaggaSRx (QSRx)!"
 fi
 if [ $errCode -gt 40 ] && [ $errCode -lt 50 ] ; then
-  errCode=$(( $errCode - 10 ))
+  errCode=$(( $errCode - 40 ))
   echo "Error during install of BGPsec-IO (BIO)!"
 fi
 if [ $errCode -gt 50 ] && [ $errCode -lt 60 ] ; then
-  errCode=$(( $errCode - 10 ))
+  errCode=$(( $errCode - 50 ))
   echo "Error during install of Examples (EXAMPLES)!"
+  echo "In case alias interfaces needed to be installed,"
   if [ "$(whoami)" != "root" ] ; then
-    echo "In case alias interfaces needed to be installed,"
     echo "make sure '$(whoami)' is in the sudoers file."
+    echo -n "In addition "
   fi
+  echo "be aware that interfaces cannot be added from "
+  echo "within Docker images. Configure the Docker image with"
+  echo "the required amount of interfaces prior configuring the"
+  echo "EXAMPLES project!"
 fi
 
-if [ $errCode -eq 0 ] ; then
+if [ $errCode -eq 0 ]  ; then
   # Call the quick tester
   echo "./buildBGP-SRx.sh -R"
   ./buildBGP-SRx.sh -R

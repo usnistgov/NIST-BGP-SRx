@@ -28,10 +28,12 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.5.1.2
+ * @version 0.5.1.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.5.1.3  - 2021/07/12 - oborchert
+ *            * Fixed speller in output
  * 0.5.1.2  - 2021/10/20 - oborchert
  *            * Added a secondary key location to make the example creation
  *              easier.
@@ -1465,7 +1467,7 @@ int showHelp(char* command)
            "  - echo [text]\n"
            "                 Print the given text on the console window.\n"
            "  - waitFor <client-IP>\n"
-           "                 Wait until the client with the given IP connect.\n"
+           "                 Wait until the client with the given IP connects.\n"
            "                 This function times out after 60 seconds.\n"
            "  - pause [prompt]\n"
            "                 Wait until any key is pressed. This is mainly\n"
@@ -1478,7 +1480,7 @@ int showHelp(char* command)
            "  - quit, exit, \\q\n"
            "                 Quits the loop and terminates the server.\n"
            "                 This command is allowed within scripts but only\n"
-           "                 as the very last command otherwise it will be\n"
+           "                 as the very last command, otherwise it will be\n"
            "                 ignored!\n"
            "  - clients\n"
            "                 Lists all clients\n"
@@ -2778,7 +2780,7 @@ static void syntax(const char* prgName)
   printf ("                 the server is started.\n");
   printf ("    -D <level>   Set the logging level ERROR(%i) to DEBUG(%i)\n\n",
                             LEVEL_ERROR, LEVEL_DEBUG);
-  printf ("  For backwards compatibility a script also can be added after a\n");
+  printf ("  For backward compatibility, a script also can be added after a\n");
   printf ("  port is specified.! - For future usage, use -f <script> to \n");
   printf ("  specify a script!\n");
   printf ("  If No port is specified the default port %u is used.\n",

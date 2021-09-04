@@ -412,7 +412,7 @@ static int _runBGPRouterSession(PrgParams* params, int sessionNr)
           {
             // Now this can have two reasons:
             // (1) The signing failed -> check for mode NS_BGP4 as fallback
-            // (2) This is an origination and it is an iBGP session -> BGP4
+            // (2) This is an origination and it is an iBGP session -> BGP-4
             //     In the case it is an iBGP session and no origin announcement
             //     then the bgpsec attribute was generated up to this router
             //     and we do not end up here.

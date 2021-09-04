@@ -23,10 +23,12 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPsec-IO
  * 
- * @version 0.2.1.6
+ * @version 0.2.1.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.7 - 2021/07/12 - oborchert
+ *            * Fixed spellers in the configuration.
  *  0.2.1.6 - 2021/05/21 - oborchert
  *            * Added information about AS_SET in update regex.
  *  0.2.1.4 - 2021/03/29 - oborchert
@@ -358,12 +360,12 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
     fprintf (file, "    %s = true;\n\n", P_CFG_BGPSEC_V6_R);
     
     fprintf (file, "    # Updates for this session only\n");
-    fprintf (file, "    # (path prefix B4 specifies BGP4 only update!)\n");
+    fprintf (file, "    # (path prefix B4 specifies BGP-4 only update!)\n");
 //    fprintf (file, "# <prefix>[,[[B4]? <asn>[p<repetition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "    # <prefix>[,[B4]? ([{]?<asn>[p<repitition>][ ]*[}]?)+"
                    "[I|V|N]?]\n");
     fprintf (file, "    #   <asn>        := [0-9]+[.[0-9]+]?>\n");
-    fprintf (file, "    #   <repitition> := [0-9]+\n");
+    fprintf (file, "    #   <repetition> := [0-9]+\n");
     fprintf (file, "    # Updates are allowed to have one AS_SET { 10 20 } in "            
                    "the path");
     fprintf (file, "    %s = (  \"%s\"\n", P_CFG_UPD_PARAM, 
@@ -385,7 +387,7 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
 // draft13 -> draft15 merger.  
 //    fprintf (file, "    #%s = true;\n\n", P_CFG_MPNLRI);
     
-    fprintf (file, "    # Allow prefix packing for BGP4 scripted updates\n");
+    fprintf (file, "    # Allow prefix packing for BGP-4 scripted updates\n");
     fprintf (file, "    # where ever possible.\n");
     fprintf (file, "    %s = false;\n\n", P_CFG_PACKING);
         

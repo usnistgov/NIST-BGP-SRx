@@ -469,6 +469,16 @@ else
               println
               println "Could not install all necessary IP's,"
               println "please continue with manual install!"
+              ## Check if inside docker container
+              dockerID="cat /proc/1/cgroup | grep 'docker/' | tail -1 | sed 's/^.*\///' | cut -c 1-12"
+              if [ "$dockerID" != "" ] ; then
+                println
+                println "This script cannot install additional IP "
+                println "addresses into a running Docker container."
+                println "Please reconfigure the Container to use $SYS_MISSING_IPS"
+                println "additional IP's to allow proper configuration!"
+                println
+              fi
               _retVal=1
               break
             else
