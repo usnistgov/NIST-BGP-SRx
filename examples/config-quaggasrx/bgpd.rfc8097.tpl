@@ -2,7 +2,7 @@
 !
 ! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sampleSRx,v 5.1 2021/05/20 12:00:00 ob Exp $
+! $Id: bgpd.conf.sampleSRx,v 6.0 2021/04/12 14:55:38 ob Exp $
 !
 hostname bgpd
 password zebra
@@ -18,11 +18,13 @@ router bgp 65000
   srx set-server 127.0.0.1 17900
   srx connect
 
-  srx evaluation origin_only
+  srx evaluation origin
 
   srx set-origin-value undefined
-  no srx policy ignore-undefined
-  srx policy prefer-valid
+
+  srx policy origin local-preference valid    add      20 
+  srx policy origin local-preference notfound add      10 
+  srx policy origin local-preference invalid  subtract 20 
 
 !
 !  Enable ROV validation signaling, to include 

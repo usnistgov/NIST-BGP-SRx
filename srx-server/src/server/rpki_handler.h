@@ -46,7 +46,9 @@
 #include <srx/srxcryptoapi.h>
 #include "server/prefix_cache.h"
 #include "server/rpki_router_client.h"
+#include "server/aspath_cache.h"
 #include "util/prefix.h"
+#include "server/aspa_trie.h"
 
 /**
  * A single RPKI/Router Handler.
@@ -55,6 +57,8 @@ typedef struct {
   PrefixCache*            prefixCache;
   RPKIRouterClientParams  rrclParams;
   RPKIRouterClient        rrclInstance;
+  ASPA_DBManager*         aspaDBManager;
+  AspathCache*            aspathCache;
 } RPKIHandler;
 
 /**
@@ -68,6 +72,7 @@ typedef struct {
  * @return \c true = all went through, \c false = an error occurred
  */
 bool createRPKIHandler(RPKIHandler* self, PrefixCache* prefixCache,
+                       AspathCache* aspathCache, ASPA_DBManager* aspaDBManager,
                        const char* serverHost, int serverPort, int version);
 
 /**

@@ -1,0 +1,16 @@
+# This file is used to fill the rpki-rtr-srv with 
+# sample BGPsec Keys.
+#
+# This script assumes that the current working folder is the srx-server root 
+# folder. Keys are located in the BGPsec-IO project which is assumed to be 
+# available as well. In case the location is different, modify the keyLoc
+# appropriately
+echo "Setting key location and loading 5 key certificates..."
+keyLoc ../bgpsec-io/data/raw-keys
+addKey 10 10.cert
+addKey 20 20.cert
+addKey 30 30.cert
+addKey 40 40.cert
+addKey 50 50.cert
+
+cache

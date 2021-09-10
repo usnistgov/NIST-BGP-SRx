@@ -20,10 +20,14 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.1
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/04/06 - oborchert
+ *            * Modified access to asType and asRelType to common header.s
+ *          - 2021/02/26 - kyehwanl
+ *            * Added ASPA processing
  * 0.5.0.1  - 2016/08/29 - oborchert
  *            * Fixed some compiler warnings.
  * 0.4.0.1  - 2016/07/02 - oborchert
@@ -60,6 +64,7 @@
 #include "util/log.h"
 #include "server/server_connection_handler.h"
 #include "server/srx_packet_sender.h"
+#include "server/aspath_cache.h"
 #include "shared/srx_identifier.h"
 #include "shared/srx_packets.h"
 #include "shared/srx_defs.h"
@@ -433,6 +438,7 @@ bool addToSCHReceiverQueue(uint8_t* pdu, ServerSocket* svrSoc,
  */
 bool createServerConnectionHandler(ServerConnectionHandler* self,
                                    UpdateCache* updCache,
+                                   AspathCache* aspathCache,
                                    Configuration* sysConfig)
 {
   bool cont = true;
@@ -465,6 +471,7 @@ bool createServerConnectionHandler(ServerConnectionHandler* self,
       }
 
       self->updateCache = updCache;
+      self->aspathCache = aspathCache;
       self->sysConfig = sysConfig;
 
       if (!sysConfig->mode_no_receivequeue)
@@ -548,6 +555,7 @@ bool processValidationRequest(ServerConnectionHandler* self,
 
   bool     doOriginVal = (hdr->flags & SRX_FLAG_ROA) == SRX_FLAG_ROA;
   bool     doPathVal   = (hdr->flags & SRX_FLAG_BGPSEC) == SRX_FLAG_BGPSEC;
+  bool     doAspaVal   = (hdr->flags & SRX_FLAG_ASPA) == SRX_FLAG_ASPA;
 
   bool      v4     = hdr->type == PDU_SRXPROXY_VERIFY_V4_REQUEST;
   // Set the BGPsec data
@@ -566,7 +574,7 @@ bool processValidationRequest(ServerConnectionHandler* self,
   bool doStoreUpdate = false;
   IPPrefix* prefix = NULL;
   // Specify the client id as a receiver only when validation is requested.
-  uint8_t clientID = (doOriginVal || doPathVal) ? client->routerID : 0;
+  uint8_t clientID = (doOriginVal || doPathVal || doAspaVal) ? client->routerID : 0;
 
   // 1. Prepare for and generate the ID of the update
   prefix = malloc(sizeof(IPPrefix));
@@ -577,6 +585,9 @@ bool processValidationRequest(ServerConnectionHandler* self,
   // initialize the val pointer - it will be adjusted within the correct
   // request type.
   uint8_t* valPtr = (uint8_t*)hdr;
+  AS_TYPE     asType;
+  AS_REL_DIR  asRelDir;
+  AS_REL_TYPE asRelType;
   if (v4)
   {
     SRXPROXY_VERIFY_V4_REQUEST* v4Hdr = (SRXPROXY_VERIFY_V4_REQUEST*)hdr;
@@ -591,6 +602,8 @@ bool processValidationRequest(ServerConnectionHandler* self,
     bgpData.afi         = v4Hdr->bgpsecValReqData.valPrefix.afi;
     bgpData.safi        = v4Hdr->bgpsecValReqData.valPrefix.safi;
     bgpData.local_as    = v4Hdr->bgpsecValReqData.valData.local_as;
+    asType              = v4Hdr->common.asType;
+    asRelType           = v4Hdr->common.asRelType;
   }
   else
   {
@@ -606,7 +619,10 @@ bool processValidationRequest(ServerConnectionHandler* self,
     bgpData.afi         = v6Hdr->bgpsecValReqData.valPrefix.afi;
     bgpData.safi        = v6Hdr->bgpsecValReqData.valPrefix.safi;
     bgpData.local_as    = v6Hdr->bgpsecValReqData.valData.local_as;
+    //asType           = ntohl(v6Hdr->asType);
+    //asRelType        = ntohl(v6Hdr->asRelType);
   }
+
 
   // Check if AS path exists and if so then set it
   if (bgpData.numberHops != 0)
@@ -645,9 +661,99 @@ bool processValidationRequest(ServerConnectionHandler* self,
   // register the client as listener (only if the update already exists)
   ProxyClientMapping* clientMapping = clientID > 0 ? &self->proxyMap[clientID]
                                                    : NULL;
+
+  uint32_t pathId = 0;
+
   doStoreUpdate = !getUpdateResult (self->updateCache, &updateID,
                                     clientID, clientMapping,
-                                    &srxRes, &defResInfo);
+                                    &srxRes, &defResInfo, &pathId);
+  
+  LOG(LEVEL_INFO, FILE_LINE_INFO " ASpath cache starts with pathID: [0x%08X] "
+      "AS Type: %d AS Relationship: %d updateId: [0x%08X]", pathId, asType, asRelType, updateID);
+
+  AS_PATH_LIST *aspl;
+  SRxResult srxRes_aspa; 
+  bool modifyUpdateCacheWithAspaValue = false;
+
+  switch (asRelType)
+  {
+    case AS_REL_CUSTOMER:
+      asRelDir = ASPA_UPSTREAM; break;
+    case AS_REL_PROVIDER:
+      asRelDir = ASPA_DOWNSTREAM; break;
+    case AS_REL_SIBLING:
+      asRelDir = ASPA_UPSTREAM; break;
+    case AS_REL_LATERAL:
+      asRelDir = ASPA_DOWNSTREAM; break;
+    default:
+      asRelDir = ASPA_UNKNOWNSTREAM;     
+  }
+
+
+  if (pathId == 0)  // if not found in  cEntry
+  {
+    pathId = makePathId(bgpData.numberHops, bgpData.asPath, asType, true);
+    LOG(LEVEL_INFO, FILE_LINE_INFO " generated Path ID : %08X ", pathId);
+
+    // to see if there is already exist or not in AS path Cache with path id
+    aspl = getAspathListFromAspathCache (self->aspathCache, pathId, &srxRes_aspa);
+    
+    // AS Path List already exist in Cache
+    if(aspl)
+    {
+      // once found aspa result value in Cache, no need to validate operation
+      //  this value is some value not undefined
+      if (srxRes_aspa.aspaResult == SRx_RESULT_UNDEFINED)
+      {
+        LOG(LEVEL_INFO, FILE_LINE_INFO " Already registered with the previous pdu");
+      }
+      else
+      {
+        // in case the same update message comes from same peer, even though same update, 
+        // bgpsec pdu is different, so that it results in a new updateID, which in turn 
+        // makes not found in updatecahe. So this case makes not found pathId, but aspath cache 
+        // stores srx result value in db with the matched path id. So srxRes_aspa.aspaResult is
+        // not undefined
+        LOG(LEVEL_INFO, FILE_LINE_INFO " ASPA validation Result[%d] is already exist", srxRes_aspa.aspaResult);
+
+        // Modify UpdateCache's srx Res -> aspaResult with srxRes_aspa.aspaResult
+        // But UpdateCache's cEntry here dosen't exist yet
+        // so, after calling storeUpdate, put this value into cEntry directly
+        modifyUpdateCacheWithAspaValue = true;
+      }
+
+      srxRes.aspaResult = srxRes_aspa.aspaResult;
+
+    }
+    // AS Path List not exist in Cache
+    else
+    {
+      aspl = newAspathListEntry(bgpData.numberHops, bgpData.asPath, pathId, asType, asRelDir, bgpData.afi, true);
+      if(!aspl)
+      {
+        LOG(LEVEL_ERROR, " memory allocation for AS path list entry resulted in fault");
+        return false;
+      }
+  
+      if (doStoreUpdate)
+      {
+        defResInfo.result.aspaResult = hdr->aspaDefRes; // router's input value (Undefined, Unverifiable, Invalid)
+        defResInfo.resSourceASPA     = hdr->aspaResSrc;
+      }
+
+      // in order to free aspl, need to copy value inside the function below
+      //
+      storeAspathList(self->aspathCache, &defResInfo, pathId, asType, aspl);
+      srxRes.aspaResult   = defResInfo.result.aspaResult;
+
+    }
+    // free 
+    if (aspl)
+      deleteAspathListEntry(aspl);
+  }
+      
+
+  // -------------------------------------------------------------------
 
   if (doStoreUpdate)
   {
@@ -669,8 +775,9 @@ bool processValidationRequest(ServerConnectionHandler* self,
     defResInfo.result.bgpsecResult = hdr->bgpsecDefRes;
     defResInfo.resSourceBGPSEC     = hdr->bgpsecResSrc;
 
+
     if (!storeUpdate(self->updateCache, clientID, clientMapping,
-                     &updateID, prefix, originAS, &defResInfo, &bgpData))
+              &updateID, prefix, originAS, &defResInfo, &bgpData, pathId))
     {
       RAISE_SYS_ERROR("Could not store update [0x%08X]!!", updateID);
       // Maybe check for ID conflict, if not then get result again - or just
@@ -685,6 +792,14 @@ bool processValidationRequest(ServerConnectionHandler* self,
   }
   free(prefix);
   prefix = NULL;
+
+  if (modifyUpdateCacheWithAspaValue)
+  {
+    // modify UpdateCache with srxRes_aspa.aspaResult, then later this value 
+    // in UpdateCahe will be used 
+    modifyUpdateCacheResultWithAspaVal(self->updateCache, &updateID, &srxRes_aspa);
+
+  }
 
   // Just check if the client has the correct values for the requested results
   if (doOriginVal && (hdr->roaDefRes != srxRes.roaResult))
@@ -708,11 +823,15 @@ bool processValidationRequest(ServerConnectionHandler* self,
     {
       sendFlags = sendFlags | SRX_FLAG_BGPSEC;
     }
+    if (doAspaVal)
+    {
+      sendFlags = sendFlags | SRX_FLAG_ASPA;
+    }
 
     // Now send the results we know so far;
     if (!sendVerifyNotification(svrSock, client, updateID, sendFlags,
                                 requestToken, srxRes.roaResult,
-                                srxRes.bgpsecResult,
+                                srxRes.bgpsecResult, srxRes.aspaResult,
                                 !self->sysConfig->mode_no_sendqueue))
     {
       RAISE_ERROR("Could not send the initial verify notification for update"
@@ -726,10 +845,10 @@ bool processValidationRequest(ServerConnectionHandler* self,
   // not have the flags set and no additional validation has to be performed at 
   // this point therefore also filter for sendFlags, the command handler will
   // do it otherwise and we can save this effort.
-  if ((doOriginVal || doPathVal) && ((sendFlags & SRX_FLAG_ROA_AND_BGPSEC) > 0))
+  if ((doOriginVal || doPathVal || doAspaVal) && ((sendFlags & SRX_FLAG_ROA_BGPSEC_ASPA) > 0))
   {
     // Only keep the validation flags.
-    hdr->flags = sendFlags & SRX_FLAG_ROA_AND_BGPSEC;
+    hdr->flags = sendFlags & SRX_FLAG_ROA_BGPSEC_ASPA;
 
     // create the validation command!
     if (!queueCommand(self->cmdQueue, COMMAND_TYPE_SRX_PROXY, svrSock, client,

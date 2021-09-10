@@ -22,10 +22,21 @@
  *
  * This handler processes ROA validation
  *
- * @version 0.5.1.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Removed handleASPAObject and replaced the function with 
+ *              function handleAspaPdu.
+ *            * Added aspaCache and aspaDBManager to handler creation.
+ *            * Modified handleEndOfData by adding ADPA data and adding an 
+ *              additional ASPA process for END of DATA.
+ *          - 2021/02/16 - oborchert
+ *            * Added skeleton function handleASPAObject() for APSA processing. 
  * 0.5.1.0  - 2018/03/09 - oborchert 
  *            * BZ1263: Merged branch 0.5.0.x (version 0.5.0.4) into trunk 
  *              of 0.5.1.0.
@@ -70,6 +81,7 @@
 #include "server/update_cache.h"
 #include "server/bgpsec_handler.h"
 #include "util/log.h"
+#include "server/aspa_trie.h"
 
 ///////////////////
 // Constants
@@ -99,6 +111,9 @@ static void handleRouterKey (uint32_t valCacheID, uint16_t session_id,
                              const char* keyInfo, void* rpkiHandler);
 static void handleEndOfData (uint32_t valCacheID, uint16_t session_id,
                              void* rpkiHandler);
+int handleAspaPdu(void* rpkiHandler, uint32_t customerAsn, 
+                    uint16_t providerAsCount, uint32_t* providerAsns, 
+                    uint8_t addrFamilyType, uint8_t announce);
 
 /**
  * Configure the RPKI Handler and create an RPKIRouter client.
@@ -109,11 +124,18 @@ static void handleEndOfData (uint32_t valCacheID, uint16_t session_id,
  * @param serverPort The port of the server to be connected to.
  * @return
  */
+
+
+
+
 bool createRPKIHandler (RPKIHandler* handler, PrefixCache* prefixCache,
+                        AspathCache* aspathCache, ASPA_DBManager* aspaDBManager,
                        const char* serverHost, int serverPort, int rpki_version)
 {
   // Attach the prefix cache
   handler->prefixCache = prefixCache;
+  handler->aspaDBManager = aspaDBManager;
+  handler->aspathCache   = aspathCache;
 
   // Create the RPKI/Router protocol client instance
   handler->rrclParams.prefixCallback     = handlePrefix;
@@ -122,6 +144,7 @@ bool createRPKIHandler (RPKIHandler* handler, PrefixCache* prefixCache,
   handler->rrclParams.routerKeyCallback  = handleRouterKey;
   handler->rrclParams.connectionCallback = handleConnection;
   handler->rrclParams.endOfDataCallback  = handleEndOfData;
+  handler->rrclParams.cbHandleAspaPdu    = handleAspaPdu;
 
   handler->rrclParams.serverHost         = serverHost;
   handler->rrclParams.serverPort         = serverPort;
@@ -239,6 +262,9 @@ static void handleEndOfData (uint32_t valCacheID, uint16_t session_id,
   SRxUpdateID*     uID = NULL;
     
   LOG(LEVEL_INFO, "Received an end of data, process RPKI Queue:\n");
+
+  process_ASPA_EndOfData(uCache, handler->aspaDBManager->cbProcessEndOfData, handler);
+
   while (rq_dequeue(rQueue, &queueElem))
   {
     uID = &queueElem.updateID;
@@ -246,10 +272,11 @@ static void handleEndOfData (uint32_t valCacheID, uint16_t session_id,
     valRes.valType  = VRT_NONE;
     valRes.valResult.roaResult    = SRx_RESULT_DONOTUSE;
     valRes.valResult.bgpsecResult = SRx_RESULT_DONOTUSE;
+    valRes.valResult.aspaResult   = SRx_RESULT_DONOTUSE;
     
     if ((queueElem.reason & RQ_ROA) == RQ_ROA)
     {
-      if (getUpdateResult(uCache, uID, 0, NULL, &srxRes, &defaultRes))
+      if (getUpdateResult(uCache, uID, 0, NULL, &srxRes, &defaultRes, NULL))
       {
         valRes.valType |= VRT_ROA;
         valRes.valResult.roaResult = srxRes.roaResult;
@@ -286,9 +313,26 @@ static void handleEndOfData (uint32_t valCacheID, uint16_t session_id,
       }
     }
     
+    // Here check for ASPA Validation which was registered 
+    if ((queueElem.reason & RQ_ASPA) == RQ_ASPA)
+    {
+      LOG(LEVEL_INFO, FILE_LINE_INFO " called for ASPA dequeue [uID: %08X] ", *uID);
+      uint32_t pathId= 0;
+      if (getUpdateResult(uCache, uID, 0, NULL, &srxRes, &defaultRes, &pathId))
+      {
+        valRes.valType |= VRT_ASPA;
+        valRes.valResult.aspaResult = srxRes.aspaResult;
+      }
+      else
+      {
+        LOG(LEVEL_WARNING, "Update 0x%08X not found during de-queuing of RPKI "
+            "QUEUE!", queueElem.updateID);
+      }
+    }
+    
     if (uCache->resChangedCallback != NULL)
     {
-      // Notify of the change of validation result.
+      // Notify of the change of validation result. (call handleUpdateResultChange)
       uCache->resChangedCallback(&valRes);     
     }
     else
@@ -358,7 +402,7 @@ static u_int8_t getAlgoID(const char* keyInfo)
  * @param asn         The as number in host format
  * @param ski         the ski buffer ()
  * @param keyInfo     Pointer to the key in DER format.
- * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+ * @param rpkiHandler Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
  *
  * @since 0.5.0.0
  */
@@ -430,5 +474,120 @@ static void handleRouterKey (uint32_t valCacheID, uint16_t session_id,
                        "supported!", bsKey.algoID);
   }
 }
+
+/**
+ * Process the ASPA PDU received from the Validation Cache and store the data
+ * in the ASPA database.
+ * 
+ * @param rpkiHandler      Pointer to the RPKI Handler itself.
+ * @param customerAsn      The ASN of the customer
+ * @param providerAsCount  Number of providers in the providersAsns list.
+ * @param providerAsns     The list of provider ASNs
+ * @param addrFamilyType   (0: IPv4, 1: IPv6)
+ * @param announce         Indicates if this in an announcement or not.
+ * 
+ * @return 1 for success, 0 for failure.
+ * 
+ * @since 0.6.0.0
+ */
+int handleAspaPdu(void* rpkiHandler, uint32_t customerAsn, 
+                  uint16_t providerAsCount, uint32_t* providerAsns, 
+                  uint8_t addrFamilyType, uint8_t announce)
+{
+// 
+// ASPA validation (called from params -> cbHandleAspaPdu in handleReceiveAspaPdu function)
+// work1. parsing ASPA objects into AS number in forms of string
+// work2. call DB to store
+//  
+  LOG(LEVEL_INFO, FILE_LINE_INFO " ASPA handler called for registering ASPA object(s) into DB");
+  RPKIHandler* handler = (RPKIHandler*)rpkiHandler;
+  ASPA_DBManager* aspaDBManager = handler->aspaDBManager;
+  int retVal = 0;
+  
+  uint16_t afi = AFI_IP; // default
+  if (addrFamilyType == 0)
+  {
+    afi = AFI_IP;
+  }
+  else if (addrFamilyType == 1)
+  {
+    afi = AFI_IP6;
+  }
+  else 
+  {
+    LOG(LEVEL_WARNING, "AFI value error");
+    return retVal;
+  }
+
+  TrieNode *node = NULL;
+  ASPA_Object *aspaObj = NULL;
+  aspaObj = newASPAObject(customerAsn, providerAsCount, providerAsns, afi);
+
+  char strWord[6];
+  sprintf(strWord, "%d", customerAsn);
+  
+
+  if (announce == 1) // 1 == announce, 0 == withdraw
+  {
+    LOG(LEVEL_INFO, "[Announce] ASPA object, search key in DB: %s", strWord);
+    node = insertAspaObj(aspaDBManager, strWord, strWord, aspaObj);
+    if (node)
+    {
+      retVal = 1; // success
+    }
+  }
+  else if (announce == 0) // withdraw
+  {
+    // XXX: Draft didn't mention about withdraw clearly
+  //
+    LOG(LEVEL_INFO, "[Withdraw] ASPA object, search key in DB: %s", strWord);
+    bool resWithdraw = delete_TrieNode_AspaObj (aspaDBManager, strWord, aspaObj);
+
+    if (resWithdraw)
+    {
+      LOG(LEVEL_INFO, "[Withdraw] Withdraw executed successfully");
+      retVal = 1; // success
+    }
+    else
+    {
+      LOG(LEVEL_WARNING, "[Withdraw] Withdraw Failed due to not found or mismatch");
+    }
+
+    if (aspaObj) // release memory unless used for inserting db
+    {
+      if (aspaObj->providerAsns)
+      {
+        free(aspaObj->providerAsns);
+      }
+      free (aspaObj);
+      aspaObj = NULL;
+    }
+  }
+  else
+  {
+    LOG(LEVEL_WARNING, " Cannot recognize the flag set");
+    if (aspaObj) // release memory unless used for inserting db
+    {
+      if (aspaObj->providerAsns)
+      {
+        free(aspaObj->providerAsns);
+      }
+      free (aspaObj);
+      aspaObj = NULL;
+    }
+  }
+
+  return retVal;
+
+}
+
+
+
+
+
+
+
+
+
 
 

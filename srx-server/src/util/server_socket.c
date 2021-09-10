@@ -192,7 +192,7 @@ static void single_packetHandler(SRXPROXY_BasicHeader* header,
                                  void* clientThread)
 {
   ClientThread* cthread = (ClientThread*)clientThread;
-  cthread->svrSock->modeCallback(cthread->svrSock, cthread, header, 
+  cthread->svrSock->modeCallback(cthread->svrSock, cthread, header,  // handlePacket
                                  ntohl(header->length), cthread->svrSock->user);
 }
 

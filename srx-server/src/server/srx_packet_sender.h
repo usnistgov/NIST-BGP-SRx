@@ -118,7 +118,7 @@ bool sendVerifyNotification(ServerSocket* svrSock, ServerClient* client,
                             SRxUpdateID updateID, uint8_t resultType,
                             uint32_t requestToken,
                             uint8_t roaResult, uint8_t bgpsecResult, 
-                            bool useQueue);
+                            uint8_t aspaResult, bool useQueue);
 
 /**
  * Send a signature notification.

@@ -1,6 +1,8 @@
+Version 0.2.1.8
+  * Fixed incorrect k value printout while displaying syntax.
 Version 0.2.1.7
-  * Fixed spellers, especially BGP4 to BGP-4 in documentation
-  * Added inofficial setting "BGP-4" next to "BGP4"
+  * Fixed spellers, especially BGP4 to BGP-4 in documentation.
+  * Added inofficial setting "BGP-4" next to "BGP4".
 Version 0.2.1.6
   * Fixed segmentation fault in update scripting.
   * Extended regex description for update generation in auto generated

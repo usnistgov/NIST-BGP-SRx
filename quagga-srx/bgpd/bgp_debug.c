@@ -47,6 +47,7 @@ unsigned long conf_bgp_debug_normal;
 unsigned long conf_bgp_debug_zebra;
 #ifdef USE_SRX
 unsigned long conf_bgp_debug_bgpsec;
+unsigned long conf_bgp_debug_aspa;
 #endif
 
 unsigned long term_bgp_debug_as4;
@@ -60,6 +61,7 @@ unsigned long term_bgp_debug_normal;
 unsigned long term_bgp_debug_zebra;
 #ifdef USE_SRX
 unsigned long term_bgp_debug_bgpsec;
+unsigned long term_bgp_debug_aspa;
 #endif
 
 /* messages for BGP-4 status */
@@ -888,6 +890,47 @@ DEFUN (no_debug_bgp_bgpsec,
   }
   return CMD_SUCCESS;
 }
+
+
+DEFUN (debug_bgp_aspa,
+       debug_bgp_aspa_cmd,
+       "debug bgp aspa",
+       DEBUG_STR
+       BGP_STR
+       "BGP ASPA debugging info \n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_ON (aspa, ASPA);
+  }
+  else
+  {
+    TERM_DEBUG_ON (aspa, ASPA);
+    vty_out (vty, "BGP ASPA debugging is on%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_debug_bgp_aspa,
+       no_debug_bgp_aspa_cmd,
+       "no debug bgp aspa",
+       NO_STR
+       DEBUG_STR
+       BGP_STR
+       "BGP ASPA debugging info \n")
+{
+  if (vty->node == CONFIG_NODE)
+  {
+    DEBUG_OFF (aspa, ASPA);
+  }
+  else
+  {
+    TERM_DEBUG_OFF (aspa, ASPA);
+    vty_out (vty, "BGP ASPA debugging is off%s", VTY_NEWLINE);
+  }
+  return CMD_SUCCESS;
+}
+
 #endif /* USE_SRX */
 
 
@@ -1124,5 +1167,11 @@ bgp_debug_init (void)
 
   install_element (ENABLE_NODE, &no_debug_bgp_bgpsec_detail_cmd);
   install_element (CONFIG_NODE, &no_debug_bgp_bgpsec_detail_cmd);
+
+  install_element (ENABLE_NODE, &debug_bgp_aspa_cmd);
+  install_element (CONFIG_NODE, &debug_bgp_aspa_cmd);
+
+  install_element (ENABLE_NODE, &no_debug_bgp_aspa_cmd);
+  install_element (CONFIG_NODE, &no_debug_bgp_aspa_cmd);
 #endif
 }

@@ -57,8 +57,11 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 #define SRX_VTY_HLP_STR         "SRx configuration setting\n"
 
-#define SRX_VTY_EVAL_ORIGIN_ONLY "origin_only"
-#define SRX_VTY_EVAL_BGPSEC      "bgpsec"
+#define SRX_VTY_EVAL_ORIGIN       "origin"
+#define SRX_VTY_EVAL_BGPSEC       "bgpsec"
+#define SRX_VTY_EVAL_ASPA         "aspa"
+// The following is to be used in combination with SRX_VTY_EVAL_BGPSEC
+#define SRX_VTY_EVAL_BGPSEC_DISTR "distributed"
 
 #define SRX_VTY_PARAM_CONNECT_SRV  0
 #define SRX_VTY_PARAM_CONNECT_PORT 1
@@ -84,29 +87,31 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                 "Hide SRx related output from the \"show\"" \
                                 " commands\n"
 
-#define SRX_VTY_CMD_EVALUATE    "srx evaluation (" SRX_VTY_EVAL_ORIGIN_ONLY \
-                                                 "|" SRX_VTY_EVAL_BGPSEC ")"
+#define SRX_VTY_CMD_EVALUATE    "srx evaluation (" SRX_VTY_EVAL_ORIGIN \
+                                                 "|" SRX_VTY_EVAL_BGPSEC \
+                                                 "|" SRX_VTY_EVAL_ASPA ")"
 #define SRX_VTY_OUT_EVALUATE    "srx evaluation %s%s"
 #define SRX_VTY_HLP_EVALUATE    SRX_VTY_HLP_STR \
                                 "Activate the policy processing\n" \
-                                "Only perform prefix origin validation using " \
+                                "Perform prefix origin validation using " \
                                   "ROAs\n" \
-                                "Perform both, prefix origin validation using" \
-                                  " ROA's and path validation\n"
-#define SRX_VTY_CMD_NO_EVALUATE "no srx evaluation"
+                                "Perform BGPsec path validation\n" \
+                                "Perform ASPA validation"
+#define SRX_VTY_CMD_NO_EVALUATE "no " SRX_VTY_CMD_EVALUATE
 #define SRX_VTY_HLP_NO_EVALUATE  NO_STR SRX_VTY_HLP_STR \
-                                "Deactivate the policy processing.\n" \
-                                
+                                "Deactivate the policy processing\n" \
+                                "Disable prefix origin validation\n" \
+                                "Disable BGPsec path validation\n" \
+                                "Disable ASPA validation"                                
 
 #define SRX_VTY_CMD_EVAL_WITHSRX "srx evaluation " SRX_VTY_EVAL_BGPSEC \
-                                 " distributed"
+                                 " " SRX_VTY_EVAL_BGPSEC_DISTR
 #define SRX_VTY_OUT_EVAL_WITHSRX "srx evaluation " SRX_VTY_EVAL_BGPSEC \
-                                 " distributed%s"
+                                 " " SRX_VTY_EVAL_BGPSEC_DISTR "%s"
 #define SRX_VTY_HLP_EVAL_WITHSRX SRX_VTY_HLP_STR \
-                                "Activate the policy processing\n" \
-                                "Perform both, prefix origin validation using" \
-                                  " ROA's and path validation\n" \
-                                "Perform path validation using srx-server.\n"
+                            "Activate the policy processing\n" \
+                            "Perform BGPsec path validation\n" \
+                            "Perform BGPsec path validation using srx-server.\n"
 
 #define SRX_VTY_CMD_KEEPWINDOW_SHORT "srx keep-window"
 #define SRX_VTY_CMD_KEEPWINDOW  SRX_VTY_CMD_KEEPWINDOW_SHORT " <0-65535>"
@@ -135,56 +140,43 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 // DEFAULT VALIDATION RESULT PARAMETER
 #define SRX_VTY_PARAM_ORIGIN_VALUE 0
-#define SRX_VTY_PARAM_PATH_VALUE   1
+#define SRX_VTY_PARAM_BGPSEC_VALUE   1
+#define SRX_VTY_PARAM_ASPA_VALUE   2
 
 #define SRX_VTY_PARAM_BGPSEC_MIN_ALGOID 1
 #define SRX_VTY_PARAM_BGPSEC_MAX_ALGOID 254
 
 // DEFAULT VALIDATION RESULT FOR ORIGIN VALIDATION
-#define SRX_VTY_CMD_CONF_DEF_ROA_RES_STR "srx set-origin-value "
-#define SRX_VTY_CMD_CONF_DEF_ROA_RES_VALID \
-                                 SRX_VTY_CMD_CONF_DEF_ROA_RES_STR "valid\n"
-#define SRX_VTY_CMD_CONF_DEF_ROA_RES_NOTFOUND \
-                                 SRX_VTY_CMD_CONF_DEF_ROA_RES_STR "notfound\n"
-#define SRX_VTY_CMD_CONF_DEF_ROA_RES_INVALID \
-                                 SRX_VTY_CMD_CONF_DEF_ROA_RES_STR "invalid\n"
-#define SRX_VTY_CMD_CONF_DEF_ROA_RES_UNDEFINED \
-                                 SRX_VTY_CMD_CONF_DEF_ROA_RES_STR "undefined\n"
+#define SRX_VTY_CMD_CONF_DEF_ROA_RES "srx set-origin-value " \
+                                 "(valid|notfound|invalid|undefined)"
+#define SRX_VTY_HLP_CONF_DEF_ROA_RES SRX_VTY_HLP_STR \
+                         "Configure the default result value for origin " \
+                         "validation\n" \
+                         "The origin validation default value is 'valid'\n" \
+                         "The origin validation default value is 'notfound'\n" \
+                         "The origin validation default value is 'invalid'\n" \
+                         "The origin validation default value is 'undefined'\n"
 
-#define SRX_VTY_HLP_CONF_DEF_ROA_RES_STR SRX_VTY_HLP_STR \
-                                 "Configure the default result value for " \
-                                   "origin validation\n" \
-                                 "The route originations default validation " \
-                                   "value is "
-#define SRX_VTY_HLP_CONF_DEF_ROA_RES_VALID \
-                                 SRX_VTY_HLP_CONF_DEF_ROA_RES_STR  "valid\n"
-#define SRX_VTY_HLP_CONF_DEF_ROA_RES_NOTFOUND \
-                                 SRX_VTY_HLP_CONF_DEF_ROA_RES_STR  "notfound\n"
-#define SRX_VTY_HLP_CONF_DEF_ROA_RES_INVALID \
-                                 SRX_VTY_HLP_CONF_DEF_ROA_RES_STR  "invalid\n"
-#define SRX_VTY_HLP_CONF_DEF_ROA_RES_UNDEFINED \
-                                 SRX_VTY_HLP_CONF_DEF_ROA_RES_STR  "undefined\n"
+// DEFAULT VALIDATION RESULT FOR BGPSEC VALIDATION
+#define SRX_VTY_CMD_CONF_DEF_BGPSEC_RES "srx set-bgpsec-value " \
+                                  "(valid|invalid|undefined)"
+#define SRX_VTY_HLP_CONF_DEF_BGPSEC_RES SRX_VTY_HLP_STR \
+                     "Configure the default result value for bgpsec path " \
+                     "validation\n" \
+                     "The bgpsec path validation default value is 'valid'\n" \
+                     "The bgpsec path validation default value is 'invalid'\n" \
+                     "The bgpsec path validation default value is 'undefined'\n"
 
-// DEFAULT VALIDATION RESULT FOR PATH VALIDATION
-#define SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "srx set-path-value "
-#define SRX_VTY_CMD_CONF_DEF_PATH_RES_VALID \
-                                 SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "valid\n"
-#define SRX_VTY_CMD_CONF_DEF_PATH_RES_INVALID \
-                                 SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "invalid\n"
-#define SRX_VTY_CMD_CONF_DEF_PATH_RES_UNDEFINED \
-                                 SRX_VTY_CMD_CONF_DEF_PATH_RES_STR "undefined\n"
-
-#define SRX_VTY_HLP_CONF_DEF_PATH_RES_STR SRX_VTY_HLP_STR \
-                                 "Configure the default result value for " \
-                                   "path validation\n" \
-                                 "The route originations default validation " \
-                                   "value is "
-#define SRX_VTY_HLP_CONF_DEF_PATH_RES_VALID \
-                                 SRX_VTY_HLP_CONF_DEF_PATH_RES_STR "valid\n"
-#define SRX_VTY_HLP_CONF_DEF_PATH_RES_INVALID \
-                                 SRX_VTY_HLP_CONF_DEF_PATH_RES_STR "invalid\n"
-#define SRX_VTY_HLP_CONF_DEF_PATH_RES_UNDEFINED \
-                                 SRX_VTY_HLP_CONF_DEF_PATH_RES_STR "undefined\n"
+#define SRX_VTY_CMD_CONF_DEF_ASPA_RES "srx set-aspa-value " \
+                                "(valid|unknown|invalid|unverifiable|undefined)"
+#define SRX_VTY_HLP_CONF_DEF_ASPA_RES SRX_VTY_HLP_STR \
+                       "Configure the default result value for aspa " \
+                       "validation\n" \
+                       "The aspa validation default value is 'valid'\n" \
+                       "The aspa validation default value is 'unknown'\n" \
+                       "The aspa validation default value is 'invalid'\n" \
+                       "The aspa validation default value is 'unverifiable'\n" \
+                       "The aspa validation default value is 'undefined'\n"
 
 // APPLY POLICY CHANGE
 #define SRX_VTY_CMD_APPLY_POLICY "srx apply-policy"
@@ -192,67 +184,180 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                  "Apply SRx policy changes to all updates in" \
                                  " the RIB.\n"
 
-// POLICY
-#define SRX_VTY_HLP_POLICY      "Evaluation policy command\n"
-#define SRX_VTY_HLP_ORIGIN_ONLY "(" SRX_VTY_EVAL_ORIGIN_ONLY ") "
+//@CHECL I believe this can be deleted.
+#define SRX_VTY_HLP_ORIGIN  "(" SRX_VTY_EVAL_ORIGIN ") "
 
-// POLICY IGNORE NOTFOUND / INVALID
-#define SRX_VTY_CMD_POL_IGNORE_NOTFOUND  "srx policy ignore-notfound"
-#define SRX_VTY_HLP_POL_IGNORE_NOTFOUND  SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                                         SRX_VTY_HLP_ORIGIN_ONLY \
-                                         "Ignore updates with validation " \
-                                         "result = UNKNOWN.\n"
+// POLICY IGNORE 
+#define SRX_VTY_CMD_POL  "srx policy "
+#define SRX_VTY_HLP_POLICY  SRX_VTY_HLP_STR \
+                            "Set policies depending on validation results\n"
+#define SRX_VTY_NO_CMD_POL  "no srx policy "
+#define SRX_VTY_NO_HLP_POLICY  NO_STR \
+                               SRX_VTY_HLP_STR \
+                            "Remove validation dependent policies\n"
 
-#define SRX_VTY_CMD_POL_IGNORE_INVALID   "srx policy ignore-invalid"
-#define SRX_VTY_HLP_POL_IGNORE_INVALID   SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                                         "Ignore updates with validation" \
-                                         " result = INVALID.\n"
+// IGNORE FOR ROA RESULT
+#define SRX_VTY_CMD_POL_ROA_IGNORE  SRX_VTY_CMD_POL  "origin ignore " \
+                                    "(notfound|invalid|undefined)\n"
+#define SRX_VTY_HLP_POL_ROA_IHLPR   "Ignore route with validation result "
+#define SRX_VTY_HLP_POL_ROA_IGNORE  SRX_VTY_HLP_POLICY \
+                                      "For origin validation\n" \
+                                      "Ignore route\n" \
+                                      SRX_VTY_HLP_POL_ROA_IHLPR "'notfound'\n" \
+                                      SRX_VTY_HLP_POL_ROA_IHLPR "'invalid'\n" \
+                                      SRX_VTY_HLP_POL_ROA_IHLPR "'undefined'\n"
 
-#define SRX_VTY_CMD_POL_IGNORE_UNDEFINED "srx policy ignore-undefined"
-#define SRX_VTY_HLP_POL_IGNORE_UNDEFINED SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                                         "Ignore updates with no complete" \
-                                         " validation result available.\n"
+#define SRX_VTY_NO_CMD_POL_ROA_IGNORE  SRX_VTY_NO_CMD_POL  "origin ignore " \
+                                       "(notfound|invalid|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_ROA_IHLPR   "Disable ignore route with validation " \
+                                         "result "
+#define SRX_VTY_NO_HLP_POL_ROA_IGNORE  SRX_VTY_NO_HLP_POLICY \
+                                  "Disable policy for origin validation\n" \
+                                  "Disable ignore policy for origin validation\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_IHLPR "'notfound'\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_IHLPR "'invalid'\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_IHLPR "'undefined'\n"
 
-// POLICY LOCAL-PREF ADJUSTMENT
-#define SRX_VTY_HLP_POL_LOCP   "Manipulate local preference\n"
-#define SRX_VTY_HLP_POL_LOCP_V "Policy for validation result  = VALID\n"
-#define SRX_VTY_HLP_POL_LOCP_U SRX_VTY_HLP_ORIGIN_ONLY "Policy for " \
-                               "validation result = UNKNOWN\n"
-#define SRX_VTY_HLP_POL_LOCP_I "Policy for validation result = INVALID\n"
+// IGNORE FPR BGPSEC RESULT
+#define SRX_VTY_CMD_POL_BGPSEC_IGNORE  SRX_VTY_CMD_POL  "bgpsec ignore " \
+                                       "(invalid|undefined)\n"
+#define SRX_VTY_HLP_POL_BGPSEC_IHLPR   "Ignore route with validation result "
+#define SRX_VTY_HLP_POL_BGPSEC_IGNORE  SRX_VTY_HLP_POLICY \
+                                    "For bgpsec validation\n" \
+                                    "Ignore route\n" \
+                                    SRX_VTY_HLP_POL_BGPSEC_IHLPR "'invalid'\n" \
+                                    SRX_VTY_HLP_POL_BGPSEC_IHLPR "'undefined'\n"
 
-#define SRX_VTY_HLP_POL_LOCP_A "To be added to the given local pref\n"
-#define SRX_VTY_HLP_POL_LOCP_S "To be subtracted from the given local pref\n"
+#define SRX_VTY_NO_CMD_POL_BGPSEC_IGNORE  SRX_VTY_NO_CMD_POL  "bgpsec ignore " \
+                                          "(invalid|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "Disable ignore route with " \
+                                        "validation result "
+#define SRX_VTY_NO_HLP_POL_BGPSEC_IGNORE  SRX_VTY_NO_HLP_POLICY \
+                               "Disable policy for bgpsec validation\n" \
+                               "Disable ignore policy for bgpsec validation\n" \
+                               SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'invalid'\n" \
+                               SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'undefined'\n"
 
-#define SRX_VTY_CMD_POL_LOCP      "srx policy local-preference"
-#define SRX_VTY_CMD_POL_LOCP_FIX  SRX_VTY_CMD_POL_LOCP \
-                                  " (valid|notfound|invalid) <0-4294967295>"
-#define SRX_VTY_HLP_POL_LOCP_FIX  SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                                  SRX_VTY_HLP_POL_LOCP \
-                                  SRX_VTY_HLP_POL_LOCP_V \
-                                  SRX_VTY_HLP_POL_LOCP_U \
-                                  SRX_VTY_HLP_POL_LOCP_I \
-                                  "The local preference value.\n"
 
-#define SRX_VTY_CMD_POL_LOCP_VAR  SRX_VTY_CMD_POL_LOCP_FIX \
-                                  " (add|subtract)"
-#define SRX_VTY_HLP_POL_LOCP_VAR  SRX_VTY_HLP_POL_LOCP_FIX \
-                                  SRX_VTY_HLP_POL_LOCP_A \
-                                  SRX_VTY_HLP_POL_LOCP_S
+// IGNORE FPR ASPA RESULT
+#define SRX_VTY_CMD_POL_ASPA_IGNORE  SRX_VTY_CMD_POL  "aspa ignore " \
+                                     "(unknown|invalid|unverifiable|undefined)\n"
+#define SRX_VTY_HLP_POL_ASPA_IHLPR   "Ignore route with validation result "
+#define SRX_VTY_HLP_POL_ASPA_IGNORE  SRX_VTY_HLP_POLICY \
+                               "For aspa validation\n" \
+                               "Ignore route\n" \
+                               SRX_VTY_HLP_POL_BGPSEC_IHLPR "'unknown'\n" \
+                               SRX_VTY_HLP_POL_BGPSEC_IHLPR "'invalid'\n" \
+                               SRX_VTY_HLP_POL_BGPSEC_IHLPR "'unverifiable'\n" \
+                               SRX_VTY_HLP_POL_BGPSEC_IHLPR "'undefined'\n"
 
-#define SRX_VTY_CMD_NO_POL_LOCP   "no " SRX_VTY_CMD_POL_LOCP \
-                                  " (valid|notfound|invalid)"
-#define SRX_VTY_HLP_NO_POL_LOCP   NO_STR SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                                  SRX_VTY_HLP_POL_LOCP \
-                                  SRX_VTY_HLP_POL_LOCP_V \
-                                  SRX_VTY_HLP_POL_LOCP_U \
-                                  SRX_VTY_HLP_POL_LOCP_I \
+#define SRX_VTY_NO_CMD_POL_ASPA_IGNORE  SRX_VTY_NO_CMD_POL  "aspa ignore " \
+                                    "(unknown|invalid|unverifiable|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_ASPA_IHLPR  "Disable ignore route with validation " \
+                                       "result "
+#define SRX_VTY_NO_HLP_POL_ASPA_IGNORE  SRX_VTY_NO_HLP_POLICY \
+                            "Disable policy for aspa validation\n" \
+                            "Disable ignore policy for aspa validation\n" \
+                            SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'unknown'\n" \
+                            SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'invalid'\n" \
+                            SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'unverifiable'\n" \
+                            SRX_VTY_NO_HLP_POL_BGPSEC_IHLPR "'undefined'\n"
 
-// POLICY PREFER-VALID
-#define SRX_VTY_CMD_POL_PREFV "srx policy prefer-valid"
-#define SRX_VTY_OUT_POL_PREFV SRX_VTY_CMD_POL_PREFV "%s"
-#define SRX_VTY_HLP_POL_PREFV SRX_VTY_HLP_STR SRX_VTY_HLP_POLICY \
-                              "Use the validation state as tie breaker" \
-                              " with valid > any other\n"
+
+// LOCAL PREF FOR ROA
+#define SRX_VTY_CMD_POL_ROA_LOCP  SRX_VTY_CMD_POL  "origin local-preference " \
+                                         "(valid|notfound|invalid|undefined) " \
+                                         "(add|subtract) <0-4294967295>\n"
+
+#define SRX_VTY_HLP_POL_ROA_LHLPR   "Modify local preference of route with " \
+                                      "origin validation result "
+#define SRX_VTY_HLP_POL_ROA_LOCP    SRX_VTY_HLP_POLICY \
+                                    "For origin validation\n" \
+                                    "Modify local preference\n" \
+                                    SRX_VTY_HLP_POL_ROA_LHLPR "'valid'\n" \
+                                    SRX_VTY_HLP_POL_ROA_LHLPR "'notfound'\n" \
+                                    SRX_VTY_HLP_POL_ROA_LHLPR "'invalid'\n" \
+                                    SRX_VTY_HLP_POL_ROA_LHLPR "'undefined'\n" \
+                                    "Increase the local preference\n" \
+                                    "Decrease the local preferecne\n" \
+                                    "The value by which the local preference " \
+                                       "will be modified.\n"
+                                         
+#define SRX_VTY_NO_CMD_POL_ROA_LOCP SRX_VTY_NO_CMD_POL "origin local-preference " \
+                                          "(valid|notfound|invalid|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_ROA_LHLPR  "Disable local preference manipulation " \
+                                      "for route with orign validation result "
+#define SRX_VTY_NO_HLP_POL_ROA_LOCP  SRX_VTY_NO_HLP_POLICY \
+                                  "Disable policy for origin validation\n" \
+                                  "Disable local preference manipulation\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_LHLPR "'valid'\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_LHLPR "'notfound'\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_LHLPR "'invalid'\n" \
+                                  SRX_VTY_NO_HLP_POL_ROA_LHLPR "'undefined'\n"
+
+// LOCAL PREF FOR BGPSEC
+#define SRX_VTY_CMD_POL_BGPSEC_LOCP SRX_VTY_CMD_POL "bgpsec local-preference " \
+                                               "(valid|invalid|undefined) " \
+                                               "(add|subtract) <0-4294967295>\n"
+
+#define SRX_VTY_HLP_POL_BGPSEC_LHLPR  "Modify local preference of route with " \
+                                         "bgpsec validation result "
+#define SRX_VTY_HLP_POL_BGPSEC_LOCP SRX_VTY_HLP_POLICY \
+                                  "For bgpsec validation\n" \
+                                  "Modify local preference\n" \
+                                  SRX_VTY_HLP_POL_BGPSEC_LHLPR "'valid'\n" \
+                                  SRX_VTY_HLP_POL_BGPSEC_LHLPR "'invalid'\n" \
+                                  SRX_VTY_HLP_POL_BGPSEC_LHLPR "'undefined'\n" \
+                                  "Increase the local preference\n" \
+                                  "Decrease the local preferecne\n" \
+                                  "The value by which the local preference " \
+                                     "will be modified.\n"
+                                         
+#define SRX_VTY_NO_CMD_POL_BGPSEC_LOCP SRX_VTY_NO_CMD_POL "bgpsec " \
+                                                "local-preference " \
+                                                "(valid|invalid|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_BGPSEC_LHLPR  "Disable local preference " \
+                                         "manipulation for route with bgpsec " \
+                                         "validation result "
+#define SRX_VTY_NO_HLP_POL_BGPSEC_LOCP  SRX_VTY_NO_HLP_POLICY \
+                                 "Disable policy for bgpsec validation\n" \
+                                 "Disable local preference manipulation\n" \
+                                 SRX_VTY_NO_HLP_POL_BGPSEC_LHLPR "'valid'\n" \
+                                 SRX_VTY_NO_HLP_POL_BGPSEC_LHLPR "'invalid'\n" \
+                                 SRX_VTY_NO_HLP_POL_BGPSEC_LHLPR "'undefined'\n"
+
+// LOCAL PREF FOR ASPA
+#define SRX_VTY_CMD_POL_ASPA_LOCP SRX_VTY_CMD_POL  "aspa local-preference " \
+                             "(valid|unknown|invalid|unverifiable|undefined) " \
+                             "(add|subtract) <0-4294967295>\n"
+
+#define SRX_VTY_HLP_POL_ASPA_LHLPR "Modify local preference of route with " \
+                                      "aspa validation result "
+#define SRX_VTY_HLP_POL_ASPA_LOCP  SRX_VTY_HLP_POLICY \
+                                 "For aspa validation\n" \
+                                 "Modify local preference\n" \
+                                 SRX_VTY_HLP_POL_ASPA_LHLPR "'valid'\n" \
+                                 SRX_VTY_HLP_POL_ASPA_LHLPR "'unknown'\n" \
+                                 SRX_VTY_HLP_POL_ASPA_LHLPR "'invalid'\n" \
+                                 SRX_VTY_HLP_POL_ASPA_LHLPR "'unverifiable'\n" \
+                                 SRX_VTY_HLP_POL_ASPA_LHLPR "'undefined'\n" \
+                                 "Increase the local preference\n" \
+                                 "Decrease the local preferecne\n" \
+                                 "The value by which the local preference " \
+                                    "will be modified.\n"
+                                         
+#define SRX_VTY_NO_CMD_POL_ASPA_LOCP SRX_VTY_NO_CMD_POL "aspa local-preference " \
+                                    "(unknown|invalid|unverifiable|undefined)\n"
+#define SRX_VTY_NO_HLP_POL_ASPA_LHLPR  "Disable local preference manipulation " \
+                                      "for route with aspa validation result "
+#define SRX_VTY_NO_HLP_POL_ASPA_LOCP  SRX_VTY_NO_HLP_POLICY \
+                              "Disable policy for aspa validation\n" \
+                              "Disable local preference manipulation\n" \
+                              SRX_VTY_NO_HLP_POL_ASPA_LHLPR "'valid'\n" \
+                              SRX_VTY_NO_HLP_POL_ASPA_LHLPR "'unknown'\n" \
+                              SRX_VTY_NO_HLP_POL_ASPA_LHLPR "'invalid'\n" \
+                              SRX_VTY_NO_HLP_POL_ASPA_LHLPR "'unverifiable'\n" \
+                              SRX_VTY_NO_HLP_POL_ASPA_LHLPR "'undefined'\n"
 
 // USE OF COMMUNITY STRING
 #define SRX_VTY_CMD_EXT_CSTR "srx extcommunity <0-255>"
@@ -337,6 +442,27 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 //                                    "Unflag that the peer as a route server and" \
 //                                    " receiving pcount equals zero is not allowed.\n"
 
+
+#define SRX_VTY_CMD_NEIGHBOR_AS_RELATIONSHIP NEIGHBOR_CMD2 "aspa (provider|customer|sibling|lateral)" 
+#define SRX_VTY_HLP_NEIGHBOR_AS_RELATIONSHIP NEIGHBOR_STR NEIGHBOR_ADDR_STR2 \
+                                    "Configure ASPA peering relationship\n" \
+                                    "The peer is a topologically upstream neighbor (transit provider)\n" \
+                                    "The peer is a topologically downstream (customer AS)\n" \
+                                    "The peer is transit provider and transit customer.\n" \
+                                    "The peering only includes prefixes of customers.\n"
+
+#define SRX_VTY_CMD_NO_NEIGHBOR_AS_RELATIONSHIP NO_NEIGHBOR_CMD2 "aspa (provider|customer|sibling|lateral)" 
+#define SRX_VTY_HLP_NO_NEIGHBOR_AS_RELATIONSHIP NO_STR NEIGHBOR_STR NEIGHBOR_ADDR_STR2 \
+                                    "Configure ASPA peering relationship\n" \
+                                    "The peer is a topologically upstream neighbor (transit provider)\n" \
+                                    "The peer is a topologically downstream (customer AS)\n" \
+                                    "The peer is transit provider and transit customer.\n" \
+                                    "The peering only includes prefixes of customers.\n"
+
+
+
+
+
 #endif /* USE_SRX */
 
 /* Typedef BGP specific types.  */
@@ -382,11 +508,11 @@ struct bgp_master
  * manipulated.
  */
 struct srx_local_pref {
-  // Indicated if the local pref has to be manipulated.
-  int      is_set;
-  // If set then add or delete the given value from the the local pref.
-  int      relative;
-  // the local pref value
+  // Indicates if this local pref manipulation is enables.
+  bool enable;
+  // indicates if the value is to be added or subtracted
+  bool add;
+  // The local pref value
   uint32_t value;
 };
 #endif /* USE_SRX */
@@ -425,13 +551,14 @@ struct bgp
 
   /* SRX Configuration */
   u_int16_t srx_config;
-#define SRX_CONFIG_EVAL_ORIGIN   (1 << 1)
+#define SRX_CONFIG_EVAL_ASPA       (1 << 0)
+#define SRX_CONFIG_EVAL_ORIGIN     (1 << 1)
 // Below must be set in combination with VALORIGIN
-#define SRX_CONFIG_EVAL_PATH     (1 << 2)
-#define SRX_CONFIG_EVALUATE      (SRX_CONFIG_EVAL_ORIGIN | SRX_CONFIG_EVAL_PATH)
-
-#define SRX_CONFIG_EVAL_DISTR    ((1 << 3) | SRX_CONFIG_EVALUATE)
-#define SRX_CONFIG_DISPLAY_INFO  (1 << 4)
+#define SRX_CONFIG_EVAL_PATH       (1 << 2)
+// This define specifies if the BGPsec evaluation needs to be done distributed 
+// or locally
+#define SRX_CONFIG_EVAL_PATH_DISTR (1 << 3)
+#define SRX_CONFIG_DISPLAY_INFO    (1 << 4)
 #endif /* USE_SRX */
 
   /* BGP router identifier.  */
@@ -526,21 +653,51 @@ struct bgp
   // Time in seconds the SRx server is requested to keep data after a delete
   int  srx_keepWindow;
   uint32_t srx_proxyID;
-  /** The local pref values for [0]valid, [1]notfound, and [2]invalid*/
-  struct srx_local_pref  srx_val_local_pref[3];
-#define VAL_LOCPRF_VALID     0
-#define VAL_LOCPRF_NOTFOUND   1
-#define VAL_LOCPRF_INVALID   2
+  
+#define NUM_LOCPREF_TYPE   3
+#define LOCPRF_TYPE_ROA    0
+#define LOCPRF_TYPE_BGPSEC 1
+#define LOCPRF_TYPE_ASPA   2
+
+// This defines are used to parse through the type specific local preference 
+// configuration array - The first set is the size of each array, the second 
+// set specifies the location of the specific validation results in each array.
+#define VAL_LOCPRF_CT_ROA       4
+#define VAL_LOCPRF_CT_BGPSEC    3
+#define VAL_LOCPRF_CT_ASPA      5
+
+  // undefined, valid, invalid, notfound
+  struct srx_local_pref srx_loc_pref_roa[VAL_LOCPRF_CT_ROA];    
+  // undefined, valid, invalid 
+  struct srx_local_pref srx_loc_pref_bgpsec[VAL_LOCPRF_CT_BGPSEC];
+  // undefined, valid, invalid, unknown, unverifiable 
+  struct srx_local_pref srx_loc_pref_aspa[VAL_LOCPRF_CT_ASPA];
+  
+#define VAL_LOCPRF_UNDEFINED    0
+#define VAL_LOCPRF_VALID        1
+#define VAL_LOCPRF_INVALID      2
+#define VAL_LOCPRF_NOTFOUND     3
+#define VAL_LOCPRF_UNKNOWN      3
+#define VAL_LOCPRF_UNVERIFIABLE 4
 
   /** Contains the bit coded policy setting*/
   uint16_t srx_val_policy;
-#define SRX_VAL_POLICY_PREFER_VALID     (1 << 0)
-#define SRX_VAL_POLICY_IGNORE_NOTFOUND  (1 << 1)
-#define SRX_VAL_POLICY_IGNORE_INVALID   (1 << 2)
-#define SRX_VAL_POLICY_IGNORE_UNDEFINED (1 << 3)
+  
+#define SRX_VAL_POLICY_ORIGIN_IGNORE_NOTFOUND      (1 << 0)
+#define SRX_VAL_POLICY_ORIGIN_IGNORE_INVALID       (1 << 1)
+#define SRX_VAL_POLICY_ORIGIN_IGNORE_UNDEFINED     (1 << 2)
 
+#define SRX_VAL_POLICY_BGPSEC_IGNORE_INVALID    (1 << 3)
+#define SRX_VAL_POLICY_BGPSEC_IGNORE_UNDEFINED  (1 << 4)
+
+#define SRX_VAL_POLICY_ASPA_IGNORE_UNKNOWN      (1 << 5)
+#define SRX_VAL_POLICY_ASPA_IGNORE_INVALID      (1 << 6)
+#define SRX_VAL_POLICY_ASPA_IGNORE_UNVERIFIABLE (1 << 7)
+#define SRX_VAL_POLICY_ASPA_IGNORE_UNDEFINED    (1 << 8)
+                                      
   uint16_t srx_default_roaVal;
   uint16_t srx_default_bgpsecVal;
+  uint16_t srx_default_aspaVal;
 
   /* Instance variables */
   SRxProxy* srxProxy;
@@ -791,6 +948,10 @@ struct peer
 #define PEER_FLAG_BGPSEC_CAPABILITY_RECV    (1 << 14)/* bgpsec capability - RECV */
 #define PEER_FLAG_BGPSEC_CAPABILITY_SEND    (1 << 15)/* bgpsec capability - SEND */
 #define PEER_FLAG_BGPSEC_CAPABILITY         (1 << 15)/* bgpsec capability - SEND */
+#define PEER_FLAG_ASPA_RELATIONSHIP_PROV    (1 << 16)/* ASPA peer relationship provider */
+#define PEER_FLAG_ASPA_RELATIONSHIP_CUST    (1 << 17)/* ASPA peer relationship customer */
+#define PEER_FLAG_ASPA_RELATIONSHIP_SIBL    (1 << 18)/* ASPA peer relationship customer */
+#define PEER_FLAG_ASPA_RELATIONSHIP_LATL    (1 << 19)/* ASPA peer relationship customer */
 #endif
 
   /* NSF mode (graceful restart) */
@@ -1312,16 +1473,18 @@ extern int bgp_default_local_preference_unset (struct bgp *);
 extern int bgp_srx_set (struct bgp *, struct vty *, const char *, int, bool);
 extern int bgp_srx_unset (struct bgp *bgp);
 
+extern int bgp_srx_set_evaluation (struct bgp *, int);
+extern int bgp_srx_unset_evaluation(struct bgp *, int);
+
 // does both, set and unset
-extern int bgp_srx_evaluation (struct bgp *, int);
 extern int bgp_srx_display (struct bgp *bgp, int);
 extern int bgp_srx_conf_default_result (struct bgp *bgp, int, int);
 
 // does set
 extern int srx_set_proxyID(struct bgp* , uint32_t);
 
-extern int srx_val_local_preference_set (struct bgp *, int, int, uint32_t);
-extern int srx_val_local_preference_unset (struct bgp *, int);
+extern int srx_val_local_preference_set (struct bgp *bgp, int, int, bool, uint32_t);
+extern int srx_val_local_preference_unset (struct bgp *, int, int);
 extern int srx_val_policy_set (struct bgp *, uint16_t);
 extern int srx_val_policy_unset (struct bgp *, uint16_t);
 

@@ -29,10 +29,17 @@
  *  - getOriginStatus: Triggered by the SRx - Router - proxy for each
  *                     validation request.
  *
- * @version 0.5.0.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/30 - oborchert
+ *            * Added missing version control. Also moved modifications labeled 
+ *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
+ *          - 2021/02/26 - kyehwanl
+ *            * Removed handleASPAObject and added handleAspaPdu instead.
+ *          - 2021/02/16 - oborchert
+ *            * Added skeleton function handleASPAObject() for ASPA Processing
  * 0.5.0.0  - 2017/07/06 - oborchert
  *            * Added parameter suppressNotification to many internal functions
  *              to allow to suppress calling the update modification callback 
@@ -2003,6 +2010,7 @@ static void notifyUpdateCacheForROAChange(UpdateCache* updCache,
     srxRes.roaResult    = newROAResult;
     srxRes.bgpsecResult = SRx_RESULT_DONOTUSE; // Indicates this
                                       // parameter must not be used
+    srxRes.aspaResult   = SRx_RESULT_DONOTUSE; 
 
     LOG(LEVEL_DEBUG, HDR "Store new ROA result[0x%02X] for update [0x%08X]",
                      pthread_self(), newROAResult, *updateID);

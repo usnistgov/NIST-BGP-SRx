@@ -21,10 +21,14 @@
  *
  * Various function to make debugging easier.
  *
- * @version 0.3.1.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0 - 2021/02/26 - kyehwanl
+ *            * Disabled display of ADD/DEL values for relative local pref 
+ *              modification. This modification type is not used anymore 
+ *              going forward. (NOT_USED_THIS_FUNCTION)
  * 0.3.1.0 - 2015/11/26 - oborchert
  *            * Added Changelog
  */
@@ -125,6 +129,7 @@ static int show_info_hash (struct vty* vty, struct bgp* bgp,
       default:
         valState = -1;
     }
+#if NOT_USED_THIS_FUNCTION
     if (valState != -1)
     {
       if (bgp->srx_val_local_pref[valState].is_set)
@@ -146,6 +151,7 @@ static int show_info_hash (struct vty* vty, struct bgp* bgp,
     {
       vty_out (vty, "      ");
     }        
+#endif
 
     /* AS-Path */
     if (attr->aspath)

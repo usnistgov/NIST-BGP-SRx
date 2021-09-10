@@ -2,19 +2,20 @@
 ## Configure template file for QuaggaSRx.
 ## autoconf will generate configure script.
 ##
-## Based on Quagga
+## Based on Quagga 0.90.22
 ## Copyright (c) 1996, 97, 98, 99, 2000 Kunihiro Ishiguro <kunihiro@zebra.org>
 ## Portions Copyright (c) 2003 Paul Jakma <paul@dishone.st>
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.4.2.10, [http://bgpsrx.antd.nist.gov])
+AC_INIT(QuaggaSRx, 0.6.0.0, [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
-# Set the requires SRxCryptoAPI Version
+# Set the required SRxCryptoAPI Version
 REQ_SCA_VER=3
-REQ_PROXY_VER=5
+# Set the rewuires SRxSnP Proxy version
+REQ_PROXY_VER=6
 
 dnl -----------------------------------
 dnl Get hostname and other information.
@@ -165,7 +166,7 @@ if test "x${cflags_specified}" = "x" ; then
         AC_MSG_RESULT([Intel default])
         ;;
     "GCC")
-  	CFLAGS="-Os -fno-omit-frame-pointer -g -std=gnu99 -Wall"
+  	CFLAGS="-Os -fno-omit-frame-pointer -g -Wall"
   	CFLAGS="${CFLAGS} -Wsign-compare -Wpointer-arith"
   	CFLAGS="${CFLAGS} -Wbad-function-cast -Wwrite-strings"
   	CFLAGS="${CFLAGS} -Wmissing-prototypes -Wmissing-declarations"

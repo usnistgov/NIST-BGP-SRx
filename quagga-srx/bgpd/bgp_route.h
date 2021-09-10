@@ -109,6 +109,7 @@ struct bgp_info
   uint32_t               localID;
   SRxValidationResultVal val_res_ROA;
   SRxValidationResultVal val_res_BGPSEC;
+  SRxValidationResultVal val_res_ASPA;
 #endif /* USE_SRX */
 };
 
@@ -247,7 +248,7 @@ extern void srx_bgp_requeue_update(struct bgp_info *);
 extern void srx_bgp_requeue_all(struct bgp *);
 extern void bgp_info_set_validation_result (struct bgp_info *,
                                        ValidationResultType resType,
-                                       uint8_t roaResult, uint8_t bgpsecResult);
+                                       uint8_t roaResult, uint8_t bgpsecResult, uint8_t);
 extern void verify_update (struct bgp *bgp, struct bgp_info *info,
                            SRxDefaultResult* defResult, bool doRegisterLocalID);
 extern int  srx_calc_validation_state(struct bgp *, struct bgp_info *);

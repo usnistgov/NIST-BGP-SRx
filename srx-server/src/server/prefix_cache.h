@@ -22,10 +22,12 @@
  *
  * Prefix Cache.
  *
- * @version 0.5.0.0
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/02/26 - kyehwanl
+ *            * Added ASPA_DBManager and AspaCache to RPKIHandler. 
  * 0.5.0.0  - 2017/07/06 - oborchert
  *            * Added parameter suppressNotification to many internal functions
  *              to allow to suppress calling the update modification callback 

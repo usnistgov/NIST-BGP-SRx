@@ -1,0 +1,9 @@
+# This file is used to fill the rpki-rtr-srv with 
+# ASPA sample data
+echo "adding 4 ASPA objects"
+addASPA 0 10 20
+addASPA 0 20 30 40 50
+addASPA 1 10 20
+addASPA 1 20 40 50
+
+cache

@@ -1,0 +1,51 @@
+echo "This is the BGP-SRx RPKI Cache Test Harness"
+echo "==========================================="
+echo "Current Cache Contents - should be empty:"
+cache
+
+echo ""
+pause "Press key to add all ROA information"
+echo "Add ROA configurations"
+
+add 10.5.0.0/20  24 65005
+add 10.10.0.0/18 20 65010
+add 10.15.0.0/20 24 65015
+add 10.20.0.0/20 24 65020
+add 10.25.0.0/22 24 65025
+add 10.30.0.0/20 22 65030
+add 10.40.0.0/20 24 65040
+
+notify
+echo ""
+echo "Current Cache Contents with ROA information:"
+cache 
+
+echo ""
+pause "Press key to add all public router keys for BGPsec"
+echo "Add Key Configuration"
+keyLoc ../opt/bgp-srx-examples/bgpsec-keys/raw-keys
+addKey 65005 65005.cert
+addKey 65010 65010.cert
+addKey 65015 65015.cert
+addKey 65020 65020.cert
+addKey 65025 65025.cert
+addKey 65030 65030.cert
+addKey 65040 65040.cert
+notify
+echo ""
+echo "Current Cache Contents with ROA, Key, and ASPA information:"
+cache
+
+echo ""
+pause "Press key to all all ASPA information"
+echo "Add ASPA configuration (AS 65030 does not participate in ASPA)"
+addASPA 0 65000 65005
+addASPA 0 65005 65015
+addASPA 0 65015 65005
+addASPA 0 65025 65015 65020
+addASPA 0 65020 65010
+addASPA 0 65040 65020
+notify
+
+echo "Current Cache Contents with ROA, Key, and ASPA information:"
+cache

@@ -507,7 +507,7 @@ bool sendVerifyNotification(ServerSocket* srvSoc, ServerClient* client,
                             SRxUpdateID updateID, uint8_t resultType,
                             uint32_t requestToken,
                             uint8_t roaResult, uint8_t bgpsecResult, 
-                            bool useQueue)
+                            uint8_t aspaResult, bool useQueue)
 {
   bool retVal = true;
   uint32_t length = sizeof(SRXPROXY_VERIFY_NOTIFICATION);
@@ -519,6 +519,7 @@ bool sendVerifyNotification(ServerSocket* srvSoc, ServerClient* client,
   pdu->requestToken  = htonl(requestToken);
   pdu->roaResult     = roaResult;
   pdu->bgpsecResult  = bgpsecResult;
+  pdu->aspaResult   = aspaResult;
   pdu->length        = htonl(length);
   pdu->updateID      = htonl(updateID);
   

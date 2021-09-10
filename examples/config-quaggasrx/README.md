@@ -5,61 +5,23 @@ The set of configurations below will provide a small set of
 possibilities but shoulg give enough insight on how to pursue
 certain configuration outcomes.
 
-
-* Prefer Valid (pv)
-
-  QuaggaSRx allows mutliple forms of implementing a prefer valid policy.
-  With prefer valid we mean valid versus anything else. To routes that are 
-  not valid will be chosen on factors other than validation.
-
-  Using 'prefer-valid' switch from (swf)
-  ---------------------------------------
-  Implemented in bgpd.pv-swf.[bgpsec|origin].conf
-
-  Using 'local preference' form (lpf)
-  -----------------------------------
-  Implemented in bgpd.pv-lpf.[bgpsec|origin].conf
-
-
 * Prefer Valid over NotFound over Invalid (pvni)
 
-  Not using the 'prefer-valid' switch, this can be achieved using 
-  an arithmetic form as well as setting form.
-  Arithmetic means the local preference will be recalculated and 
-  modified according to the validation state. The setting form
-  will overwrite the configuration.
+  This can be done in an arithmetic form by adding or subtracting 
+  a calculated value from the local pref depending on the validation 
+  state of each performed validation.
 
-  The following examples ONLY use local preference. The arithmetic 
-  form (arf) is used to increase or decrease the already determined 
-  local preference. This is done by choosing a delta value to add or 
-  subtract from the local pref. This form very much depends on the 
-  initial local pref and could still result in an invalid route 
-  being selected over any other route. 
-  For instance an invalid route A with a local pref of 200 and a 
-  subtraction of 20 would result in a local pref of 180.
-  Now a valid route B with a local pred of 100 and an addition of 20
-  would only result in a local pref of 120. Here the invalid route 
-  still would be chosen over the valid route. 
-  There are two different approaches to mitigate this issue:
-  - Add switch 'prefer-valid'
-  - Use the set form rather than the arithmetic form
-
-  To prevent this from happening local pref based policies always can 
-  include the 'prefer-valid' switch
+  The following examples only use local preference. The arithmetic 
+  form (arf) could still result in an invalid route selected over
+  any other route. The reason is that this form recalculates the 
+  local pref by increasing or decreasing the already specified local 
+  preference. This can lead to the situation were a valid route's new
+  local prev value is still less then the competing 'invalid' route due 
+  to the difference of local pref due to previous policy decisions.
 
   Using arithmetic form (arf)
   ---------------------------
-  Implemented in bgpd.pvni-arf.[bgpsec|origin].conf
-
-
-  The following examples overwrite the local preference depending on the 
-  validation result. This is done using the set form (sef) where the new
-  local preference is specified.
-
-  Using set form (sef)
-  --------------------
-  Implemented in bgpd.pvni-sef.[bgpdec|origin].conf
-
+  Implemented in bgpd.pvni-arf.[bgpdec|origin|aspa].conf
 
 * Activate signaling of origin validation
 

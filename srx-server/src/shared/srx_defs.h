@@ -24,13 +24,16 @@
 /**
  * Contains Constants and its definitions for SRX client/server and protocol.
  *
- * @version 0.5.1.1
+ * @version 0.6.0.0
  *
  * SRx constant and type definitions.
  *
  * Change log:
  * -----------------------------------------------------------------------------
- * 0.5.1.1. - 2020/07/31 - oborchert
+ *  0.6.0.0 - 2021/03/31 - oborchert
+ *            * Added SRX_PROXY_RESTYPE_ASPA
+ *            * Changed SRX_DEV_TOYEAR t0 2021
+ *  0.5.1.1 - 2020/07/31 - oborchert
  *            * Added PRG_DEV_TOYEAR To allow specifying the last development
  *              year.
  *  0.5.0.0 - 2017/07/06 - oborchert
@@ -69,12 +72,13 @@
 /** Result Type Bits  */
 #define SRX_PROXY_RESTYPE_ROA       1
 #define SRX_PROXY_RESTYPE_BGPSEC    2
+#define SRX_PROXY_RESTYPE_ASPA      4
 #define SRX_PROXY_RESTYPE_RECEIPT 128
 
 // SRX_DEV_TOYEAR can be overwritten in the config.h through configuration
 // my modifying configure.ac and rerun with autoreconf -i --force
 #ifndef SRX_DEV_TOYEAR
-#define SRX_DEV_TOYEAR "2020"
+#define SRX_DEV_TOYEAR "2021"
 #endif
 
 /** The time in which a handshake between proxy and SRx SHOULD be performed
@@ -142,7 +146,11 @@ typedef uint8_t SRxVerifyFlag;
 
 #define SRX_FLAG_ROA               1
 #define SRX_FLAG_BGPSEC            2
+#define SRX_FLAG_ASPA              4
+#define SRX_FLAG_ROA_AND_ASPA     (SRX_FLAG_ROA | SRX_FLAG_ASPA)
 #define SRX_FLAG_ROA_AND_BGPSEC  (SRX_FLAG_ROA | SRX_FLAG_BGPSEC)
+#define SRX_FLAG_BGPSEC_AND_ASPA  (SRX_FLAG_BGPSEC | SRX_FLAG_ASPA)
+#define SRX_FLAG_ROA_BGPSEC_ASPA  (SRX_FLAG_ROA | SRX_FLAG_BGPSEC | SRX_FLAG_ASPA)
 #define SRX_FLAG_REQUEST_RECEIPT 128
 
 /** Router specific, unique ID that identifies the RIB-in entry or update */
@@ -163,13 +171,18 @@ typedef enum {
   VRT_NONE   = 0,
   VRT_ROA    = SRX_FLAG_ROA,                  // 1
   VRT_BGPSEC = SRX_FLAG_BGPSEC,               // 2
-  VRT_BOTH   = SRX_FLAG_ROA_AND_BGPSEC        // 3
+  VRT_BOTH   = SRX_FLAG_ROA_AND_BGPSEC,       // 3
+  VRT_ASPA   = SRX_FLAG_ASPA,                 // 4
+  VRT_ROAS   = SRX_FLAG_ROA_AND_ASPA,         // 5
+  VRT_BSAS   = SRX_FLAG_BGPSEC_AND_ASPA,      // 6
+  VRT_ALL    = SRX_FLAG_ROA_BGPSEC_ASPA       // 7
 } ValidationResultType;
 
 /** Return value */
 typedef struct {
   uint8_t roaResult;
   uint8_t bgpsecResult;
+  uint8_t aspaResult;
 } SRxResult;
 
 /** This struct contains the validation result. */
@@ -191,6 +204,7 @@ typedef enum {
 typedef struct {
   SRxResultSource resSourceROA;     // The source of the provided ROA result
   SRxResultSource resSourceBGPSEC;  // The source of the provided BGPSEC result
+  SRxResultSource resSourceASPA;  // The source of the provided BGPSEC result
   SRxResult       result; // the default result value provided
 } SRxDefaultResult;
 
@@ -200,9 +214,59 @@ typedef enum {
   SRx_RESULT_NOTFOUND  = 1, // ONLY FOR ROA
   SRx_RESULT_INVALID   = 2, // ROA & BGPSEC
   SRx_RESULT_UNDEFINED = 3, // ROA & BGPSEC (if no result is available)
-  SRx_RESULT_DONOTUSE  = 4  // ONLY FOR INTERNAL USE WITHIN SRx Server.
+  SRx_RESULT_DONOTUSE     = 4, // ONLY FOR INTERNAL USE WITHIN SRx Server.
+  SRx_RESULT_UNKNOWN      = 5, // ASPA Validation
+  SRx_RESULT_UNVERIFIABLE = 6  // ASPA Validation
 } SRxValidationResultVal;
 
 #define NUM_TRANS 3
+
+typedef enum {
+  AS_SET             = 1,
+  AS_SEQUENCE        = 2,
+  AS_CONFED_SEQUENCE = 3,
+  AS_CONFED_SET      = 4
+} AS_TYPE;
+
+typedef struct {
+  uint32_t asn;
+} ASSEGMENT;
+
+typedef enum {
+  AS_REL_UNKNOWN         = 0,
+  AS_REL_CUSTOMER        = 1,
+  AS_REL_PROVIDER        = 2,
+  AS_REL_SIBLING         = 3,
+  AS_REL_LATERAL         = 4,
+  AS_REL_MAKE_ENUM_32bit = 0xffffffff,
+} AS_REL_TYPE;
+
+typedef struct {
+  uint8_t     length;
+  ASSEGMENT*  segments;
+  AS_TYPE     asType;  // SEQUENCE, AS_SET, 
+  AS_REL_TYPE asRelationship;
+} SRxASPathList;
+
+typedef enum {
+  ASPA_RESULT_VALID        = 0,
+  ASPA_RESULT_INVALID      = 1,
+  ASPA_RESULT_UNDEFINED    = 2,
+  ASPA_RESULT_UNKNOWN      = 4,
+  ASPA_RESULT_UNVERIFIABLE = 8,
+  ASPA_RESULT_NIBBLE_ZERO  = 16,
+  ASPA_Val_ENUM_16bit      = 0xffff,
+} ASPA_ValidationResult;
+
+typedef enum {
+  ASPA_UNKNOWNSTREAM = 0,
+  ASPA_UPSTREAM      = 1,
+  ASPA_DOWNSTREAM    = 2,
+} AS_REL_DIR;
+
+/* Address family numbers from RFC1700. */
+#define AFI_IP                    1
+#define AFI_IP6                   2
+#define AFI_MAX                   3
 
 #endif // !__SRX_DEFS_H__

@@ -1,0 +1,231 @@
+# 
+# This demo used one QuagagSRx instance as AS65000 and two BGPsec-IO (BIO) 
+# traffic generators as AS65005 and AS 65010. The pre-requisite of this 
+# example topology and configuration is that the system needs to have two IP  
+# addresses configured, one for BIO-1 and the second one for BIO-2. 
+# 
+# The modification required in each provided configuration file are the 
+# assigned IP addresses in the physical arena of the example.  
+# The Virtualized area is provided by both BGPsec-IO instances. 
+#
+# This example is the same as example-demo-interactive with the exception
+# that the rpki cache test harness does not pause after loading each Object
+# type. That means all data is available as soon ad the cache is started.
+# 
+# Topology: 
+# ========= 
+# 
+#       (65025) customer of 65015  (65030) (==NO ASPA==)  (65040) customer of 65020
+#        |   |          and 65020     |    [10.30.0.0/22]  |   :  [10.40.0.0/22] 
+#        |   |  [10.25.0.0/22]        |    <10.30.0.0/23>  |   :  ROA:10.40/20-24
+#      /-/   |  (10.25.0.0/21)        |    ROA:10.30/20-22 /   :
+#     /       \  ROA:10.25/20-22      |                   /     . 
+#    /         \                      | /----------------/       .-.-.-.-.-.-.
+#    |          \--------------------\|/                                      .
+# (65015) provider of 65025        (65020) provider of 65025 and 65040         : 
+#    |    sibling of 65005            |    customer of 65010                   :  
+#    |    [10.15.0.0/20]              |    [10.20.0.0/20]                      : 
+#    |    ROA:10.15/20-24             |    ROA:10.20/20-24                     : 
+#    |                                |                                       . 
+#    |      (forged-origin hijack)    |                                      .
+#    |    .-.-.-.-.-.-.-.-.-.-.-.-.-.-|-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.  
+#    |   .  (^^ FAKE CONNECTION ^^)   |  (^^ FAKE CONNECTION^^)
+#    |  :                             |                               Virtualized 
+#----+--:-----------------------------+------------------------------------------ 
+#    |  :                             |                                  Physical
+#    | .  {10.40.5.0/24}              |
+#    |.                               | 
+# (65005) provider of 65000           |
+#    |    sibling of 65015            |
+#    |    [10.5.0.0/20]               |
+#    |    ROA:10.5/20-24              | 
+#    \                                |
+#     \-----------(65000)----------(65010) provider of 65020 
+#            customer of 65005             peer to 65000
+#            peer to 65010                 [10.10.0.0/20]
+#                                          (10.10.128.0/17) {65011 65012}
+#                                          |10.10.32.0/19|  {65013 65014}
+#                                          ROA:10.10/18-20
+# Legend: 
+# ======= 
+#   (65000)      AS 65000 
+#   [A.B.C.D/E]  Announcement of prefix A.B.C.D/E : ROA match
+#   (A.B.C.D/E)  Announcement of prefix A.B.C.D/E : No ROA coverage / possible AS_SET
+#   <A.B.C.D/E>  Announcement of prefix A.B.C.D/E : ROA covered but not matched
+#   {A.B.C.D/E}  Announcement of prefix A.B.C.D/E : ROA match but hijacked
+#   |A.B.C.D/E|  Announcement of prefix A.B.C.D/E : ROA covered and AS_SET
+#   | -----      Link between two ASes 
+#   : -.-.-      Fake link ( used for hijack attacks ) 
+# 
+# 
+# 
+# Hijack: 
+# ======= 
+#  AS 65005: 
+#   - route: 10.40.5.0/24 65005 65040 (sub-prefix forged-origin attack) 
+#  As shown in the topology above, AS 65005 does not have a direct link 
+#  to AS 65040 but it creates an UPDATE to fake the link and perform a 
+#  sub-prefix attack 
+# 
+# Route Leaks: 
+# ============ 
+#  AS 65025: 
+#   - leaks 3 routes learned from AS 65020 to it's provider AS 65015  
+#     it does NOT leak the learned route to AS65040  
+#   - routes: 10.10.0.0/20 65025 65020 65010 
+#             10.10.32.0/19 65025 65020 65010 {65011 65012}
+#             10.10.128.0/17 65025 65020 65010 {65013 65014}
+#             10.20.0.0/20 65025 65020  
+#             10.30.0.0/22 65025 65030 
+#             10.30.0.0/23 65025 65030 
+# 
+# The above leaks are propagated from 65025 to 65015 to 65006 to 65000 
+# All leaks and hijack are received by AS 65000 from AS 65005 
+# 
+# Updates from AS 65005 to AS 65000: (* hijack)    (+ leak) 
+#     10.05.0.0/20   65005 
+#   + 10.10.0.0/20   65005 65015 65025 65020 65010 
+#   + 10.10.32.0/19  65005 65015 65025 65020 65010 {65011 65012} 
+#   + 10.10.128.0/17 65005 65015 65025 65020 65010 {65013 65014} 
+#     10.15.0.0/20   65005 65015 
+#   + 10.20.0.0/20   65005 65015 65025 65020  
+#     10.25.0.0/21   65005 65015 65025 
+#     10.25.0.0/22   65005 65015 65025 
+#   + 10.30.0.0/22   65005 65015 65025 65020 65030
+#   + 10.30.0.0/23   65005 65015 65025 65020 65030 
+#   * 10.40.5.0/24   65005 65040 
+# 
+# Updates from AS 65010 to AS 65000 
+#     10.10.0.0/20   65010 
+#     10.10.32.0/19  65010 {65011 65012} 
+#     10.10.128.0/17 65010 {65013 65014} 
+#     10.20.0.0/20   65010 65020 
+#     10.25.0.0/21   65010 65020 65025 
+#     10.25.0.0/22   65010 65020 65025
+#     10.30.0.0/22   65010 65020 65030 
+#     10.30.0.0/23   65010 65020 65030 
+#     10.40.0.0/22   65010 65020 65040 
+# 
+# For Prefix Origin Validation 
+# ============================= 
+# Registered ROA's: (prefix-maxlen, Origin-AS) 
+# (10.5.0.0/20-24, 65005);
+# (10.10.0.0/18-20, 65010);
+# (10.15.0.0/20-24, 65015);
+# (10.20.0.0/20-24, 65020);
+# (10.25.0.0/22-24, 65025);
+# (10.30.0.0/20-22, 65030);
+# (10.40.0.0/20-24, 65040);
+# 
+# For BGPsec Path Validation 
+# =========================== 
+# Private key usage: 
+# BIO-65005:  65005, 65015, 65025, 65010, 65020, 65030, (use FAKE for 65040) 
+# BIO-65010:  65010, 65020, 65025, 65030, 65040 
+# QSRx-65000: 65000 
+# 
+# Signature Generation Mode in BIO: 
+# ================================= 
+# Use the pre-defined "k" value to have a deterministic signature outcome. 
+# BIO-65005: signature_generation = BIO-K1 
+# BIO-65010: signature_generation = BIO-K1 
+# 
+# Public Key distribution: 
+# QSRx-65000: 65005, 65010, 65015, 65020, 65025, 65030, 65040 
+# 
+# 
+# For ASPA Validation: 
+# ==================== 
+# Registered ASPA Objects: (AFI CUST-AS PROV-AS [PROV-AS]*) 
+# (0 65000 65005);
+# (0 65005 65015);
+# (0 65015 65005);
+# (0 65025 65015 65020);  
+# (0 65020 65010); 
+# (NO ASPA Object for 65030);  
+# (0 65040 65020) 
+# 
+#  Validation Results in 65000: 
+#  ======================= 
+#  Origin..(ROV)...: (v)alid, (n)ot-found, (i)nvalid
+#  BGPsec..(BPV)...: (v)alid, (i)nvalid
+#  ASPA....(APV)...: (v)alid, (u)nknown, (i)nvalid, (f)unverifiable
+#
+#  (?) Represents "undefined" and can be used as "unverified" if 
+#      used as default value. No validation algorithm does return
+#      this result which indicates that no validation finished
+#      or started for the particular algorithm.
+
+# Prefix     - (ROV, BPV, APV) - Path 
+# 10.5.0.0/20    - (v,v,v) - 65005 
+# 10.10.0.0/20   - (v,v,v) - 65010 
+# 10.10.0.0/20   - (v,v,i) - 65005 65015 65025 65020 65010 
+# 10.10.32.0/19  - (i,i,f) - 65010 { 65011 6012 }
+# 10.10.32.0/19  - (i,i,i) - 65005 65015 65025 65020 65010 { 65011 6012 }
+# 10.10.128.0/17 - (n,i,f) - 65010 { 65013 6014 }
+# 10.10.128.0/17 - (n,i,i) - 65005 65015 65025 65020 65010 { 65013 6014 }
+# 10.15.0.0/20   - (v,v,v) - 65005 65015 
+# 10.20.0.0/20   - (v,v,v) - 65010 65020 
+# 10.20.0.0/20   - (v,v,i) - 65005 65015 65025 65020  
+# 10.25.0.0/21   - (n,v,v) - 65010 65020 65025 
+# 10.25.0.0/21   - (n,v,v) - 65005 65015 65025 
+# 10.25.0.0/22   - (v,v,v) - 65010 65020 65025 
+# 10.25.0.0/22   - (v,v,v) - 65005 65015 65025 
+# 10.30.0.0/22   - (v,v,u) - 65010 65020 65030 
+# 10.30.0.0/22   - (v,v,i) - 65005 65015 65025 65020 65030 
+# 10.30.0.0/23   - (i,v,u) - 65010 65020 65030 
+# 10.30.0.0/23   - (i,v,i) - 65005 65015 65025 65020 65030 
+# 10.40.0.0/22   - (v,v,v) - 65010 65020 65040 
+# 10.40.5.0/24   - (v,i,v) - 65005 65040 
+
+# Validation Local Pref Policy: 
+# ==============================
+# Algorithm | (v)alid | (u)nknown | (n)ot-found | (i)nvalid | (f)unverifiable 
+# ----------+---------+-----------+-------------+-----------+----------------
+#    ROV    |   +20   |    ---    |     +10     |    -20    |      ---
+# ----------+---------+-----------+-------------+-----------+----------------
+#    BPV    |   +20   |    ---    |     ---     |    -20    |      ---  
+# ----------+---------+-----------+-------------+-----------+----------------
+#    APV    |   +20   |    +10    |     ---     |    -20    |       -5
+# ----------+---------+-----------+-------------+-----------+----------------
+#
+# Expected route selection according to Local Pref Policy with or without 
+# ignore policies enabled
+#
+# selection | IP              validation  Local Preference  AS
+# LP | LP/I | Prefix            result    delta value       Path
+# ---+------|----------------------------------------------------------------
+#  > |   >  | 10.05.0.0/20   -  (v,v,v)  - (+20+20+20 = +60) 65005 
+#
+#  > |   >  | 10.10.0.0/20   -  (v,v,v)  - (+20+20+20 = +60) 65010 
+#    |   I  | 10.10.0.0/20   -  (v,v,i)  - (+20+20-20 = +20) 65005 65015 65025 65020 65010 
+#
+#  > |   I  | 10.10.32.0/19  -  (i,i,f)  - (-20-20-5  = -45) 65010 {65011 65012} 
+#    |   I  | 10.10.32.0/19  -  (i,i,i)  - (-20-20-20 = -60) 65005 65015 65025 65020 65010 {65011 65012} 
+#
+#  > |   I  | 10.10.128.0/17 -  (n,i,f)  - (+10-20-5  = -15) 65010 {65012 65013} 
+#    |   I  | 10.10.128.0/17 -  (n,i,i)  - (+10-20-20 = -30) 65005 65015 65025 65020 65010 {65012 65013} 
+#
+#  > |   >  | 10.15.0.0/20   -  (v,v,v)  - (+20+20+20 = +60) 65005 65015 
+#
+#  > |   >  | 10.20.0.0/20   -  (v,v,v)  - (+20+20+20 = +60) 65010 65020 
+#    |   I  | 10.20.0.0/20   -  (v,v,i)  - (+20+20-20 = +20) 65005 65015 65025 65020  
+#
+#  ? |   ?  | 10.25.0.0/21   -  (n,v,v)  - (+10+20+20 = +50) 65010 65020 65025 
+#  ? |   ?  | 10.25.0.0/21   -  (n,v,v)  - (+10+20+20 = +50) 65005 65015 65025 
+#
+#  ? |   ?  | 10.25.0.0/22   -  (v,v,v)  - (+20+20+20 = +60) 65010 65020 65025 
+#  ? |   ?  | 10.25.0.0/22   -  (v,v,v)  - (+20+20+20 = +60) 65005 65015 65025 
+#
+#  > |   >  | 10.30.0.0/22   -  (v,v,u)  - (+20+20+10 = +50) 65010 65020 65030 
+#    |   I  | 10.30.0.0/22   -  (v,v,i)  - (+20+20-20 = +20) 65005 65015 65025 65020 65030 
+#
+#  > |   I  | 10.30.0.0/23   -  (i,v,u)  - (-20+20+10 = +10) 65010 65020 65030 
+#    |   I  | 10.30.0.0/23   -  (i,v,i)  - (-20+20-20 = -20) 65005 65015 65025 65020 65030 
+#
+#  > |   >  | 10.40.0.0/22   -  (v,v,v)  - (+20+20+20 = +60) 65010 65020 65040 
+#
+#  > |   I  | 10.40.5.0/24   -  (v,i,v)  - (+20-20+20 =  20) 65005 65040 
+#
+# For routes marked with ? the router will decide depending on the router id (smaller one)
+#

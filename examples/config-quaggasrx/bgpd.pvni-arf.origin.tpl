@@ -2,14 +2,11 @@
 !
 ! QuaggaSRx BGPd sample configuration file
 !
-! $Id: bgpd.conf.sampleSRx,v 5.1 2021/05/20 12:00:00 ob Exp $
+! $Id: bgpd.conf.sampleSRx,v 6.0 2021/04/12 14:55:38 ob Exp $
 !
 hostname bgpd
 password zebra
 
-!
-!bgp multiple-instance
-!
 router bgp 65000
   bgp router-id 10.0.0.65
 
@@ -20,24 +17,21 @@ router bgp 65000
   srx connect
   no srx extcommunity
 
-  srx evaluation origin_only
+  srx evaluation origin
 
   srx set-origin-value undefined
+
 
 !
 ! Configure "Prefer Valid" using local preference
 ! Increase the local preference if route is valid.
 !
-! To assure that no local-pref will result in a non Valid
-! route being selected over a valid route add prefer-valid
-!
-! srx policy prefer-valid 
 
-  srx policy local-preference valid       20 add
-  srx policy local-preference notfound    10 add
-  srx policy local-preference invalid     20 subtract
+  srx policy origin local-preference valid    add      20 
+  srx policy origin local-preference notfound add      10 
+  srx policy origin local-preference invalid  subtract 20 
 
-  no srx policy ignore-undefined
+  no srx policy origin ignore undefined
 
 ! Specify Neighbors
 ! =================

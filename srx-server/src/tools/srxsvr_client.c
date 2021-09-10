@@ -22,10 +22,12 @@
  *
  * This program allows to test the SRX server implementation.
  *
- * @version 0.3.0.10
+ * @version 0.6.0.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.0.0  - 2021/03/21 - oborchert
+ *            * Integrated ASPA to main method.
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Added initialization of variables in runScript
  *            * Removed unused variables from doVerify
@@ -953,12 +955,14 @@ bool handleValidationResult(SRxUpdateID          updateID,
                             ValidationResultType valType,
                             uint8_t              roaResult,
                             uint8_t              bgpsecResult,
+                            uint8_t              aspaResult,        
                             void* userPtr)
 {
   bool retVal = true;
   bool isReceipt    = localID != 0;
   bool printROA     = (valType & SRX_PROXY_RESTYPE_ROA) != 0;
   bool printBGPSEC  = (valType & SRX_PROXY_RESTYPE_BGPSEC) != 0;
+  bool printASPA    = (valType & SRX_PROXY_RESTYPE_ASPA) != 0;
   char* resultStr;  
   
   PRINTF("=> Received validation result for update [uid=0x%08X;lid:0x%08X]: ",
@@ -1023,10 +1027,37 @@ bool handleValidationResult(SRxUpdateID          updateID,
     }
     PRINTF("%s BGPSEC=%s", (printROA ? "; " : ""), resultStr);
   }
-
-  if (!(printROA || printBGPSEC))
+  
+  if (printASPA)
   {
-    PRINTF("ERROR - no ROA or BGPSEC information!!!");
+    switch (aspaResult)
+    {
+      case ASPA_RESULT_VALID:
+        resultStr = "VALID";
+        break;        
+      case ASPA_RESULT_INVALID:
+        resultStr = "INVALID";
+        break;        
+      case ASPA_RESULT_UNDEFINED:
+        resultStr = "UNDEFINED";
+        break;        
+      case ASPA_RESULT_UNKNOWN:
+        resultStr = "UNKNOWN";
+        break;        
+      case ASPA_RESULT_UNVERIFIABLE:
+        resultStr = "UNVERIFIABLE";
+        break;        
+      case ASPA_RESULT_NIBBLE_ZERO:
+        resultStr = "NIBBLE_ZERO";
+        break;        
+      default:
+        resultStr = "???????";
+    }
+  }
+
+  if (!(printROA || printBGPSEC || printASPA))
+  {
+    PRINTF("ERROR - no ROA, BGPSEC, or ASPA information!!!");
     retVal=false;
   }
 
@@ -1288,6 +1319,7 @@ void doVerify(bool log, char** argPtr)
 
 
   BGPSecData       bgpsec;
+  SRxASPathList asPathList;
 
   char ipString[255];
   char* ipStringPtr = ipString;
@@ -1407,8 +1439,8 @@ void doVerify(bool log, char** argPtr)
   // The method verifyUpdate will go into wait mode if receipt is requested.
   verifyUpdate(proxy, localID,
                (method & SRX_FLAG_ROA) == SRX_FLAG_ROA,
-               (method & SRX_FLAG_BGPSEC) == SRX_FLAG_BGPSEC,
-               &defResult, &prefix, as32, &bgpsec);
+               (method & SRX_FLAG_BGPSEC) == SRX_FLAG_BGPSEC, false,
+               &defResult, &prefix, as32, &bgpsec, asPathList);
 }
 
 void doSign(bool log, char** argPtr)
@@ -1684,8 +1716,8 @@ void resetProxy(char** argPtr)
       proxy = createSRxProxy(handleValidationResult, handleSignatures,
                              handleSyncRequest, commManagement,
                              proxyID,
-                             50, // ProxyAS
-                             NULL);
+                             (uint32_t)50, // ProxyAS
+                             (void*)NULL);
       if (proxy == NULL)
       {
         printf("failed!\n");
@@ -1881,7 +1913,7 @@ int main(int argc, char* argv[])
   proxy = createSRxProxy(handleValidationResult, handleSignatures,
                          handleSyncRequest, commManagement,
                          proxyID,
-                         50, // ProxyAS
+                         DEFAULT_PEERAS, // ProxyAS
                          NULL);
 
   if (proxy == NULL)

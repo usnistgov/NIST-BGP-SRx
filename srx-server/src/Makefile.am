@@ -109,7 +109,9 @@ srx_server_SOURCES = $(SERVER_DIR)/bgpsec_handler.c \
 		     $(SERVER_DIR)/rpki_packet_printer.c \
 		     $(SERVER_DIR)/server_connection_handler.c \
 		     $(SERVER_DIR)/srx_packet_sender.c \
-		     $(SERVER_DIR)/update_cache.c 
+		     $(SERVER_DIR)/update_cache.c \
+		     $(SERVER_DIR)/aspa_trie.c \
+		     $(SERVER_DIR)/aspath_cache.c 
 
 srx_server_LDADD = $(LIB_PATRICIA) $(SCA_LIBS) \
 		   libsrx_shared.la \
@@ -196,6 +198,8 @@ noinst_HEADERS = $(CLIENT_DIR)/client_connection_handler.h \
 		 $(SERVER_DIR)/srx_packet_sender.h \
 		 $(SERVER_DIR)/srx_server.h \
 		 $(SERVER_DIR)/update_cache.h \
+		 $(SERVER_DIR)/aspa_trie.h \
+		 $(SERVER_DIR)/aspath_cache.h \
 		 \
 		 $(SHARED_DIR)/srx_packets.h \
 		 $(SHARED_DIR)/srx_defs.h \
