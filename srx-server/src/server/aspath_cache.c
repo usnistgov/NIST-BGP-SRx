@@ -22,10 +22,12 @@
  *
  * This file contains the AS-Path Cache.
  *
- * Version 0.6.0.0
+ * Version 0.6.1.0
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.0 - 2021/08/27 - kyehwanl
+ *           * Added additional error condition
  * 0.6.0.0 - 2021/03/31 - oborchert
  *           * Modified loops to be C99 compliant 
  *         - 2021/02/26 - kyehwanl
@@ -232,6 +234,12 @@ int storeAspathList (AspathCache* self, SRxDefaultResult* srxRes,
                       uint32_t pathId, AS_TYPE asType, AS_PATH_LIST* pathlistEntry)
 {
   int retVal = 1; // by default report it worked
+
+  if(!pathlistEntry)
+  {
+    LOG(LEVEL_ERROR, "path list entry doesn't exist!");
+    return -1;
+  }
 
   PathListCacheTable *plCacheTable;
   

@@ -1,5 +1,11 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.1.0
+ * quagga-srx V0.99.22.srx.0.6.0.0_release
+ * srx-server V0.6.1.0_release
+ * srx-crypto-api V0.3.0.3_release
+ * bgpsec-io version_0.2.1.8
+ * examples 0.6.0.0_release
 Version 6.0.3
  * Update to the README.md file
 Pre Release 6.0.2

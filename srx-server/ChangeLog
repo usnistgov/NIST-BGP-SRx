@@ -1,12 +1,18 @@
-ChangeLog for Version 0.6.0.0
+ChangeLog for Version 0.6.1
+- Fixed issues in APSA algorithm that change the outcome in certain scenarios.
+- Removed dead code
+- Added c99 flag to allow c99 code style 
+- Added srx-server-protocol specification to doc folder
+ChangeLog for Version 0.6.0
+- Fixes spellers in output and ChangeLog
 - Added ASPA processing as specified in draft-ietf-sidrops-aspa-verification-07
 - Added an ASPA trie to maintain ASPA information.
 - Added a new cache to store AS-Path information needed for ASPA processing.as
 - Added ASPA processing to CommandHandler.
-- Added inplementation for draft-8210bis which provides ASPA objects for the 
+- Added implementation for draft-8210bis which provides ASPA objects for the 
   router to cache protocol. This is an early adoption of the draft currently
   active in the IETF SIDROPS working group.
-- Added ASPA PDU processing to RPKI-Hanlder.
+- Added ASPA PDU processing to RPKI-Handler.
 - Modified SRx-Proxy-Protocol to version 3
 - Modified project email and website
 Changelog for Version 0.5.1
@@ -21,7 +27,7 @@ Changelog for Version 0.5.1
   connect. 
 Changelog for Version 0.5.0
 - Removed revision test (0.5.0.7)
-- Removed inine keyword from header files and minor bug fixes (0.5.0.6)
+- Removed inline keyword from header files and minor bug fixes (0.5.0.6)
 - Fixed some error handling and fixed verbose output (0.5.0.5)
 - Modified debugging of send and received messages (0.5.0.4)
 - Fixed rpkirtr_srv "cache" printout for router keys (update 0.5.0.3)
@@ -61,21 +67,21 @@ Changelog for Version 0.3.0
 - Fixed init.d server daemon script
 - Removed un-used configuration switches.
 - Removed the libconfig library distribution from source package. 
-- Fixed minor output formating at the remote console.
+- Fixed minor output formatting at the remote console.
 - modified the RPM installer in such that the configuration file is not deleted 
   upon removal. It is renamed into srx_server.conf.rpmsav 
 - Fixed issues with specifying the location of the configuration file.
 - Fixed Memory issue in configuration.c that caused crashes the server on Ubuntu 
   based Systems. 
 - Changed updated validation state from "Unknown" to "NotFound" - RFC6811
-- Ignore adding white-list entries for ROAS assigned to ASN's reserved for 
+- Ignore adding white-list entries for ROAs assigned to ASNs reserved for 
   documentation examples only - RFC5398
 - Fixed missing requirement of RFC 6483 which states an origin cannot be found 
-  if an AS_SET exists. (Its a QuaggaSRx bug but also needs some tweeking here. 
+  if an AS_SET exists. (Its a QuaggaSRx bug but also needs some tweaking here. 
 - Use sync=true as default setting
 - Remodeled the message communication management in srx proxy API. These 
   management handler allows the user of the SRx proxy to implement an error 
-  handler as well as a generell message handler.
+  handler as well as a general message handler.
 - Disabled command rtr-goodbye in server console due to bugs. 
   Will be differed to 0.3.1 or later
 - Fixed bugs during connect call and timeout.

@@ -25,10 +25,16 @@
  * queue is fed by the srx-proxy communication thread.
  *
  *
- * @version 0.6.0.0
+ * @version 0.6.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.0 - 2021/08/27 - kyehwanl
+ *           * Added validation conditions for only AS_SET list case
+ *         - 2021/07/27 - kyehwanl
+ *           * Removed un-used code
+ *           * Downstream ASPA validation updated with the supplemented 
+ *             algorithm
  * 0.6.0.0 - 2021/03/31 - oborchert
  *           * Modified loops to be C99 compliant 
  *         - 2021/03/30 - oborchert
@@ -380,8 +386,6 @@ uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType,
 
   uint32_t customerAS, providerAS, startId=0;
   bool swapFlag = false;
-  // index for for loops
-  int idx = 0;
 
   // 
   // Initial Check for direct neighbor
@@ -405,7 +409,7 @@ uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType,
   ASPA_ValidationResult hopResult[length];  
 
   // initialize
-  for (idx = 0; idx < length; idx++)
+  for(int idx =0; idx <length; idx++)
   {
     hopResult[idx] = 0;
   }
@@ -439,31 +443,22 @@ uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType,
   {
     LOG(LEVEL_INFO, "Upstream Validation start");
     LOG(LEVEL_INFO, "Lookup Result Index (0:valid, 1:Invalid, 2:Undefined 4:Unknown, 8:Unverifiable)");
-    for (idx = 0; idx < length-1; idx++)
+    for (int idx=0; idx < length-1; idx++)
     {
-      /*
-      if (asType == AS_SET) // if AS_SET, skip
-      {
-        hopResult[idx+1] = ASPA_RESULT_UNVERIFIABLE;
-        LOG(LEVEL_INFO, "validation  - Unverifiable detected");
-        continue;
-      }
-      */
-
       customerAS = list[idx];
       providerAS = list[idx+1];
       LOG(LEVEL_INFO, "customer AS: %d\t provider AS: %d", customerAS, 
-                      providerAS);
+          providerAS);
 
       currentResult = hopResult[idx+1] = 
-                     ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+        ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
 
       result |= currentResult;
       LOG(LEVEL_INFO, "current lookup result: %x Accured Result: %x", 
-                      currentResult, result);
+          currentResult, result);
 
-      if (   currentResult == ASPA_RESULT_VALID 
-          || currentResult == ASPA_RESULT_UNKNOWN)
+      if (currentResult == ASPA_RESULT_VALID || 
+          currentResult == ASPA_RESULT_UNKNOWN)
         continue;
 
       if (currentResult == ASPA_RESULT_INVALID)
@@ -477,61 +472,150 @@ uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType,
    */
   else 
   {
-    LOG(LEVEL_INFO, "Downstream Validation start");
-    uint32_t temp;
-    for (idx = 0; idx < length-1; idx++)
+    LOG(LEVEL_INFO, "Downstream Validation starting...");
+    uint8_t K_val, L_val, u_val=0, i_val, j_val, iMax=0, jMax=0;
+
+    if (length == 1)
     {
-      /*
-      if (asType == AS_SET) // if AS_SET, skip
+      result |= ASPA_RESULT_VALID;
+      LOG(LEVEL_INFO, "Valid if AS path length is one");
+      goto Validation_Result;
+    }
+
+    //
+    // finding K value
+    //
+    LOG(LEVEL_INFO, "Downstream - Finding K value");
+    for (i_val=1; i_val <= length-2; i_val++)
+    {
+      customerAS = list[i_val-1];
+      providerAS = list[i_val];
+    
+      LOG(LEVEL_INFO, "+ Testing ASPA_Eval(cust:%d, prov:%d)", customerAS, providerAS);
+        
+      ASPA_ValidationResult tempResult = 
+        ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+
+      if (tempResult == ASPA_RESULT_VALID)
       {
-        hopResult[idx+1] = ASPA_RESULT_UNVERIFIABLE;
-        LOG(LEVEL_INFO, "validation  - Unverifiable detected");
+        iMax = i_val;
         continue;
       }
-      */
-
-      customerAS = list[idx];
-      providerAS = list[idx+1];
-
-      if (swapFlag)
+      else 
       {
-        temp       = customerAS;
-        customerAS = providerAS;
-        providerAS = temp;
-        LOG(LEVEL_INFO, "customer provider ASN swapped ");
+        break;
       }
-      LOG(LEVEL_INFO, "customer AS: %d\t provider AS: %d", 
-                      customerAS, providerAS);
+    }
+    K_val = iMax +1;    
 
-      currentResult = hopResult[idx+1] = 
-                     ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+    if (K_val == length -1)
+    {
+      result |= ASPA_RESULT_VALID;
+      LOG(LEVEL_INFO, "Valid if AS path left one");
+      goto Validation_Result;
+    }
+    LOG(LEVEL_INFO, "K value found: %d - path list[%d] : %d ", 
+        K_val, K_val-1, list[K_val-1]);
 
-      result |= currentResult;
-      LOG(LEVEL_INFO, "current lookup result: %x Accured Result: %x", 
-                      currentResult, result);
+
+    //
+    // finding L value
+    //
+    LOG(LEVEL_INFO, "Downstream - Finding L value");
+    for (j_val=1; j_val <= length-K_val-1; j_val++)
+    {
+      customerAS = list[length - j_val];
+      providerAS = list[length - (j_val+1)];
+
+      LOG(LEVEL_INFO, "+ Testing ASPA_Eval(cust:%d, prov:%d)", customerAS, providerAS);
+
+      ASPA_ValidationResult tempResult = 
+        ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+
+      if (tempResult == ASPA_RESULT_VALID)
+      {
+        jMax = j_val;
+        continue;
+      }
+      else 
+      {
+        break;
+      }
+    }
+    L_val = length - jMax; 
+
+    LOG(LEVEL_INFO, "L value found: %d - path list[%d] : %d ", 
+        L_val,  L_val-1,  list[L_val-1]);
+
+
+    // Intrim ASes Evaluation
+    if (L_val-K_val <= 1)
+    {
+      LOG(LEVEL_INFO, "Downstream - Interim Evaluation in case L-K value <= 1");
+      result |= ASPA_RESULT_VALID;
+    }
+    else if ( L_val-K_val >= 2)
+    {
+      LOG(LEVEL_INFO, "Downstream - Interim Evaluation in case L-K value >= 2");
+      // first check forward direction
+      for (int i_val=K_val; i_val <= L_val-2; i_val++)
+      {
+        customerAS = list[i_val-1];
+        providerAS = list[i_val];
       
-      if (   currentResult == ASPA_RESULT_VALID 
-          || currentResult == ASPA_RESULT_UNKNOWN)
-        continue;
+        LOG(LEVEL_INFO, "+ Testing i val=%d, ASPA_Eval(cust:%d, prov:%d) - forward",
+            i_val, customerAS, providerAS);
 
-      if (currentResult == ASPA_RESULT_INVALID && !swapFlag)
-      {
-        swapFlag = true;
-        result ^= currentResult;
-        LOG(LEVEL_INFO, "INVALID and swap flag set (modified Accured Result: 0x%x)", result);
-        continue;
+        ASPA_ValidationResult tempResult = 
+          ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+      
+        if (tempResult == ASPA_RESULT_INVALID)
+        {
+          u_val = i_val;
+          LOG(LEVEL_INFO, "+ u value: =%d", u_val);
+          break;
+        }
+        else
+        {
+          result |= ASPA_RESULT_UNKNOWN;
+          continue;
+        }
       }
-      else
+
+      // second check - reverse direction
+      if (u_val != 0)
       {
-        return SRx_RESULT_INVALID;
+        for(int j_val= u_val+1; j_val <= L_val-1; j_val++)
+        {
+          customerAS = list[j_val];
+          providerAS = list[j_val-1];
+
+          LOG(LEVEL_INFO, "+ Testing j val=%d, ASPA_Eval(cust:%d, prov:%d) - reverse",
+              j_val, customerAS, providerAS);
+
+          ASPA_ValidationResult tempResult = 
+            ASPA_DB_lookup(aspaDBManager, customerAS, providerAS, afi);
+
+          if (tempResult == ASPA_RESULT_INVALID)
+          {
+            return SRx_RESULT_INVALID;
+          }
+          else
+          {
+            result |= ASPA_RESULT_UNKNOWN;
+            continue;
+          }
+        }
       }
-    } 
+
+    } // end - if (L-K >=2 )
   } // end of DownStream
 
 
   /* 
    * Final result return
    */
+Validation_Result:
   result = result & 0x0f; // filter out
   if (result == ASPA_RESULT_VALID)
     return SRx_RESULT_VALID;
@@ -547,6 +631,7 @@ uint8_t validateASPA (PATH_LIST* asPathList, uint8_t length, AS_TYPE asType,
 
   return SRx_RESULT_UNDEFINED;
 }
+
 
 
 /**
@@ -709,12 +794,21 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
         aspl->lastModified = cTime;
         modifyAspaValidationResultToAspathCache (cmdHandler->aspathCache, pathId, 
             valResult, aspl);
+
+        // modify aspl and srx Res
         aspl->aspaValResult = valResult;
+        //if (srxRes.aspaResult != valResult)
+          //srxRes.aspaResult  = valResult;
       }
 
       // modify Update Cache
       srxRes_mod.aspaResult = aspl->aspaValResult;
           
+    }
+    else if (!aspl && pathId == 0 && (bhdr->asType == AS_SET))
+    {
+      LOG(LEVEL_INFO, "Unverifiable enabled for the aspath list which only includes AS_SET");
+      srxRes_mod.aspaResult = SRx_RESULT_UNVERIFIABLE;  
     }
     else
     {
@@ -735,11 +829,23 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
   // has the validation result which was generated previously with the same path list 
   //
   if (aspaVal && srxRes.aspaResult != SRx_RESULT_UNDEFINED
-              && (defRes.result.aspaResult != SRx_RESULT_INVALID))
+              && (defRes.result.aspaResult != SRx_RESULT_INVALID)
+              && (bhdr->asType != AS_SET))
   {
-    // modify Update Cache
+    LOG(LEVEL_INFO, "path id and srx result already exists in UpdateCache");
     srxRes_mod.aspaResult = srxRes.aspaResult; // srx Res came from UpdateCache (cEntry)
   }
+
+  // AS SET comes with srx result which has aspa value not undefined
+  else if (aspaVal && srxRes.aspaResult != SRx_RESULT_UNDEFINED
+              && (defRes.result.aspaResult != SRx_RESULT_INVALID)
+              && (bhdr->asType == AS_SET)
+              && pathId == 0)
+  {
+    LOG(LEVEL_INFO, "Unverifiable enabled with only includes AS_SET and srx result is not undefined");
+    srxRes_mod.aspaResult = SRx_RESULT_UNVERIFIABLE;  
+  }
+
 
 
   // Now check if the update changed - In a future version check if bgpsecResult

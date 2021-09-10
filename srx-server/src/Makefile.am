@@ -11,7 +11,7 @@ TOOLS_DIR = tools
 UTIL_DIR = util
 TEST_DIR = test
 
-AM_CFLAGS = -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS)
+AM_CFLAGS = -DSRX_SERVER_PACKAGE=$(PACKAGE_VERSION) $(SCA_CFLAGS) -std=gnu99
 
 # Used to generate the srx folder for installation - DESTDIR for RPM generation
 INC_OUT = $(DESTDIR)$(includedir)/$(SRX_DIR)

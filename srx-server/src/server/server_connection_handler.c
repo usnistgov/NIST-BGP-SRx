@@ -20,12 +20,14 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.6.0.0
+ * @version 0.6.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.0  - 2021/08/27 - kyehwanl
+ *            * Added logging informations
  * 0.6.0.0  - 2021/04/06 - oborchert
- *            * Modified access to asType and asRelType to common header.s
+ *            * Modified access to asType and asRelType to common header.
  *          - 2021/02/26 - kyehwanl
  *            * Added ASPA processing
  * 0.5.0.1  - 2016/08/29 - oborchert
@@ -668,8 +670,13 @@ bool processValidationRequest(ServerConnectionHandler* self,
                                     clientID, clientMapping,
                                     &srxRes, &defResInfo, &pathId);
   
-  LOG(LEVEL_INFO, FILE_LINE_INFO " ASpath cache starts with pathID: [0x%08X] "
-      "AS Type: %d AS Relationship: %d updateId: [0x%08X]", pathId, asType, asRelType, updateID);
+  LOG(LEVEL_INFO, FILE_LINE_INFO "\033[1;33m ------- Received ASpath info ------- \033[0m");
+  LOG(LEVEL_INFO, "     updateId: [0x%08X] pathID: [0x%08X] "
+      " AS Type: %s  AS Relationship: %s", 
+      updateID, pathId, 
+      asType==2 ? "AS_SEQUENCE": (asType==1 ? "AS_SET": "ETC"),
+      asRelType == 2 ? "provider" : (asRelType == 1 ? "customer": \        
+        (asRelType == 3 ? "sibling": (asRelType == 4 ? "lateral" : "unknown"))));
 
   AS_PATH_LIST *aspl;
   SRxResult srxRes_aspa; 
@@ -732,7 +739,7 @@ bool processValidationRequest(ServerConnectionHandler* self,
       if(!aspl)
       {
         LOG(LEVEL_ERROR, " memory allocation for AS path list entry resulted in fault");
-        return false;
+        //return false;
       }
   
       if (doStoreUpdate)
