@@ -1,8 +1,13 @@
+Version 0.2.1.8
+  * Fixed incorrect k value printout while displaying syntax.
+Version 0.2.1.7
+  * Fixed spellers, especially BGP4 to BGP-4 in documentation.
+  * Added inofficial setting "BGP-4" next to "BGP4".
 Version 0.2.1.6
   * Fixed segmentation fault in update scripting.
   * Extended regex description for update generation in auto generated
     config script to show how to add AS_SET to an update.
-  * Updates with AS_SET are forced BGP4 only updates.
+  * Updates with AS_SET are forced BGP-4 only updates.
 Version 0.2.1.5
   * Removed data folder, will now be provided by examples project
   * Fixed GEN mode that produced incorrect binary data files.

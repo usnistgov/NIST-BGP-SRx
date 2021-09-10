@@ -1,8 +1,8 @@
-This folder contains NIST BGP-SRx Software Suite V6.0.1
+This folder contains NIST BGP-SRx Software Suite V6.0.2
  * quagga-srx V0.99.22.srx.0.6.0.0_release
  * srx-server V0.6.0.0_release
  * srx-crypto-api V0.3.0.3_release
- * bgpsec-io version_0.2.1.6
+ * bgpsec-io version_0.2.1.8
  * examples 0.6.0.0_release
 
 Comments for this software package:
@@ -27,7 +27,7 @@ Comments for this software package:
   - requires libconfig-devel
   - requires openssl-devel
   - requires uthash-devel
-* bgpsec-io version_0.2.1.6 developed and tested under CentOS.
+* bgpsec-io version_0.2.1.8 developed and tested under CentOS.
   - requires srx-crypto-api
   - requires libconfig-devel
   - requires openssl-devel

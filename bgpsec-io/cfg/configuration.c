@@ -21,10 +21,19 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.6
+ * @version 0.2.1.8
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.8 - 2021/09/09 - oborchert
+ *            * Fixed incorreck k value being printed out for BIO-2 when 
+ *              printing syntax
+ *  0.2.1.7 - 2021/09/03 - oborchert
+ *            * Fixed formatting in code.
+ *          - 2021/07/12 - oborchert
+ *            * Fixed spellers in the configuration.
+ *            * Added P_TYPE_NSM_BGP_4="BGP-4" as inofficial alternative to 
+ *              setting "BGP4"
  *  0.2.1.6 - 2021/05/21 - oborchert
  *            * Fixed a segmentation fault in update processing
  *  0.2.1.5 - 2021/05/10 - oborchert
@@ -218,7 +227,7 @@ static void _setErrMsg(PrgParams* param, char* str)
 void printSyntax()
 {
   printf ("\nSyntax: %s [parameters]\n", PRG_NAME);
-  printf (" This program allows to receive updates via pipe stream, one update"
+  printf (" This program allows receiving updates via pipe stream, one update"
           " per line.\n");
   printf ("\n Parameters:\n");
   printf (" ===========\n");
@@ -245,7 +254,7 @@ void printSyntax()
   printf ("                  an extended community string will be added with\n");
   printf ("                  the RPKI validation state I:invalid, V:valid, or\n");
   printf ("                  N:not-found (no difference between iBGP or eBGP\n");  
-  printf ("                To define BGP4 only path, start path with B4 for BGP4!\n");
+  printf ("                To define BGP-4 only path, start path with B4 for BGP-4!\n");
 
  // SKI_FILE
   printf ("  -%c <filename>, %s <filename>\n", P_C_SKI_FILE, P_SKI_FILE);
@@ -322,7 +331,7 @@ void printSyntax()
   // Binary Output file
   printf ("  -%c <filename>, %s <filename>\n", P_C_OUTFILE, P_OUTFILE);
   printf ("          The filename where to write the output to - Here only\n");
-  printf ("          the first configures session will be used.\n");
+  printf ("          the first configured session will be used.\n");
   printf ("          Requires GEN mode!!\n");
 
   // Binary Output file
@@ -400,7 +409,7 @@ void printSyntax()
   CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K1);
   printf ("           k=%s\n", kStr);
   printf ("          BIO-K2 uses k for SHA256 and msg=test.\n");
-  CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K1);
+  CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K2);
   printf ("           k=%s\n", kStr);
   
   // Force extended length for BGPSEC path attribute.
@@ -1471,7 +1480,11 @@ bool readConfig(PrgParams* params)
             } else if (strcmp(strVal, P_TYPE_NSM_BGP4) == 0)
             {
               bgpConf->algoParam.ns_mode = NS_BGP4;
-            } else if (strcmp(strVal, P_TYPE_NSM_FAKE) == 0)
+            } else if (strcmp(strVal, P_TYPE_NSM_BGP_4) == 0)
+            { // Inofficial alternative setting for BGP4
+              bgpConf->algoParam.ns_mode = NS_BGP4;
+            }
+            else if (strcmp(strVal, P_TYPE_NSM_FAKE) == 0)
             {
               bgpConf->algoParam.ns_mode = NS_FAKE;
 

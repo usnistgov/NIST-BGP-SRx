@@ -22,10 +22,13 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.5
+ * @version 0.2.1.7
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.7 - 2021/07/12 - oborchert
+ *            * Added P_TYPE_NSM_BGP_4="BGP-4" as inofficial alternative to 
+ *              setting "BGP4"
  *  0.2.1.5 - 2021/05/10 - oborchert
  *            * Updated changes from 0.2.1.3 to point into /opt/bgp-srx-examples
  *            * Modified SRX_DEV_TOYEAR to reflect 2021
@@ -58,7 +61,7 @@
  *          - 2017/12/05 - oborchert
  *            * Replaced interface binding with outgoing IP address binding.
  *              (does not require elevated privileges - better solution)
- *            * Added capability to use an update as BGP4 only
+ *            * Added capability to use an update as BGP-4 only
  *          - 2017/11/12 - oborchert
  *            * Added configuration for interface binding
  *  0.2.0.21 -2018/06/08 - oborchert
@@ -188,7 +191,7 @@
 #define DEF_PRINT              false
 // The default setting for encoding IPv4 updates in MP_NLRI format.
 #define DEF_MPNLRI_V4          true
-// The default setting for BGP4 UPDATE prefix packing
+// The default setting for BGP-4 UPDATE prefix packing
 #define DEF_PACKING            false;
 
 /******************************************************************************/
@@ -205,8 +208,11 @@
 #define P_TYPE_NSM_DROP "DROP" 
 /* Use the fake signature. */
 #define P_TYPE_NSM_FAKE "FAKE" 
-/* Use BGP4 attribute instead of BGPSec*/
-#define P_TYPE_NSM_BGP4 "BGP4"
+/* Use BGP-4 attribute instead of BGPSec*/
+#define P_TYPE_NSM_BGP4  "BGP4"
+/** Inofficial alternative to "BGP4" 
+ * @since 2.1.7 */
+#define P_TYPE_NSM_BGP_4 "BGP-4"
 
 // Specification for signature mode
 #define P_TYPE_SIGMODE_CAPI   "CAPI"
@@ -522,7 +528,7 @@ typedef enum OP_Mode
  *  main method. */
 typedef struct 
 {
-  /** Indicates if this update MUST be used as BGP4 only update. */
+  /** Indicates if this update MUST be used as BGP-4 only update. */
   bool            bgp4_only;
   /** Can be typecase to IPv4 and IPv6. */
   BGPSEC_V6Prefix prefixTpl;
