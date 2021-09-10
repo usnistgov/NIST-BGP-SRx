@@ -21,10 +21,13 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.7
+ * @version 0.2.1.8
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.8 - 2021/09/09 - oborchert
+ *            * Fixed incorreck k value being printed out for BIO-2 when 
+ *              printing syntax
  *  0.2.1.7 - 2021/09/03 - oborchert
  *            * Fixed formatting in code.
  *          - 2021/07/12 - oborchert
@@ -406,7 +409,7 @@ void printSyntax()
   CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K1);
   printf ("           k=%s\n", kStr);
   printf ("          BIO-K2 uses k for SHA256 and msg=test.\n");
-  CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K1);
+  CRYPTO_k_to_string(kStr, STR_MAX, SM_BIO_K2);
   printf ("           k=%s\n", kStr);
   
   // Force extended length for BGPSEC path attribute.

@@ -25,31 +25,30 @@ but not limited to:
 
 ## Project Status
 
-The project contains two major versions, version 5 which is the current major 
-version providing BGPsec path validation and prefix origin validation. Even though 
-the majority of modules within this version are currently in maintenance only mode
-only, we did add an experimentation part to this version.
-The second version available in this repository will be version 6 which provides
-an overhaul of the QuaggaSRx implementation by separating path and origin validation
-as well as adding ASPA validation. Version 6 is currently only in pre-release available
-and once the release version 6 will be available we will add it to the master branch.
+The project contains two major versions:
+* **version 6** which is the current major
+version providing BGPsec path validation (BGP-PV), BGP origin validation (BGP-OV) and ASPA validation (BGP-AV).
+
+* **version 5** only contains BGP-PV and BGP-OV.
+
+Version 6 provides
+an overhaul of the QuaggaSRx policy processing by separating BGP-PV and BGP-OV as well as adding ASPA validation (BGP-PV).
+This version is the preferred version available in the master branch.
 
 ## Branching
 
-The main branch of the repository will still deliver NIST-BGP-SRx version 5.
-Branch: 
-* **version5**: This branch is synchronized with the master branch. Implementations
-            can easily switch between version5 and master back and forth, both deliver
-            the same content.
-* **pre-release-6**: This branch is a "sneak preview" of the upcoming version 6.
+The main branch of the repository will deliver NIST-BGP-SRx version 6.
+Branch:
+* **master**: This branch provides the current recommended version of NIST-BGP-SRx (version6.1).
+            This version contains ASPA validation and a complete re-write of the Quagga-SRx
+            policy scripting and processing for BGP-OV, BGP-PV, and BGP-AV.
             The ASPA implementation follows the IETF draft draft-ietf-sidrops-aspa-verification-07
-            but some modifications within the algorithm are expected to come in the next
-            version of the draft. Once the new updates are implemented, we will release version 6.
-            From that moment on, master will provide the version 6 code base.
-* **master**: This branch provides the current recommended version of NIST-BGP-SRx (version5).
-            All modifications to this branch will be merged into the version5 branch only.
-            Once version 6 is released, master will hold version6.
-            At that point changes to version5 are only applied to branch version5.
+            including an expected modification for Downstream validation which is expected in the
+            next draft.
+* **version5**: This branch stands on its own and is only maintained for BUG fixes.
+            New features are added to the master branch which is contains NIST-BGP-SRx Version 6.
+* **pre-release-6** (*deprecated*): This branch was a "sneak preview" of the upcoming version 6 and
+            is not further maintained and expected to be removed in the future.
 
 ## Testing
 
@@ -57,31 +56,31 @@ The software was continuously tested during development. We performed
 interoperability test and published them at IETF SIDR meetings as well as
 IETF SIDROPS meetings.
 The codebase itself provides a simple testing to test basic functionality.
-The developement was doneusing CentOS 7 though we compiled the project on CentOS 8 and successfullly executed the test suite provided in this release.
+The development was done using CentOS 7 though we compiled the project on CentOS 8 and successfully executed the test suite provided in this release.
 
 ### Unit Test
 
 BGP-SRx consists of fours semi-independent components. Semi-independent only
 because some components such as the srx-crypto-api and srx-server do provide
-API's for other components within the package. The development though is 
-performed separately. 
+API's for other components within the package. The development though is
+performed separately.
 
 For this reason each component will have its own unit tests if at all. These
-will if available be located within the appropriate source folder or the newly 
+will if available be located within the appropriate source folder or the newly
 added EXAMPLES project which will be installed in ```opt/bgp-srx-examples```. Please
 consult the README files located in each component directory for more information.
 
 ### Performance Test
 
 The software was tested throughout the development and multiple publications are
-available regarding performance testing. Please visit the 
+available regarding performance testing. Please visit the
 [NIST BGP-SRx project page](https://bgp-srx.antd.nist.gov) for more information.
 
 
 ## Getting Started
 
 This project archive provides a "buildBGP-SRx.sh" shell script for an easy
-sandbox installation. This script allows to have the software sinstalled within
+sandbox installation. This script allows to have the software installed within
 the code folder.
 
 The codebase itself contains multiple components
@@ -117,7 +116,6 @@ This archive provides two forms of building and installing the software.
 * Using Linux System(s) / VM / Containers other than docker
 * Using Docker
 
-
 ### Building & Installing (Single System Install - Physical system, VM, other)
 
 The CONTENT file does specify what development libraries are required
@@ -138,13 +136,13 @@ in detail by calling
 
 For building the software we provide a bash shell script which allows
 the software to be configured, build, and installed within the folder
-it is stored in. This folder functions as a sandbox. 
+it is stored in. This folder functions as a sandbox.
 
 ```
 ./buildBGP-SRx.sh
 ```
 
-Furthermore this script allows to build, configure, install, or clean 
+Furthermore this script allows to build, configure, install, or clean
 not only the complete project but also separately sub components.
 
 **SCA:**       SRx Crypto API
@@ -159,13 +157,13 @@ not only the complete project but also separately sub components.
 
 #### Manual Building
 
-For manual installation, each component's separate source folder contains the 
-appropriate README and INSTALL files. They contain all necessary information. 
-It is important to note that building the components requires to keep a certain 
-order. It is also possible to manually call the auto build script for each 
+For manual installation, each component's separate source folder contains the
+appropriate README and INSTALL files. They contain all necessary information.
+It is important to note that building the components requires to keep a certain
+order. It is also possible to manually call the auto build script for each
 component individually.
 
-To rebuild the configuration scripts call *autoreconf -i --force*. For that 
+To rebuild the configuration scripts call *autoreconf -i --force*. For that
 the automake tools are required.
 
 To build and install only the SRx Crypto API use the SCA option.
@@ -191,17 +189,17 @@ To build and install only the SRx Crypto API use the SCA option.
 
 #### Using Bootstrap Install Script
 
-This section provides a script that can be used for a CentOS 7 and 
-CentOS 8 minimal install. Copy the script below into a new install 
-script file and run it. The script is tested and should be free of 
+This section provides a script that can be used for a CentOS 7 and
+CentOS 8 minimal install. Copy the script below into a new install
+script file and run it. The script is tested and should be free of
 bugs but regardless it is to be used on your on risk!
 
-The script functions works with default CentOS 7 and CentOS 8 Docker 
-containers, though the configuration of the experiments does fail if 
-not enough interfaces are provided to the container itself. Due to 
-security restrictions, this script is not able to generate alias 
+The script functions works with default CentOS 7 and CentOS 8 Docker
+containers, though the configuration of the experiments does fail if
+not enough interfaces are provided to the container itself. Due to
+security restrictions, this script is not able to generate alias
 interfaces from within a docker container as it is possible from within
-virtual machines, [ProxMox](https://www.proxmox.com/en/) containers, 
+virtual machines, [ProxMox](https://www.proxmox.com/en/) containers,
 and physical systems. The script is configured for CentOS 7 distributions
 but also can operate under CentOS 8 distributions using the switch 'c8'.
 
@@ -223,10 +221,8 @@ echo "Install Script for BGP-SRx on clean CentOS 7 and CentOS 8 install"
 
 repo=( "https://github.com/usnistgov/NIST-BGP-SRx" NIST-BGP-SRx-master
        "--branch__version5__https://github.com/usnistgov/NIST-BGP-SRx" NIST-BGP-SRx-master
-       "--branch__pre-release-6__https://github.com/usnistgov/NIST-BGP-SRx" NIST-BGP-SRx-master
-       "https://github.com/usnistgov/NIST-BGP-SRx/archive/refs/heads/master.zip" NIST-BGP-SRx-master
+       "https://github.com/usnistgov/NIST-BGP-SRx/archive/refs/heads/master.zip" NIST-BGP-SRx-version6
        "https://github.com/usnistgov/NIST-BGP-SRx/archive/refs/heads/version5.zip" NIST-BGP-SRx-version5
-       "https://github.com/usnistgov/NIST-BGP-SRx/archive/refs/heads/pre-release-6.zip" NIST-BGP-SRx-pre-release-6
       )
 
 select_repo=0
@@ -234,7 +230,7 @@ select_file=$(($select_repo+1))
 version=0
 zip_start=0
 use_c8=0
-switches=( "master" "v5" "pr6" )
+switches=( "master" "v5" "v6" )
 sw_str=$(echo ${switches[@]} | sed -e "s/ /|/g")
 in_docker_image="$(cat /proc/1/cgroup | grep 'docker/' | tail -1 | sed 's/^.*\///' | cut -c 1-12)"
 
@@ -263,9 +259,12 @@ do
            exit 
            ;;
 
-    "master") select=0; version="GitHub master" ;;
-    "v5")     select=1; version="GitHub V5" ;;
-    "pr6")    select=2; version="GitHub PR 6" ;;
+    "master" \
+    | "v6") select=0; version="GitHub V6" ;;
+    "v5")   select=1; version="GitHub V5" ;;
+
+    "pr6") echo "Pre-Release is deprecated! Abort !!"; exit 99 ;;
+
     "c8") echo "Prepare for CentOS 8"
           tool_pkg="$(echo $tool_pkg) dnf-plugins-core"
           devel_pkg="$(echo $devel_pkg) make tar patch"
@@ -444,23 +443,23 @@ the above content into the file and call 'sh <your-file>'
 
 To install the binaries outside of the "sandbox" folder where the code is
 located, call the build script ```buildBGP-SRx.sh -P <absolute-path> [<more parameters>]```
-and the binaries will will be installed inthe given ```<absolute-path>```
-folder. Make sure the build script has access to either create the path 
+and the binaries will will be installed in the given ```<absolute-path>```
+folder. Make sure the build script has access to either create the path
 and or create the binaries in the  given path.
 
 ### Quick Functional Test / Demo
 
 The BGP-SRx software suite does provide a test system integrated in the build  
-script. The script does test proper functionality of the srx-crypto-api as well 
+script. The script does test proper functionality of the srx-crypto-api as well
 as the integration into BGPsec-IO.
 
 Furthermore BGP-SRx provides a complete set of examples, demos which are
-located in the examples folder but will be compiled for the host system 
-uding the buildBGP-SRx.sh script. 
+located in the examples folder but will be compiled for the host system
+using the buildBGP-SRx.sh script.
 The examples will be installed in the folder ```opt/bgp-srx-examples/``` folder.
 Each example does have it's own example starter script which allows to easily
-start all needed components eiterh usinf the ```screen``` tool (default) or
-the ```gnome-terminal``` using ```-t```. 
+start all needed components either using the ```screen``` tool (default) or
+the ```gnome-terminal``` using ```-t```.
 Furthermore the test folders contain an appropriate run/sh script.
 All scripts provide a help which will be printed by using the ```-?``` switch.
 
@@ -480,11 +479,10 @@ All scripts provide a help which will be printed by using the ```-?``` switch.
 
   https://docs.docker.com/compose/install/
 
-
-
 #### Docker Running Examples
 
-In order to edit QuaggaSRx, SRx Server and Rpkirtr server's configuration files in detail, please refer to each example file within the example directories.
+In order to edit QuaggaSRx, SRx Server and Rpkirtr server's configuration files in detail,
+please refer to each example file within the example directories.
 
 * **Generate Docker image**
 
@@ -534,7 +532,7 @@ In order to edit QuaggaSRx, SRx Server and Rpkirtr server's configuration files 
 
   Example Result: 172.17.0.2
   ```
-  Using the retrieved IP address, configure the SRx Server instance to point ot the RPKI Cache Test Harness. Here replace 172.17.0.2 with the IP address retrieved prior. 
+  Using the retrieved IP address, configure the SRx Server instance to point ot the RPKI Cache Test Harness. Here replace 172.17.0.2 with the IP address retrieved prior.
   ```
   sed "s/localhost/172.17.0.2/g" ./srx-server/src/server/srx_server.conf > /tmp/srx_server.conf
   ```
@@ -621,7 +619,7 @@ to the projects.
 
 ## Copyright
 
-For license information see the [LICENSE](LICENSE) file. 
+For license information see the [LICENSE](LICENSE) file.
 
 ## Contacts
 
