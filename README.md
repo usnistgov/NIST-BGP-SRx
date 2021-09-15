@@ -447,6 +447,32 @@ and the binaries will will be installed in the given ```<absolute-path>```
 folder. Make sure the build script has access to either create the path
 and or create the binaries in the  given path.
 
+#### Error during install incl. Bootstrap Install Script
+
+In case the ```buildBGP-SRx.sh``` script terminates in an error, analyse
+the output of the script. Most likely the script will provide enough
+information to decide the next steps.
+
+The general order for installing is:
+* SCA (needed by SRxSnP, QSRx, and BIO)
+* SRxSnP (needed by QSRx) / BIO (order irrelevant)
+* QSRx / BIO (if not installed already)
+
+In case the install script stops with an error, read carefully the message.
+Each module can be re-build manually. It is recommended to deep clean a module
+prior configuration and building. This can be achieved using the command
+```./buildBGP-SRx.sh -D <module> [<module> ]*```
+
+The most likely error will happen during the configuration of the experiments using the ```buildBGP-SRx.sh``` script. In this case the following steps will most
+likely solve the issues:
+
+* Deep clean EXAMPLES:
+  ```./buildBGP-SRx.sh EXAMPLES -D```
+* Reconfigure and build EXAMPLES:
+   ```./buildBGP-SRx.sh -A -T -X examples 1 -I```
+
+Afterwards calling ```./buildBGP-SRx.sh -R``` allows to ***quicktest*** the installation. 
+
 ### Quick Functional Test / Demo
 
 The BGP-SRx software suite does provide a test system integrated in the build  

@@ -1,5 +1,7 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.1.1
+ * Update in README.md file - Added error section
 Version 6.1.0
  * quagga-srx V0.99.22.srx.0.6.0.0_release
  * srx-server V0.6.1.0_release
