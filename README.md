@@ -5,7 +5,8 @@ reference implementation and research platform for investigating emerging BGP
 security extensions and supporting protocols such as RPKI Origin Validation
 and BGPsec Path Validation.
 
-Additional information can be found at the [BGP-SRx Software Page](https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype)
+Additional information can be found at the [BGP-SRx Software Page](https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype) and the latest
+publication [BGP Secure Routing Extension (BGP-SRx): Reference Implementation and Test Tools for Emerging BGP Security Standards](https://csrc.nist.gov/publications/detail/white-paper/2021/09/15/bgp-secure-routing-extension-bgp-srx/final) based on NIST-BGP-SRx version 5.
 
 Please read the [NIST disclaimer](https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software) regarding
 the software of this project, the information it provides and the other
@@ -16,15 +17,16 @@ Additional 3rd party license Information can be found in the
 quagga-srx and srx-server codebase in files and folders listed
 but not limited to:
 
-  * [quagga-srx/COPYING](quagga-srx/COPYING)
-  * [quagga-srx/COPYING.LIB](quagga-srx/COPYING.LIB)
-  * [srx-server/extras/README](srx-server/extras/README)
-  * [srx-server/extras/COPYING](srx-server/extras/COPYING)
+* [quagga-srx/COPYING](quagga-srx/COPYING)
+* [quagga-srx/COPYING.LIB](quagga-srx/COPYING.LIB)
+* [srx-server/extras/README](srx-server/extras/README)
+* [srx-server/extras/COPYING](srx-server/extras/COPYING)
 
 ## Project Status
 
 The project contains two major versions:
-* **version 6** which is the current version providing BGPsec path 
+
+* **version 6** which is the current version providing BGPsec path
 validation (BGP-PV), BGP origin validation (BGP-OV) and ASPA validation
 (BGP-AV).
 
@@ -38,6 +40,7 @@ This version is the preferred version available in the master branch.
 
 The main branch of the repository will deliver NIST-BGP-SRx version 6.
 Branch:
+
 * **master**: This branch provides the current recommended version of
             NIST-BGP-SRx (version6.1). This version contains ASPA
             validation and a complete re-write of the Quagga-SRx
@@ -108,18 +111,22 @@ This software suite provides the following list of modules:
 * **BIO:**       BGPsec traffic generator and crypto module tester.
 * **EXAMPLES:**  Examples and test scripts the  BGP-SRx modules.
 
-#### Required to build SRx Crypto API (SCA):
+### Required to build SRx Crypto API (SCA)
+
 1) Build SRx Crypto API (srx-crypto-api)
 
-#### Required to build SRx-Server (SRxSnP):
+### Required to build SRx-Server (SRxSnP)
+
 1) Build and install SRx Crypto API (srx-crypto-api)
 2) Build SRx Server and Proxy (srx-server)
 
-#### Required to build BGPsec IO (BIO):   
+### Required to build BGPsec IO (BIO)
+
 1) Build and install SRx Crypto API (srx-crypto-api)
 2) BGPsec-IO (bgpsec-io)
 
-### Required to build Quagga-SRx (QSRx):
+### Required to build Quagga-SRx (QSRx)
+
 1) Build and install SRx Crypto API (srx-crypto-api)
 2) Build and install SRx Server and Proxy (srx-server)
 3) Quagga SRx (quagga-srx)
@@ -131,7 +138,7 @@ script. The script does test proper functionality of the srx-crypto-api as well
 as the integration into BGPsec-IO.
 
 Furthermore BGP-SRx provides a complete set of examples, demos which are
-in the examples folder but will be compiled for the host system using the 
+in the examples folder but will be compiled for the host system using the
 ```buildBGP-SRx.sh``` script.
 The examples will be installed in the folder ```opt/bgp-srx-examples/``` folder.
 Each example does have its own example starter script which allows to easily
@@ -140,9 +147,9 @@ the ```gnome-terminal``` using ```-t```.
 Furthermore, the test folders contain an appropriate run/sh script.
 All scripts provide a help which will be printed by using the ```-?``` switch.
 
-### Building and Installing using Docker
+## Building and Installing using Docker
 
-#### Docker Requirements
+### Docker Requirements
 
 * **Docker Version:**
 
@@ -151,133 +158,159 @@ All scripts provide a help which will be printed by using the ```-?``` switch.
 * **Operating Systems:**
 
   MacOS, Linux, Windows 10 Professional or Enterprise edition
-    (https://docs.docker.com/engine/install/)
+    [Docker Engine](https://docs.docker.com/engine/install/)
+
 * **Docker-compose install links:**
 
-  https://docs.docker.com/compose/install/
+    [Docker Compose](https://docs.docker.com/compose/install/)
 
-#### Docker Running Examples
+### Docker Running Examples
 
-In order to edit QuaggaSRx, SRx Server and Rpkirtr server's configuration files
+In order to edit QuaggaSRx, SRx Server and RPKI-Rtr server's configuration files
 in detail, please refer to each example file within the example directories.
 
-* **Generate Docker image**
+#### *Generate Docker image*
 
-  To generate docker image, you need to run 'docker build' command with the
-  Docker file
+To generate docker image, you need to run 'docker build' command with the
+Docker file
 
-  ```
-  docker build -f <docker file> -t <docker image name> <path>
-  ```
-  In our example,
-  ```
-  docker build -t nist/bgp-srx .  (Don't forget '.' at the end)
-  ```
+```/bin/bash
+docker build -f <docker file> -t <docker image name> <path>
+```
+
+In our example,
+
+```/bin/.bash
+docker build -t nist/bgp-srx .  (Don't forget '.' at the end)
+```
 
 * **Staring the RPKI Cache Test Harnes (rpkirtr_svr)**
   
-  (1) Create the configuration file for the RPKI Cache Test Harnes: *rpkirtr_svr.conf*
-  ```
-  echo "add 10.0.0.0/8 9 7675" > ./rpkirtr_svr.conf
-  ```
+1) Create the configuration file for the RPKI Cache Test Harnes: *rpkirtr_svr.conf*
 
-  (2) Start the docker container for *rpkirtr_svr* instance
-  ```
+```/bin/bash
+  echo "add 10.0.0.0/8 9 7675" > ./rpkirtr_svr.conf
+```
+
+2) Start the docker container for *rpkirtr_svr* instance
+
+```/bin/bash
   docker run --rm -it --name rpkirtr_server \
          -v $PWD/./rpkirtr_svr.conf:/usr/etc/rpkirtr_svr.conf \
          -p 323:323 \
          nist/bgp-srx \
          rpkirtr_svr -f /usr/etc/rpkirtr_svr.conf
-  ```
-  Or run a *rpkirtr_svr* instance with a pre-defined configuration
-  ```
+```
+
+Or run a *rpkirtr_svr* instance with a pre-defined configuration
+
+```/bin/bash
   docker run --rm -it --name rpkirtr_server \
          -v <location/user-defined/rpkirtr_svr.conf:/usr/etc/rpkirtr_svr.conf \
          -p 323:323 \
          nist/bgp-srx \
          rpkirtr_svr -f /usr/etc/rpkirtr_svr.conf
-  ```
+```
 
 * **Starting the SRx Server**
 
-  (1) Identify the IP address of the RPKI Cache Test Harness *rpkirtr_svr*
-  ```
+1) Identify the IP address of the RPKI Cache Test Harness *rpkirtr_svr*
+
+```/bin/bash
   docker inspect --format '{{ .NetworkSettings.IPAddress }}' <container name>
-  ```
-  Here:
-  ```
+```
+
+Here:
+
+```/bin/bash
   docker inspect --format '{{ .NetworkSettings.IPAddress }}' rpkirtr_server
 
   Example Result: 172.17.0.2
-  ```
-  Using the retrieved IP address, configure the SRx Server instance to point ot the RPKI Cache Test Harness. Here replace 172.17.0.2 with the IP address retrieved prior.
-  ```
+```
+
+Using the retrieved IP address, configure the SRx Server instance to point ot the RPKI Cache Test Harness. Here replace 172.17.0.2 with the IP address retrieved prior.
+
+```/bin/bash
   sed "s/localhost/172.17.0.2/g" ./srx-server/src/server/srx_server.conf > /tmp/srx_server.conf
-  ```
-  Now start the SRx Server *srx_server* docker container.
-  ```
+```
+
+Now start the SRx Server *srx_server* docker container.
+
+```/bin/bash
   docker run --rm -it --name srx_server \
          -v /tmp/srx_server.conf:/usr/etc/srx_server.conf \
          -v $PWD/./examples/bgpsec-keys/:/usr/opt/bgp-srx-examples/bgpsec-keys \
          -p 17900:17900 -p 17901:17901 \
          nist/bgp-srx \
          srx_server -f /usr/etc/srx_server.conf
-  ```
-  Or use our pre-defined keys and config files in the example directories
-  ```
+```
+
+Or use our pre-defined keys and config files in the example directories
+
+```/bin/bash
   docker run --rm -it --name srx_server \
          -v </location/user-defined/srx_server.config>:/usr/etc/srx_server.conf  \
          -v </location/user-defined/keys/>:/usr/opt/bgp-srx-examples/bgpsec-keys \
          -p 17900:17900 -p 17901:17901 \
          nist/bgp-srx \
          srx_server -f /usr/etc/srx_server.conf
-  ```
+```
 
 * **Starting QuaggaSrx**
 
-  First gather the IP address for the SRx Server instance as described earlier and add modify the quagga configuration.
-  ```
-  docker inspect --format '{{ .NetworkSettings.IPAddress }}' srx_server
+First gather the IP address for the SRx Server instance as described earlier and add modify the quagga configuration.
 
-  Example result: 172.17.0.3
-  ```
-  Use the learned IP address and update the QuaggaSRx configuration
-  ```
-  sed "s/srx connect/srx connect 172.17.0.3 17900/g" ./quagga-srx/bgpd/bgpd.conf.sampleSRx > /tmp/bgpd.conf
-  ```
-  Finally start the QuaggaSRx server
-  ```
+```/bin/bash
+docker inspect --format '{{ .NetworkSettings.IPAddress }}' srx_server
+
+Example result: 172.17.0.3
+```
+
+Use the learned IP address and update the QuaggaSRx configuration
+
+```/bin/bash
+sed "s/srx connect/srx connect 172.17.0.3 17900/g" ./quagga-srx/bgpd/bgpd.conf.sampleSRx > /tmp/bgpd.conf
+```
+
+Finally start the QuaggaSRx server
+
+```/bin/bash
   docker run --rm -it --name quaggasrx \
          -v /tmp/bgpd.conf:/usr/etc/bgpd.conf \
          -v $PWD/./examples/bgpsec-keys/:/usr/opt/bgp-srx-examples/bgpsec-keys \
          -p 179:179 -p 2605:2605 \
          nist/bgp-srx \
          bgpd -f /usr/etc/bgpd.conf
-  ```
-  Or use pre-defined keys and config files in our example directories
-  ```
+```
+
+Or use pre-defined keys and config files in our example directories
+
+```/bin/bash
   docker run --rm -it --name quaggasrx \
          -v </location/user-defined/quagga.config>:/usr/etc/bgpd.conf  \
          -v </location/user-defined/keys/>:/usr/opt/bgp-srx-examples/bgpsec-keys \
          -p 179:179 -p 2605:2605 \
          nist/bgp-srx \
          bgpd -f /usr/etc/bgpd.conf  
-  ```
+```
 
 * **Docker compose**
 
-  Docker Compose (https://docs.docker.com/compose/) allows to  define and run multi-container Docker applications.
-  With Compose, you use a YAML file to configure your application’s services.
-  Then, with a single command, you create and start all the services from your configuration.
+[Docker Compose](https://docs.docker.com/compose/) allows to  define and run multi-container Docker applications.
+With Compose, you use a YAML file to configure your application’s services.
+Then, with a single command, you create and start all the services from your configuration.
 
-  The following command will execute all three docker containers in the docker-compose.yml file.
-  ```
-  docker-compose up
-  ```
-  To stop and remove containers, simply **Ctrl-C** twice or
-  ```
-  docker-compose down
-  ```
+The following command will execute all three docker containers in the docker-compose.yml file.
+
+```/bin/bash
+docker-compose up
+```
+
+To stop and remove containers, simply **Ctrl-C** twice or
+
+```/bin/bash
+docker-compose down
+```
 
 ## Contributing
 
@@ -288,12 +321,20 @@ to the projects.
 
 ### Developer
 
-- Oliver Borchert (Lead)
-- Kyehwan Lee
+* Oliver Borchert (Lead)
+
+* Kyehwan Lee
+
+## System Design
+
+* Oliver Borchert
+* Kyehwan Lee
+* Sriram Kotikalapudi
+* Doug Montgomery
 
 ### Previous Developer
 
-- Patrick Gleichmann
+* Patrick Gleichmann
 
 ## Copyright
 
@@ -302,4 +343,4 @@ For license information see the [LICENSE](LICENSE) file.
 ## Contacts
 
 For information, questions, or comments, contact by sending
-an email to itrg-contact@list.nist.gov.
+an email to itrg-contact@list.nist.gov

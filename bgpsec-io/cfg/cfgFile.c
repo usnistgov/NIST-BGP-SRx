@@ -23,10 +23,12 @@
  * cfgFile allows to generate a fully functional sample configuration file
  * for BGPsec-IO
  * 
- * @version 0.2.1.7
+ * @version 0.2.1.9
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.9 - 2021/09/24 - oborchert
+ *            * Fixed bug in generation of configuration file using -C
  *  0.2.1.7 - 2021/07/12 - oborchert
  *            * Fixed spellers in the configuration.
  *  0.2.1.6 - 2021/05/21 - oborchert
@@ -96,7 +98,7 @@
  *          - 2017/01/31 - oborchert
  *            * Fixed some configuration documentation spellers.
  *            * Added missing extended message size capability configuration.
- *            * Added configuration to selectively enable/disable bgpsec
+ *            * Added configuration to selectively enable/disable BGPsec
  *          - 2017/01/11 - oborchert
  *            * Fixed invalid type for signature_generation to use "BIO" 
  *              (P_TYPE_SIGMODE_BIO) as default type. (BZ:1066)
@@ -366,15 +368,18 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
                    "[I|V|N]?]\n");
     fprintf (file, "    #   <asn>        := [0-9]+[.[0-9]+]?>\n");
     fprintf (file, "    #   <repetition> := [0-9]+\n");
-    fprintf (file, "    # Updates are allowed to have one AS_SET { 10 20 } in "            
-                   "the path");
+    fprintf (file, "    # Updates are allowed to have one AS_SET { 65010 65020 } in "            
+                   "the path\n");
     fprintf (file, "    %s = (  \"%s\"\n", P_CFG_UPD_PARAM, 
                                                     "10.0.0.0/24");
     fprintf (file, "              , \"%s, %s\"\n", "10.1.0.0/24", 
-                                                               "B4 10 20p3 30");
-    fprintf (file, "              , \"%s, %s\"\n", "10.0.1.0/24", "10 20p3 30");
-    fprintf (file, "              , \"%s, %s\"\n", "10.0.2.0/24", "10 20 40 50");
-    fprintf (file, "              , \"%s, %s\"\n", "10.0.3.0/24", "10 20 60 70V");
+                   "B4 65010 65015p3 65020");
+    fprintf (file, "              , \"%s, %s\"\n", "10.0.1.0/24", 
+                   "65010 65015p3 65020");
+    fprintf (file, "              , \"%s, %s\"\n", "10.0.2.0/24", 
+                   "65010 65015 65025 65030");
+    fprintf (file, "              , \"%s, %s\"\n", "10.0.3.0/24", 
+                   "65010 65015 65536 65040V");
     fprintf (file, "             );\n\n");
     fprintf (file, "    # Enable/Disable adding global updates to this session."
                                                                           "\n");
@@ -462,11 +467,10 @@ bool generateFile(char* fName, char* iface, u_int32_t localASN,
     fprintf (file, ");\n\n");
 
     fprintf (file, "# global updates for all sessions\n");
-//    fprintf (file, "# <prefix>[,[[B4]? <asn>[p<repetition>]]*[ ]*[I|V|N]?]\n");
     fprintf (file, "# <prefix>[,[B4]? ([{]?<asn>[p<repitition>][ ]*[}]?)+[I|V|N]?]\n");
     fprintf (file, "#   <asn>        := [0-9]+[.[0-9]+]?>\n");
     fprintf (file, "#   <repitition> := [0-9]+\n");
-    fprintf (file, "# Updates are allowed to have one AS_SET { 10 20 } in the path");
+    fprintf (file, "# Updates are allowed to have one AS_SET { 65010 65020 } in the path\n");
     fprintf (file, "%s = ( \n", P_CFG_UPD_PARAM);
     fprintf (file, "         );\n");
     fclose(file);

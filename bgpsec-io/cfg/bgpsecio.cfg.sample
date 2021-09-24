@@ -6,8 +6,8 @@
 # The ASNs as well as the IPv4 and IPv6 prefixes used in this example are taken 
 # from RFC5398 and RFC6890
 
-ski_file    = "/var/lib/key-vault/ski-list.txt";
-ski_key_loc = "/var/lib/key-vault/";
+ski_file    = "../opt/bgp-srx-examples/bgpsec_keys/ski-list.txt";
+ski_key_loc = "../opt/bgp-srx-examples/bgpsec_keys/";
 
 preload_eckey = false;
 

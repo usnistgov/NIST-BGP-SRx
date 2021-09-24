@@ -1,3 +1,6 @@
+Version 0.2.1.9
+  * Fixed bug in generating configuration file using -C
+  * Updated path to keys in bgpsecio.cfg.samples
 Version 0.2.1.8
   * Fixed incorrect k value printout while displaying syntax.
 Version 0.2.1.7
