@@ -1,4 +1,5 @@
 # BGP-SRx INSTALL file #
+
 This package provides tools to facilitate an easy install without
 worrying about dependencies.
 This file describes two simple means on how to install the software
@@ -37,6 +38,7 @@ container must be called using the following command or similar:
 ```docker run --cap-add=NET_ADMIN -ti --name=C7 centos:7 bash```
 
 ### Manual Install ###
+
 Installing everything manual without any install script.
 This method does not use the install script specified in the README.md file.
 For this method all libraries must be installed by hand before calling the
@@ -45,31 +47,31 @@ For this method all libraries must be installed by hand before calling the
 To see the full list of repositories needed consult the CONTENT file. It is
 updated to provide the latest information.
 
-  The following command allows to generate a list of packages to required.
+The following command allows to generate a list of packages to required.
 
-  ```cat CONTENT | grep requires | sort -u ``` 
+```cat CONTENT | grep requires | sort -u ```
 
-  To generate the list with yum install command use the command below
+To generate the list with yum install command use the command below
 
-  ```cat CONTENT | grep requires | sort -u | sed -e "s/- requires/yum install -y /g" | sh``` 
+```cat CONTENT | grep requires | sort -u | sed -e "s/- requires/yum install -y /g" | sh```
 
-  Once all libraries are installed call the build script.
+Once all libraries are installed call the build script.
 
-  ```./build-BGPSRx.sh -A -T -X examples 1 -I```
+```./build-BGPSRx.sh -A -T -X examples 1 -I```
 
-  - ```-A```: Answer all questions with Y(es)
-  - ```-T```: Touch all autoconfig files. This is sometimes required.
-  - ```-X```: Pass a configuration setting to the given module.
+* ```-A```: Answer all questions with Y(es)
+* ```-T```: Touch all autoconfig files. This is sometimes required.
+* ```-X```: Pass a configuration setting to the given module.
 
-  The parameter ```-X examples 1``` specifies to have one parameter to the
-  configure.sh script of examples. The parameter is ```-I``` for automated
-  NIC-ALIAS installation.
+The parameter ```-X examples 1``` specifies to have one parameter to the
+configure.sh script of examples. The parameter is ```-I``` for automated
+NIC-ALIAS installation.
 
-  In case the build script fails, it is recommended to clean the failed module
-  by calling ```./build-BGPSrx.sh -D <MODULE>``` before starting a new attempt.
+In case the build script fails, it is recommended to clean the failed module
+by calling ```./build-BGPSrx.sh -D <MODULE>``` before starting a new attempt.
 
-  Each script provides the parameter "-?" for help. Also see the appropriate
-  README file in each module folder for more information.
+Each script provides the parameter "-?" for help. Also see the appropriate
+README file in each module folder for more information.
 
 ### Automated Install ###
 
@@ -79,14 +81,14 @@ folder or any other folder you plan on installing the software in.
 Edit the newly created ```install.sh``` file and copy the bash script listed
 at the end of this file into the newly created ```install.sh``` file.
 
-Once this is done, call ```sh install.sh```. The script will ask for a set of 
+Once this is done, call ```sh install.sh```. The script will ask for a set of
 parameters.
 
-  - (git|zip) Specifies the source of the software, clone a git repo or
+* (git|zip) Specifies the source of the software, clone a git repo or
     download and extract the zip file
-  - (master|v5|v6) Specifies the version. Since 6.1 master and v6 are same.
-  - (c8) Specify this install is on CentOS 8
-  - (-I) Specify that interfaces are to be installed if missing, needed
+* (master|v5|v6) Specifies the version. Since 6.1 master and v6 are same.
+* (c8) Specify this install is on CentOS 8
+* (-I) Specify that interfaces are to be installed if missing, needed
     for the EXAMPLE project
 
 This form is the simplest install. The install script does install all
@@ -116,7 +118,7 @@ the required interfaces using ALIAS interfaces.
 To allow an automatic install of ALIAS interfaces, the configure script of the
 examples project needs the parameter ```-I```. To pass this parameter to the
 configuration script the ```build-BGPSRx.sh``` script provides a mechanism to
-pass the parameters through to the install script. This is done using the 
+pass the parameters through to the install script. This is done using the
 parameter ```-X <module-lower-case> <num-params> <param> [<param>*]```.
 in this case the proper command is ```./build-BGPSRx.sh EXAMPLES -A -X examples 1 -I```
 where the parameter ```-A``` which allows to answer every user input with 'Y'.
@@ -131,13 +133,14 @@ a search progress bar ```[pppp-pp-]``` with  ```p``` indicating an address is
 used and ```-``` a free address is located and will be used. The parsing starts
 from ```A.B.C.1``` to ```A.B.C.254```.
 
-#### Error During Install incl. Bootstrap Install Script
+#### Error During Install incl. Bootstrap Install Script ####
 
 In case the ```buildBGP-SRx.sh``` script terminates in an error, analyse
 the output of the script. Most likely the script will provide enough
 information to decide the next steps.
 
 The general order for installing is:
+
 * SCA (needed by SRxSnP, QSRx, and BIO)
 * SRxSnP (needed by QSRx) / BIO (order irrelevant)
 * QSRx / BIO (if not installed already)
@@ -190,7 +193,7 @@ to allow for the examples being properly installed.
 The issue is related to allowing the generation of missing ALIAS NICs
 from within the docker image.
 
-```
+```/bin/bash
 #!/bin/bash
 
 #Install Script for BGP-SRx on clean CentOS 7 and CentOS 8 install

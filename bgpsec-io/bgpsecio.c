@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.5
+ * @version 0.2.1.9
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.9 - 2021/09/24 - oborchert
+ *            * Added information to output when configuration file is generated
+ *              using parameter -C.
  *  0.2.1.5 - 2021/05/20 - oborchert
  *            * Fixed bug in preparation for storing the BGPsec Path Attribute 
  *              data. The issue was that not the BGPsec Path data was handed to 
@@ -1203,6 +1206,7 @@ static bool _checkSettings(PrgParams* params, int* exitVal)
     {
       printf("Configuration file \"%s\" successfully generated!\n",
               params->newCfgFileName);
+      printf("Verify the key file settings and correct them is necessary!\n");
       *exitVal  = EXIT_SUCCESS;
     }
     keepGoing = false;

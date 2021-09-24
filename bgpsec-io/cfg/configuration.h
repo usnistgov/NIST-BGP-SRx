@@ -22,12 +22,15 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.7
+ * @version 0.2.1.9
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.9 - 2021/09/24 - oborchert
+ *            * Modified defines for key file setting.
+ *            * Modified default AS and PEER define
  *  0.2.1.7 - 2021/07/12 - oborchert
- *            * Added P_TYPE_NSM_BGP_4="BGP-4" as inofficial alternative to 
+ *            * Added P_TYPE_NSM_BGP_4="BGP-4" as unofficial alternative to 
  *              setting "BGP4"
  *  0.2.1.5 - 2021/05/10 - oborchert
  *            * Updated changes from 0.2.1.3 to point into /opt/bgp-srx-examples
@@ -164,9 +167,9 @@
 /***  Defines for default BGP session configuration  **************************/
 /******************************************************************************/
 // The default location where to find the keys
-#define DEF_KEYLOCATION        "/opt/bgp-srx-examples/bgpsec-keys/\0"
+#define DEF_KEYLOCATION        "/opt/bgp-srx-examples/bgpsec-keys/"
 // The default file containing the list of public keys
-#define DEF_SKIFILE            "/opt/bgp-srx-examples/bgpsec-keys/ski-list.txt\0"
+#define DEF_SKIFILE            DEF_KEYLOCATION "ski-list.txt\0"
 // The default port of the peer
 #define DEF_PEER_PORT          179
 // The default BGP hold time
@@ -184,9 +187,9 @@
 // The default IPv4 peer IP address
 #define DEF_PEER_IP            "10.0.1.32"
 // The default local ASN
-#define DEF_LOCAL_ASN          64
+#define DEF_LOCAL_ASN          65000
 // The default peer ASN
-#define DEF_PEER_ASN           32
+#define DEF_PEER_ASN           65005
 // The default print setting
 #define DEF_PRINT              false
 // The default setting for encoding IPv4 updates in MP_NLRI format.
