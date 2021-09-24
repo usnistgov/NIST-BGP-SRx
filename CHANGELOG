@@ -1,5 +1,8 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 5.1.11
+ * Update in README.md file - Restructured and moved sections to INSTALL.md
+ * Added INSTALL.md file 
 Version 5.1.10
  * Update in README.md file - Added error section
 Version 5.1.9
