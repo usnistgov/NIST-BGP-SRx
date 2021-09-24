@@ -1,5 +1,8 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.1.2
+ * Update in README.md file - Restructured and moved sections to INSTALL.md
+ * Added INSTALL.md file
 Version 6.1.1
  * Update in README.md file - Added error section
 Version 6.1.0
