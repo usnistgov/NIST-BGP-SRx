@@ -20,10 +20,16 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.9
+ * @version 0.2.1.10
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.10- 2021/09/27 - oborchert
+ *            * Ignore B4 scripted updates for CAPI processing.
+ *            * Ignore updates where signing failed during CAPI processing with
+ *              DROP and BGP4 fallback selected.
+ *            * Added BGP-4 scripted, and sign error BGP-4/DROP to statistics
+ *            * Fixed formating in Statistics CAPI output.
  *  0.2.1.9 - 2021/09/24 - oborchert
  *            * Added information to output when configuration file is generated
  *              using parameter -C.
@@ -655,7 +661,7 @@ typedef struct {
  * @param elapsedTime OUT - The time it took to process the validation.
  * @param status Returns the status flag from the validation process.
  * 
- * @return the validation result as specified in SrxCryptoApi
+ * @return the validation result as specified in SrxCryptoAPI
  */
 static int __capiProcessBGPSecAttr(SRxCryptoAPI* capi, PrgParams* params, 
                                    BGPSEC_PrefixHdr* prefix, 
@@ -860,6 +866,11 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
   int keyNotFound = 0;
   int invalid     = 0;
   int processed   = 0;
+  // Counter for found BGP-4 updates.
+  int bgp4updates   = 0;
+  // In case signature could not be make.
+  int nullSigDropedUpdates = 0;
+  int nullSigBGP4Updates   = 0;
   __cleanPubKeys(bgpConf);
   
   BIO_Statistics statistics[2];
@@ -875,6 +886,13 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
   {
     params->maxUpdates--;
     update   = (UpdateData*)popStack(updateStack);
+    if (update->bgp4_only)
+    {
+      // Do not further process this UPDATE, BGP-4 UPDATES are note processed
+      // by BGPsec
+      bgp4updates++;
+      continue;
+    }
     prefix   = (BGPSEC_PrefixHdr*)&update->prefixTpl;  
     
     segments = 0;
@@ -884,6 +902,24 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
                                                       bgpConf, 
                                                       prefix, asList,
                                                       params->onlyExtLength);
+    if (pathAttr == NULL)
+    {
+      // Collect for statistics 
+      switch (bgpConf->algoParam.ns_mode)
+      {
+        case NS_DROP:
+          nullSigDropedUpdates++;
+          break;
+        case NS_BGP4:
+          nullSigBGP4Updates++;
+          break;
+        default:
+          printf("ERROR: Enexpected Null Signature ns_mode value for '%s'!\n", 
+                 update->pathStr);
+          break;          
+      }
+      continue;
+    }
     elapsed   = 0;
     valStatus = API_STATUS_OK;
     valResult = __capiProcessBGPSecAttr(capi, params, prefix, pathAttr,&elapsed,
@@ -1001,6 +1037,26 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
   float     avgNoSegments     = 0.0;
   u_int32_t valid             = processed - invalid;
   int idx = 0;
+  printf ("\nSkiped CAPI Validation Statistics:\n=============================="
+          "======\n");
+  printf ("  %d scripted BGP-4 update%sfound\n", bgp4updates, 
+          bgp4updates != 1 ? "s " : " "); 
+  if ((nullSigBGP4Updates+nullSigDropedUpdates) != 0)
+  {
+    switch (bgpConf->algoParam.ns_mode)
+    {
+      case NS_BGP4:
+        printf ("  %d signing error: fallback -> create BGP-4 update%s\n", 
+                nullSigBGP4Updates, nullSigBGP4Updates != 1 ? "s " : " "); 
+        break;
+      case NS_DROP:
+        printf ("  %d signing error: fallback -> drop update%s\n", 
+                nullSigDropedUpdates, nullSigDropedUpdates != 1 ? "s " : " "); 
+        break;
+    }
+  }
+  printf ("\n");
+
   for (; idx <= API_VALRESULT_VALID; idx++)
   {
     processed = idx == API_VALRESULT_VALID ? valid : invalid;
@@ -1027,11 +1083,11 @@ static int _runCAPI(PrgParams* params, SRxCryptoAPI* capi)
     {
       if (error > 0)
       {
-        printf (" - Invalid updates due to errors: %d\n", error);
+        printf ("  - Invalid updates due to errors: %d\n", error);
       }
       if (keyNotFound > 0)
       {
-        printf (" - Invalid updates due to missing key: %d\n", keyNotFound);
+        printf ("  - Invalid updates due to missing key: %d\n", keyNotFound);
       }
     }
     else
