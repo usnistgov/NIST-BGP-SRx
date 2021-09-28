@@ -36,6 +36,8 @@ Version 6 provides an overhaul of the QuaggaSRx policy processing by
 separating BGP-PV and BGP-OV as well as adding ASPA validation (BGP-PV).
 This version is the preferred version available in the master branch.
 
+To view a complete list of the NIST BGP-SRx capabilities see the [CAPABILITIES](CAPABILITIES.md) file.
+
 ## Branching
 
 The main branch of the repository will deliver NIST-BGP-SRx version 6.
@@ -325,7 +327,7 @@ to the projects.
 
 * Kyehwan Lee
 
-## System Design
+### System Design
 
 * Oliver Borchert
 * Kyehwan Lee

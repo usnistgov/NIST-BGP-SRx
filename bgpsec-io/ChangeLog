@@ -1,3 +1,8 @@
+Version 0.2.1.10
+  * Ignore B4 scripted UPDATES for CAPI processing.
+  * Added BGP-4 scripted and sign error with DROP and BGP-4 fallback to 
+    Statistics.
+  * Fixed formating for CAPI statistics.
 Version 0.2.1.9
   * Fixed bug in generating configuration file using -C
   * Updated path to keys in bgpsecio.cfg.samples
@@ -5,11 +10,11 @@ Version 0.2.1.8
   * Fixed incorrect k value printout while displaying syntax.
 Version 0.2.1.7
   * Fixed spellers, especially BGP4 to BGP-4 in documentation.
-  * Added inofficial setting "BGP-4" next to "BGP4".
+  * Added unofficial setting "BGP-4" next to "BGP4".
 Version 0.2.1.6
   * Fixed segmentation fault in update scripting.
   * Extended regex description for update generation in auto generated
-    config script to show how to add AS_SET to an update.
+    configuration script to show how to add AS_SET to an update.
   * Updates with AS_SET are forced BGP-4 only updates.
 Version 0.2.1.5
   * Removed data folder, will now be provided by examples project
