@@ -142,6 +142,7 @@ void stopProcessingCommands(CommandHandler* self);
  */
 bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult);
 
+bool _isSet(uint32_t bitmask, uint32_t bits);
 
 /**
  * This function performs the ASPA validation.

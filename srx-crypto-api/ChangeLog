@@ -1,5 +1,7 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.3.0.4 - Oct 2021
+  - Fixed spec file for rpm generation
 Version 0.3.0.3 - May 2021
   - Moved the configuration from from hard coded to be a template
     file that is configured the build process. This allows to point

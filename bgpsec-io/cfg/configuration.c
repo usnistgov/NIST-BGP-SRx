@@ -21,10 +21,13 @@
  *
  * This header file contains data structures needed for the application.
  *
- * @version 0.2.1.8
+ * @version 0.2.1.11
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.11- 2021/10/26 - oborchert
+ *            * Removed the printout of UPDATES and SEQUENCE, etc while 
+ *              processing/loading UPDATES.
  *  0.2.1.8 - 2021/09/09 - oborchert
  *            * Fixed incorreck k value being printed out for BIO-2 when 
  *              printing syntax
@@ -237,7 +240,7 @@ void printSyntax()
 
   printf ("  -%c, %s\n", P_C_VERSION, P_VERSION);
   printf ("          Display the version number.\n");
-  
+
   printf ("  -%c <config>, %s <config>\n", P_C_CONFIG, P_CONFIG);
   printf ("          config: The configuration file.\n");
 
@@ -357,6 +360,10 @@ void printSyntax()
   printf ("          This setting is only used in combination with the\n");
   printf ("          creation of a configuration file.\n");
   
+  printf ("  %s\n", P_SUPRESS_WARNING);
+  printf ("          This setting disables the programs WARNING message\n");
+  printf ("          this software is for test purpose only.\n");
+  
   printf ("\n Configuration file only parameters:\n");
   printf (" ===================================\n");
   
@@ -470,7 +477,7 @@ void printSyntax()
   printf ("          This setting only affects the CAPI mode.\n");
   
   printf ("\n");
-  printf ("%s Version %s\nDeveloped 2015-%s by Oliver Borchert ANTD/NIST\n", 
+  printf ("%s Version %s\nDeveloped 2015-%s by Oliver Borchert - NIST\n", 
           PACKAGE_NAME, PACKAGE_VERSION, SRX_DEV_TOYEAR);
   printf ("Send bug reports to %s\n\n", PACKAGE_BUGREPORT);
 }
@@ -954,11 +961,11 @@ bool _readUpdates(const config_setting_t* updates, Stack* stack,
       UpdateData* updateData = createUpdate(strVal, params);
       if (updateData)
       {
-        printf ("\nUPATE: %s\n", strVal);
-        if (updateData->asSetStr != NULL)
-          printf("AS_SET: %s\n", updateData->asSetStr);
-        if (updateData->pathStr != NULL)
-          printf("AS_SEQUENCE: %s\n", updateData->pathStr);
+//        printf ("\nUPATE: %s\n", strVal);
+//        if (updateData->asSetStr != NULL)
+//          printf("AS_SET: %s\n", updateData->asSetStr);
+//        if (updateData->pathStr != NULL)
+//          printf("AS_SEQUENCE: %s\n", updateData->pathStr);
         fifoPush(stack, updateData);      
       }
       else if (params->errMsgBuff[0] != '\0')
@@ -1630,6 +1637,9 @@ void initParams(PrgParams* params)
   params->preloadECKEY                = true;
   params->onlyExtLength               = true;
   params->appendOut                   = false;
+  
+  // Used to identify if the software warning at the beginning can be suppressed
+  params->suppressWarning             = false;
 
 // TODO: below is merger code - maybe not needed
 //  params->bgpConf.printPollLoop       = false;
@@ -1912,14 +1922,17 @@ int parseParams(PrgParams* params, int argc, char** argv)
         if (strcmp(argv[idx], P_EXT_MSG_FORCE) == 0)
         {
           bgpConf->capConf.extMsgForce = true;
+          break;
         }
-        else
+        else if (strcmp(argv[idx], P_SUPRESS_WARNING) == 0)
         {
-          snprintf(params->errMsgBuff, PARAM_ERRBUF_SIZE, 
-                   "Unknown Parameter '%s'!", argv[idx]);
-          idx = argc; // stop further processing.
-          printSyntax();
+          params->suppressWarning = true;
+          break;
         }
+        snprintf(params->errMsgBuff, PARAM_ERRBUF_SIZE, 
+                 "Unknown Parameter '%s'!", argv[idx]);
+        idx = argc; // stop further processing.
+        printSyntax();
     }
     
     // something went wrong during the update processing, free the leftover

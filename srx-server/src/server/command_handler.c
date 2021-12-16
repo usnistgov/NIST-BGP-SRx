@@ -25,10 +25,13 @@
  * queue is fed by the srx-proxy communication thread.
  *
  *
- * @version 0.6.1.0
+ * @version 0.6.1.2
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.2 - 2021/11/10 - kyehwanl
+ *           * Added a missing case of if-else clause to support the invalid case 
+ *             which comes from the router.
  * 0.6.1.0 - 2021/08/27 - kyehwanl
  *           * Added validation conditions for only AS_SET list case
  *         - 2021/07/27 - kyehwanl
@@ -821,6 +824,15 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
 
     if (aspl)
       deleteAspathListEntry (aspl);
+  }
+
+  // Invalid case
+  else if (aspaVal && (srxRes.aspaResult == SRx_RESULT_UNDEFINED) 
+              && (defRes.result.aspaResult == SRx_RESULT_INVALID)
+              && (defRes.resSourceASPA = SRxRS_ROUTER))
+  {
+    LOG(LEVEL_INFO, "default result from a router is invalid, so sening it as well");
+    srxRes_mod.aspaResult = SRx_RESULT_INVALID;  
   }
 
 

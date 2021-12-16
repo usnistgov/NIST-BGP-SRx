@@ -2537,11 +2537,13 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
 
   bool retVal = false;
 
+  /*
   if (BGP_DEBUG (aspa, ASPA))
   {
-    zlog_debug ("[ ASPA ] %s notified Aspa Validation Result: %x (0:V 1:Nf 2:Iv 3:Ud 5:Uk 6:Uv)",
+    zlog_debug ("[ ASPA ] [%s] notified Aspa Validation Result: %x (0:V 1:Nf 2:Iv 3:Ud 5:Uk 6:Uv)",
         __FUNCTION__, aspaResult);
   }
+  */
 
   if (localID != 0) // update & requestToken substitution
   {

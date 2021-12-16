@@ -22,10 +22,12 @@
  *
  * This file contains the ASPA trie header information.
  *
- * Version 0.6.0.0
+ * Version 0.6.1.2
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.2 - 2021/11/18 - kyehwanl
+ *           * Moved static declaration statement from .h into .c file 
  * 0.6.0.0  - 2021/02/26 - kyehwanl
  *          - Created source
  */
@@ -72,14 +74,9 @@ typedef struct {
 } ASPA_DBManager;
 
 
-static TrieNode* newAspaTrie(void);
-static TrieNode* make_trienode(char data, char* userData, ASPA_Object* );
-static void free_trienode(TrieNode* node);
 TrieNode* insertAspaObj(ASPA_DBManager* self, char* word, char* userData, ASPA_Object* obj);
-static int search_trie(TrieNode* root, char* word);
 void print_trie(TrieNode* root);
 bool initializeAspaDBManager(ASPA_DBManager* aspaDBManager, Configuration* config);
-static void emptyAspaDB(ASPA_DBManager* self);
 ASPA_Object* findAspaObject(ASPA_DBManager* self, char* word);
 void print_search(TrieNode* root, char* word);
 bool deleteASPAObject(ASPA_DBManager* self, ASPA_Object *obj);

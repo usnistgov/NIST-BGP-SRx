@@ -22,10 +22,13 @@
  *
  * This header file contains data structures needed for the application.
  * 
- * @version 0.2.1.9
+ * @version 0.2.1.11
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.11- 2021/10/27 - oborchert
+ *            * Added a P_SUPRESS_WARNING = --suppress-warning to suppress the 
+ *              warning session message.
  *  0.2.1.9 - 2021/09/24 - oborchert
  *            * Modified defines for key file setting.
  *            * Modified default AS and PEER define
@@ -232,6 +235,9 @@
 // Display the version number
 #define P_VERSION       "--version"
 #define P_C_VERSION     'V'
+
+// Suppress the WARNING message
+#define P_SUPRESS_WARNING "--suppress-warning"
 
 // for the configuration file
 #define P_CFG_SESSION   "session"
@@ -567,6 +573,9 @@ typedef struct
   char      keyLocation[FNAME_SIZE];
   /** Indicate if the OpenSSL EC_KEY should be generated during loading.*/
   bool      preloadECKEY;
+  
+  /** Indicate if the WARNING message should be suppressed. */
+  bool      suppressWarning;
   
   /** Specify if all BGPSec Path Attributes must be generated with extended 
    * length flag set and 2 byte length field. */

@@ -28,10 +28,13 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.6.0.1
+ * @version 0.6.1.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.0  - 2021/11/05 - oborchert
+ *            * Increased the line buffer for reading files from 255 bytes to 
+ *              4KiB. ASPA objects can be rather large.
  * 0.6.0.1  - 2021/07/30 - oborchert
  *            * Fixed speller in output (imported from version 5)
  * 0.6.0.0  - 2021/03/30 - oborchert
@@ -184,8 +187,9 @@
 #include "util/timer.h"
 #include "util/prefix.h"
 
-// Max characters per line
-#define LINE_BUF_SIZE 255
+// Max characters per line - Increase to 4KB. This is needed because
+// ASPA objects can become rather large.
+#define LINE_BUF_SIZE 4096
 
 /** This structure specified one cache entry. */
 typedef struct {

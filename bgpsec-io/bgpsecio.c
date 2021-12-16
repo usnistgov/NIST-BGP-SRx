@@ -20,10 +20,15 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.10
+ * @version 0.2.1.11
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.11- 2021/10/26 - oborchert
+ *            * Modified the STARTUP_MSG string.
+ *            * Added switch to reduce the above warning message.
+ *            2021/10/22 - oborchert
+ *            * Added STARTUP_MSG to the main message!
  *  0.2.1.10- 2021/09/27 - oborchert
  *            * Ignore B4 scripted updates for CAPI processing.
  *            * Ignore updates where signing failed during CAPI processing with
@@ -187,6 +192,17 @@
 
 /** Used as key source for BGPsec-IO bin: 1111 1100 dec: 252 */
 #define BIO_KEYSOURCE 0xFC
+
+/** Used to display upon starting the tool */
+#define STARTUP_MSG "******************************************************\n" \
+                    " WARNING:  This software is for test purposes only.\n" \
+                    " It can generate live protocol exchanges with routers\n" \
+                    " using synthetic data for BGP and RPKI.  It is not \n" \
+                    " intended to be used in a production environment.\n" \
+                    "******************************************************\n\n"
+#define STARTUP_MSG_SUPPRESSED \
+                    "INFO: Important WARNING message suppressed - Restart " \
+                    "without parameter '--suppress-warning'!\n"
 
 /**
  * Contains a linked list of AS numbers including the assigned BGPSEC keys.
@@ -1337,7 +1353,16 @@ int main(int argc, char** argv)
   {
     postProcessUpdateStack(&params);
     
-    printf ("Starting %s...\n", PACKAGE_STRING);
+    printf ("Starting %s...\n\n", PACKAGE_STRING);
+    // Print message on standard error so it is visible on the screen.
+    if (!params.suppressWarning)
+    {
+      fprintf (stderr, "%s", STARTUP_MSG);
+    }
+    else
+    {
+      fprintf (stderr, "%s", STARTUP_MSG_SUPPRESSED);
+    }
     
     BGP_SessionConf* bgpConf = NULL;
     for (sessIdx = 0; sessIdx < params.sessionCount; sessIdx++)

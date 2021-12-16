@@ -110,7 +110,7 @@ Group:    System Environment/Daemons
 Source0:  %{name}-%{version}.tar.gz
 #Source0:	http://www.quagga.net/snapshots/cvs/%{name}-%{version}.tar.gz
 #URL:		  http://www.quagga.net
-URL:	 	  http://bgpsrx.antd.nist.gov
+URL:	 	  https://github.com/usnistgov/NIST-BGP-SRx
 
 %if %{with_snmp}
 BuildRequires:	net-snmp-devel
@@ -132,8 +132,8 @@ Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 
 # Needed for QuaggaSRx
-Requires(pre): srxcryptoapi >= 0.3.0 srxcryptoapi < 0.3.1, srx-proxy >= 0.5.1, srx-proxy < 0.5.2
-Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.5.1, srx-proxy < 0.5.2, srxcryptoapi >= 0.3.0, srxcryptoapi < 0.3.1
+Requires(pre): srxcryptoapi >= 0.3.0 srxcryptoapi < 0.3.1, srx-proxy >= 0.6.0, srx-proxy < 0.6.2
+Requires: glibc >= 2.12, readline >= 6.0, srx-proxy >= 0.6.0, srx-proxy < 0.6.2, srxcryptoapi >= 0.3.0, srxcryptoapi < 0.3.1
 
 %description
 QuaggaSRx is a free software based upon Quagga that manages TCP/IP based routing

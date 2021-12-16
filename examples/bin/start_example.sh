@@ -6,8 +6,15 @@ if [ "$_BGP_SRX_CALLER" == "" ] ; then
   echo "This starter script cannot be called directly!"
   exit 1
 fi
+
+VERSION=0.6.0.3
+
+if [ "$1" == "version" ] || [ "$1" == "-v" ] ; then
+  echo "Version $VERSION"
+  exit 
+fi
+
 echo "Start $_BGP_SRX_CALLER..."
-_BGP_SRX_CALLER=
 
 DEMO_FLDR=$(readlink -f $0 | xargs dirname)
 DEMO_CURR_FLDR=$(pwd)
@@ -31,10 +38,12 @@ if [ "$FUNCTION_LIB_VER" == "" ] ; then
 fi
 ##############################################################################
 
-PRG_BIO=bgpsecio
+PRG_BIO="bgpsecio"
 PRG_CACHE=rpkirtr_svr
 PRG_SRX=srx_server
 PRG_ROUTER=bgpd
+# Will be set to "" if --global-binary us used.
+PRG_SFX="./"
 
 # Indicates if gnome-terminal is available & should be used in lieu of screen
 TOOL_TERMINAL=0
@@ -44,7 +53,7 @@ if [  $? -eq 0 ] ; then
   TOOL_TERMINAL=1
 fi
 
-# Perform the stop all untik $STOP_ALL_LOOP -eq 0
+# Perform the stop all until $STOP_ALL_LOOP -eq 0
 # This allows to tweak the stopping of all. 
 # Recommended is 3
 if [ "$STOP_ALL_LOOP" == "" ] ; then
@@ -65,24 +74,22 @@ fi
 if [ "$SIT_AND_WAIT_MOD" == "" ] ; then
   SIT_AND_WAIT_MOD=()
 fi
-#countInParameters "bio1" ${SIT_AND_WAIT_MOD[@]}
-#if [ $? -eq 0 ] ; then
-#  SIT_AND_WAIT_MOD+=("bio1" )
-#fi
-#countInParameters "bio2" ${SIT_AND_WAIT_MOD[@]}
-#if [ $? -eq 0 ] ; then
-#  SIT_AND_WAIT_MOD+=("bio2" )
-#fi
-if [ "$SIT_AND_WAIT_MOD" == "" ] ; then
-  SIT_AND_WAIT_MOD=()
+
+# This allows to exclude bio2 by setting SKIP_BIO2=1
+if [ "$SKIP_BIO2" == "" ] ; then
+  SKIP_BIO2=0
 fi
 
 # Contains the parameters that can be globally used for each module
-GLOB_PARAMS=( "-t" "--wait-for-enter" )
+GLOB_PARAMS=( "-t" "--wait-for-enter" "--global-binary")
 
 # These arrays are used for the automated starting and stopping.
 # modules are started and stopped in this order
-ALL_MOD_NAME=( "cache" "srx" "router" "bio1" "bio2" )
+ALL_MOD_NAME=( "cache" "srx" "router" "bio1" )
+if [ $SKIP_BIO2 -eq 0 ] ; then
+  ALL_MOD_NAME+=( "bio2" )
+fi
+
 if [ "$PORT_CACHE" == "" ] ; then
   PORT_CACHE=50000
 fi
@@ -96,9 +103,14 @@ fi
 # The module order is: cache srx router bio1 bio2
 # did not show (happens sometimes) try to kill the app using the port
 # port=0 skip
-ALL_MOD_PORT=( $PORT_CACHE    $PORT_SRX  $PORT_ROUTER        0             0 )
+ALL_MOD_PORT=( $PORT_CACHE    $PORT_SRX  $PORT_ROUTER       0)
 # These ports are required by the specific module
-ALL_MOD_PORT_REQ=( 0         $PORT_CACHE   $PORT_SRX    $PORT_ROUTER  $PORT_ROUTER )
+ALL_MOD_PORT_REQ=( 0         $PORT_CACHE   $PORT_SRX   $PORT_ROUTER)
+
+if [ $SKIP_BIO2 -eq 0 ] ; then
+  ALL_MOD_PORT+=( 0 )
+  ALL_MOD_PORT_REQ+=( $PORT_ROUTER )
+fi
 
 if [ "$LISTEN_TIMEOUT" == "" ] ; then
   LISTEN_TIMEOUT=10
@@ -135,11 +147,11 @@ CFG_BIO2=$DEMO_FLDR/$CFG_BIO2_NAME
 #
 syntax()
 {
-  echo "$0 <module> [-t] [--wait-for-enter] | <command>"
+  echo "$0 <module> [-t] [--wait-for-enter] [--gloal-binary] | <command>"
   echo
   echo " --wait-for-enter Wait for the enter key to be pressed"
   echo "                  before the program ends." 
-  echo
+  echo " --global-binary  Indicates if the binaries are in the PATH."
   echo " -t               Use the gnome-terminal in lieu of screen"
   echo "                  when using <all> or <select>"
   if [ $TOOL_TERMINAL -eq 0 ] ; then
@@ -147,9 +159,10 @@ syntax()
   fi
   echo
   echo "Command:"
-  echo "  view-table: Display the content of the BGP router's RIB-IN"
-  echo "  view-all    Display all 'screens' available"
-  echo "  stop-all    Stop all BGP-SRx 'screens'"
+  echo "  view-table:  Display the content of the BGP router's RIB-IN"
+  echo "  view-all     Display all 'screens' available"
+  echo "  stop-all     Stop all BGP-SRx 'screens'"
+  echo "  version | -v Display the version number and exit" 
   echo 
   echo "Module:"
   echo "  all"
@@ -165,9 +178,12 @@ syntax()
   echo "  srx      Start the SRx Server"
   echo "  router   Start the Quagga router (root privileges required!)"
   echo "  bio1     Start BGPsec-IO traffic generator 1"
-  echo "  bio2     Start BGPsec-IO traffic generator 2"
+  if [ $SKIP_BIO2 -eq 0 ] ; then
+    echo "  bio2     Start BGPsec-IO traffic generator 2"
+  fi
+  echo 
+  echo "NIST-BGP-SRx $0 V $VERSION"
   echo
-
   endPrg $1
 }
 
@@ -208,8 +224,8 @@ function startPrg()
   if [ "$_program" != "" ] ; then
     if [ -e $_program ] ; then
       echo "Current Folder: $(pwd)"
-      echo "Starting [$_sudo./$2 $3 $4 $5 $6]$_sudo_text..."    
-      $_sudo./$_program $@
+      echo "Starting [$_sudo$_program $@]$_sudo_text..."    
+      $_sudo$_program $@
       _retVal=$?
 
       if [ ! $_retVal -eq 0 ] ; then 
@@ -295,16 +311,6 @@ function _startModuleIn()
         echo "$_tab  Start failed!"
       fi
       countInParameters $_module ${SIT_AND_WAIT_MOD[@]}
-#      if [ $? -gt 0 ] ; then
-#        echo -n "$_tab  Add delay after staring of $SIT_AND_WAIT_TIME seconds"
-#        _counter=$SIT_AND_WAIT_TIME
-#        while [ $_counter -gt 0 ] ; do
-#          echo -n "."
-#          sleep 1
-#          _counter=$(($_counter-1))
-#        done
-#        echo "done"
-#      fi 
     fi
   fi
   return $_retVal
@@ -367,7 +373,10 @@ function runAutomated()
     countInParameters "router" ${_MODULES[@]}
     if [ $? -gt 0 ] ; then
       # Just in case, add bio1 and bio2 into the sit and wait
-      SIT_AND_WAIT_MOD+=( "bio1" "bio2" )
+      SIT_AND_WAIT_MOD+=( "bio1" )
+      if [ $SKIP_BIO2 -eq 0 ] ; then
+        SIT_AND_WAIT_MOD+=( "bio2" )
+      fi
     fi
     for _mod_idx in ${!ALL_MOD_NAME[@]} ; do
       # Check if this module is part of the requested modules.
@@ -448,7 +457,6 @@ function viewAll()
   screen -ls | grep "(Detached)"
   echo "Screen for (root):"
   sudo screen -ls | grep "(Detached)"
-  echo ${view[@]}
 }
 
 
@@ -538,8 +546,11 @@ fi
 #echo "DEMO_SBIN_FDLR...: $DEMO_SBIN_FLDR"
 
 # Check that all files are configured
-CFG_FILES=("$CFG_CACHE" "$CFG_SRX" "$CFG_SCA" 
-           "$CFG_ROUTER" "$CFG_BIO1"  "$CFG_BIO2")
+CFG_FILES=( "$CFG_CACHE" "$CFG_SRX" "$CFG_SCA" 
+            "$CFG_ROUTER" "$CFG_BIO1" )
+if [ $SKIP_BIO2 -eq 0 ] ; then
+  CFG_FILES+=( "$CFG_BIO2" )
+fi
 
 # List of tools required for the "all" mode
 REQ_TOOLS=("/bin/bash" "screen" "netstat" "awk")
@@ -559,6 +570,9 @@ for param in ${_PARAMS[@]} ; do
   case $param in 
     "--wait-for-enter") 
       READ_ENTER=1 
+      ;;
+    "--global-binary")
+      PRG_SFX=""
       ;;
     "-t") 
       if [ $TOOL_TERMINAL -eq 1 ] ; then
@@ -628,9 +642,11 @@ if [ $retVal -eq 0 ] ; then
       if [ ! $_retVal -eq 0 ] ; then
         echo "An error occured during starting one of the modules."
       fi
-      echo "Use 'screen -r -S <screen-name>' to reattach to any screen."
-      echo "Once reattached, press 'Ctrl-a d' to detach again."
-      echo "For more information on how to use screen, use 'man screen'."
+      if [ $USE_TERMINAL -eq 0 ] ; then
+        echo "Use 'screen -r -S <screen-name>' to reattach to any screen."
+        echo "Once reattached, press 'Ctrl-a d' to detach again."
+        echo "For more information on how to use screen, use 'man screen'."
+      fi
       echo "Call $0 view-table to see the routers RIB-IN."
       READ_ENTER=0
       ;;
@@ -641,36 +657,44 @@ if [ $retVal -eq 0 ] ; then
       if [ ! $_retVal -eq 0 ] ; then
         echo "An error occured during starting one of the modules."
       fi
-      echo "Use 'screen -r -S <screen-name>' to reattach to any screen."
-      echo "Once reattached, press 'Ctrl-a d' to detach again."
-      echo "For more information on how to use screen, use 'man screen'."
+      if [ $USE_TERMINAL -eq 0 ] ; then
+        echo "Use 'screen -r -S <screen-name>' to reattach to any screen."
+        echo "Once reattached, press 'Ctrl-a d' to detach again."
+        echo "For more information on how to use screen, use 'man screen'."
+      fi
       echo "Call $0 view-table to see the routers RIB-IN."
       READ_ENTER=0
       ;;
     "cache")
       cd $DEMO_BIN_FLDR
-      startPrg "./$PRG_CACHE" "-f" "$CFG_CACHE" $PORT_CACHE
+      startPrg "$PRG_SFX$PRG_CACHE" "-f" "$CFG_CACHE" $PORT_CACHE
       retVal=$?
       ;;
     "srx")
       cd $DEMO_BIN_FLDR
-      startPrg "./$PRG_SRX" "-f" "$CFG_SRX"
+      startPrg "$PRG_SFX$PRG_SRX" "-f" "$CFG_SRX"
       retVal=$?
       ;;
     "router")
       cd $DEMO_SBIN_FLDR
-      startPrg "./$PRG_ROUTER" "-f" "$CFG_ROUTER"
+      startPrg "$PRG_SFX$PRG_ROUTER" "-f" "$CFG_ROUTER"
       retVal=$?
       ;;
     "bio1")
       cd $DEMO_BIN_FLDR
-      startPrg "./$PRG_BIO" "-f" "$CFG_BIO1"
+      startPrg "$PRG_SFX$PRG_BIO" "-f" "$CFG_BIO1"
       retVal=$?
       ;;
     "bio2")
-      cd $DEMO_BIN_FLDR
-      startPrg "./$PRG_BIO" "-f" "$CFG_BIO2"
-      retVal=$?
+      if [ $SKIP_BIO2 -eq 0 ] ; then
+        cd $DEMO_BIN_FLDR
+        startPrg "$PRG_SFX$PRG_BIO" "-f" "$CFG_BIO2"
+        retVal=$?
+      else
+        echo "Module '$1' not included in this example!"
+        retVal=$?
+        READ_ENTER=0
+      fi
       ;;
     *)
       echo "Unknown Module '$1'"

@@ -23,12 +23,12 @@ Summary:SRx Crypto API - developers package
 
 Group:Security Libraries
 License:https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software
-URL:https://bgpsrx.antd.nist.gov
+URL://https://github.com/usnistgov/NIST-BGP-SRx
 Vendor:National Institute of Standards and Technology (NIST)
 Distribution:NIST BGP-SRx Software Suite
 Packager: BGP-SRx Team <itrg-contact@list.nist.gov>
 Source0:%{core_name}-%{version}.tar.gz
-BuildRoot:/tmp/rpm/%{core_name}-%{version}s
+BuildRoot:/tmp/rpm/%{core_name}-%{version}
 #Prefix: %{_prefix}
 #Prefix: %{_sysconfdir}
 

@@ -22,10 +22,12 @@
  * Connects to an RPKI/Router Protocol server and prints all received
  * information on stdout.
  *
- * @version 0.6.0.0
+ * @version 0.6.1.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.1  - 2021/10/27 - oborchert
+ *            * Removed label ANTD
  * 0.6.0.0  - 2021/03/30 - oborchert
  *            * Added missing version control. Also moved modifications labeled 
  *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
@@ -365,7 +367,7 @@ void syntax(const char* prgName)
     printf ("    The order in which the data is printed is ASN, Prefix, Maxlen");
     printf ("\n    This means the formating string must contain the order");
     printf ("\n    integer - string - integer");
-    printf ("\n\n 2010-%s ANTD NIST - Version %s\n", SRX_DEV_TOYEAR, SRX_TOOLS_VERSION);
+    printf ("\n\n 2010-%s NIST - Version %s\n", SRX_DEV_TOYEAR, SRX_TOOLS_VERSION);
 }
 
 /**

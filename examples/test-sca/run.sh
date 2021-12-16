@@ -121,10 +121,10 @@ cd $DEMO_SBIN_FLDR
 case "$_module" in
   "sca-1")
     if [ $__REPORT -eq 0 ] ; then
-      startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-1.conf" 
+      startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-1.conf" 2>/dev/null
       retVal=$?
     else
-      startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-1.conf" \
+      startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-1.conf" 2>/dev/null \
                  | grep -e "$_ERROR_REGEX" >> /dev/null
       retVal=$?
     fi
@@ -132,11 +132,11 @@ case "$_module" in
   "sca-2")
     if [ $__REPORT -eq 0 ] ; then
       startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-2-3.conf" \
-                 -k pub 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
+                 -k pub 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 2>/dev/null
       retVal=$?
     else
       startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-2-3.conf" \
-                 -k pub 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 \
+                 -k pub 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 2>/dev/null \
                  | grep -e "$_ERROR_REGEX" >> /dev/null
       retVal=$?
     fi
@@ -144,11 +144,11 @@ case "$_module" in
   "sca-3")
     if [ $__REPORT -eq 0 ] ; then
       startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-2-3.conf" \
-                 -k priv 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64
+                 -k priv 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 2>/dev/null
       retVal=$?
     else
       startPrg 0 "./$PRG_SCA" "-f" "$DEMO_FLDR/srxcryptoapi-sca-2-3.conf" \
-                 -k priv 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 \
+                 -k priv 65000 8E232FCCAB9905C3D4802E27CC0576E6BFFDED64 2>/dev/null \
                  | grep -e "$_ERROR_REGEX" >> /dev/null
 #      echo $_ERROR_REPORT
       retVal=$?

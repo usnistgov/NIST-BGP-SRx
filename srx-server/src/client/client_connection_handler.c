@@ -43,10 +43,12 @@
  *
  * GET RID OFF SEND QUEUE ??
  *
- * Version 0.3.0
+ * Version 0.6.1.2
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.2  - 2021/11/18 - kyehwanl
+ *            * Fixed bug in LOG print.
  * 0.3.0.10 - 2015/11/10 - oborchert
  *            * Removed un-used static function _suppressSIGINT. It was already
  *              replaced with SIG_IGN. 
@@ -567,7 +569,7 @@ bool sendGoodbye(ClientConnectionHandler* self, uint16_t keepWindow)
   SRXPROXY_GOODBYE* hdr = (SRXPROXY_GOODBYE*)pdu;
   memset(pdu, 0, length);
 
-  LOG(LEVEL_DEBUG, HDR" send Goodbye! called" );
+  LOG(LEVEL_DEBUG, HDR" send Goodbye! called", pthread_self());
   hdr->type       = PDU_SRXPROXY_GOODBYE;
   hdr->keepWindow = htons(keepWindow);
   hdr->length     = htonl(length);

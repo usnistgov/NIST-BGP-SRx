@@ -10,11 +10,11 @@ all software modules on a fresh minimal CentOS 7/8 install.
 ## Build and Install ##
 
 In case the build and install is preferred to be completely manual, please
-check each module's source directory for README and INSTALL files that do
-explain how the install should be done. This will be of big help if the
-installation is done on systems other than CentOS7 and CentOS8.
+check the source directory of each module for additional README and INSTALL
+files that do explain how the install should be done. This will be of
+big help if the installation is done on systems other than CentOS7 and CentOS8.
 
-This install section deals with helper scripts that allow a __plug'n play__
+This install section deals with helper scripts that allow a __plug & play__
 install fully automated as well as partial automated. The most important
 script for building the software is ```get-BGPSRx.sh```. It is highly
 recommended to get familiar with all the options of this script which can
@@ -49,7 +49,7 @@ updated to provide the latest information.
 
 The following command allows to generate a list of packages to required.
 
-```cat CONTENT | grep requires | sort -u ```
+```cat CONTENT | grep requires | sort -u```
 
 To generate the list with yum install command use the command below
 
@@ -126,7 +126,7 @@ where the parameter ```-A``` which allows to answer every user input with 'Y'.
 Then automatically installing the examples the configuration script determines
 how many IP addresses are needed and scans each interface available. Then it
 uses the already assigned IP address of the interface and tries to locate
-available  IP addresses int he /24 network of the NIS's IP address.
+available  IP addresses int he /24 network of the NICS's IP address.
 
 NOTE: While parsing through the /24 network, the configuration script provides
 a search progress bar ```[pppp-pp-]``` with  ```p``` indicating an address is
@@ -150,8 +150,9 @@ Each module can be re-build manually. It is recommended to deep clean a module
 prior configuration and building. This can be achieved using the command
 ```./buildBGP-SRx.sh -D <module> [<module> ]*```
 
-The most likely error will happen during the configuration of the experiments using the ```buildBGP-SRx.sh``` script. In this case the following steps will most
-likely solve the issues:
+The most likely error will happen during the configuration of the experiments
+using the ```buildBGP-SRx.sh``` script. In this case the following steps will
+most likely solve the issues:
 
 * Deep clean EXAMPLES:
   ```./buildBGP-SRx.sh EXAMPLES -D```

@@ -1,3 +1,14 @@
+Version 0.6.0.3
+  * Suppress bio warning when running test cases.
+Version 0.6.0.2
+  * Added VERSION tag into start_example.sh
+  * Added --suppress-warning to start_example.sh to shorten
+    newly added warning string from BGPsec-IO
+  * Added additional experiment for ASPA with the focus on the algorithm fix.
+Versoin 0.6.0.1
+  * Fixed minor bugs.
+Version 0.6.0.0 (Pre-Release)
+  * Added ASPA 
 Version 0.5.1.11
   * Removed sudo test - it is just annoying when not needed.
   * Fixed bug for where configuration prematurely stops when the number

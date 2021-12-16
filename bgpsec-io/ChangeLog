@@ -1,3 +1,6 @@
+Version 0.2.1.11
+  * Added startup message.
+  * Added switch to reduce the warning message output.
 Version 0.2.1.10
   * Ignore B4 scripted UPDATES for CAPI processing.
   * Added BGP-4 scripted and sign error with DROP and BGP-4 fallback to 

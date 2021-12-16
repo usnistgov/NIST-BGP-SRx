@@ -950,8 +950,8 @@ struct peer
 #define PEER_FLAG_BGPSEC_CAPABILITY         (1 << 15)/* bgpsec capability - SEND */
 #define PEER_FLAG_ASPA_RELATIONSHIP_PROV    (1 << 16)/* ASPA peer relationship provider */
 #define PEER_FLAG_ASPA_RELATIONSHIP_CUST    (1 << 17)/* ASPA peer relationship customer */
-#define PEER_FLAG_ASPA_RELATIONSHIP_SIBL    (1 << 18)/* ASPA peer relationship customer */
-#define PEER_FLAG_ASPA_RELATIONSHIP_LATL    (1 << 19)/* ASPA peer relationship customer */
+#define PEER_FLAG_ASPA_RELATIONSHIP_SIBL    (1 << 18)/* ASPA peer relationship sibling */
+#define PEER_FLAG_ASPA_RELATIONSHIP_LATL    (1 << 19)/* ASPA peer relationship lateral */
 #endif
 
   /* NSF mode (graceful restart) */

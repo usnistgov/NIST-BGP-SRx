@@ -1,5 +1,7 @@
 ChangeLog for Version 0.6.1
+- Increased line buffer in file reader of rpkirtr_svr
 - Fixed issues in APSA algorithm that change the outcome in certain scenarios.
+- Fixed sibling and lateral relation ship where both were incorrectly reversed.
 - Removed dead code
 - Added c99 flag to allow c99 code style 
 - Added srx-server-protocol specification to doc folder

@@ -20,10 +20,13 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.6.1.0
+ * @version 0.6.1.2
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.2  - 2021/11/15 - kyehwanl
+ *            * Exchange the conditions to determine between sibling and lateral 
+ *              peer.
  * 0.6.1.0  - 2021/08/27 - kyehwanl
  *            * Added logging informations
  * 0.6.0.0  - 2021/04/06 - oborchert
@@ -689,9 +692,9 @@ bool processValidationRequest(ServerConnectionHandler* self,
     case AS_REL_PROVIDER:
       asRelDir = ASPA_DOWNSTREAM; break;
     case AS_REL_SIBLING:
-      asRelDir = ASPA_UPSTREAM; break;
-    case AS_REL_LATERAL:
       asRelDir = ASPA_DOWNSTREAM; break;
+    case AS_REL_LATERAL:
+      asRelDir = ASPA_UPSTREAM; break;
     default:
       asRelDir = ASPA_UNKNOWNSTREAM;     
   }

@@ -678,8 +678,10 @@ int bgp_info_set_ignore_flag (struct bgp_info* info)
 
   if (BGP_DEBUG (aspa, ASPA))
   {
-    zlog_debug ("[ ASPA ] %s called [uID:%08X]- ROA: %d BGPSEC:%d ASPA:%d (0:V 1:NF 2:Iv 3:Ud 4:DNU 5:Uk 6:Uv)", 
-        __FUNCTION__, info->updateID, info->val_res_ROA, info->val_res_BGPSEC, info->val_res_ASPA);
+    if (info->updateID)
+      zlog_debug ("[ ASPA ] [%s][uID:%08X] - ROA: %d BGPSEC:%d ASPA:%d"
+          "\033[2;34m(0:V 1:NF 2:Iv 3:Ud 4:DNU 5:Uk 6:Uv)\033[0m",
+          __FUNCTION__, info->updateID, info->val_res_ROA, info->val_res_BGPSEC, info->val_res_ASPA);
   }
   
   // 1. Check if Origin Validation is enabled and if then check the ignore policy
@@ -3442,7 +3444,7 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
         asPathList.asType = cseg->type;
         asPathList.segments = (ASSEGMENT*)calloc(asPathList.length, sizeof(ASSEGMENT));
             
-        zlog_debug ("[ ASPA ] AS PathList Info - AS Length: %d  Type: %s  AS relationship: %s", 
+        zlog_debug ("[ ASPA ] AS PathList Info - AS Length: %d  Type: %s  AS relationship: %s ", 
                 asPathList.length, asPathList.asType==2 ? "AS_SEQUENCE": (asPathList.asType==1 ? "AS_SET": "ETC"), 
                 asPathList.asRelationship == 2 ? "provider" : (asPathList.asRelationship == 1 ? "customer": \
                 (asPathList.asRelationship == 3 ? "sibling": (asPathList.asRelationship == 4 ? "lateral" : "unknown"))));

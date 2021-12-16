@@ -113,6 +113,9 @@ This software suite provides the following list of modules:
 * **BIO:**       BGPsec traffic generator and crypto module tester.
 * **EXAMPLES:**  Examples and test scripts the  BGP-SRx modules.
 
+Two more implementations are available ExaBGPsec and GoBGPsec. Mre information on then
+can be found in the [CAPABILITIES](CAPABILITIES.mf).
+
 ### Required to build SRx Crypto API (SCA)
 
 1) Build SRx Crypto API (srx-crypto-api)

@@ -6,6 +6,10 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.6.0.2 - Nov 2021
+    * Fix in bgp_info_fetch when prefix is re-originated by same peer
+  0.6.0.1 - Oct 2021
+    * Fixed SPEC file for rpm generation
   0.6.0.0 - May 2021
     * Added missing local update ID to show up bgp a.b.c.e
     * Fixed incorrect local pref display in all versions of show ip bgp

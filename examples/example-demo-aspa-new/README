@@ -1,0 +1,91 @@
+# 
+# This demo used one QuagagSRx instance as AS65000 and one BGPsec-IO (BIO) 
+# traffic generator as AS65005
+# The pre-requisite of this example topology and configuration is that the 
+# system needs to have one single IP addresses configured, one for BIO-1 
+# 
+# The modification required in each provided configuration file are the 
+# assigned IP addresses in the physical arena of the example.  
+# The Virtualized area is provided using the BGPsec-IO instance. 
+#
+# 
+# Topology: 
+# ========= 
+#
+#             65030---65025---65010---65015
+#               |               |       \
+#               |               |        \
+#             65040           65005     65020
+#          (10.40.0.0/22)      BIO   (10.20.0.0/22)
+#                               |
+#                             65000
+#                              IUT
+#
+# Legend: 
+# ======= 
+#   (65000)      AS 65000 
+#   (A.B.C.D/E)  Announcement of prefix A.B.C.D/E
+#   | -----      Link between two ASes 
+# 
+# Updates from AS 65005 to AS 65000 
+#     10.40.0.0/22   65005 65010 65025 65030 65040
+#     10.10.0.0/22   65005 65010 65015 65020 
+# 
+#  Validation Results in 65000: 
+#  ======================= 
+#  ASPA....(APV)...: (v)alid, (u)nknown, (i)nvalid, (f)unverifiable 
+#
+#  (?) Represents "undefined" and can be used as "unverified" if 
+#      used as default value. No validation algorithm does return
+#      this result which indicates that no validation finished
+#      or started for the particular algorithm.
+
+#
+# Implementation following draft-ietf-sidrops-aspa-verification-08
+# (This version is generates an incorrect validation result)
+#
+# Prefix     - (ROV, BPV, APV) - Path 
+# 10.20.0.0/22   - (-,-,u) - 65005 65010 65015 65020
+# 10.40.0.0/22   - (-,-,u) - 65005 65010 65025 65030 65040 
+#
+#
+#
+# Implementation following proposed algorithm correction
+#
+# Prefix     - (ROV, BPV, APV) - Path 
+# 10.20.0.0/22   - (-,-,v) - 65005 65010 65015 65020
+# 10.40.0.0/22   - (-,-,v) - 65005 65010 65025 65030 65040 
+
+# Validation Local Pref Policy: 
+# ==============================
+# Algorithm | (v)alid | (u)nknown | (i)nvalid | (f)unverifiable 
+# ----------+---------+-----------+-----------+----------------
+#    APV    |   +20   |    +10    |    -20    |       -5
+# ----------+---------+-----------+-----------+----------------
+#
+# Expected route selection according to Local Pref Policy with or without 
+# ignore policies enabled
+#
+#
+# Implementation following draft-ietf-sidrops-aspa-verification-08
+# (This version is generates an incorrect validation result)
+#
+# selection | IP              validation  Local Preference  AS
+# LP | LP/I | Prefix            result    delta value       Path
+# ---+------|----------------------------------------------------------------
+#  > |   >  | 10.20.0.0/22   -  (-,-,u)  -      (+10)       65005 65010 65015 65020 
+#  > |   >  | 10.40.0.0/22   -  (-,-,u)  -      (+10)       65005 65010 65025 65030 65040 
+#
+#
+#
+# Implementation following proposed algorithm correction
+#
+# selection | IP              validation  Local Preference  AS
+# LP | LP/I | Prefix            result    delta value       Path
+# ---+------|----------------------------------------------------------------
+#  > |   >  | 10.20.0.0/22   -  (-,-,v)  -      (+20)       65005 65010 65015 65020 
+#  > |   >  | 10.40.0.0/22   -  (-,-,v)  -      (+20)       65005 65010 65025 65030 65040 
+#
+#
+# For routes marked with ? the router will decide depending on the router id (smaller one)
+#

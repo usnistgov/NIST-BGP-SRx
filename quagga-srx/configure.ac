@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.6.0.0, [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
+AC_INIT(QuaggaSRx, 0.6.0.1, [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 

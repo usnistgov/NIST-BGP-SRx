@@ -12,6 +12,16 @@
 >
 >The details of the components 1 - 4 can be found int the NIST Technical Note [TN-2060](https://www.nist.gov/publications/bgp-secure-routing-extension-bgp-srx-reference-implementation-and-test-tools-emerging). This document functions as a quick overview of the capabilities and features of the NIST BGP-SRx Software Suite.
 
+### Additional Implementations ###
+
+In addition to the above mentioned components two more implementations were created that make usage of the
+SRx-Crypto-API as well as the SRx-Server. These two components are:
+
+1. **ExaBGPsec** - Navigate to [code at GitHub](https://github.com/usnistgov/exabgpsrx)
+2. **GoBGPsec** - Navigate to [code at GitHub](https://github.com/usnistgov/gobgpsrx)
+
+More detailed information on each implementation can be found in each respective GitHub repository.
+
 ## Overall Capabilities ##
 >
 >* Perform BGP Origin Validation (BGP-OV) (RFC 6811):
@@ -81,3 +91,12 @@
 >### Experiments ###
 >
 >The experiments folder contains experimentation for each validation mode and one combining all tree modes. Each experiment can be run in a "Sandbox" environment.
+>
+><hr/>
+>
+>### ExaBGPsec ###
+>ExaBGPsec uses NIST SRxCrypto library to facilitate cryptographic calculations which is able to deal with X.509 objects for BGPSec path validation. This software is based on Exabgp BGP implementation and added codes for implementing BGPSec protocol (RFC 8205).
+>
+>### GoBGPsec ###
+>
+>GoBGPsec uses NIST SRxCrypto library to facilitate crypto calculations which is able to sign and verify X.509 objects for BGPSec path validation. This software is based on Gobgp BGP implementation and added codes for implementing BGPSec protocol (RFC 8205).

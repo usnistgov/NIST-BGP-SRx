@@ -146,29 +146,29 @@ if [ $retVal -eq 0 ] ; then
   if [ $__REPORT -eq 0 ] ; then
     if [ "$_DATA_FILE" == "" ] ; then
       # run bio-sca-1 without report
-      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m CAPI
+      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m CAPI 2>/dev/null
       retVal=$?
       echo "It is expected to have 1 invalid and 3 valid routes!"
     else
       # run bio-sca-2 or bio-sca-3 without report
-      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m GEN-C --out $_DATA_FILE
+      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m GEN-C --out $_DATA_FILE 2>/dev/null
       retVal=$?
       if [ $retVal -eq 0 ] ; then
-        startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_2 -m CAPI --bin $_DATA_FILE
+        startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_2 -m CAPI --bin $_DATA_FILE 2>/dev/null
         retVal=$?
       fi
     fi
   else
     if [ "$_DATA_FILE" == "" ] ; then
       # run bio-sca-1 with report
-      _RESULT=$(startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m CAPI \
+      _RESULT=$(startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m CAPI 2>/dev/null \
                 | grep -e "$_ERROR_REGEX" | wc -l)
     else
       # run bio-sca-2 with report
-      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m GEN-C --out $_DATA_FILE >> /dev/null
+      startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_1 -m GEN-C --out $_DATA_FILE >/dev/null 2>&1
       retVal=$?
       if [ $retVal -eq 0 ] ; then
-        _RESULT=$(startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_2 -m CAPI --bin $_DATA_FILE \
+        _RESULT=$(startPrg 0 "./$PRG_BIO" "-f" $_CONF_FILE_2 -m CAPI --bin $_DATA_FILE 2>/dev/null \
                   | grep -e "$_ERROR_REGEX" | wc -l)
       else
         _RESULT=0

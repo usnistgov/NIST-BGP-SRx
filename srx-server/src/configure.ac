@@ -1,8 +1,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.6.1.0], [itrg-contact@list.nist.gov], [srx], [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
-s# The -Wno=portability is needed for the $(shell...) GNU extension.
+AC_INIT([SRx], [0.6.1.2], [itrg-contact@list.nist.gov], [srx], [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
+# The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 LT_PREREQ([2.2])

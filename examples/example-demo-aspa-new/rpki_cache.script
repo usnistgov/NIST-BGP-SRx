@@ -1,0 +1,15 @@
+echo "This is the BGP-SRx RPKI Cache Test Harness"
+echo "==========================================="
+
+echo "Add ASPA configuration (AS 65015 & AS 65025 do not participate in ASPA)"
+
+addASPA 0 65000 65005
+addASPA 0 65005 65010
+addASPA 0 65010 65025
+addASPA 0 65020 65015
+addASPA 0 65025 65010
+addASPA 0 65040 65030
+notify
+
+echo "Cache Contents:"
+cache

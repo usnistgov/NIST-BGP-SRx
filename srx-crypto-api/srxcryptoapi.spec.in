@@ -9,8 +9,6 @@
 %define lib_ver_info @VER_INFO@
 %define srxdir       @SRX_DIR@
 
-%define keyvault      /var/lib/bgpsec-keys
-
 %define lib_version_info %{lib_ver_info}
 %define package_version %{package_num}.%{major_ver}.%{minor_ver}.%{update_num}
 %define version %{package_version}
@@ -35,12 +33,12 @@
 
 Name:%{name}
 Version:%{version}
-Release:	1%{?dist}
+Release:1%{?dist}
 Summary:SRx Crypto API for BGPsec speakers
 
 Group:Security Libraries
 License:https://www.nist.gov/director/copyright-fair-use-and-licensing-statements-srd-data-and-software
-URL:https://bgpsrx.antd.nist.gov
+URL:https://github.com/usnistgov/NIST-BGP-SRx
 Source0:%{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 Prefix: %{_prefix}
@@ -86,78 +84,60 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%pre
+if [ -e %{_sysconfdir}/qsrx-router-key.conf ] ; then
+  mv -f %{_sysconfdir}/qsrx-router-key.conf %{_sysconfdir}/qsrx-router-key.curr
+fi 
+if [ -e %{_sysconfdir}/srxcryptoapi.conf ]; then
+  mv -f %{_sysconfdir}/srxcryptoapi.conf %{_sysconfdir}/srxcryptoapi.curr
+fi
+
 
 %post
-mkdir -p %{keyvault}
-if [ ! -e %{keyvault}/ski-list.txt ]; then
-  touch %{keyvault}/ski-list.txt
+if [ -e %{_sysconfdir}/qsrx-router-key.curr ]; then
+  mv -f %{_sysconfdir}/qsrx-router-key.conf %{_sysconfdir}/qsrx-router-key.conf.rpmnew
+  mv -f %{_sysconfdir}/qsrx-router-key.curr %{_sysconfdir}/qsrx-router-key.conf
 fi
-
-if [ ! -e %{keyvault}/priv-ski-list.txt ]; then
-  touch %{keyvault}/priv-ski-list.txt
-fi
-
-if [ ! -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
-  mv -f %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf
-else
-  mv -f %{_sysconfdir}/qsrx-router-key.cnf.sample %{_sysconfdir}/qsrx-router-key.cnf.rpmnew
-fi
-
-if [ ! -e %{_sysconfdir}/srxcryptoapi.conf ]; then
-  mv -f %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf
-else
-  mv -f %{_sysconfdir}/srxcryptoapi.conf.sample %{_sysconfdir}/srxcryptoapi.conf.rpmnew
+if [ -e %{_sysconfdir}/srxcryptoapi.curr ]; then
+  mv -f %{_sysconfdir}/srxcryptoapi.conf %{_sysconfdir}/srxcryptoapi.rpmnew
+  mv -f %{_sysconfdir}/srxcryptoapi.curr %{_sysconfdir}/srxcryptoapi.conf
 fi
 ldconfig
 
 %preun
-# the installation created sample files, create some if they don't exist to
-# prevent the annoying yum warning
-touch %{_sysconfdir}/srxcryptoapi.conf.sample
-touch %{_sysconfdir}/qsrx-router-key.cnf.sample
-
-%postun
-if [ -e %{keyvault} ] ; then
-  if [ ! -s %{keyvault}/ski-list.txt ]; then
-    rm -rf %{keyvault}/ski-list.txt
-  fi
-
-  if [ ! -s %{keyvault}/priv-ski-list.txt ]; then
-    rm -rf %{keyvoault}/priv-ski-list.txt
-  fi
-
-  if [ "x$(ls -A %{keyvault})" = "x" ]; then
-    rmdir %{keyvault} >> /dev/null
-  fi
-fi
-# in case a .rpmnew exists remove it. In this case don't move .cnf or .conf into
-# .rpmsafe because the .cnf or .conf was generated elsewhere. in case no .rpmnew 
-# exists the .cnf or .conf was installed by this package and will be moved into
-# .rpmsafe 
-if [ -e %{_sysconfdir}/qsrx-router-key.cnf.rpmnew ]; then
-  rm -f %{_sysconfdir}/qsrx-router-key.cnf.rpmnew
-else 
-  if [ -e %{_sysconfdir}/qsrx-router-key.cnf ]; then
-    mv -f %{_sysconfdir}/qsrx-router-key.cnf %{_sysconfdir}/qsrx-router-key.cnf.rpmsafe
-  fi
-fi
-
-if [ -e %{_sysconfdir}/srxcryptoapi.conf.rpmnew ]; then
-  rm -f %{_sysconfdir}/srxcryptoapi.conf.rpmnew
-else
+# In case no .rpmnew found, it indicates the configuration file was installed
+# using this script. Here move the configuration file into .rpmsafe 
+if [ ! -e %{_sysconfdir}/srxcryptoapi.conf.rpmnew ]; then
   if [ -e %{_sysconfdir}/srxcryptoapi.conf ]; then
     mv -f %{_sysconfdir}/srxcryptoapi.conf %{_sysconfdir}/srxcryptoapi.conf.rpmsafe
   fi
 fi
+if [ ! -e %{_sysconfdir}/qsrx-router-key.conf.rpmnew ]; then
+  if [ -e %{_sysconfdir}/qsrx-router-key.conf ]; then
+    mv -f %{_sysconfdir}/qsrx-router-key.conf %{_sysconfdir}/qsrx-router-key.conf.rpmsafe
+  fi
+fi
 
+%postun
+# in case a .rpmnew exists remove it.
+if [ -e %{_sysconfdir}/qsrx-router-key.conf.rpmnew ]; then
+  rm -f %{_sysconfdir}/qsrx-router-key.conf.rpmnew
+fi
+if [ -e %{_sysconfdir}/srxcryptoapi.conf.rpmnew ]; then
+  rm -f %{_sysconfdir}/srxcryptoapi.conf.rpmnew
+fi
+# below will result in an error if srxdir is not empty and that is fine as long 
+# as nothing is printed out.
+rmdir %{_libdir}/%{srxdir}/
 ldconfig
 
 %files
 %defattr(-,root,root,-)
 %doc
 %{_sysconfdir}/ld.so.conf.d/srxcryptoapi_lib@CPU_ARCH@.conf
-%{_sysconfdir}/srxcryptoapi.conf.sample
-%{_sysconfdir}/qsrx-router-key.cnf.sample
+%{_sysconfdir}/srxcryptoapi.conf
+%{_sysconfdir}/qsrx-router-key.conf
+# The Header file is part of the devel package
 #%{_includedir}/%{srxdir}/srxcryptoapi.h
 %{_libdir}/%{srxdir}/libSRxCryptoAPI.so.%{lib_version_info}
 %{_libdir}/%{srxdir}/libSRxCryptoAPI.so.%{major_ver}
