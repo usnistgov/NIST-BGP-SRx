@@ -1,3 +1,5 @@
+Version 0.6.1.0
+  * Added the Test Framework Generator for ASPA
 Version 0.6.0.3
   * Suppress bio warning when running test cases.
 Version 0.6.0.2

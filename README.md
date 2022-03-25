@@ -111,10 +111,13 @@ This software suite provides the following list of modules:
 * **SRxSnP:**    SRx-Server and SRx-Proxy (the validation server and proxy)
 * **QSRx:**      Quagga SRx (the routing engine)
 * **BIO:**       BGPsec traffic generator and crypto module tester.
-* **EXAMPLES:**  Examples and test scripts the  BGP-SRx modules.
+* **EXAMPLES:**  Examples, test scripts, and test framework generators (TFG) to test BGP-SRx modules.
 
-Two more implementations are available ExaBGPsec and GoBGPsec. More information on them
+Two more implementations are available ExaBGPsec and GoBGPsec. More information on then
 can be found in the [CAPABILITIES](CAPABILITIES.md) file.
+
+The newest addition is the Test Framework Generator for ASPA (TFG-ASPA). It is part of the EXAMPLES module. More
+information on the TFG-ASPA can be found in the TFGA-ASPA [README.MD](examples/tfg-aspa/README.md) file.
 
 ### Required to build SRx Crypto API (SCA)
 

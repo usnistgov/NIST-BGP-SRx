@@ -90,7 +90,7 @@ More detailed information on each implementation can be found in each respective
 >
 >### Experiments ###
 >
->The experiments folder contains experimentation for each validation mode and one combining all tree modes. Each experiment can be run in a "Sandbox" environment.
+>The experiments folder contains experimentation for each validation mode and one combining all tree modes. Each experiment can be run in a "Sandbox" environment. A new feature is the addition of Framework Test Generators (TFG). The latest one it the TFG for ASPA.
 >
 ><hr/>
 >

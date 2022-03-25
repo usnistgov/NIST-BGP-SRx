@@ -48,6 +48,15 @@ The examples are split into four main sections:
     This folder contains custom generated examples. Most likely buy you in
     case you want to build your own examples.
 
+5) Test Framework Generators
+
+    Test Framework Generators are tools used to generate large scale tests
+    as well as carefully designed data sets. The prefix of these frameworks
+    is tfg- followed byt the larger area.
+    
+    Currently the only framework added is the tfg-ASPA. For more information
+    on the tfg-ASPA see the [README.md](tfg-aspa/README.md) file.
+
 Template Configuration:
 =======================
 

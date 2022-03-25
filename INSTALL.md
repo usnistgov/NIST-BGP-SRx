@@ -289,7 +289,7 @@ repo_name="$(echo ${repo[$select_repo]} | sed -e "s/__/ /g")"
 repo_fldr="${repo[$select_fldr]}"
 
 tool_pkg="$(echo $tool_pkg) gcc patch openssl epel-release autoconf net-tools bind-utils sudo which sed telnet"
-devel_pkg="$(echo $devel_pkg) file screen libconfig-devel openssl-devel uthash-devel readline-devel net-snmp-devel"
+devel_pkg="$(echo $devel_pkg) file screen libconfig-devel openssl-devel uthash-devel readline-devel net-snmp-devel wget bgpdump"
 echo "yum -y install $tool_pkg"
 yum -y install $tool_pkg
 if [ ! $? -eq 0 ] ; then
