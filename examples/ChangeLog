@@ -1,3 +1,13 @@
+Version 0.6.3.1
+  * Updated the ASPA commands of all rpki_cache.script files by
+    removing the AFI entry.
+Version 0.6.3.0
+  * Removed loopback, it provided big problems in the examples.
+  * Fixed address assignments in example templates.
+  * Fixed bio templates using the proper key lists.
+Version 0.6.2.0
+  * Modified the IP generation for missing interface addresses to use
+    the loopback address range.
 Version 0.6.1.0
   * Added the Test Framework Generator for ASPA
 Version 0.6.0.3

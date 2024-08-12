@@ -102,6 +102,9 @@ typedef struct {
   SRxProxy*        srxProxy;      // A pointer to the SRX proxy instance.
                                   // Will be set using the method
                                   // initializeClientConnectionHandler.
+#ifdef USE_GRPC
+  unsigned int    grpcClientID;
+#endif
 } ClientConnectionHandler;
 
 /**

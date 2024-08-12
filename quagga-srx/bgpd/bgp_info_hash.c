@@ -288,11 +288,9 @@ void bgp_info_unregister(struct bgp_info_hash* hash, uint32_t identifier)
 struct bgp_info* bgp_info_fetch (struct bgp_info_hash* hash, 
                                  uint32_t identifier)
 {
-  struct bgp_info_hash_item* entry, *entry_orig;
+  struct bgp_info_hash_item* entry;
   
   HASH_FIND (hh, hash->table, &identifier, sizeof(uint32_t), entry);
-
-  entry_orig = entry;
 
   if(entry) 
   {

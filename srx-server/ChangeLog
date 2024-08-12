@@ -1,4 +1,15 @@
-ChangeLog for Version 0.6.1
+ChangeLog for Version 0.6.2.0
+- Updated to draft RFC8210-bis13 and removed AFI from ASPA PDU.
+ChangeLog for Version 0.6.1.3
+- Fixed server socket and rpki_router client linker error when compiled on ROCKY9
+  by moving the file descriptor variables from header to c file and declaring it
+  external in the header.
+- Updated automake and config to allow compilation on ROCKY 9
+ChangeLog for Version 0.6.1.2
+- Fixed error in configure.ac
+ChangeLog for Version 0.6.1.1
+- Fixed some bugs in ASPA implementation
+ChangeLog for Version 0.6.1.0
 - Increased line buffer in file reader of rpkirtr_svr
 - Fixed issues in APSA algorithm that change the outcome in certain scenarios.
 - Fixed sibling and lateral relation ship where both were incorrectly reversed.

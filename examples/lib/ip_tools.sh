@@ -3,7 +3,7 @@
 # This file provides tools for IP retrieval, assignment, and verification
 #
 #
-IP_TOOLS_LIB_VER=0.5.1.12
+IP_TOOLS_LIB_VER=0.5.3.0
 
 if [ "$FUNCTION_LIB_VER" == "" ] ; then
   funclib=$( find -name functions.sh )
@@ -36,7 +36,7 @@ _IPT_INSTALL_IPS_ERRMSG=""
 ## This array contains the list of all successfull installed Interface
 ## Aliasses
 ## 
-_IPT_ADDIP_IFACE_AIAS=()
+_IPT_ADDIP_IFACE_ALIAS=()
 
 ##
 ## This function verifies if the given address is a valid
@@ -74,6 +74,9 @@ function verifyIPv4()
 ## it attempts to ping the address. If both were unsucessful, the address
 ## is considered available.
 ##
+## In case the IP address is int he 127.0.0.0/8 prefix it is available as 
+## long as it is not assigned to any interface.
+##
 ## $1 the IPv4 address
 ## 
 ## Return 0 - if the address is available
@@ -85,6 +88,8 @@ function isIPv4Available()
 {
   local retVal=1
   local ipAddr=""
+  local addrPool=()
+  local addr
   
   verifyIPv4 $1
   if [ $? -eq 0 ] ; then
@@ -92,20 +97,34 @@ function isIPv4Available()
   fi
 
   if [ "$ipAddr" != "" ] ; then
-    # First check DNS using nslookup
-    nslookup "$ipAddr" > /dev/null 2>&1
-    if [ $? -eq 1 ] ; then 
-      # No DNS entry found, check if it can be pinged.
-      ##echo "ping $ip123.$byte"
-      ping "$ipAddr" -c 1 -W 1 > /dev/null 2>&1
-      if [ ! $? -eq 0 ] ; then
-        # Yeah, no nslookup, no ping => addr available
-        retVal=0
-      else
-        retVal=3
-      fi
+    # Check for 127.0.0.0/8
+    echo $ipAddr | grep "^127\..*" > /dev/null 2>&1
+    if [ $? -eq 0 ] ; then
+      # loopback address - determine available=0 until found in an interface, 
+      # then declare it pingable=3
+      addrPool+=( $(ifconfig | grep "inet " | awk '{ print $2 }' ) )
+      retVal=0
+      for addr in ${addrPool[@]} ; do
+        if [ "$addr" == "$ipAddr" ] ; then
+          retVal=3
+        fi
+      done
     else
-      retVal=2
+      # First check DNS using nslookup
+      nslookup "$ipAddr" > /dev/null 2>&1
+      if [ $? -eq 1 ] ; then 
+        # No DNS entry found, check if it can be pinged.
+        ##echo "ping $ip123.$byte"
+        ping "$ipAddr" -c 1 -W 1 > /dev/null 2>&1
+        if [ ! $? -eq 0 ] ; then
+          # Yeah, no nslookup, no ping => addr available
+          retVal=0
+        else
+          retVal=3
+        fi
+      else
+        retVal=2
+      fi
     fi
   fi
 
@@ -293,7 +312,7 @@ function addIPv4()
         retVal=$?
         if [ $retVal -eq 0 ] ; then
           println "done!"
-          _IPT_ADDIP_IFACE_AIAS+=( $iFace:$nextNum:$ipAddr )
+          _IPT_ADDIP_IFACE_ALIAS+=( $iFace:$nextNum:$ipAddr )
         else
           println "failed!"
           _IPT_ADD_IPV4_ERRMSG="Error creating the Alias assignment!"      
@@ -328,7 +347,7 @@ function addIPv4()
 ##
 ## $1 interface name (no alias)
 ## $2 number of IP addresses to be installed - Must be > 0
-## $3 Optional IP prefix (only IP portion, no /length) - (optional)
+## $3 IP prefix (only IP portion, no /length)
 ## $4 Optional TAB (will be in $3 if $3 is not an IP address)
 ##
 ## Return the number of successfully installed interfaces or 0 in case of an error
@@ -338,72 +357,53 @@ function installIPs()
   local retVal=0
   local iFace=$1
   local doInstall=$2
-  local optionalIP="$3"
+  local netIP=$3
   local TAB="$4"
-  local netIP=""
   local fullRange=1
   _IPT_INSTALL_IPS_ERRMSG=""
   ## Used to abort if more than failMax IP installs fail on this interface
   local failed=0
   local failMax=3
   
-  verifyIPv4 $optionalIP
+  verifyIPv4 $netIP
   if [ $? -eq 1 ] ; then
-    optionalIP=""
-    if [ "$TAB" == "" ] ; then
-      TAB="$3"
-    else
-      _IPT_INSTALL_IPS_ERRMSG="Invalid IP: '$3'"
-      doInstall=0
-    fi
+    _IPT_INSTALL_IPS_ERRMSG="Invalid IP: '$netIP'"
+    doInstall=0
   fi
 
   if [ "$doInstall" != "" ] ; then
-    ## Retrieve the first IP address already assigned to the interface
-    netIP=$(ifconfig $iFace | grep "inet " | awk '{ print $2 }')
-    if [ "netIP" == "" ] ; then
-      println "$TAB""Interface does not have an IP address configured."
-      netIP=$3
-      # only use the /24 range starting with $3 + 1
-      fullRange=0
+    if [ $fullRange -eq 1 ] ; then
+      # Rewrite netIP to use 0 as last byte
+      netIP=$( echo $netIP | sed -e "s/\./ /g" | awk '{ print $1"."$2"."$3".0" }')
     fi
 
-    if [ "$netIP" != "" ] ; then
-      if [ $fullRange -eq 1 ] ; then
-        # Rewrite netIP to use 0 as last byte
-        netIP=$( echo $netIP | sed -e "s/\./ /g" | awk '{ print $1"."$2"."$3".0" }')
-      fi
-
-      findFreeIPv4 $netIP $doInstall "$TAB"
-      case $? in
-        0 | 3)
-          println "$TAB- Found ${#_IPT_FIND_FREE_IPV4_VALUE[@]} available addresses"
-          for ipAddr in ${_IPT_FIND_FREE_IPV4_VALUE[@]} ; do
-            print "$TAB  * "
-            ## Ramaining text is generated in addIPv4
-            addIPv4 $ipAddr $iFace
-            if [ $? -eq 0 ] ; then
-              retVal=$(( $retVal + 1 ))
+    findFreeIPv4 $netIP $doInstall "$TAB"
+    case $? in
+      0 | 3)
+        println "$TAB- Found ${#_IPT_FIND_FREE_IPV4_VALUE[@]} available addresses"
+        for ipAddr in ${_IPT_FIND_FREE_IPV4_VALUE[@]} ; do
+          print "$TAB  * "
+          ## Ramaining text is generated in addIPv4
+          addIPv4 $ipAddr $iFace
+          if [ $? -eq 0 ] ; then
+            retVal=$(( $retVal + 1 ))
+          else
+            failed=$(( $failed + 1 ))
+            if [ "$_APT_INSTALL_IPS_ERRMSG" == "" ] ; then
+              _APT_INSTALL_IPS_ERRMSG="Error installing IP $ipAddr"
             else
-              failed=$(( $failed + 1 ))
-              if [ "$_APT_INSTALL_IPS_ERRMSG" == "" ] ; then
-                _APT_INSTALL_IPS_ERRMSG="Error installing IP $ipAddr"
-              else
-                _APT_INSTALL_IPS_ERRMSG="$_APT_INSTALL_IPS_ERRMSG, $ipAddr"
-              fi
-              if [ ! $failed -lt $failMax ] ; then
-                break
-              fi
+              _APT_INSTALL_IPS_ERRMSG="$_APT_INSTALL_IPS_ERRMSG, $ipAddr"
             fi
-          done
-          ;;
-        *) 
-          _IPT_INSTALL_IPS_ERRMSG="No suitable IP addresses found!"
-          ;;
-      esac
-    else
-      _IPT_INSTALL_IPS_ERRMSG="Cannot identify any suitable /24 prefix for $1!"
-    fi
+            if [ ! $failed -lt $failMax ] ; then
+              break
+            fi
+          fi
+        done
+        ;;
+      *) 
+        _IPT_INSTALL_IPS_ERRMSG="No suitable IP addresses found!"
+        ;;
+    esac
   else
     if [ "$1" == "" ] ; then
       _IPT_INSTALL_IPS_ERRMSG="Interface name and number of IP's to install missing!"

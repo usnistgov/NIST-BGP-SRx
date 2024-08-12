@@ -8,10 +8,10 @@ hostname bgpd
 password zebra
 
 router bgp 65000
-  bgp router-id 10.0.0.65
+  bgp router-id {IP_AS_65000}
 
   srx display
-  srx set-proxy-id 10.0.0.65
+  srx set-proxy-id {IP_AS_65000}
 
   srx set-server 127.0.0.1 17900
   srx connect

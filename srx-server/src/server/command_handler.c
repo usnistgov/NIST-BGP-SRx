@@ -81,6 +81,10 @@
 #include "util/prefix.h"
 #include "util/slist.h"
 
+#ifdef USE_GRPC
+#include "server/libsrx_grpc_server.h"
+#endif
+
 #define HDR "([0x%08X] Command Handler): "
 
 // Forward declaration
@@ -835,7 +839,6 @@ static bool _processUpdateValidation(CommandHandler* cmdHandler,
     srxRes_mod.aspaResult = SRx_RESULT_INVALID;  
   }
 
-
   //
   // in case, path id already exists in AS Path Cache and srx result already 
   // has the validation result which was generated previously with the same path list 
@@ -1030,6 +1033,13 @@ static void* handleCommands(void* arg)
             case PDU_SRXPROXY_PEER_CHANGE:
               _processPeerChange(cmdHandler, item);
               break;
+#ifdef USE_GRPC
+            case PDU_SRXPROXY_SYNC_REQUEST:
+              LOG(LEVEL_INFO, HDR "[SRx server][handle_commands](Hello Resonse) "
+                  "calling cb_proxyStream in CommandHandler", pthread_self());
+              cb_proxyStream(item->dataLength, bhdr);
+              break;
+#endif // USE_GRPC
             default:
               RAISE_ERROR("Unknown/unsupported pdu type: %d",
                           item->dataID);
@@ -1095,6 +1105,7 @@ bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult)
   // Prepare the array of clients.
   uint8_t clientSize = self->updCache->minNumberOfClients;
   uint8_t clients[clientSize];
+  memset(clients, 0x0, sizeof(uint8_t) * clientSize);
   ServerClient* client = NULL;
 
   int clientCt = getClientIDsOfUpdate(self->updCache, &valResult->updateID,
@@ -1125,11 +1136,19 @@ bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult)
 
     /* extract a specific client to send packet */
     retVal = false;
+
     while  (clientCt-- > 0)
     {
       // work the clients array backwards - saves maintaining a counter variable
       if (self->svrConnHandler->proxyMap[clients[clientCt]].isActive)
       {
+#ifdef USE_GRPC
+        if (self->svrConnHandler->proxyMap[clients[clientCt]].grpcClient)
+        {
+          if (self->grpcEnable)
+            cb_proxy(pduLength, pdu);
+        }
+#endif // USE_GRPC
         client = self->svrConnHandler->proxyMap[clients[clientCt]].socket;
 
         retVal |= sendPacketToClient(&self->svrConnHandler->svrSock,

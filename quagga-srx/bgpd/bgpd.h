@@ -460,7 +460,15 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
                                     "The peering only includes prefixes of customers.\n"
 
 
-
+#ifdef USE_GRPC
+#define SRX_VTY_CMD_CONNECT_GRPC_SHORT "srx connect grpc"
+#define SRX_VTY_CMD_CONNECT_GRPC    "srx connect grpc .LINE <0-65535>"
+#define SRX_VTY_HLP_CONNECT_GRPC    SRX_VTY_HLP_STR \
+                                    "Connect the router with SRx server\n" \
+                                    "using grpc protocol\n" \
+                                    "Specifies SRx server host name or IP address\n" \
+                                    "Specifies SRx server port\n"
+#endif // USE_GRPC
 
 
 #endif /* USE_SRX */
@@ -548,6 +556,9 @@ struct bgp
 #define BGP_CONFIG_CONFEDERATION          (1 << 2)
 #ifdef USE_SRX
 #define BGP_CONFIG_SRX                    (1 << 3)
+#ifdef USE_GRPC
+#define BGP_CONFIG_SRX_GRPC               (1 << 4)
+#endif // USE_GRPC
 
   /* SRX Configuration */
   u_int16_t srx_config;
@@ -645,6 +656,11 @@ struct bgp
 
   char *srx_host;
   int  srx_port;
+#ifdef USE_GRPC
+  int  srx_port_grpc;
+#define SRX_DEFAULT_GRPC_PORT      50051
+#endif // USE_GRPC
+
 #define SRX_HANDHAKE_TIMEOUT  30
 #define SRX_KEEP_WINDOW      900
 
@@ -1494,6 +1510,9 @@ extern int srx_extcommunity_unset (struct bgp *);
 extern int srx_config_check (struct bgp *, uint16_t);
 
 extern int srx_connect_proxy(struct bgp *);
+#ifdef USE_GRPC
+extern int bgp_srx_set_grpc(struct bgp *, struct vty *, const char *, int , bool );
+#endif // USE_GRPC
 #define DEBUG_TEST
 #endif /* USE_SRX */
 

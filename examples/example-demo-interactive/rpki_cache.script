@@ -39,12 +39,12 @@ cache
 echo ""
 pause "Press key to all all ASPA information"
 echo "Add ASPA configuration (AS 65030 does not participate in ASPA)"
-addASPA 0 65000 65005
-addASPA 0 65005 65015
-addASPA 0 65015 65005
-addASPA 0 65025 65015 65020
-addASPA 0 65020 65010
-addASPA 0 65040 65020
+addASPA 65000 65005
+addASPA 65005 65015
+addASPA 65015 65005
+addASPA 65025 65015 65020
+addASPA 65020 65010
+addASPA 65040 65020
 notify
 
 echo "Current Cache Contents with ROA, Key, and ASPA information:"

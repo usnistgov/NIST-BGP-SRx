@@ -74,6 +74,9 @@
 #include "shared/srx_defs.h"
 #include "util/prefix.h"
 #include "util/slist.h"
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif /* HAVE_CONFIG_H */
   
 
 /** This type specifies the different error codes the proxy provides. */
@@ -283,6 +286,10 @@ typedef struct {
     
   // Experimental
   ProxySocketConfig socketConfig;
+#ifdef USE_GRPC 
+  bool  grpcClientEnable; 
+  bool  grpcConnectionInit; 
+#endif
 } SRxProxy;
 
 

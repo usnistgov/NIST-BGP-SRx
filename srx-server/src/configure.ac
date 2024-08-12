@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([SRx], [0.6.1.2], [itrg-contact@list.nist.gov], [srx], [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
+AC_INIT([SRx], [0.6.2.0], [itrg-contact@list.nist.gov], [srx], [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
 # The -Wno=portability is needed for the $(shell...) GNU extension.
 # If this is a problem remove the $(shell...) extension in Makefile_Common. 
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
@@ -265,6 +265,26 @@ AC_ARG_WITH([buildtest],
 AC_MSG_RESULT([${withval}])
 AM_CONDITIONAL([BUILD_TEST], [test x$buildtest = xtrue])
 
+# check gRPC support variables
+AC_ARG_ENABLE(grpc,
+              [ --enable-grpc       enable grpc features],
+              [enable_grpc="yes"],[])
+
+AM_CONDITIONAL([ENABLE_GRPC_COND], [test x$enable_grpc = xyes])
+
+AC_MSG_CHECKING(checking to see if grpc is enabled)
+if test "x${enable_grpc}" = "xyes"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([USE_GRPC],[], SRX GRPC)
+    AC_ARG_VAR(grpc_dir, provide grpc driver directory in which grpc server and client installed)
+else
+    AC_MSG_RESULT(no) 
+fi
+
+
+
+
+
 AS_BOX(Processing required headers)
 # Checks for header files.
 #                  winsock.h \
@@ -360,6 +380,11 @@ AC_CONFIG_FILES([Makefile \
      srx-proxy-devel-$PACKAGE_VERSION.spec:srx-proxy-devel.spec.in \
      server/srx_serverd:server/srx_serverd.in])
 
+if test "x${enable_grpc}" = "xyes"; then
+    AC_CONFIG_FILES([$grpc_dir/Makefile]) 
+    AC_SUBST([HOME_DIR], [${home_dir}])
+fi
+
 AC_OUTPUT
 
 echo
@@ -383,3 +408,9 @@ echo "----------------------------------"
 echo "SCA_LIBS.......: $SCA_LIBS"
 echo "SCA_LDFLAGS....: $SCA_LDFLAGS"
 echo "SCA_CFLAGS.....: $SCA_CFLAGS"
+if test "x${enable_grpc}" = "xyes"; then
+echo
+echo "----------------------------------"
+echo "Enable gRPC....: ${enable_grpc}"
+echo "gRPC DIR  .....: $grpc_dir"
+fi

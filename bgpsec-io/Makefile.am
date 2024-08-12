@@ -64,7 +64,8 @@ AM_FLAGS = -DPRG_VERSION=@MAJOR_VER@.@MINOR_VER@
 
 bgpsecio_LDADD = $(top_srcdir)/antd-util/libantd_util.la
 
-bgpsecio_CFLAGS = $(CFLAGS) $(SCA_CFLAGS) $(OPENSSL_CFLAGS)
+#bgpsecio_CFLAGS = $(CFLAGS) $(SCA_CFLAGS) $(OPENSSL_CFLAGS)
+bgpsecio_CFLAGS = $(SCA_CFLAGS) $(OPENSSL_CFLAGS) $(OS_CFLAGS)
 
 bgpsecio_LDFLAGS = $(LDFLAGS) $(SCA_LDFLAGS) $(OPENSSL_LDFLAGS)\
                    -ldl \

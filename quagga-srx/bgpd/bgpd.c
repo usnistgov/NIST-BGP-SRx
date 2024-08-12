@@ -66,7 +66,6 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_info_hash.h"
 #include "bgpd/bgp_validate.h"
 
-
 // Forward Declaration
 bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
                                 ValidationResultType valType,
@@ -78,6 +77,10 @@ void handleSRxSynchRequest(void* bgpRouter);
 void handleSRxMessages(SRxProxyCommCode mainCode, int subCode, void* userPtr);
 void srx_set_default(struct bgp *bgp);
 int respawnReceivePacket(struct thread *t);
+#ifdef USE_GRPC
+int respawn_grpc_init(struct thread *t);
+bool grpc_init (SRxProxy* proxy, uint32_t proxyID, char* host, int srx_port_grpc);
+#endif // USE_GRPC
 #endif /* USE_SRX */
 
 /* BGP process wide configuration.  */
@@ -623,6 +626,50 @@ int srx_connect_proxy(struct bgp *bgp)
   // configuration, set a flag to connect once g_rq is established.
   if (g_rq != NULL)
   {
+#ifdef USE_GRPC
+    if (bgp_config_check (bgp, BGP_CONFIG_SRX_GRPC))
+    {
+      g_rq->proxy = bgp->srxProxy;
+      if (bgp->srxProxy->grpcConnectionInit)
+      {
+        connected = connectToSRx_grpc(bgp->srxProxy, bgp->srx_host, bgp->srx_port,
+            bgp->srx_handshakeTimeout, false);  
+
+        if (connected)
+        {
+          if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
+            zlog_info ("\033[92m""Enabled Distributed Evaluation on SRx server <GRPC>""\033[0m" );
+        }
+      }
+      else
+      {
+        zlog_info ("grpc connection is not yet initialized and calling init again soon at %s:%d",
+            bgp->srx_host, bgp->srx_port);
+        g_rq->t_read = thread_add_timer(bm->master, respawn_grpc_init, g_rq, 1); 
+        //else
+        //  zlog_err ("Could not connect to SRx server at %s:%d, check if server(grpc) is "
+              //"running", bgp->srx_host, bgp->srx_port);
+
+
+        // NOTE: GRPC XXX - consider the way of respawning like the one below using tcp socket
+        //
+        // thread add_read uses a socket file descriptor 
+        // So, need to have another quagga timer such as thread_add_timer
+        //
+        // Necessary functions - 
+        //      1. grpc_init(bgp->srxProxy, bgp->srx_proxyID); - bgpd.c::srx_default_set
+        //          1.1 just dialing with grpc port is ok ??
+        //
+        //      2. checkClientConnection - bgp_route.c ?? --> possibly no
+        //
+
+        // t_read is thread, who has event function and times etc (defined in lib/thread.h)
+      }
+      g_rq->t_read = thread_add_timer(bm->master, respawn_grpc_init, g_rq, 10); // retry timer 10 sec
+    }
+#ifdef TBD
+    else if (bgp_config_check (bgp, BGP_CONFIG_SRX))
+    {
     // The last parameter (true) stands for external socket control
     connected = connectToSRx (bgp->srxProxy, bgp->srx_host, bgp->srx_port,
                               bgp->srx_handshakeTimeout, true);
@@ -646,6 +693,37 @@ int srx_connect_proxy(struct bgp *bgp)
       zlog_err ("Could not connect to SRx server at %s:%d, check if server is "
                 "running", bgp->srx_host, bgp->srx_port);
     }
+  }
+#endif // TBD
+    else
+    {
+        zlog_err ("Could not connect to SRx server ");
+    }
+#else
+    // The last parameter (true) stands for external socket control
+    connected = connectToSRx (bgp->srxProxy, bgp->srx_host, bgp->srx_port,
+        bgp->srx_handshakeTimeout, true);
+    if (connected)
+    {
+      g_rq->proxy = bgp->srxProxy;
+      clientFD = getInternalSocketFD(bgp->srxProxy, true);
+
+      g_rq->t_read = thread_add_read (bm->master, respawnReceivePacket,
+          g_rq, clientFD);
+      bgp->srx_proxyID = bgp->srxProxy->proxyID;
+      zlog_info ("Connect to SRx server %s:%d", bgp->srx_host, bgp->srx_port);
+
+      if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
+      {
+        zlog_info ("\033[92m""Enabled path validation using SRx server""\033[0m" );
+      }
+    }
+    else
+    {
+      zlog_err ("Could not connect to SRx server at %s:%d, check if server is "
+          "running", bgp->srx_host, bgp->srx_port);
+    }
+#endif /* USE_GRPC */
   }
 
   return connected ? 0 : 1;
@@ -760,8 +838,25 @@ int bgp_srx_unset (struct bgp *bgp)
       thread_cancel(g_rq->t_read);
     }
 
+    zlog_info("[%s] bgp exit process", __FUNCTION__);
     disconnectFromSRx (bgp->srxProxy, bgp->srx_keepWindow);
   }
+#ifdef USE_GRPC
+  if (bgp_config_check (bgp, BGP_CONFIG_SRX_GRPC))
+  {
+    bgp_config_unset (bgp, BGP_CONFIG_SRX_GRPC);
+    XFREE (MTYPE_SRX_HOST, bgp->srx_host);
+
+    if(g_rq->t_read)
+    {
+      zlog_debug ("%s thread cancel", __FUNCTION__);
+      thread_cancel(g_rq->t_read);
+    }
+
+    zlog_info("[%s] for grpc - bgp exit process", __FUNCTION__);
+    disconnectFromSRx (bgp->srxProxy, bgp->srx_keepWindow);
+  }
+#endif // USE_GRPC
   else
   {
     zlog_info("BGP session is not connected to an SRx server!");
@@ -2537,13 +2632,11 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
 
   bool retVal = false;
 
-  /*
   if (BGP_DEBUG (aspa, ASPA))
   {
-    zlog_debug ("[ ASPA ] [%s] notified Aspa Validation Result: %x (0:V 1:Nf 2:Iv 3:Ud 5:Uk 6:Uv)",
+    zlog_debug ("[ ASPA ] %s notified Aspa Validation Result: %x (0:V 1:Nf 2:Iv 3:Ud 5:Uk 6:Uv)",
         __FUNCTION__, aspaResult);
   }
-  */
 
   if (localID != 0) // update & requestToken substitution
   {
@@ -2617,7 +2710,6 @@ bool handleSRxValidationResult (SRxUpdateID updateID, uint32_t localID,
     deleteUpdate(bgp->srxProxy, bgp->srx_keepWindow, updateID);
   }
 
-
   return retVal;
 }
 
@@ -2644,6 +2736,7 @@ static void _handleSRxSynchRequest_processTable(struct bgp* bgp,
 {
   struct bgp_info *binfo;
   struct bgp_node *bnode;
+  zlog_info ("*** SRx Sync Request Process table(%p): bnode(%p) dump ***", table, bgp_table_top(table));
 
   SRxDefaultResult defResult;
 
@@ -2677,7 +2770,7 @@ static void _handleSRxSynchRequest_processTable(struct bgp* bgp,
  */
 void handleSRxSynchRequest(void* bgpRouter)
 {
-  zlog_info ("*** Received SRx Synchronization Request! ***\n");
+  zlog_info ("*** Received SRx Synchronization Request! ***");
 
   struct bgp* bgp = (struct bgp*)bgpRouter;
   if (bgp == NULL)
@@ -2755,6 +2848,11 @@ void srx_set_default(struct bgp *bgp)
 //  }
 
   memset(bgp->srx_bgpsec_key, 0, sizeof (BGPSecKey));
+
+#ifdef USE_GRPC
+  bgp->srx_port_grpc = SRX_DEFAULT_GRPC_PORT;
+  //grpc_init(bgp->srxProxy, bgp->srx_proxyID);
+#endif /* USE_GRPC */
 }
 #endif /* USE_SRX */
 
@@ -2952,6 +3050,15 @@ bgp_delete (struct bgp *bgp)
   if (list_isempty(bm->bgp))
     bgp_close ();
 
+#ifdef USE_SRX
+  if (bgp->srxProxy)
+  {
+    zlog_debug ("[%s] calling release SRx proxy ", __FUNCTION__);
+    releaseSRxProxy (bgp->srxProxy);
+    bgp->srxProxy = NULL;
+  }
+#endif
+
   bgp_unlock(bgp);  /* initial reference */
 
   return 0;
@@ -2970,7 +3077,9 @@ bgp_unlock(struct bgp *bgp)
 {
   assert(bgp->lock > 0);
   if (--bgp->lock == 0)
+  {
     bgp_free (bgp);
+}
 }
 
 static void
@@ -3002,7 +3111,9 @@ bgp_free (struct bgp *bgp)
   bgp_info_hash_finish (&bgp->info_lid_hash);
   if (bgp->srxProxy)
   {
+    zlog_debug ("[%s] calling release SRx proxy ", __FUNCTION__);
     releaseSRxProxy (bgp->srxProxy);
+    bgp->srxProxy = NULL;
   }
   int kIdx = 0;
   for (; kIdx < SRX_MAX_PRIVKEYS; kIdx++)
@@ -6369,6 +6480,14 @@ static int srx_config_write_configuration (struct vty *vty, struct bgp *bgp)
     vty_out (vty, "%s ! Connect to SRx-server%s", VTY_NEWLINE, VTY_NEWLINE);
     vty_out (vty, " %s%s", SRX_VTY_CMD_CONNECT_SHORT, VTY_NEWLINE);
   }
+#ifdef USE_GRPC
+  else if (bgp_config_check(bgp, BGP_CONFIG_SRX_GRPC))
+  {
+    // CONNECT TO SERVER
+    vty_out (vty, "%s ! Connect to SRx-server (gRPC) %s", VTY_NEWLINE, VTY_NEWLINE);
+    vty_out (vty, " %s %s %d%s ", SRX_VTY_CMD_CONNECT_GRPC_SHORT, bgp->srx_host, bgp->srx_port, VTY_NEWLINE);
+  }
+#endif // USE_GRPC
 
   return 0;
 }
@@ -6657,6 +6776,7 @@ bgp_init (void)
 #endif /* HAVE_SNMP */
 }
 
+
 void
 bgp_terminate (void)
 {
@@ -6684,3 +6804,126 @@ bgp_terminate (void)
       bm->process_rsclient_queue = NULL;
     }
 }
+
+
+#ifdef USE_GRPC
+extern SRxProxy *g_proxy;
+extern void ImpleGoStreamThread (SRxProxy* proxy, uint32_t proxyID);
+
+bool grpc_init (SRxProxy* proxy, uint32_t proxyID, char* host, int srx_port_grpc)
+{
+    // calling to initialize GRPC on libSRxProxy
+    //
+    char *addr = (char*)calloc(sizeof(char), 30);
+    sprintf(addr, "%s:%d", host, srx_port_grpc);
+    bool initResult = callSRxGRPC_Init(addr); 
+    zlog_debug ("[grpc_init ] proxy: %p,  proxy ID [defaul]: %08x, grpcEnabled[%d]", proxy, proxyID, initResult);
+
+    if (!initResult)
+    {
+      zlog_debug ("[grpc_init ] grpc call fail");
+      return false; 
+    }
+
+    proxy->grpcConnectionInit = true;
+    g_proxy = proxy;
+
+    // NOTE: here some stream server threads
+    ImpleGoStreamThread(proxy, proxyID);
+    return true;
+}
+
+
+
+
+
+int bgp_srx_set_grpc(struct bgp *bgp, struct vty *vty, 
+                     const char *host, int port, bool doConnect)
+{
+
+  int  prev_set, same_host = 0; //, same_port = 0;
+
+  prev_set = bgp_config_check (bgp, BGP_CONFIG_SRX_GRPC);
+  zlog_debug(" bgp previous config_already_set(gRPC) checking %d \n", prev_set);
+
+  if (isConnected(bgp->srxProxy))
+  {
+    vty_out (vty, "%% Already connected to SRx-server. Disconnect first!%s",
+                  VTY_NEWLINE);
+    return CMD_WARNING;
+  }
+
+
+  if (prev_set && bgp->srx_host)
+  {
+    same_host = (strcmp (bgp->srx_host, host) == 0);
+    //same_port = (bgp->srx_port == port);
+
+    if (!same_host)
+    {
+      XFREE (MTYPE_SRX_HOST, bgp->srx_host);
+    }
+  }
+
+  bgp_config_set (bgp, BGP_CONFIG_SRX_GRPC);
+  if (!same_host)
+  {
+    bgp->srx_host = XSTRDUP (MTYPE_SRX_HOST, host);
+  }
+  bgp->srx_port_grpc = port;
+  bgp->srx_port = -1; // no use
+
+
+  if (bgp->srxProxy != NULL)
+  {
+    char proxyIDstr[20];
+    char pconfIDstr[20];
+    memset(proxyIDstr, '\0', 20);
+    memset(pconfIDstr, '\0', 20);
+    sprintf(proxyIDstr, "%u.%u.%u.%u",
+               (bgp->srxProxy->proxyID >> 24) & 0xFF,
+               (bgp->srxProxy->proxyID >> 16) & 0xFF,
+               (bgp->srxProxy->proxyID >>  8) & 0xFF,
+                bgp->srxProxy->proxyID & 0xFF);
+    sprintf(pconfIDstr, "%u.%u.%u.%u",
+               (bgp->srx_proxyID >> 24) & 0xFF,
+               (bgp->srx_proxyID >> 16) & 0xFF,
+               (bgp->srx_proxyID >>  8) & 0xFF,
+                bgp->srx_proxyID & 0xFF);
+
+    zlog_debug(" current srx_proxy_id: %s (%u) ", proxyIDstr,
+               bgp->srxProxy->proxyID);
+
+    zlog_debug(" Proxy instantiated with proxy id %s (%u) and configured "
+               "with proxy id %s (%u)\n",proxyIDstr, bgp->srxProxy->proxyID,
+               pconfIDstr, bgp->srx_proxyID);
+
+
+    // call grpc init
+    //
+    bool bRetVal = grpc_init(bgp->srxProxy, bgp->srx_proxyID, bgp->srx_host, bgp->srx_port_grpc);
+    if (!bRetVal)
+    {
+      vty_out (vty, "%% gRPC initialization fails. need to init grpc first!%s", VTY_NEWLINE);
+      return CMD_WARNING;
+    }
+
+    // Only connect if requested.
+    if (doConnect)
+    {
+      // Code moved into _bgp_srx_connect as result of BZ301
+      if (srx_connect_proxy(bgp) == 1)
+      {
+        // it did not connect because we are still in configuration state and
+        // the necessary framework is not configured yet. It will be done then.
+        // See bgp_route.c::initUnSocket
+        flagDoConnectSrx = bgp;
+      }
+    }
+  }
+
+  return CMD_SUCCESS;
+
+}
+
+#endif /* USE_GRPC */

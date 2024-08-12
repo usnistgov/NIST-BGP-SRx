@@ -15,30 +15,35 @@ _P_CHECK_ONLY=0
 _VERBOSE=1
 _IP_PRE_SELECTION=()
 _P_INSTALL_ALIAS=0
+# If install alias is selected, successful installed aliases are stored
+# in the array _IPT_ADDIP_IFACE_ALIAS provided by ip_tools.sh
 _P_REINSTALL_ALIAS=0
+_P_NO_LOOPBACK=1
+# Will be overwritten
+_CUSTOM_PFX_24="192.168.255.0"
 
 ##############################################################################
 ##  LOAD THE LIBRARY
 ##
 if [ ! -e lib/functions.sh ] ; then
-  println "WARNING: Could not find library script [lib/functions.sh]!"
-  println "         Install framework properly prior usage."
+  echo "WARNING: Could not find library script [lib/functions.sh]!"
+  echo "         Install framework properly prior usage."
 else
   . lib/functions.sh
 fi
 if [ "$FUNCTION_LIB_VER" == "" ] ; then
-  println "ERROR loading the functions library - Abort operation!"
+  echo "ERROR loading the functions library - Abort operation!"
   exit 1
 fi
 
 if [ ! -e lib/ip_tools.sh ] ; then
-  println "WARNING: Could not find library script [lib/ip_tools.sh]!"
-  println "         Install framework properly prior usage."
+  echo "WARNING: Could not find library script [lib/ip_tools.sh]!"
+  echo "         Install framework properly prior usage."
 else
   . lib/ip_tools.sh
 fi
 if [ "$IP_TOOLS_LIB_VER" == "" ] ; then
-  println "ERROR loading the ip_tools library - Abort operation!"
+  echo "ERROR loading the ip_tools library - Abort operation!"
   exit 1
 fi
 ##############################################################################
@@ -79,7 +84,9 @@ loadIPConfig()
 }
 
 #
-# Exit the program with a given text string
+# Exit the program and returns to the initial disectory
+#
+# $1 the error code to be used, 0 if none is given
 #
 exitPrg()
 {
@@ -119,14 +126,15 @@ while [ "$1" != "" ] ; do
        echo "Configure the experiment project or inquire about the configuration"
        echo "  state using '-c'"
        echo
-       echo "Syntax: $0 [-c|-i|-?|-h] | [-R][-I] [--no-interactive <Y|N>] [--no-verbose]"
+       echo "Syntax: $0 [-c|-i|-?|-h] | [-R|-RA|-A|-AP][-I] [--no-interactive <Y|N>] [--no-verbose]"
        echo
        echo "  Parameters:"
        echo "        -c  Only perform a check if the project is configured!"
        echo "            Errorlevel 0: Is configured"
-       echo "            Errorlevel 1: Is not confiured"
+       echo "            Errorlevel 1: Is not configured"
        echo "        -i  Display the IP addresses available for the configurator"
        echo "        -?  Help screen."
+       echo "        -h  Help screen."
        echo ""
        echo "        -R  Rollback configuration using the last backup file"
        echo "            back into the configuration file. This includes -RA"
@@ -135,6 +143,8 @@ while [ "$1" != "" ] ; do
        echo "        -I  Install IP address alias if more IP addresses are needed!"
        echo "        -A  Reinstall the IP address alias - Needed after system reboot"
        echo "            when the temporary alias installs are not active anymore."
+       echo "        -AP Allows to modify the second byte to be modified."
+       echo "            Loopback Prefix - By default 128 for 127.128.0.0/24"
        echo ""
        echo "        --no-interactive <Y|N> [ip-selection]"
        echo "            This option removed any interactivity and answers"
@@ -155,7 +165,16 @@ while [ "$1" != "" ] ; do
        ;;
     "-i")
        echo
-       fill_SYS_IP 1 "" 1 1
+       fill_SYS_IP 1 "" 1 1 > /dev/null
+       echo "The following System IP addresses are available for usage:"
+       echo
+       _idx=0
+       _ct=1
+       while [ $_idx -lt ${#SYS_IP[@]} ] ; do
+         echo "  - [$_ct]: ${SYS_IP[$_idx]}"
+         ((_idx++))
+         ((_ct++))
+       done
        exitPrg 0
        ;;
     "-R")
@@ -170,6 +189,32 @@ while [ "$1" != "" ] ; do
        ;;
     "-A")
        _P_REINSTALL_ALIAS=1
+       ;;
+    "-AP")
+       shift
+       ERR_MSG=""
+       if [ "$1" == "" ] ; then
+         ERR_MSG="-AP requires a parameter. Try --? for more info"
+       else
+         _ipNum=$(($1+0))
+         if [ "$_ipNum" != "$1" ] ; then
+           ERR_MSG="-AP $1 - Value '$1' is not a valid number!"
+         else
+           if [ $_ipNum -lt 0 ] || [ $_ipNum -gt 255 ] ; then
+             ERR_MSG="Value '$1' must be bewteen 0..255"
+           fi
+         fi
+       fi
+       if [ "$ERR_MSG" != "" ] ; then
+         println "$ERR_MSG"
+         exitPrg 1
+       fi
+       _CUSTOM_PFX_24="$1"
+       verifyIPv4 $_CUSTOM_PFX_24
+       if [ $? -eq 0 ] ; then
+         println "Parameter -AP is invalid IP prefix $_CUSTOM_PFX_24/24!"
+         exitPrg 1
+       fi
        ;;
     "--no-interactive")
       shift
@@ -284,6 +329,10 @@ fi
 if [ $_P_ROLLBACK_ALIAS -eq 1 ] ; then
 
   _aliasCFG=( $( grep -e "^#>:.*" $_IP_FILE | sed -e "s/#>: //g" )  )
+
+#echo "_IP_FILE: $_IP_FILE"
+#echo "_aliasCFG: ${_aliasCFG[@]}"
+
   if [ ${#_aliasCFG[@]} -eq 0 ] ; then
     println "No alias configuration available."
   else
@@ -345,7 +394,7 @@ if [ $_P_ROLLBACK -eq 1 ] ; then
     _ROLLBACK_FILE_CT=$(($_ROLLBACK_FILE_CT+1))
     _bak_files=( $(ls $_BAK_FILE* | sort -u ) )
     _lastFileNr=$((${#_bak_files[@]}-1))
-    readYN "Rolling back $_IP_FILE to ${_bak_files[$_lastFileNr]}"
+    readYN "Rolling back $_IP_FILE using ${_bak_files[$_lastFileNr]}"
     if [ $? == 1 ] ; then
       mv ${_bak_files[$_lastFileNr]} $_IP_FILE
     else
@@ -442,29 +491,32 @@ else
     _retVal=0
     while [ $_SELECTION_OK -eq 0 ] ; do
       reset_SYS_IP
-      # here fill the selected IP addresses
-      # ($1) #IP addr, (2) label, (3) type:2=allow re-selection, 4... ip selections
       fill_SYS_IP $_ID_CT "ip-address-" 2 ${_IP_PRE_SELECTION[@]}
-      if [ ! $? -eq 0 ]; then
+      _retVal=$?
+
+      if [ ! $_retVal -eq 0 ]; then
         # Not enough IP addresses available to configure.
         if [ $_P_INSTALL_ALIAS -eq 1 ] ; then
           println "   * Identify feasable network interface cards..."
           # Ignore interface starting with 'l' (lo),'v' (vibr) (virt) (v...), and (tun..)
           findIFace "lvt"
-          if [ $? -eq 0 ] ; then
+          _retVal=$?
+
+          if [ $_retVal -eq 0 ] ; then
             println "   * found: ${_IPT_FIND_IFACE[@]}"
             # Now just select the first interface found:
             iFaceNum=0
             while [ $iFaceNum -lt ${#_IPT_FIND_IFACE[@]} ] && [ $SYS_MISSING_IPS -gt 0 ] ; do
               iFace=${_IPT_FIND_IFACE[$iFaceNum]}
               println "   * Select interface [$iFace]!"
-              installIPs $iFace $SYS_MISSING_IPS "     "
+              installIPs $iFace $SYS_MISSING_IPS $_CUSTOM_PFX_24 "     "
               instIPs=$?
               if [ $instIPs -gt 0 ] ; then
                 SYS_MISSING_IPS=$(( $SYS_MISSING_IPS - $instIPs ))
               fi
               iFaceNum=$(($iFaceNum+1))
-            done
+            done       
+            
             if [ $SYS_MISSING_IPS -gt 0 ] ; then
               println
               println "Could not install all necessary IP's,"
@@ -506,7 +558,26 @@ else
       println
       readYN "      Apply selection?" $_ignore_apply_global_yn
       _SELECTION_OK=$?
-      echo $_SELECTION_OK
+      if [ $_SELECTION_OK -eq 0 ] ; then
+        echo
+        if [ ${#_IPT_ADDIP_IFACE_ALIAS[@]} -gt 0 ] ; then
+          println "    * Remove ${#_IPT_ADDIP_IFACE_ALIAS[@]} installed Alias Interfaces:"
+        fi
+        for iFaceInfo in ${_IPT_ADDIP_IFACE_ALIAS[@]} ; do
+          iFaceData=( $( echo $iFaceInfo | sed -e "s/:/ /g") )
+          print "      - Remove ${iFaceData[2]} from ${iFaceData[0]}:${iFaceData[1]}..."
+          sudo ifconfig ${iFaceData[0]}:${iFaceData[1]} down
+          if [ $? -eq 0 ] ; then
+            println "done!"
+          else
+            println "failed!"
+          fi
+        done
+        println
+        println "Selection not applied, abort installation!"
+        println
+        exitPrg 1
+      fi
     done
     SYS_IP_TAB=""
     if [ $_retVal -eq 0 ] ; then
@@ -542,11 +613,11 @@ else
       done
       println "     - Build new configuration file '$_IP_FILE'"
       mv $_IP_FILE.$_run$_currNumber $_IP_FILE
-      if [ ${#_IPT_ADDIP_IFACE_AIAS[@]} -gt 0 ] ; then
+      if [ ${#_IPT_ADDIP_IFACE_ALIAS[@]} -gt 0 ] ; then
         println "     - Add information of ALIAS interface configuration to file '$_IP_FILE'"
         echo >> $_IP_FILE
         echo "# Interface Configuration:" >> $_IP_FILE
-        for iFace in ${_IPT_ADDIP_IFACE_AIAS[@]} ; do
+        for iFace in ${_IPT_ADDIP_IFACE_ALIAS[@]} ; do
           echo "#>: $iFace" >> $_IP_FILE
         done
       fi 

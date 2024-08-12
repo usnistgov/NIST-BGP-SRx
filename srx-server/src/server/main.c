@@ -105,6 +105,10 @@
 #include "server/aspa_trie.h"
 #include "util/directory.h"
 #include "util/log.h"
+#ifdef USE_GRPC
+#include "server/grpc_service.h"
+#include "server/libsrx_grpc_server.h"
+#endif
 
 // Some defines needed for east
 #define SETUP_RPKI_HANDLER         1
@@ -180,6 +184,12 @@ static void doCleanupHandlers(int handler);
 
 /** Holds the SRxCryptoAPI */
 SRxCryptoAPI* g_capi = NULL;
+
+#ifdef USE_GRPC
+static void* gRPCService(void* arg);
+void createGRPCService();
+extern GRPC_ServiceHandler     grpcServiceHandler;
+#endif
 
 ////////////////////
 // Server Call backs
@@ -768,6 +778,10 @@ int main(int argc, const char* argv[])
       }
       else
       {
+#ifdef USE_GRPC
+        createGRPCService();
+        LOG(LEVEL_INFO, HDR "[server] created GRPC Service thread\n");
+#endif
         // Ready for requests
         cleanupRequired = true;
         run();
@@ -809,3 +823,54 @@ int main(int argc, const char* argv[])
   }
   return exitCode;
 }
+
+#ifdef USE_GRPC
+void createGRPCService()
+{
+  pthread_t tid;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  LOG(LEVEL_INFO, HDR "+ pthread grpc service started (port:%d)...\n", pthread_self(), config.grpc_port);
+
+  /* init service handler */
+  grpcServiceHandler.cmdQueue   = &cmdQueue;
+  grpcServiceHandler.cmdHandler = &cmdHandler;
+  grpcServiceHandler.updCache = &updCache;
+  grpcServiceHandler.svrConnHandler = &svrConnHandler;
+  grpcServiceHandler.grpc_port  = config.grpc_port;
+
+  LOG(LEVEL_DEBUG,  "+ grpcServiceHandler : %p  \n", &grpcServiceHandler );
+  LOG(LEVEL_DEBUG,  "+ grpcServiceHandler.CommandQueue   : %p  \n", grpcServiceHandler.cmdQueue);
+  LOG(LEVEL_DEBUG,  "+ grpcServiceHandler.CommandHandler : %p  \n", grpcServiceHandler.cmdHandler );
+  LOG(LEVEL_DEBUG,  "+ grpcServiceHandler.UpdateCache    : %p  \n", grpcServiceHandler.updCache);
+  LOG(LEVEL_DEBUG,  "+ grpcServiceHandler.svrConnHandler : %p  \n", grpcServiceHandler.svrConnHandler);
+  LOG(LEVEL_INFO ,  "+ grpcServiceHandler.grpc_port      : %d  \n", grpcServiceHandler.grpc_port);
+
+  LOG(LEVEL_INFO, "Init Worker Pool");
+  InitWorkerPool();
+
+  int ret = pthread_create(&tid, &attr, gRPCService, &grpcServiceHandler);
+  if (ret != 0)
+  {
+    RAISE_ERROR("Failed to create a grpc thread");
+  }
+
+  pthread_join(tid, NULL);
+  LOG(LEVEL_INFO, HDR "grpc service thread STOPPED and going to joinable status");
+  LOG(LEVEL_INFO, HDR "+ pthread grpc service thread stopped and going to joinable status\n");
+}
+
+static void* gRPCService(void* arg)
+{
+  GRPC_ServiceHandler* grpcSH = arg;
+  LOG(LEVEL_INFO, HDR "++ gRPC Server Thread started (port:%d)", pthread_self(), grpcSH->grpc_port);
+  LOG(LEVEL_INFO, HDR "++ pthread grpc service thread started...\n");
+
+  Serve(grpcSH->grpc_port);
+
+  pthread_exit(0);
+}
+#endif
+
+

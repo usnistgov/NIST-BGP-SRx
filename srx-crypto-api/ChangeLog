@@ -1,5 +1,9 @@
 More details on changes are scripted in the files itself.
 ===========================================================
+Version 0.3.0.6 - July 2024
+  - Fixed bug in deleting keys from key_storage
+Version 0.3.0.5 - July 2024
+  - Re-ran autoreconf to enable being compiled on Rocky 9
 Version 0.3.0.4 - Oct 2021
   - Fixed spec file for rpm generation
 Version 0.3.0.3 - May 2021

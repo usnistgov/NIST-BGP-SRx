@@ -44,12 +44,21 @@ The main branch of the repository will deliver NIST-BGP-SRx version 6.
 Branch:
 
 * **master**: This branch provides the current recommended version of
-            NIST-BGP-SRx (version6.1). This version contains ASPA
-            validation and a complete re-write of the Quagga-SRx
-            policy scripting and processing for BGP-OV, BGP-PV, and
-            BGP-AV. The ASPA implementation follows the IETF draft ```draft-ietf-sidrops-aspa-verification-07``` including an
-            expected modification for Downstream validation which is
-            expected in the next draft.
+            NIST-BGP-SRx (version6.3). This version is updated to be 
+            used with Rocky 9 and contains ASPA validation and a 
+            complete re-write of the Quagga-SRx policy scripting and 
+            processing for BGP-OV, BGP-PV, and BGP-AV. 
+            The ASPA implementation in BGP-SRx incorporates the algorithms
+            for ASPA-based upstream and downstream AS path verifications.
+            It is our understanding that while the style of describing these
+            algorithms may have changed, they have remained unchanged in
+            their function in draft versions 10 through 18
+            (https://datatracker.ietf.org/doc/html/draft-ietf-sidrops-aspa-verification-18 ).
+            So, our implementation of the algorithms is consistent with draft
+            version-18.  Our code includes the basic cases of customer-to-provider,
+            lateral peer, and provider-to-customer peering relationships.
+            We have not coded the specialized cases such as those involving
+            route server (RS), mutual-transit, or complex relations.
 * **version5**: This branch stands on its own and is only maintained
             for BUG fixes. New features are added to the master branch
             which is contains NIST-BGP-SRx Version 6.

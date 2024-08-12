@@ -586,6 +586,153 @@ bool sendGoodbye(ClientConnectionHandler* self, uint16_t keepWindow)
   return false;
 }
 
+#ifdef USE_GRPC
+#include "client/libsrx_grpc_client.h"
+bool sendGoodbye_grpc(ClientConnectionHandler* self, uint16_t keepWindow)
+{
+  uint32_t length = sizeof(SRXPROXY_GOODBYE);
+  uint8_t pdu[length];
+  SRXPROXY_GOODBYE* hdr = (SRXPROXY_GOODBYE*)pdu;
+  memset(pdu, 0, length);
+
+  hdr->type       = PDU_SRXPROXY_GOODBYE;
+  hdr->keepWindow = htons(keepWindow);
+  hdr->length     = htonl(length);
+
+  LOG(LEVEL_INFO, HDR"+ send Goodbye! called", pthread_self());
+  LOG(LEVEL_INFO, HDR"+ [%s] :%d \n", pthread_self(), __FUNCTION__, __LINE__);
+
+  RunProxyGoodBye(*hdr, self->grpcClientID);
+  self->established = false;
+
+  return true;
+}
+
+typedef struct {
+    SRxProxy* proxy;
+    uint32_t proxyID;
+} StreamThreadData;
+
+// Imple GoStreamThread called for thread process
+//
+static void* GoodByeStreamThread(void *arg)
+{
+    StreamThreadData *std = (StreamThreadData*)arg;
+  
+    LOG(LEVEL_INFO, HDR "Run Proxy Good Bye Stream", pthread_self());
+    printf("Run Proxy Good Bye Stream \n");
+    printf("[%s:%d] arguments proxy: %p, proxyID: %08x\n", __FUNCTION__, __LINE__, std->proxy, std->proxyID);
+
+    while(!std->proxy->grpcClientEnable)
+    {
+        sleep(1);
+    }
+
+    // This is dummy data for initiating stream operation to use grpc tranortation
+    char buff_goodbye_stream_request[12] = {0x02, 0x03, 0x84, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0c};
+    /* 
+      typedef struct {                           
+        uint8_t   type;              // 2        
+        uint16_t  keepWindow;                    
+        uint8_t   reserved8;                     
+        uint32_t  zero32;                        
+        uint32_t  length;            // 12 Bytes 
+      } __attribute__((packed)) SRXPROXY_GOODBYE;
+    */
+
+    GoSlice goodbye_stream_pdu = {(void*)buff_goodbye_stream_request, (GoInt)12, (GoInt)12};
+    int result = RunProxyGoodByeStream (goodbye_stream_pdu, std->proxyID);
+
+    printf("Run Proxy Good Bye Stream terminated with result value: %d\n", result);
+    
+
+    // XXX: here general closure procedures by receiving GoodBye
+    //  relase proxy function is blocked, because reconnect function needs to have the proxy pointer,
+    //  so it should not be removed inside release SRxProxy ()
+    //
+    //releaseSRxProxy(std->proxy);
+}
+
+// This function for Proxy SyncRequest, Sign Notification and so on
+//
+static void* StreamThread(void *arg)
+{
+    StreamThreadData *std = (StreamThreadData*)arg;
+    printf("Run Proxy Stream \n");
+    printf("[%s:%d] arguments proxy: %p, proxyID: %08x\n", __FUNCTION__, __LINE__, std->proxy, std->proxyID);
+
+    //while(!std->proxy->grpcClientEnable)
+    {
+     //   sleep(1);
+    }
+
+    // This is dummy data for initiating stream operation to use grpc tranortation
+    char buff_stream_request[12] = {0x02, 0x00, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0c};
+    GoSlice stream_pdu = {(void*)buff_stream_request, (GoInt)12, (GoInt)12};
+    int result = RunProxyStream (stream_pdu, std->proxyID);
+
+    printf("Run Proxy Stream terminated \n");
+
+}
+
+static void* WorkerPoolThread(void *arg)
+{
+
+    //bool ret = InitWorkerPool();
+}
+
+void ImpleGoStreamThread (SRxProxy* proxy, uint32_t proxyID)
+{
+    pthread_t tid, tid2, tid3;
+    pthread_attr_t attr, attr2, attr3;
+    pthread_attr_init(&attr);
+    pthread_attr_init(&attr2);
+    pthread_attr_init(&attr3);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr2, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr3, PTHREAD_CREATE_DETACHED);
+    printf("+ pthread grpc service started...\n");
+
+
+    StreamThreadData *std = (StreamThreadData*)malloc(sizeof(StreamThreadData));
+    std->proxy = proxy;
+    std->proxyID = proxyID;
+    printf("[%s:%d] arguments proxy: %p, proxyID: %08x\n", __FUNCTION__, __LINE__, std->proxy, std->proxyID);
+
+    int ret = pthread_create(&tid, &attr, GoodByeStreamThread, (void*)std);
+    if (ret != 0)
+    {
+        RAISE_ERROR("Failed to create a grpc thread");
+    }
+    printf("+ GoodBye Stream Thread created \n");
+    pthread_join(tid, NULL);
+
+
+
+    int ret2 = pthread_create(&tid2, &attr2, StreamThread, (void*)std);
+    if (ret2 != 0)
+    {
+        RAISE_ERROR("Failed to create a grpc thread");
+    }
+    printf("+ Stream Thread for notification created \n");
+    pthread_join(tid2, NULL);
+
+
+    /*
+    int ret3 = pthread_create(&tid3, &attr3, WorkerPoolThread, (void*)NULL);
+    if (ret3 != 0)
+    {
+        RAISE_ERROR("Failed to create a grpc workerPoll thread");
+    }
+    printf("+ Worker Pool Thread created \n");
+    pthread_join(tid3, NULL);
+    */
+    
+    printf("+ All Go Stream Threads Terminated \n");
+}
+
+
+#endif // USE_GRPC
 ////////////////////////////////////////////////////////////////////////////////
 // Local helper functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -609,7 +756,7 @@ bool reconnectSRX(ClientConnectionHandler* self)
   bool retVal = false;
   SRxProxy* proxy = (SRxProxy*)self->srxProxy;
 
-  LOG (LEVEL_DEBUG, "([0x%08X]) > Client Connection Handler Thread started!",
+  LOG (LEVEL_INFO, "([0x%08X]) > Client Connection Handler Thread started!",
                      pthread_self());
   
   if (self->initialized && !self->stop)

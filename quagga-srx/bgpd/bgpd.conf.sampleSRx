@@ -135,7 +135,7 @@ router bgp 7675
 !  
 ! The following results are possible with BGPsec path validation processing:
 !   valid       - The path was fully validated and all signatures could be 
-                  verified.
+!                 verified.
 !   invalid     - The route could not be successfully validated.
 !   (undefined) - Validation not performed yet.
 !

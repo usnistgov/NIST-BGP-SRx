@@ -1,3 +1,8 @@
+Version 0.2.2.1
+  * Fixed speller in message when using parameter -C
+Version 0.2.2
+  * Added OS_CFLAGS to add ROCKY 9 compatibility.
+  * Re-run autoreconfig 
 Version 0.2.1.11
   * Added startup message.
   * Added switch to reduce the warning message output.

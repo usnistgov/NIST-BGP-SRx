@@ -1,13 +1,13 @@
-This folder contains NIST BGP-SRx Software Suite V6.2.0
- * quagga-srx V0.99.22.srx.0.6.0.2_release
- * srx-server V0.6.1.2_release
- * srx-crypto-api V0.3.0.4_release
- * bgpsec-io version_0.2.1.11
- * examples 0.6.1.0_release
+This folder contains NIST BGP-SRx Software Suite V6.3.0
+ * quagga-srx V0.99.22.srx.0.6.0.4_release
+ * srx-server V0.6.2.0_release
+ * srx-crypto-api V0.3.0.6_release
+ * bgpsec-io version_0.2.2.1
+ * examples 0.6.3.1_release
 
 Comments for this software package:
 ===================================
-* quagga-srx 0.99.22.srx.0.6.0.2_release was developed and tested under CentOS.
+* quagga-srx 0.99.22.srx.0.6.0.4_release was developed and tested under CentOS.
   - SRx-Server Proxy (srx-proxy)
   - SRx-Crypto-API (srxcryptoapi)
   - requires gcc
@@ -17,7 +17,7 @@ Comments for this software package:
   - requires libconfig-devel
   - requires uthash-devel
   - requires readline-devel
-* srx-server 0.6.1.2_release developed and tested under CentOS.
+* srx-server 0.6.2.0_release developed and tested under CentOS.
   Use telnet for login into the srx-server!
   - SRx-Crypto-API (srxcryptoapi)
   - requires gcc
@@ -27,17 +27,17 @@ Comments for this software package:
   - requires libconfig-devel
   - requires uthash-devel
   - requires patch
-* srx-crypto-api 0.3.0.4_release developed and tested under CentOS.
+* srx-crypto-api 0.3.0.6_release developed and tested under CentOS.
   - requires gcc
   - requires libconfig-devel
   - requires openssl-devel
   - requires uthash-devel
-* bgpsec-io version_0.2.1.11 developed and tested under CentOS.
+* bgpsec-io version_0.2.2.1 developed and tested under CentOS.
   - requires gcc
   - requires libconfig-devel
   - requires openssl-devel
   - requires readline-devel
-* examples 0.6.1.0_release developed and tested under under CentOS.
+* examples 0.6.3.1_release developed and tested under under CentOS.
   Contains example scripts as well as example keys for BIO, SCA, and QSRx.
   - requires  epel-release
   - requires sed
@@ -56,4 +56,4 @@ Comments for this software package:
   - optional python3
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V7.0.2
+Packaged by BGP-SRx Software Suite Bundler V8.1.6

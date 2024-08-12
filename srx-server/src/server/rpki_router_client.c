@@ -22,10 +22,13 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.6.0.0
+ * @version 0.6.1.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.3 - 2024/06/12 - oborchert
+ *           * Moved int g_rpki_single_thread_client_fd into the .c file and 
+ *             declared it as extern in the .h file.
  * 0.6.0.0 - 2021/03/31 - oborchert
  *           * Modified loops to be C99 compliant 
  *         - 2021/03/30 - oborchert
@@ -127,6 +130,9 @@
 #define RRC_MAX_STRING 255
 // Maximum errors during PDU processing
 #define RRC_MAX_ERRCT  10
+
+/** The file descriptor for the rpki_router_client. */
+int g_rpki_single_thread_client_fd;
 
 /**
  * Handle received IPv4 Prefixes.

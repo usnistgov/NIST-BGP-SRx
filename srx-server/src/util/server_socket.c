@@ -22,10 +22,14 @@
  *
  * Provides functionality to handle the SRx server socket.
  *
- * @version 0.5.0.0
+  * @version 0.6.1.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.6.1.3 - 2024/06/12 - oborchert
+ *            * Fixed linker error in 'ROCKY 9' regarding the variable declaration
+ *              int g_single_thread_client_fd which needs to be declared in the .c
+ *              file and listed here as extern.
  *  0.5.0.0 - 2017/06/16 - oborchert
  *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
  *          - 2016/10/26 - oborchert
@@ -72,6 +76,9 @@
 /**
  * A single client thread.
  */
+
+/** The file descriptor to the single thread. Moved from header file into c file.*/
+int g_single_thread_client_fd=0;
 
 /**
  * Sends data as a packet (length, data).
@@ -165,20 +172,34 @@ static void clientThreadCleanup(ClientMode mode, ClientThread* ct)
 static bool single_sendResult(ServerClient* client, void* data, size_t size)
 {
   ClientThread* clt = (ClientThread*)client;
+#ifdef USE_GRPC
+  bool retVal = false;
+#else
   bool retVal = true;
+#endif
+
+#ifdef USE_GRPC
+  if(!clt->type_grpc_client)
+  {
+#endif
   // Only when still active
   if (clt->active)
   {
     lockMutex(&clt->writeMutex);
     sendData(&clt->clientFD, data, (PacketLength)size);
     unlockMutex(&clt->writeMutex);
+#ifdef USE_GRPC
+      retVal = true;
+#endif // USE_GRPC
   }
   else
   {
     RAISE_ERROR("Trying to send a packet over an inactive connection");
     retVal = false;
   }
-  
+#ifdef USE_GRPC
+  }
+#endif // USE_GRPC
   return retVal;
 }
 
@@ -771,6 +792,9 @@ void runServerLoop(ServerSocket* self, ClientMode clMode,
         cthread->clientFD = cliendFD;
         cthread->svrSock  = self;
         cthread->caddr	  = caddr;
+#ifdef USE_GRPC
+        cthread->type_grpc_client = false;
+#endif
 
         ret = pthread_create(&(cthread->thread), &attr,
                              CL_THREAD_ROUTINES[clMode],
@@ -805,7 +829,12 @@ static void _killClientThread(void* clt)
   if (clientThread->active)
   {
     // Close the client connection
+#ifdef USE_GRPC
+    if(!clientThread->type_grpc_client)
+      close(clientThread->clientFD);
+#else
     close(clientThread->clientFD);
+#endif
 
     // Wait until the thread terminated - if necessary
     //pthread_join(clientThread->thread, NULL);
@@ -875,6 +904,13 @@ int closeClientConnection(ServerSocket* self, ServerClient* client)
   LOG(LEVEL_DEBUG, HDR "Close and remove client: Thread [0x%08X]; [ID :%u]; "
                        "[FD: 0x%08X]", pthread_self() , clientThread->thread,
                        clientThread->proxyID, clientThread->clientFD);
+#ifdef USE_GRPC
+  if (clientThread->svrSock->statusCallback != NULL)
+  {
+    clientThread->svrSock->statusCallback(clientThread->svrSock, clientThread, 
+                                        -1, false, clientThread->svrSock->user);
+  }
+#endif // USE_GRPC
   
   //deleteMapping(self, clientThread);
   _killClientThread(clientThread);
@@ -886,4 +922,8 @@ int closeClientConnection(ServerSocket* self, ServerClient* client)
   
   return true;
 }
+
+
+
+
 

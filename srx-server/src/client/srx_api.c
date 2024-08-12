@@ -90,6 +90,11 @@
 #include "util/mutex.h"
 #include "util/log.h"
 #include "util/socket.h"
+#ifdef USE_GRPC
+#include "client/grpc_client_service.h"
+#include "client/libsrx_grpc_client.h"
+extern bool sendGoodbye_grpc(ClientConnectionHandler* self, uint16_t keepWindow);
+#endif
 
 #define HDR "(SRX API): "
 
@@ -101,6 +106,7 @@ static ProxyLogger _pLogger = NULL;
 static void dispatchPackets(SRXPROXY_BasicHeader* packet, void* proxyPtr);
 void callCMgmtHandler(SRxProxy* proxy, SRxProxyCommCode mainCode, int subCode);
 void pLog(LogLevel level, const char* fmt, va_list args);
+inline void printHex(int len, unsigned char* buff);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -193,6 +199,12 @@ SRxProxy* createSRxProxy(ValidationReady   validationReadyCallback,
   // initialize the connection handler
   proxy->connHandler = createClientConnectionHandler(proxy);
 
+#ifdef USE_GRPC
+  // grpc connections
+  proxy->grpcClientEnable = false;
+  proxy->grpcConnectionInit = false;
+#endif // USE_GRPC
+
   return proxy;
 }
 
@@ -205,6 +217,7 @@ void releaseSRxProxy(SRxProxy* proxy)
 {
   if (proxy != NULL)
   {
+    LOG(LEVEL_DEBUG, "### [%s] ###  Reset process ... ", __FUNCTION__);
     disconnectFromSRx(proxy, SRX_DEFAULT_KEEP_WINDOW);
     releaseSList(&proxy->peerAS);
     free(proxy->connHandler);
@@ -340,7 +353,14 @@ void deleteUpdate(SRxProxy* proxy, uint16_t keep_window, SRxUpdateID updateID)
     hdr->length           = htonl(length);
     hdr->updateIdentifier = htonl(updateID);
 
+#ifdef USE_GRPC
+  GoSlice verify_pdu = {(void*)hdr, (GoInt)length, (GoInt)length};
+  printHex(length, (unsigned char*)hdr);
+  int32_t result = ImpleProxyDeleteUpdate(verify_pdu, connHandler->grpcClientID);
+  LOG(LEVEL_INFO, HDR "[deleteUpdate] Result: %02x\n", result);
+#else
     sendData(&connHandler->clSock, hdr, length);
+#endif
 
     free(hdr);
   }
@@ -507,7 +527,23 @@ bool disconnectFromSRx(SRxProxy* proxy, uint16_t keepWindow)
   // Macro for type casting back to the proxy.
   if (isConnected(proxy))
   {
+#ifdef USE_GRPC
+    if(proxy->grpcClientEnable && connHandler->grpcClientID)
+    {
+      LOG(LEVEL_INFO, "### [%s] ###  Reset process ... ", __FUNCTION__);
+      sendGoodbye_grpc(connHandler, keepWindow);
+      connHandler->grpcClientID = 0;
+      proxy->grpcClientEnable = false;
+      proxy->grpcConnectionInit = false;
+
+    }
+    else
+    {
     sendGoodbye(connHandler, keepWindow);
+    }
+#else
+    sendGoodbye(connHandler, keepWindow);
+#endif
     connHandler->established = false;
     releaseClientConnectionHandler(connHandler);
     callCMgmtHandler(proxy, COM_PROXY_DISCONNECT, COM_PROXY_NO_SUBCODE);
@@ -1086,13 +1122,13 @@ void processVerifyNotify(SRXPROXY_VERIFY_NOTIFICATION* hdr, SRxProxy* proxy)
 
 #ifdef BZ263
     ct++;
-    printf("#%u - uid:0x%08x lid:0x%08X (%u)\n", ct, updateID, localID,
-           localID);
+    //LOG(LEVEL_DEBUG, HDR "#%u - uid:0x%08x lid:0x%08X (%u)\n", 
+    //ct, updateID, localID, localID);
 #endif
 
     if (localID > 0 && !hasReceipt)
     {
-      printf(" -> ERROR, no receipt flag set.\n");
+      LOG(LEVEL_WARNING, HDR " -> ERROR, no receipt flag set.\n");
       LOG(LEVEL_WARNING, HDR "Unusual notification for update [0x%08X] with "
                          "local id [0x%08X] but receipt flag NOT SET!",
           updateID, localID);
@@ -1381,4 +1417,197 @@ bool isErrorCode(SRxProxyCommCode code)
 {
   // Error codes are between 0..127
   return (code & 0x7F) == code;
+}
+
+#ifdef USE_GRPC
+bool connectToSRx_grpc(SRxProxy* proxy, const char* host, int port,
+                  int handshakeTimeout, bool externalSocketControl)
+{
+
+  LOG(LEVEL_INFO, "[SRx Client] Establish connection with proxyID [0x%x]...", proxy->proxyID);
+  uint32_t noPeers    = 0; //proxy->peerAS.size;
+  uint32_t length     = sizeof(SRXPROXY_HELLO) + (noPeers * 4);
+  uint8_t  pdu[length];
+  SRXPROXY_HELLO* hdr = (SRXPROXY_HELLO*)pdu;
+  uint32_t peerASN    = 0;
+  uint32_t* peerAS    = NULL;
+  printf("[SRx Client] ========= proxy hello size: %d leng: %d ====== \n", sizeof(SRXPROXY_HELLO), length );
+
+  memset(pdu, 0, length);
+
+  hdr->type            = PDU_SRXPROXY_HELLO;
+  hdr->version         = htons(SRX_PROTOCOL_VER);
+  hdr->length          = htonl(length);
+  hdr->proxyIdentifier = htonl(proxy->proxyID);
+  hdr->asn             = htonl(proxy->proxyAS);
+  hdr->noPeers         = htonl(noPeers);
+
+  LOG(LEVEL_INFO, HDR "[SRx Client] Request Proxy Hello:");
+
+  LogLevel lv = getLogLevel();
+  LOG(LEVEL_NOTICE, HDR "[SRx Client] srx client log Level : %d (set from createSRxProxy)\n", lv);
+  if (lv >= LEVEL_NOTICE) {
+    printHex(length, pdu);
+  }
+    
+  unsigned char result[sizeof(SRXPROXY_HELLO_RESPONSE)];
+  //unsigned char result[12];
+
+  int size = length;
+  char buf_data[size];
+  memcpy(buf_data, pdu, size);
+
+  GoSlice gopdu = {(void*)buf_data, (GoInt)size, (GoInt)size};
+  //result = Run(gopdu);
+  //printf(" ---- sleep 5 sec delaying hello request \n");
+  //sleep(5);
+  struct RunProxyHello_return tResp = RunProxyHello(gopdu);
+
+  if (tResp.r0 == NULL)
+  {
+    printf("------- [SRx Client](srx_api.c :: connectToSRx grpc) hello response ERROR ----------\n");
+    return false;
+  }
+
+  unsigned char* pRes = tResp.r0;
+  memcpy(result, pRes, sizeof(SRXPROXY_HELLO_RESPONSE));
+
+  printf("------- [SRx Client](srx_api.c :: connectToSRx grpc) hello response ----------\n");
+  LOG(LEVEL_NOTICE, HDR "[SRx Client] Response Proxy[ID:%d] Hello Response: ", tResp.r1);
+  if (lv >= LEVEL_NOTICE) {
+    printHex(sizeof(SRXPROXY_HELLO_RESPONSE), result);
+  }
+
+  ClientConnectionHandler* connHandler =
+                                   (ClientConnectionHandler*)proxy->connHandler;
+
+  // Initialize the grpc client socket 
+  ClientSocket client_sock = connHandler->clSock;
+
+  client_sock.oldFD = -1;
+  client_sock.type = SRX_PROXY_GRPC_SOCKET;
+  client_sock.clientFD = port;
+  client_sock.canBeClosed = false;  // grpc socket fd should not be closed
+  client_sock.reconnect = false;
+
+
+
+  if (!createRWLock(&connHandler->queueLock))
+  {
+    closeClientSocket(&connHandler->clSock);
+    RAISE_ERROR("%s:%d Could not aquire read write lock!", __FUNCTION__, __LINE__);
+    return false;
+  }
+
+  connHandler->packetHandler = dispatchPackets;
+  connHandler->stop = false;
+  connHandler->handshake_timeout = SRX_DEFAULT_HANDSHAKE_TIMEOUT;
+  connHandler->initialized = true;
+  connHandler->established = false;
+      
+  // XXX NOTE: packet Handler set a flag,'established' with true or false
+  connHandler->packetHandler((SRXPROXY_BasicHeader*)result, proxy); // --> dispatchPackets()
+
+  free(pRes);
+  
+  if (connHandler->established)
+  {
+      connHandler->grpcClientID = ntohl(((SRXPROXY_HELLO_RESPONSE*)result)->proxyIdentifier);
+      proxy->grpcClientEnable = true;
+      LOG(LEVEL_NOTICE, HDR "[SRx Client] grpc client id: %08x\n", connHandler->grpcClientID);
+  }
+
+  // following return value will be determined by calling (fn_packetHandler --> fn_dispatchPackets)
+  return connHandler->established;
+}
+
+
+void verifyUpdate_grpc(SRxProxy* proxy, uint32_t localID,
+                  bool usePrefixOriginVal, bool usePathVal, bool useAspaVal,
+                  SRxDefaultResult* defaultResult,
+                  IPPrefix* prefix, uint32_t as32,
+                  BGPSecData* bgpsec, SRxASPathList asPathList)
+{
+  LOG(LEVEL_NOTICE, "[SRx Client] calling verify Update grpc  [proxyID:0x%x]...", proxy->proxyID);
+  if (!isConnected(proxy))
+  {
+    RAISE_ERROR(HDR "Abort verify, not connected to SRx server!" ,
+                pthread_self());
+    return;
+  }
+
+  // Specify the verify request method.
+  uint8_t method =   (usePrefixOriginVal ? SRX_FLAG_ROA : 0)
+                   | (usePathVal ? SRX_FLAG_BGPSEC : 0)
+                   | (useAspaVal ? SRX_FLAG_ASPA : 0)
+                   | (localID != 0 ? SRX_FLAG_REQUEST_RECEIPT : 0);
+
+  bool isV4 = prefix->ip.version == 4;
+  // The client connection handler
+  ClientConnectionHandler* connHandler =
+                                   (ClientConnectionHandler*)proxy->connHandler;
+
+  // create data packet.
+  uint16_t bgpsecLength = 0;
+  if (bgpsec != NULL)
+  {
+    bgpsecLength = (bgpsec->numberHops * 4) + bgpsec->attr_length;
+  }
+  uint32_t length = (isV4 ? sizeof(SRXPROXY_VERIFY_V4_REQUEST)
+                          : sizeof(SRXPROXY_VERIFY_V6_REQUEST)) + bgpsecLength;
+  uint8_t  pdu[length];
+  uint32_t requestToken = localID;
+
+  memset(pdu, 0, length);
+
+  // Generate VERIFY PACKET
+  if (isV4)
+  {
+    createV4Request(pdu, method, requestToken, defaultResult, prefix, as32, bgpsec, asPathList);
+  }
+  else
+  {
+    createV6Request(pdu, method, requestToken, defaultResult, prefix, as32, bgpsec);
+  }
+
+  // Send Data
+  //sendPacketToServer(connHandler, (SRXPROXY_PDU*)pdu, length);
+
+  GoSlice verify_pdu = {(void*)pdu, (GoInt)length, (GoInt)length};
+  //int32_t result = RunStream(verify_pdu);
+  printf("============== Run ProxyVerify calling (From Client ProxyAPI)  ===============\n");
+  printf("---- PDU (from create V4 request) --: \n");
+  printHex(length, pdu);
+  int32_t result = RunProxyVerify(verify_pdu, connHandler->grpcClientID);
+  LOG(LEVEL_NOTICE, HDR "[SRx Client] Validation Result: %02x\n", result);
+
+}
+
+bool callSRxGRPC_Init(const char* addr)
+{
+    GoString gs_addr = {
+        p : addr, // "localhost:50051",
+        n : 0
+    };
+    gs_addr.n = strlen((const char*)addr);
+    printf(" addr: %s  digit count:%d \n", gs_addr.p, gs_addr.n);
+
+    bool res = InitSRxGrpc(gs_addr); // res:0 failure to connect, res:1 success to connect
+    LOG(LEVEL_NOTICE, HDR  "Init SRx GRPC result: %d (0: fail, 1:sucess) ", res);
+
+    return res;
+}
+
+
+#endif /* USE GRPC */
+
+__attribute__((always_inline)) inline void printHex(int len, unsigned char* buff)
+{
+    int i;
+    for(i=0; i < len; i++ )
+    {
+        if(i%16 ==0) printf("\n");
+        printf("%02x ", buff[i]);
+    }
+    printf("\n");
 }

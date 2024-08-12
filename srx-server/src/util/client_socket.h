@@ -47,7 +47,13 @@ typedef enum {
   /** This is a client socket within the SRx API */
   SRX_PROXY_CLIENT_SOCKET,
   /** This is a client socket within srx-server to the rpki validation cache */
+#ifdef USE_GRPC
+  RPKI_RTR_CLIENT_SOCKET,
+  /* grpc socket */
+  SRX_PROXY_GRPC_SOCKET
+#else
   RPKI_RTR_CLIENT_SOCKET
+#endif // USE_GRPC
 } ClientSocketType;
 
 /**

@@ -212,7 +212,7 @@ bool receivePackets(int* fdPtr, SRxPacketHandler dispatcher, void* pHandler,
           pthread_self());
       // call the dispatcher that deals with the packet
       // TODO: Good point to have a receiver queue handing it over to.
-      dispatcher((SRXPROXY_BasicHeader*)buffer, pHandler);
+      dispatcher((SRXPROXY_BasicHeader*)buffer, pHandler); // --> call dispatchPackets()
     }
   }
 

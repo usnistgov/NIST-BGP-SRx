@@ -245,6 +245,10 @@ void initConfiguration(Configuration* self)
   self->mode_no_sendqueue = false;
   self->mode_no_receivequeue = false;
 
+#ifdef USE_GRPC
+#define DEFAULT_GRPC_PORT 50051
+  self->grpc_port = DEFAULT_GRPC_PORT;
+#endif
   self->defaultKeepWindow = SRX_DEFAULT_KEEP_WINDOW; // from srx_defs.h
   memset(&self->mapping_routerID, 0, MAX_PROXY_MAPPINGS);
 }
@@ -771,6 +775,17 @@ bool readConfigFile(Configuration* self, const char* filename)
     LOG(LEVEL_ERROR, "Required bgpsec: { ... } settings are missing!");
     goto free_config;
   }
+
+#ifdef USE_GRPC 
+  // grpc
+  sett = config_lookup(&cfg, "grpc");
+  if (sett != NULL)
+  {
+    if ( config_setting_lookup_int(sett, "port", &intVal) == CONFIG_TRUE )
+    { self->grpc_port = (int)intVal ; }
+  }
+#endif
+
 
   // optional experimental
   sett = config_lookup(&cfg, "mode");

@@ -2142,6 +2142,39 @@ DEFUN (srx_connect,
   return bgp_srx_set (bgp, vty, argv[SRX_VTY_PARAM_CONNECT_SRV], port, true);
 }
 
+#ifdef USE_GRPC
+DEFUN (srx_grpc_connect,
+       srx_grpc_connect_cmd,
+       SRX_VTY_CMD_CONNECT_GRPC,  // srx grpc port 50051
+       SRX_VTY_HLP_CONNECT_GRPC)
+{
+
+  struct bgp *bgp;
+  int port;
+
+  bgp = vty->index;
+
+  if (argc != 2)
+  {
+    return CMD_ERR_INCOMPLETE;
+  }
+
+  /* Host name */
+  if (strlen(argv[SRX_VTY_PARAM_CONNECT_SRV]) == 0)
+  {
+    vty_out (vty, "%% Empty SRx host name%s", VTY_NEWLINE);
+    return CMD_ERR_INCOMPLETE;
+  }
+
+  /* Port number */
+  VTY_GET_INTEGER_RANGE ("Port", port, argv[SRX_VTY_PARAM_CONNECT_PORT],
+                         1, 65535);
+    
+  return bgp_srx_set_grpc (bgp, vty, argv[SRX_VTY_PARAM_CONNECT_SRV], port, true);
+}
+#endif // USE_GRPC
+
+
 DEFUN (srx_disconnect,
        srx_disconnect_cmd,
        SRX_VTY_CMD_DISCONNECT,
@@ -11075,6 +11108,9 @@ bgp_vty_init (void)
   install_element (BGP_NODE, &no_srx_evaluation_cmd);
   install_element (BGP_NODE, &srx_evaluation_bgpsec_distribute_cmd);
 
+#ifdef USE_GRPC
+  install_element (BGP_NODE, &srx_grpc_connect_cmd);
+#endif // USE_GRPC
 
 // NOT IN THIS VERSION
 //  install_element (BGP_NODE, &srx_apply_policy_cmd);

@@ -202,6 +202,7 @@ sigint (void)
     bgp_terminate ();
 
   zprivs_terminate (&bgpd_privs);
+  zlog_notice (" bgp exit calling");
   bgp_exit (0);
 }
 

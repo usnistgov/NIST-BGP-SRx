@@ -84,6 +84,9 @@ typedef struct {
   // Internal
   pthread_t                 threads[NUM_COMMAND_HANDLER_THREADS];
   int                       numThreads;
+#ifdef USE_GRPC
+  bool                      grpcEnable;
+#endif
 } CommandHandler;
 
 /**
@@ -141,8 +144,8 @@ void stopProcessingCommands(CommandHandler* self);
  *              registered client
  */
 bool broadcastResult(CommandHandler* self, SRxValidationResult* valResult);
-
 bool _isSet(uint32_t bitmask, uint32_t bits);
+
 
 /**
  * This function performs the ASPA validation.

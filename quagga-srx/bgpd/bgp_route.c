@@ -56,7 +56,6 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_vty.h"
 #include "bgpd/bgp_mpath.h"
 
-
 #ifdef USE_SRX
 #include <sys/un.h>
 #include "srx/srx_defs.h"
@@ -72,12 +71,26 @@ extern const char *bgp_origin_long_str[];
 #define NUM_MAX_RECONNECT   2
 #define RETRY_TIMER_SEC     10
 
+// Global variable used to manage the SRx proxy socket - initialized in
+// bgp_route.c::initUnSocket and also modified in bgpd.c::srx_connect(...)
+struct SRxThread *g_rq;
+// helper to allow connection command to be set during configuration. This
+// variable is either NULL or the bgp instance. It only will be set to the
+// bgp instance when in configuration mode, not when configuration will be
+// altered from console. The only methods that alter this variable are
+// bgpd.c::bgp_srx_set and bgp_route.c::initUnSocket. The later on is the only
+// function reading this value.sfinitUnSocket
+void* flagDoConnectSrx;
+
 extern bool handleSRxValidationResult (SRxValidationResult* result,
                                        void* bgpRouter);
 extern void handleSRxSignatures(SRxUpdateID* updateID, BGPSecData* data,
                                 void* bgpRouter);
 extern void handleSRxSynchRequest(void* bgpRouter);
 int respawnReceivePacket(struct thread *t);
+#ifdef USE_GRPC
+int respawn_grpc_init(struct thread *t);
+#endif // USE_GRPC
 struct thread *g_current_read_thread;
 
 struct SRxThread* srx_thread_arg_new(void)
@@ -246,6 +259,95 @@ int respawnReceivePacket(struct thread *t)
     }
     return 0;
 }
+
+#ifdef USE_GRPC
+int respawn_grpc_init(struct thread *t)
+{
+  //zlog_debug("respawn_grpc_init called");
+
+  struct SRxThread *rq;
+  struct thread *thr=NULL;
+  rq = (struct SRxThread *)THREAD_ARG(t);
+  rq->t_read = NULL;
+  SRxProxy* srxProxy = rq->proxy;
+
+  bool bRetVal = true;
+  struct bgp* bgp = bgp_get_default();
+  bool connected = false;
+
+  static int siMaxReconnect = 0;
+
+
+  if (!srxProxy->grpcConnectionInit)
+  {
+    // TODO: max number attempt variables are needed here
+    bRetVal = grpc_init(srxProxy, ((SRxProxy*)(rq->proxy))->proxyID, bgp->srx_host, bgp->srx_port_grpc);
+    if (bRetVal)
+    {
+      if (srxProxy->grpcConnectionInit && !srxProxy->grpcClientEnable)
+      {
+        connected = connectToSRx_grpc(srxProxy, bgp->srx_host, bgp->srx_port,
+            bgp->srx_handshakeTimeout, false);  
+
+        if (connected)
+        {
+          if ( CHECK_FLAG(bgp->srx_config, SRX_CONFIG_EVAL_PATH_DISTR))
+            zlog_info ("\033[92m""Enabled Distributed Evaluation on SRx server <GRPC>""\033[0m" );
+          siMaxReconnect = 0;
+        }
+      } // end of if 'connected'
+    } 
+    else
+    {
+      if(siMaxReconnect >= NUM_MAX_RECONNECT )
+      {
+        if (bgp == NULL)
+        {
+          return 0;
+        }
+
+        zlog_debug (" srx unset() bgp info hash finish() and releaseSRxProxy()");
+        bgp_srx_unset(bgp);
+        siMaxReconnect =0;
+        //bgp_info_hash_finish (&bgp->info_hash);
+        if (bgp->srxProxy)
+        {
+          releaseSRxProxy (bgp->srxProxy);
+        }
+        if(thr)
+        {
+          thread_cancel(thr);
+        }
+
+        zlog_debug (" srx set default again");
+        srx_set_default(bgp);
+        return 0;
+      }
+      siMaxReconnect++;
+    } // end of if (bRet Val)
+  } // end grpc_ConnectionInit
+
+  rq->t_read = thr =  thread_add_timer (bm->master, respawn_grpc_init, rq,
+      RETRY_TIMER_SEC/2); // every 10 sec, try again
+
+  return 0;
+}
+
+int checkClientConnection_grpc(struct thread *t)
+{
+    zlog_debug (" %s called", __FUNCTION__);
+    struct thread *thr=NULL;
+    struct SRxThread *rq;
+    
+    rq = (struct SRxThread *)THREAD_ARG(t);
+    rq->t_read = NULL;
+
+    struct bgp* bgp = bgp_get_default();
+
+
+    return 0;
+}
+#endif
 
 int initUnSocket(struct thread *t)
 {
@@ -678,9 +780,7 @@ int bgp_info_set_ignore_flag (struct bgp_info* info)
 
   if (BGP_DEBUG (aspa, ASPA))
   {
-    if (info->updateID)
-      zlog_debug ("[ ASPA ] [%s][uID:%08X] - ROA: %d BGPSEC:%d ASPA:%d"
-          "\033[2;34m(0:V 1:NF 2:Iv 3:Ud 4:DNU 5:Uk 6:Uv)\033[0m",
+    zlog_debug ("[ ASPA ] %s called [uID:%08X]- ROA: %d BGPSEC:%d ASPA:%d (0:V 1:NF 2:Iv 3:Ud 4:DNU 5:Uk 6:Uv)", 
           __FUNCTION__, info->updateID, info->val_res_ROA, info->val_res_BGPSEC, info->val_res_ASPA);
   }
   
@@ -3374,6 +3474,7 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
     bgp_info_register (bgp->info_lid_hash, info, info->localID);
   }
 
+  zlog_debug ("isConnected (bgp->srxProxy): %d \n", isConnected (bgp->srxProxy));
   // Now let proxy change it if necessary
   // Also check if connectionHanlder->established (connHandler[1])
   // bool type must not be zero
@@ -3445,7 +3546,8 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
         asPathList.segments = (ASSEGMENT*)calloc(asPathList.length, sizeof(ASSEGMENT));
             
         zlog_debug ("[ ASPA ] AS PathList Info - AS Length: %d  Type: %s  AS relationship: %s ", 
-                asPathList.length, asPathList.asType==2 ? "AS_SEQUENCE": (asPathList.asType==1 ? "AS_SET": "ETC"), 
+                asPathList.length, 
+                asPathList.asType==2 ? "AS_SEQUENCE": (asPathList.asType==1 ? "AS_SET": "ETC"), 
                 asPathList.asRelationship == 2 ? "provider" : (asPathList.asRelationship == 1 ? "customer": \
                 (asPathList.asRelationship == 3 ? "sibling": (asPathList.asRelationship == 4 ? "lateral" : "unknown"))));
 
@@ -3487,8 +3589,16 @@ void verify_update (struct bgp *bgp, struct bgp_info *info,
         useAspaVal = true;
       }
 
+#ifdef USE_GRPC
+      //printf("prefix: %s \/%d \n", inet_ntoa(prefix->ip.addr.v4.in_addr), prefix->length);
+      verifyUpdate_grpc(bgp->srxProxy, info->localID, useOriginVal, usePathVal,
+                    useAspaVal, defResult, prefix, oas, bgpsec, asPathList);
+
+#else   /* USE_GRPC */
       verifyUpdate(bgp->srxProxy, info->localID, useOriginVal, usePathVal, 
                    useAspaVal, defResult, prefix, oas, bgpsec, asPathList);
+#endif  /* USE_GRPC */
+
 
       if(asPathList.segments)
       {

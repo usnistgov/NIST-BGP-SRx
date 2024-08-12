@@ -25,10 +25,13 @@
  *
  * Uses log.h for error reporting
  *
- * @version 0.5.1.0
+ * @version 0.6.1.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.1.3 - 2024/06/12 - oborchert
+ *           * Moved int g_rpki_single_thread_client_fd into the .c file and 
+ *             declared it as extern in the .h file.
  * 0.6.0.0  - 2021/03/30 - oborchert
  *            * Added missing version control. Also moved modifications labeled 
  *              as version 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
@@ -439,7 +442,9 @@ bool handleReceiveAspaPdu(RPKIRouterClient* client,
                           RPKIASPAHeader* hdr, uint32_t length);
 
 // @TODO: fix this not so nice work around
-int g_rpki_single_thread_client_fd;
+// In ROCKY this throws a linker error. The solution is to declare it extern here and then
+// make the proper declaration in rpki_routewr_client.c
+extern int g_rpki_single_thread_client_fd;
 
 void generalSignalProcess(void);
 

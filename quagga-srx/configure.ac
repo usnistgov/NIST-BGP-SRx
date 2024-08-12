@@ -8,7 +8,7 @@
 ##
 AC_PREREQ(2.53)
 
-AC_INIT(QuaggaSRx, 0.6.0.1, [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
+AC_INIT(QuaggaSRx, 0.6.0.4, [https://www.nist.gov/services-resources/software/bgp-secure-routing-extension-bgp-srx-prototype])
 AC_CONFIG_SRCDIR(lib/zebra.h)
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -358,6 +358,25 @@ AC_ARG_ENABLE(srx,
   AC_HELP_STRING([--disable-srx],[disable all SRx functionality!!]))
 AC_ARG_ENABLE(srxcryptoapi,
   AC_HELP_STRING([--disable-srxcryptoapi],[disable srxcryptoapi integration]))
+
+
+# check gRPC support variables
+AC_ARG_ENABLE(grpc,
+              [ --enable-grpc       enable grpc features],
+              [enable_grpc="yes"],[])
+
+AM_CONDITIONAL([ENABLE_GRPC_COND], [test x$enable_grpc = xyes])
+
+AC_MSG_CHECKING(checking to see if grpc is enabled)
+if test "x${enable_grpc}" = "xyes"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([USE_GRPC],[], SRX GRPC)
+    AC_ARG_VAR(grpc_dir, provide grpc driver directory in which grpc server and client installed)
+else
+    AC_MSG_RESULT(no)
+fi
+
+
 
 # Make sure the values are set
 AC_MSG_CHECKING([SRx additions are enabled])
@@ -1878,6 +1897,7 @@ group for vty sockets  	: ${enable_vty_group}
 config file mask        : ${enable_configfile_mask}
 log file mask           : ${enable_logfile_mask}
 enable srx-crypto-api   : ${sca_usage}
+enable gRPC support     : ${enable_grpc}
 
 The above user and group must have read/write access to the state file
 directory and to the config files in the config file directory."

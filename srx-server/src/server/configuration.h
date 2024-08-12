@@ -51,6 +51,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif /* HAVE_CONFIG_H */
 
 //@TODO: Remove line below
 //static char* DEFAULT_CONSOLE_PASSWORD = "SRxSERVER";
@@ -131,6 +134,9 @@ typedef struct {
   int                   defaultKeepWindow;
   /** the configuration array for the proxy mapping */
   uint32_t              mapping_routerID[256];
+#ifdef USE_GRPC
+  uint32_t              grpc_port;
+#endif
 } Configuration;
 
 /**

@@ -23,10 +23,14 @@
  * Function to create a server-socket and to start/stop a server runloop.
  * Provides functionality to handle the SRx server socket.
  *
- * @version 0.5.0.0
+ * @version 0.6.1.3
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.6.1.3 - 2024/06/12 - oborchert
+ *            * Fixed linker error in 'ROCKY 9' regarding the variable declaration
+ *              int g_single_thread_client_fd which needs to be declared in the .c
+ *              file and listed here as extern.
  *  0.5.0.0 - 2017/06/16 - oborchert
  *            * Version 0.4.1.0 is trashed and moved to 0.5.0.0
  *  0.5.0.0 - 2016/08/19 - oborchert
@@ -263,6 +267,9 @@ typedef struct
   ServerSocket* svrSock;
   /* The socket address. */
   struct sockaddr caddr;  
+#ifdef USE_GRPC 
+  bool type_grpc_client; /* between general client and  grpc client */
+#endif
 } ClientThread;
 
 /**
@@ -330,7 +337,15 @@ int closeClientConnection(ServerSocket* self, ServerClient* client);
 
 // TODO: Check if it is still needed - Still used in server_socket.c/h 
 // Maybe it can be moved into server_socket.c
-int g_single_thread_client_fd;
+// In ROCKY this throws a linker error. The solution is to declare it extern here and then
+// make the proper declaration in server_socket.c
+extern int g_single_thread_client_fd;
 
+#ifdef USE_GRPC
+void runServerLoop_gRPC(ServerSocket* self, ClientMode clMode,
+                   void (*modeCallback)(),
+                   ClientStatusChanged statusCallback,
+                   void* user);
+#endif // USE_GRPC
 #endif // !__SERVER_SOCKET_H__
 

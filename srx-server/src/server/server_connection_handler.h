@@ -86,6 +86,9 @@ typedef struct {
   /** Number of updates assigned to this client. This allows a more efficient
    * cleanup. */
   uint32_t updateCount;  
+#ifdef USE_GRPC
+  bool grpcClient;
+#endif
 } ProxyClientMapping;
 
 #define MAX_PROXY_CLIENT_ELEMENTS MAX_PROXY_MAPPINGS

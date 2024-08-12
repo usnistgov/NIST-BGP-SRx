@@ -53,7 +53,9 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#include <bits/signum.h>
+#ifndef OS_ROCKY 
+  #include <bits/signum.h>
+#endif
 #include "bgp/BGPFinalStateMachine.h"
 #include "bgp/BGPSession.h"
 #include "printer/BGPHeaderPrinter.h"

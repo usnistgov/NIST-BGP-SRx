@@ -72,7 +72,12 @@ struct testcase_t__ {
 
 /* need these to link in libbgp */
 struct thread_master *master = NULL;
+#ifdef USE_SRX
+// Declared as static to prevent linker error on ROCKY 9 (since 0.6.0.4)
+static struct zclient *zclient;
+#else
 struct zclient *zclient;
+#endif
 struct zebra_privs_t bgpd_privs =
 {
   .user = NULL,

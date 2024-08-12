@@ -27,10 +27,13 @@
  * Known Issue:
  *   At this time only PEM formated private keys can be loaded.
  * 
- * @version 0.3.0.3
+ * @version 0.3.0.6
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ *  0.3.0.6 - 2024/07/22 - oborchert
+ *            * The number of stored keys was reduced twice when deleting. This
+ *              resulted in an incorrect warning message. 
  *  0.3.0.3 - 2021/05/08 - oborchert
  *            * Renamed all instances of volt to vault
  *  0.3.0.0 - 2017/09/13 - oborchert
@@ -640,9 +643,9 @@ int ks_delKey(KeyStorage* storage, BGPSecKey* key, sca_key_source_t source,
       else
       {
         // DER is NULL so delete the complete element.
-        storage->size -= elem->noKeys;
+        int newSize = storage->size - elem->noKeys;
         _ks_freeKS_Elem(storage, bucket, elem);
-        deleted = true;
+        deleted = storage->size == newSize;
       }
       elem = NULL;
     }

@@ -28,10 +28,12 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.6.1.0
+ * @version 0.6.2.0
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.0  - 2024/07/26 - oborchert
+ *            * Removed AFI from ASPA according to 8210-bis13
  * 0.6.1.0  - 2021/11/05 - oborchert
  *            * Increased the line buffer for reading files from 255 bytes to 
  *              4KiB. ASPA objects can be rather large.
@@ -1505,7 +1507,6 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   int            idx;
   char*          fields[num_fields];
   
-  uint8_t        afi;
   uint32_t       customerAS;
   uint16_t       providerCount;
   uint8_t*       providerBuff;
@@ -1537,7 +1538,7 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   {
     if (arg == NULL)
     {
-      ERRORF("Error: Data missing: <afi> <customer-as> <provider-as> [<provider-as>*]\n");
+      ERRORF("Error: Data missing: <customer-as> <provider-as> [<provider-as>*]\n");
       return false;
     }
   }
@@ -1614,14 +1615,9 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     } while (idx < num_fields && !fieldIsNull);
 
     // Parse fields
-    afi = strtoul(fields[0], NULL, 10);
-    SKIP_IF(!BETWEEN(afi,0,1), "Invalid AFI", fields[0]);
-    // The AFI bit is the second bit, not the first one
-    afi = (uint8_t)afi << 1;
-
-    customerAS = strtoul(fields[1], NULL, 10);
+    customerAS = strtoul(fields[0], NULL, 10);
     SKIP_IF(customerAS == 0,
-            "Invalid Customer AS", fields[1]);
+            "Invalid Customer AS", fields[0]);
 
     if(providerBuff != NULL)
     {
@@ -1633,15 +1629,15 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     
     if (idx > 1)
     {
-      providerBuff = malloc((idx-2) * 4);
-      memset(providerBuff, 0, (idx-2) * 4);
+      providerBuff = malloc((idx-1) * 4);
+      memset(providerBuff, 0, (idx-1) * 4);
       providerAS = (uint32_t*)providerBuff;
-      providerCount=idx-2;
+      providerCount=idx-1;
 //@TODO: The drafts are contradicting. 8210-bis01 says it's OK to have no
 //       provider, the ASPA Profile draft says 1..N providers.
       SKIP_IF(providerCount==0, "At least one provider MUST be specified!", 
               "0");
-      for (providerCounter = 2; providerCounter < idx; providerCounter++, providerAS++)
+      for (providerCounter = 1; providerCounter < idx; providerCounter++, providerAS++)
       {
         *providerAS = htonl(strtoul(fields[providerCounter], NULL, 10));
       }
@@ -1674,7 +1670,7 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     cEntry->serial  = cEntry->prevSerial = serial++;
     cEntry->expires = 0; // Not needed , it is 0 already from above
 
-    cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT | afi;
+    cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT;
     cEntry->prefixLength    = 0;
     cEntry->prefixMaxLength = 0;
     cEntry->isASPA          = true;
@@ -1803,9 +1799,9 @@ int showHelp(char* command)
            "                 delay!\n"
            "  - addKey <as> <cert file>\n"
            "                 Manually add a RPKI Router Certificate\n"
-           "  - addASPA <afi> <customer-as> <provider-as> [<provider-as>*]\n"
+           "  - addASPA <customer-as> <provider-as> [<provider-as>*]\n"
            "                 Manually add an ASPA object to the cache\n"
-           "  - addASPANow <afi> <customer-as> <provider-as> [<provider-as>*]\n"
+           "  - addASPANow <customer-as> <provider-as> [<provider-as>*]\n"
            "                 Manually add an ASPA object to the cache without\n"
            "                 any delay!\n"
            "  - remove <index> [end-index]\n"
@@ -2364,7 +2360,7 @@ int appendRouterKeyNow(char* line)
 
 /*
  * This method adds the ASPA cache entry into the test harness. The format
- * is <afi> <customer-AS> <provider-AS> [ <provider-AS>*] 
+ * is <customer-AS> <provider-AS> [ <provider-AS>*] 
  * 
  * The serial notify notification will be send out to all attached clients right
  * away if now==true
@@ -2392,7 +2388,7 @@ int _appendASPA(char* line, bool now)
 
 /**
  * This method adds the ASPA cache entry into the test harness. The format
- * is <afi> <customer-AS> <provider-AS> [ <provider-AS>*] 
+ * is <customer-AS> <provider-AS> [ <provider-AS>*] 
  *
  * @param line The command line
  *
@@ -2405,7 +2401,7 @@ int appendASPA(char* line)
 
 /**
  * This method adds the ASPA cache entry into the test harness. The format
- * is <afi> <customer-AS> <provider-AS> [ <provider-AS>*] 
+ * is <customer-AS> <provider-AS> [ <provider-AS>*] 
  * The notification will be send out to all attached clients right away.
  *
  * @param line The command line
@@ -2539,9 +2535,7 @@ int printCache()
       }
       else if (cEntry->isASPA)
       {
-        printf("[ASPA]: AFI=IPv%c", 
-                (cEntry->flags & PREFIX_FLAG_AFI_V6) ? '6' : '4');
-        printf (", CAS=%u", ntohl(cEntry->asNumber));
+        printf ("[ASPA]: CAS=%u", ntohl(cEntry->asNumber));
         
         ptr32 = (uint32_t*)cEntry->providerAS;
         for (idx = 0; idx < ntohs(cEntry->providerCount); idx++, ptr32++)

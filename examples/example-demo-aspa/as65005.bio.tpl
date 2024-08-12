@@ -1,4 +1,4 @@
-ski_file    = "../opt/bgp-srx-examples/bgpsec-keys/ski-list.txt";
+ski_file    = "../opt/bgp-srx-examples/example-demo-aspa/ski-list.as65005.txt";
 ski_key_loc = "../opt/bgp-srx-examples/bgpsec-keys/";
 
 preload_eckey = false;

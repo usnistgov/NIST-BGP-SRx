@@ -6,6 +6,12 @@ management system. Please see:
 
 QuaggaSRx changes are:
 ======================
+  0.6.0.4 - June 2024
+    * Fixed linker issues in bgpd/bgp_route.[c|h] and test/bgp_mpath_test.c 
+  0.6.0.3 - Oct 2022
+    * Fix bug in sample configuration
+  0.6.0.2 - Nov 2021
+    * Fix in bgp_info_fetch when prefix is re-originated by same peer
   0.6.0.1 - Oct 2021
     * Fixed SPEC file for rpm generation
   0.6.0.0 - May 2021

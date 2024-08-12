@@ -608,15 +608,11 @@
    slash. */
 #undef LSTAT_FOLLOWS_SLASHED_SYMLINK
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Musica IPv6 stack */
 #undef MUSICA
-
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
 
 /* NRL */
 #undef NRL
@@ -740,6 +736,9 @@
 
 /* Enable IS-IS topology generator code */
 #undef TOPOLOGY_GENERATE
+
+/* SRX GRPC */
+#undef USE_GRPC
 
 /* Use PAM for authentication */
 #undef USE_PAM

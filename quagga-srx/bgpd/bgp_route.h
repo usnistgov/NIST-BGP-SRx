@@ -156,14 +156,14 @@ struct SRxThread
 
 // Global variable used to manage the SRx proxy socket - initialized in
 // bgp_route.c::initUnSocket and also modified in bgpd.c::srx_connect(...)
-struct SRxThread *g_rq;
+extern struct SRxThread *g_rq;
 // helper to allow connection command to be set during configuration. This
 // variable is either NULL or the bgp instance. It only will be set to the
 // bgp instance when in configuration mode, not when configuration will be
 // altered from console. The only methods that alter this variable are
 // bgpd.c::bgp_srx_set and bgp_route.c::initUnSocket. The later on is the only
 // function reading this value.sfinitUnSocket
-void* flagDoConnectSrx;
+extern void* flagDoConnectSrx;
 
 /* Flags which indicate a route is unusable in some form */
 #define BGP_INFO_UNUSEABLE \
@@ -254,6 +254,9 @@ extern void verify_update (struct bgp *bgp, struct bgp_info *info,
 extern int  srx_calc_validation_state(struct bgp *, struct bgp_info *);
 struct SRxThread* srx_thread_arg_new(void);
 int checkClientConnection(struct thread *t);
+#ifdef USE_GRPC
+int checkClientConnection_grpc(struct thread *t);
+#endif /* USE_GRPC */
 int initUnSocket(struct thread *t);
 int checkSendQueue(struct thread *t);
 void threadControlCall(int type);

@@ -2767,6 +2767,7 @@ bgp_read (struct thread *thread)
 
   size = (peer->packet_size - BGP_HEADER_SIZE);
 
+
   /* Read rest of the packet and call each sort of packet routine */
   switch (type)
     {

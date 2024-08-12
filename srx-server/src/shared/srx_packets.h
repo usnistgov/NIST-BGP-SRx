@@ -167,8 +167,8 @@ typedef struct {
   uint16_t  version;
   uint8_t   reserved8;
   uint32_t  zero32;
-  uint32_t  length;            // 12 Bytes
-  uint32_t  proxyIdentifier;
+  uint32_t  length;            
+  uint32_t  proxyIdentifier;    // 16 Bytes
 } __attribute__((packed)) SRXPROXY_HELLO_RESPONSE;
 
 /**
@@ -179,7 +179,7 @@ typedef struct {
   uint16_t  keepWindow;
   uint8_t   reserved8;
   uint32_t  zero32;
-  uint32_t  length;            // 8 Bytes
+  uint32_t  length;            // 12 Bytes
 } __attribute__((packed)) SRXPROXY_GOODBYE;
 
 typedef struct {

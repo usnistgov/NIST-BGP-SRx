@@ -678,7 +678,7 @@ bool processValidationRequest(ServerConnectionHandler* self,
       " AS Type: %s  AS Relationship: %s", 
       updateID, pathId, 
       asType==2 ? "AS_SEQUENCE": (asType==1 ? "AS_SET": "ETC"),
-      asRelType == 2 ? "provider" : (asRelType == 1 ? "customer": \        
+      asRelType == 2 ? "provider" : (asRelType == 1 ? "customer":         
         (asRelType == 3 ? "sibling": (asRelType == 4 ? "lateral" : "unknown"))));
 
   AS_PATH_LIST *aspl;
@@ -1494,6 +1494,10 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
   // Now if still ok, get the map element belonging to the clientID
   if (ok)
   {
+  
+#ifdef USE_GRPC
+    ClientThread* cthread = (ClientThread*)cSocket;
+#endif // USE_GRPC
     LOG(LEVEL_INFO,"Register proxyID[0x%08X] as clientID[0x%08X]",
         proxyID, clientID);
     if (self->proxyMap[clientID].proxyID == 0)
@@ -1506,6 +1510,12 @@ bool addMapping(ServerConnectionHandler* self, uint32_t proxyID,
     self->proxyMap[clientID].socket     = cSocket;
     self->proxyMap[clientID].isActive   = activate;
     self->proxyMap[clientID].crashed    = 0;
+#ifdef USE_GRPC
+    if(cthread && cthread->type_grpc_client)
+    {
+      self->proxyMap[clientID].grpcClient = true;
+    }
+#endif
     if (!activate)
     {
       // The mapping gets added. if not active is is considered pre-configured.
@@ -1621,6 +1631,9 @@ void deactivateConnectionMapping(ServerConnectionHandler* self,
   self->proxyMap[clientID].crashed = crashed ? time.tv_sec : 0;
   _delMapping(self, clientID, keepWindow);
   self->proxyMap[clientID].updateCount = 0;
+#ifdef USE_GRPC
+  self->proxyMap[clientID].grpcClient = false;
+#endif
 }
 
 /**
@@ -1634,3 +1647,5 @@ void markConnectionHandlerShutdown(ServerConnectionHandler* self)
 {
   self->inShutdown = true;
 }
+
+

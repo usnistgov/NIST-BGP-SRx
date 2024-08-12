@@ -2,13 +2,32 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bgpsecio], [0.2.1.11], [itrg-contact@list.nist.gov])
+AC_INIT([bgpsecio], [0.2.2.1], [itrg-contact@list.nist.gov])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability subdir-objects])
 
 # AC_CONFIG_SRCDIR specifies a file that the configuration checks for existence.
 AC_CONFIG_SRCDIR([ASList.h])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
+
+# Attempt to determine the OS
+AC_MSG_CHECKING( Configure for )
+if test x`ls /etc/os-release 2>/dev/null` = x"/etc/os-release" ; then
+  OS_NAME=`grep -e "^ID=" /etc/os-release | sed -e "s/\"//g" | sed -s "s/ID=\(.*\)/\1/g"`
+  # Change to all upper case
+  OS_VERSION=`grep -e "^VERSION_ID=" /etc/os-release | sed -e "s/\"//g" | sed -s "s/VERSION_ID=\(.*\)/\1/g" | cut -d . -f 1`
+else
+  OS_NAME="CENTOS"
+  OS_VERSION="7"
+fi
+if test x`echo ${OS_NAME}` == "x" ; then
+  OS_NAME="LINUX"
+fi
+if test x`echo ${OS_VERSION}` == "x" ; then
+  OS_VERSION="0"
+fi
+AC_MSG_RESULT( ${OS_NAME} ${OS_VERSION} )
+OS_CFLAGS="-DOS_${OS_NAME^^}"
 
 # library information versioning
 # Extract Version numbers from AC_INIT above
@@ -278,6 +297,7 @@ AC_SUBST(SCA_LDFLAGS)
 AC_SUBST(CPU_ARCH)
 AC_SUBST(CPU_ARCH_FLAG)
 AC_SUBST(TESTMAKE)
+AC_SUBST(OS_CFLAGS)
 
 AC_CONFIG_FILES([Makefile
                  antd-util/Makefile
@@ -297,6 +317,9 @@ echo "LIBS.........: $LIBS"
 echo "LDFLAGS......: $LDFLAGS"
 echo "CFLAGS.......: $CFLAGS"
 echo "LCONFIG_INT..: $LCONFIG_INT"
+echo ""
+echo "OS System....: $OS_NAME $OS_VERSION"
+echo " - OS_CFLAGS.: $OS_CFLAGS"
 echo ""
 echo "OpenSSL Configuration:"
 if test "x${openssl_dir}" = "x"; then

@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.2.1.11
+ * @version 0.2.1.12
  * 
  * ChangeLog:
  * -----------------------------------------------------------------------------
+ *  0.2.1.12- 2024/06/11 - oborchert
+ *            * Fixed speller in message when using parameter -C <file>
  *  0.2.1.11- 2021/10/26 - oborchert
  *            * Modified the STARTUP_MSG string.
  *            * Added switch to reduce the above warning message.
@@ -1278,7 +1280,7 @@ static bool _checkSettings(PrgParams* params, int* exitVal)
     {
       printf("Configuration file \"%s\" successfully generated!\n",
               params->newCfgFileName);
-      printf("Verify the key file settings and correct them is necessary!\n");
+      printf("Verify the key file settings and correct them if necessary!\n");
       *exitVal  = EXIT_SUCCESS;
     }
     keepGoing = false;
