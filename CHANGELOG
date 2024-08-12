@@ -1,5 +1,9 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.3.1
+ * Updated INSTALL.md and fixed bootstrap (install.sh) script for  Rocky 9
+ * Updated build script
+ * Same software components as in Version 6.3.0
 Version 6.3.0 (ROCKY 9)
  * quagga-srx V0.99.22.srx.0.6.0.4_release
  * srx-server V0.6.2.0_release

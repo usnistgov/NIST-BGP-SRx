@@ -1,4 +1,4 @@
-This folder contains NIST BGP-SRx Software Suite V6.3.0
+This folder contains NIST BGP-SRx Software Suite V6.3.1
  * quagga-srx V0.99.22.srx.0.6.0.4_release
  * srx-server V0.6.2.0_release
  * srx-crypto-api V0.3.0.6_release
@@ -23,6 +23,7 @@ Comments for this software package:
   - requires gcc
   - requires readline-devel
   - requires ncurses-devel
+  - requires tar
   - requires openssl-devel
   - requires libconfig-devel
   - requires uthash-devel
@@ -56,4 +57,4 @@ Comments for this software package:
   - optional python3
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V8.1.6
+Packaged by BGP-SRx Software Suite Bundler V8.1.7

@@ -252,7 +252,9 @@ do
            exit 
            ;;
 
-    "master") select=0; version="Latest GitHub (For Rocky)" ;;
+    "master") select=0; version="Latest GitHub (For Rocky)"
+              devel_pkg="$(echo $devel_pkg) tar"
+              ;;
     "v5")     select=1; version="GitHub V5 (For CentOS 8)"
               tool_pkg="$(echo $tool_pkg) dnf-plugins-core"
               devel_pkg="$(echo $devel_pkg) make tar patch"
