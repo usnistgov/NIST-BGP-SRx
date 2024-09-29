@@ -1,4 +1,4 @@
-This folder contains NIST BGP-SRx Software Suite V6.3.2
+This folder contains NIST BGP-SRx Software Suite V6.3.3
  * quagga-srx V0.99.22.srx.0.6.0.4_release
  * srx-server V0.6.2.1_release
  * srx-crypto-api V0.3.0.6_release
@@ -57,4 +57,4 @@ Comments for this software package:
   - optional python3
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V8.2.0
+Packaged by BGP-SRx Software Suite Bundler V8.2.1

@@ -72,7 +72,10 @@ The software was continuously tested during development. We performed
 interoperability test and published them at IETF SIDR meetings as well as
 IETF SIDROPS meetings.
 The codebase itself provides a simple testing to test basic functionality.
-The development was done using CentOS 7 though we compiled the project on CentOS 8 and successfully executed the test suite provided in this release.
+The development up to version 6.2.0 was done using CentOS 7 though we compiled 
+the project on CentOS 8. Starting with version 6.3.0 the development was
+performed on linux Rocky 9. Each release was successfully build and tested
+using the build script and test suite provided.
 
 ### Unit Test
 

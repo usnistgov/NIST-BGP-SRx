@@ -1,5 +1,8 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.3.3
+ * Updated README.MD file.
+ * Same software components as in Version 6.3.0
 Version 6.3.2
  * quagga-srx V0.99.22.srx.0.6.0.4_release
  * srx-server V0.6.2.1_release
