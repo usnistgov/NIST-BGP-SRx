@@ -28,12 +28,35 @@
  * - Removed, i.e. withdrawn routes are kept for one hour
  *   (see CACHE_EXPIRATION_INTERVAL)
  *
- * @version 0.6.2.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/24 - oborchert
+ *            * Fixed serial generation when replaceing ASPA objects.
+ *          - 2024/09/23 - oborchert
+ *            * Updated RPKI_RTR_SRV_VER.
+ *            * Fixed error handling for incorrect ASPA scripting.
+ *            * Fixed memory leak in removal of ASPA objects.
+ *          - 2024/09/20 - oborchert
+ *            * Added findASPA and remove ASPA objects that will be overwritten
+ *              using addASPA.
+ *          - 2024/09/11 - oborchert
+ *            * Updated cache.version number to represent the latest protocol 
+ *              number.
+ *          - 2024/09/10 - oborchert
+ *            * Changed data types from u_int... to uint... which follows C99
+ *            * Added sendEndOfData to allow distinguishing between version 1
+ *              and version 2 processing.
+ *          - 2024/09/03 - oborchert
+ *            * Moved SKIP_IF macro from within function to top of file and 
+ *              added one more parameter.
+ *            * Fixed some documentation.
+ *            * Fixed segmentation fault in ASPA processing.
+ *          - 2024/08/27 - oborchert
+ *            * Added more printout information to sendErrorPDU. 
  * 0.6.2.0  - 2024/07/26 - oborchert
- *            * Removed AFI from ASPA according to 8210-bis13
+ *            * Removed AFI from ASPA according to 8210-bis13.
  * 0.6.1.0  - 2021/11/05 - oborchert
  *            * Increased the line buffer for reading files from 255 bytes to 
  *              4KiB. ASPA objects can be rather large.
@@ -289,7 +312,7 @@ typedef struct {
 #ifdef PACKAGE_VERSION
 const char* RPKI_RTR_SRV_VER          = PACKAGE_VERSION "\0";
 #else
-const char* RPKI_RTR_SRV_VER          = "> 0.5.1\0";
+const char* RPKI_RTR_SRV_VER          = "> 0.6.2\0";
 #endif
 const char* RPKI_RTR_SRV_NAME         = "RPKI Cache Test Harness\0";
 const char* HISTORY_FILENAME          = ".rpkirtr_svr.history\0";
@@ -312,6 +335,11 @@ struct {
   uint32_t  maxSerial;
   uint32_t  minPSExpired, maxSExpired;
   uint8_t   version;
+
+  // Values for Version 2 - see RFC8210 for more
+  uint32_t  refreshInterval; // = PDU_EOD_REFRESH_DEF;
+  uint32_t  retryInterval;   // = PDU_EOD_RETRY_DEF;
+  uint32_t  expireInterval;  // = PDU_EOD_EXPIRE_DEF;
 } cache;
 
 struct {
@@ -357,6 +385,18 @@ char keyLocation[LINE_BUF_SIZE];
 #define ERRORF(FMT, ...) \
   printf(FMT, ## __VA_ARGS__); \
   OPROMPT()
+
+#define SKIP_IF(COND, MSG, VAR, IS_FILE) \
+  if (COND)                     \
+  {                             \
+    if (IS_FILE)                \
+    {                           \
+      ERRORF("Error: " MSG " (line %d): '%s'\n", lineNo, VAR); \
+    } else {                    \
+      ERRORF("Error: " MSG " : '%s'\n", VAR); \
+    }                           \
+    continue;                   \
+  }
 
 ////////////////////////////////////////////////////////////////////////////////
 // CLIENT SERVER COMMUNICATION AND UTILITIES
@@ -423,7 +463,7 @@ bool dropSession(int* fdPtr)
 
 /**
  * Send a PDU that contains the serial field. This method can be used to
- * send SERIAL_NOTIFY (4.1), SERIAL_QUERY (4.2), or END_OF_DATA (4.7)
+ * send SERIAL_NOTIFY (4.1) or SERIAL_QUERY (4.2)
  * @param fdPtr The file descriptor to be used to send the packet.
  * @param type The PDU type.
  *
@@ -447,6 +487,45 @@ bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial,
   return sendNum(fdPtr, &pdu, sizeof(RPKISerialQueryHeader));
 }
 
+
+/**
+ * Send the end of data PDU.
+ * @since 0.6.2.1
+ */
+bool sendEndOfData(int* fdPtr, uint32_t serial, uint8_t version, 
+                     uint32_t refresh_interval, uint32_t retry_interval,
+                     uint32_t expire_interval)
+{
+  uint8_t                pdu[sizeof(RPKIEndOfDataHeader_2)];
+  RPKIEndOfDataHeader_2* hdr    = (RPKIEndOfDataHeader_2*)pdu;
+  uint32_t               length = sizeof(RPKIEndOfDataHeader);
+  bool                   retVal = false;
+
+  memset(hdr, 0, sizeof(sizeof(RPKIEndOfDataHeader_2)));
+
+  switch (version)
+  {
+    case 2:
+      hdr->refresh_interval = htonl(refresh_interval);
+      hdr->retry_interval   = htonl(retry_interval);
+      hdr->expire_interval  = htonl(expire_interval);
+      length                = sizeof(RPKIEndOfDataHeader_2);
+    case 1:
+      hdr->v1.version       = version;
+      hdr->v1.type          = (uint8_t)PDU_TYPE_END_OF_DATA;
+      hdr->v1.sessionID     = htons(sessionID);
+      hdr->v1.length        = htonl(length);
+      hdr->v1.serial        = htonl(serial);
+      // Send
+      OUTPUTF(false, "Sending an RPKI-RTR 'PDU[%u] with Serial'\n", 
+              PDU_TYPE_END_OF_DATA);
+      retVal = sendNum(fdPtr, &pdu, length);
+      break;
+    default:
+  }
+  return retVal;
+}
+
 /**
  * Send a CACHE RESET to the client.
  *
@@ -455,7 +534,7 @@ bool sendPDUWithSerial(int* fdPtr, RPKIRouterPDUType type, uint32_t serial,
  *
  * @return true id the packet was send successful.
  */
-bool sendCacheReset(int* fdPtr, u_int8_t version)
+bool sendCacheReset(int* fdPtr, uint8_t version)
 {
   uint8_t               pdu[sizeof(RPKICacheResetHeader)];
   RPKICacheResetHeader* hdr;
@@ -478,7 +557,7 @@ bool sendCacheReset(int* fdPtr, u_int8_t version)
  *
  * @return true id the packet was send successful.
  */
-bool sendCacheResponse(int* fdPtr, u_int8_t version)
+bool sendCacheResponse(int* fdPtr, uint8_t version)
 {
   uint8_t                  pdu[sizeof(RPKICacheResetHeader)];
   RPKICacheResponseHeader* hdr;
@@ -506,7 +585,7 @@ bool sendCacheResponse(int* fdPtr, u_int8_t version)
  *                ignored.
  */
 void sendCacheObjects(int* fdPtr, uint32_t clientSerial, 
-                      uint16_t clientSessionID, bool isReset, u_int8_t version)
+                      uint16_t clientSessionID, bool isReset, uint8_t version)
 {
   // No need to send the notify anymore
   service.notify = false;
@@ -655,29 +734,42 @@ void sendCacheObjects(int* fdPtr, uint32_t clientSerial,
                                   + (ntohs(cEntry->providerCount) * 4);
               aspahdr->length            = htonl(aspaBufferMinSize);
               aspahdr->flags             = cEntry->flags;
+              aspahdr->customer_asn      = cEntry->asNumber;
+              if ( (cEntry->flags & PREFIX_FLAG_ANNOUNCEMENT) != 0 )
+              {
+              aspahdr->provider_as_count = cEntry->providerCount;
               aspahdr->provider_as_count = cEntry->providerCount;
               aspahdr->customer_asn      = cEntry->asNumber;
-              if (aspaBufferSize < aspaBufferMinSize)
-              {
-                uint8_t* newBuffer = realloc(aspaBuffer, aspaBufferMinSize);
-                if (newBuffer != NULL)
+                aspahdr->provider_as_count = cEntry->providerCount;
+              aspahdr->customer_asn      = cEntry->asNumber;
+                if (aspaBufferSize < aspaBufferMinSize)
                 {
-                  aspaBuffer     = newBuffer;
-                  aspaBufferSize = aspaBufferMinSize;
-                  aspahdr        = (RPKIASPAHeader*)aspaBuffer;
-                  newBuffer      = NULL;
+                  uint8_t* newBuffer = realloc(aspaBuffer, aspaBufferMinSize);
+                  if (newBuffer != NULL)
+                  {
+                    aspaBuffer     = newBuffer;
+                    aspaBufferSize = aspaBufferMinSize;
+                    aspahdr        = (RPKIASPAHeader*)aspaBuffer;
+                    newBuffer      = NULL;
+                  }
+                  else
+                  {
+                    ERRORF("Error: Not enough memory for ASPA object!\n");
+                    break;
+                  }
                 }
-                else
-                {
-                  ERRORF("Error: Not enough memory for ASPA object!\n");
-                  break;
-                }
+                // Now use a helper pointer to copy the list of provider ASs to 
+                // into the PDU
+                uint8_t* ptr = aspaBuffer + sizeof(RPKIASPAHeader);
+                memcpy(ptr, (uint8_t*)cEntry->providerAS, 
+                      ntohs(cEntry->providerCount) * 4);
               }
-              // Now use a helper pointer to copy the list of provider ASs to 
-              // into the PDU
-              uint8_t* ptr = aspaBuffer + sizeof(RPKIASPAHeader);
-              memcpy(ptr, (uint8_t*)cEntry->providerAS, 
-                     ntohs(cEntry->providerCount) * 4);
+              else
+              {
+                // Withdrawal - No PRovider ASes
+                aspaBufferMinSize = sizeof(RPKIASPAHeader);
+                aspahdr->provider_as_count = 0;
+              }
 
               // Here aspahdr is a pointer so we can hand is over directly.
               if (!sendNum(fdPtr, aspahdr, aspaBufferMinSize))
@@ -737,7 +829,8 @@ void sendCacheObjects(int* fdPtr, uint32_t clientSerial,
               cache.maxSerial);
 
       // was sending cache version, not session version.
-      if (!sendPDUWithSerial(fdPtr, PDU_TYPE_END_OF_DATA, cache.maxSerial, version))
+      if (!sendEndOfData(fdPtr, cache.maxSerial, version, cache.refreshInterval,
+                         cache.retryInterval, cache.expireInterval))
       {
         ERRORF("Error: Failed to send a 'End of Data'\n");
       }
@@ -815,10 +908,10 @@ int sendCacheResetToAllClients()
  * @return true if it could be send.
  */
 bool sendErrorPDU(int* fdPtr, RPKICommonHeader* pdu, char* reason, 
-                  u_int8_t version)
+                  uint8_t version)
 {
   // @TODO: Fix sendErrorPDU.
-  printf("ERROR: invalid PDU because of %s\n", reason);
+  printf("ERROR: [V:%u] invalid PDU because of %s\n", version, reason);
 //  uint8_t                  pdu[sizeof(RPKIErrorReportHeader)];
 //  RPKICacheResponseHeader* hdr;
 //
@@ -1095,10 +1188,13 @@ void handleClient(ServerSocket* svrSock, int sock, void* user)
   // read the beginning of the header to see how many bytes are actually needed
   while (recvNum(&sock, &hdr, sizeof(RPKICommonHeader)))
   {
-    if (hdr.version > RPKI_RTR_PROTOCOL_VERSION)
+    if (hdr.version > cache.version)
     {
-      sendErrorPDU(&ccl->fd, &hdr, "Unsupported Version", 
-                   RPKI_RTR_PROTOCOL_VERSION);
+      char buff[256];
+      sprintf(buff, "Unsupported Version %u, expected %u", hdr.version, 
+              RPKI_RTR_PROTOCOL_VERSION);
+      printf("");
+      sendErrorPDU(&ccl->fd, &hdr, buff, RPKI_RTR_PROTOCOL_VERSION);
       close(sock);
       break;          
     }
@@ -1299,13 +1395,6 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   ValCacheEntry* cEntry;
   bool           goOn=true;
 
-  #define SKIP_IF(COND, MSG, VAR) \
-    if (COND)                     \
-    {                             \
-      ERRORF("Warning: " MSG " (line %d): '%s'\n", lineNo, VAR); \
-      continue;                   \
-    }
-
   if (isFile)
   {
     fh = fopen(arg, "rt");
@@ -1397,15 +1486,15 @@ bool readPrefixData(const char* arg, SList* dest, uint32_t serial, bool isFile)
 
     // Parse fields
     SKIP_IF(!strToIPPrefix(fields[0], &prefix),
-            "Invalid IP Prefix", fields[0]);
+            "Invalid IP Prefix", fields[0], isFile);
 
     maxLen = strtoul(fields[1], NULL, 10);
     SKIP_IF(!BETWEEN(maxLen, 0, GET_MAX_PREFIX_LEN(prefix.ip)),
-            "Invalid max. length", fields[1]);
+            "Invalid max. length", fields[1], isFile);
 
     oas = strtoul(fields[2], NULL, 10);
     SKIP_IF(oas == 0,
-            "Invalid origin AS", fields[2]);
+            "Invalid origin AS", fields[2], isFile);
 
     // Append
     cEntry = (ValCacheEntry*)appendToSList(dest, sizeof(ValCacheEntry));
@@ -1483,17 +1572,55 @@ int _countTokens(char* line)
   return tokens;
 }
 
+/** 
+ * Find the ASPA entry for the given customerAS
+ * 
+ * @param customerAS The ASN of the customer for whom the cache entry is
+ *                   requested.
+ * 
+ * @return Pointer to the cache entry (ValCacheEntry) or NULL is not found.
+ * 
+ * @since 0.6.2.1
+ */
+ValCacheEntry* findASPA(uint32_t customerAS)
+{
+  ValCacheEntry* retVal = NULL;
+  ValCacheEntry* cEntry = NULL;
+  SListNode*     lnode  = NULL;
+  // it is faster to translate this into network representation once rather than
+  // translating each stored value into host representation.
+  uint32_t       cAS    = htonl(customerAS);
+  
+  if (sizeOfSList(&cache.entries) != 0)
+  {
+    FOREACH_SLIST(&cache.entries, lnode)
+    {
+      cEntry = (ValCacheEntry*)getDataOfSListNode(lnode);
+      if (cEntry->isASPA)
+      {
+        if (cAS == cEntry->asNumber)
+        {
+          retVal = cEntry;
+          break;
+        }
+      }
+    }
+  }
+
+  return retVal;
+}
+
 /**
  * Read ASPA data from a given file or from command line. An error while
  * reading from command line will result in skipping the line and posting a
  * WARNING. An error from command line results in abort of the operation.
  *
  * @param arg The filename or the data provided via command line.
- * @param dest
- * @param serial The serial number of the prefix announcement(s).
+ * @param dest The list where the data will be stored in.
+ * @param serial The serial number of the ASPA announcement(s).
  * @param isFile determine if the argument given specifies a file or input data.
  *
- * @return true if the prefix(es) could be send.
+ * @return true if the ASPA data is added.
  */
 bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
 {
@@ -1507,23 +1634,19 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   int            idx;
   char*          fields[num_fields];
   
-  uint32_t       customerAS;
-  uint16_t       providerCount;
-  uint8_t*       providerBuff;
-  uint32_t*      providerAS;
+  uint32_t       previousSerial;
+  uint32_t       numAdded = 0;
+
+  uint32_t       customerAS, pAS;
+  uint16_t       providerCount = 0;
+  uint8_t*       providerBuff  = NULL;
+  uint32_t*      providerAS    = NULL;
   int providerCounter;
   providerBuff = NULL;
   providerAS   = NULL;
   
   ValCacheEntry* cEntry;
   bool           goOn=true;
-
-  #define SKIP_IF(COND, MSG, VAR) \
-    if (COND)                     \
-    {                             \
-      ERRORF("Warning: " MSG " (line %d): '%s'\n", lineNo, VAR); \
-      continue;                   \
-    }
 
   if (isFile)
   {
@@ -1617,7 +1740,7 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     // Parse fields
     customerAS = strtoul(fields[0], NULL, 10);
     SKIP_IF(customerAS == 0,
-            "Invalid Customer AS", fields[0]);
+            "Invalid Customer AS", fields[0], isFile);
 
     if(providerBuff != NULL)
     {
@@ -1627,29 +1750,74 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
       providerAS   = NULL; 
     }
     
-    if (idx > 1)
+    int errorCode = (idx > 1) ? 0 : 1;
+    // 1 : NO provider specified
+    // 2 : CUstomer also specified as provider
+    if (errorCode == 0)
     {
       providerBuff = malloc((idx-1) * 4);
       memset(providerBuff, 0, (idx-1) * 4);
       providerAS = (uint32_t*)providerBuff;
       providerCount=idx-1;
-//@TODO: The drafts are contradicting. 8210-bis01 says it's OK to have no
-//       provider, the ASPA Profile draft says 1..N providers.
-      SKIP_IF(providerCount==0, "At least one provider MUST be specified!", 
-              "0");
-      for (providerCounter = 1; providerCounter < idx; providerCounter++, providerAS++)
+      if (providerCount != 0)
       {
-        *providerAS = htonl(strtoul(fields[providerCounter], NULL, 10));
+        for (providerCounter = 1; providerCounter < idx; 
+             providerCounter++, providerAS++)
+        {
+          pAS = strtoul(fields[providerCounter], NULL, 10);
+          *providerAS = htonl(pAS);
+          if (customerAS == pAS)
+          {
+            errorCode = 2;
+            break;
+          }
+        }
+      }
+      else
+      {
+        errorCode = 1;
       }
     }
-    else
+
+    // 
+    if (errorCode != 0)
     {
       free(providerBuff);
       providerBuff = NULL;
       providerAS   = NULL;
-      SKIP_IF(false, "At lease one provider is required!", "");
+      switch(errorCode)
+      {
+        case 1: SKIP_IF(true, "At least one provider is required!", 
+                              "Use 'remove #' to delete ASPA!", isFile);
+                break;
+        case 2: SKIP_IF(true, "Provider and Customer must not be same!", 
+                              "Customer cannot be it's own provider!", isFile);
+                break;
+        default: SKIP_IF(true, "Unknown Error!", 
+                              "UNKNOWN ERROR WHILE PROCESSING addASPA!",isFile);
+                break;
+      }
     }
     
+    // Check if the cache already contains an ASPA object for this particular
+    // clientAS. In this case remove it directly from the cache, do not call 
+    // removeASPA.
+    previousSerial = 0;
+    cEntry = findASPA(customerAS);
+    //cEntry = NULL;
+    if (cEntry != NULL)
+    {
+      LOG(LEVEL_INFO, "Found previous ASPA object with ASN %u, remove object"
+                      " from cache to install replacement!", customerAS);
+      previousSerial = cEntry->serial;
+      deleteFromSList(&cache.entries, cEntry);
+      free(cEntry->providerAS);
+      cEntry->providerCount = 0;
+      cEntry->providerAS    = NULL;
+      free(cEntry);
+      cEntry = NULL;
+    }
+
     // Append
     cEntry = (ValCacheEntry*)appendToSList(dest, sizeof(ValCacheEntry));
     if (cEntry == NULL)
@@ -1667,7 +1835,8 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     // Reset cEntry value to all zero
     memset(cEntry, 0, sizeof(ValCacheEntry));
             
-    cEntry->serial  = cEntry->prevSerial = serial++;
+    cEntry->serial  = serial++;
+    cEntry->prevSerial = previousSerial != 0 ? previousSerial : cEntry->serial;
     cEntry->expires = 0; // Not needed , it is 0 already from above
 
     cEntry->flags           = PREFIX_FLAG_ANNOUNCEMENT;
@@ -1677,6 +1846,7 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
     cEntry->asNumber        = htonl(customerAS);
     cEntry->providerCount   = htons(providerCount);
     cEntry->providerAS      = providerBuff;
+    numAdded++;
     providerBuff = NULL;
     providerAS   = NULL;
   }
@@ -1685,7 +1855,7 @@ bool readASPAData(const char* arg, SList* dest, uint32_t serial, bool isFile)
   {
     fclose(fh);
   }
-  return true;
+  return numAdded;
 }
 
 /**
@@ -2110,7 +2280,7 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
   // parsing pubkey part and SKI
   //
   fseek(fpKey, OFFSET_PUBKEY, SEEK_SET);
-  keyLength = (u_int16_t)fread (&buffKey, sizeof(char), KEY_BIN_SIZE, fpKey);
+  keyLength = (uint16_t)fread (&buffKey, sizeof(char), KEY_BIN_SIZE, fpKey);
 
   if (keyLength != KEY_BIN_SIZE)
   {
@@ -2120,7 +2290,7 @@ bool readRouterKeyData(const char* arg, SList* dest, uint32_t serial)
 
   fseek(fpKey, OFFSET_SKI, SEEK_SET);
   // read two times of SKI_SIZE(20 bytes) because of being written in a way of ASCII
-  skiLength = (u_int16_t)fread(&buffSKI_asc, sizeof(char), SKI_LENGTH * 2,
+  skiLength = (uint16_t)fread(&buffSKI_asc, sizeof(char), SKI_LENGTH * 2,
                                fpKey);
 
   int idx;
@@ -2194,7 +2364,7 @@ bool appendRouterKeyData(char* line)
 }
 
 /**
- * This function does the real work of adding the prefix to the cache test
+ * This function does the real work of adding the ASPA data to the cache test
  * harness. It will be called in both modes, file and console.
  *
  * @param arg Can be a filename (file) or cache entry (console)
@@ -2204,19 +2374,15 @@ bool appendRouterKeyData(char* line)
  */
 bool appendASPAData(char* arg, bool fromFile)
 {
-  size_t  numBefore, numAdded;
-  bool    succ;
+  size_t  numAdded;
 
   acquireReadLock(&cache.lock);
-  numBefore = sizeOfSList(&cache.entries);
 
   changeReadToWriteLock(&cache.lock);
-  succ = readASPAData(arg, &cache.entries, cache.maxSerial + 1, fromFile);
+  numAdded = readASPAData(arg, &cache.entries, cache.maxSerial + 1, fromFile);
+  cache.maxSerial += numAdded;
   changeWriteToReadLock(&cache.lock);
 
-  // Check how many entries were added
-  numAdded = succ ? (sizeOfSList(&cache.entries) - numBefore) : 0;
-  cache.maxSerial += numAdded;
   unlockReadLock(&cache.lock);
 
   OUTPUTF(false, "Read %d ASPA object%s\n", (int)numAdded,
@@ -2228,7 +2394,7 @@ bool appendASPAData(char* arg, bool fromFile)
     service.notify = true;
   }
 
-  return succ;
+  return numAdded > 0;
 }
 
 /**
@@ -2529,7 +2695,7 @@ int printCache()
         printf("[Key]:  SKI=");
         for (idx = 0; idx < SKI_LENGTH; idx++)
         {
-          printf ("%02X", (u_int8_t)cEntry->ski[idx]);
+          printf ("%02X", (uint8_t)cEntry->ski[idx]);
         }
         printf (", OAS=%u", ntohl(cEntry->asNumber));
       }
@@ -2648,6 +2814,15 @@ bool processEntryRemoval(char* arg)
       currEntry->flags &= ~PREFIX_FLAG_ANNOUNCEMENT;
       currEntry->serial = ++cache.maxSerial;
       currEntry->expires = tsExp;
+
+      if (currEntry->isASPA)
+      {
+        currEntry->providerCount = 0;
+        free(currEntry->providerAS);
+        currEntry->providerCount = NULL;
+      }
+//@TODO
+// Maybe reduce the entry to zero providers if it is an ASPA object
 
       // Move to end
       moveSListNode(&cache.entries, &cache.entries, currIndex, prevNode);
@@ -3265,7 +3440,11 @@ bool setupCache()
   cache.maxSerial     = 0;
   cache.minPSExpired  = UINT32_MAX;
   cache.maxSExpired   = 0;
-  cache.version       = 1; // cache version
+  cache.version       = RPKI_RTR_PROTOCOL_VERSION; // cache version
+
+  cache.refreshInterval = RPKI_RTR_REFRESH_DEF;
+  cache.retryInterval   = RPKI_RTR_RETRY_DEF;
+  cache.expireInterval  = RPKI_RTR_EXPIRE_DEF;
 
   return true;
 }

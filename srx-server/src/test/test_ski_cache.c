@@ -22,10 +22,12 @@
  *  
  * This files is used for testing the SKI Cache functions.
  *
- * @version 0.5.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.0  - 2017/06/30 - oborchert
  *            * Added tests 7 and 8
  *          - 2017/06/29 - oborchert
@@ -45,11 +47,11 @@
 #include "util/log.h"
 
 typedef struct {
-  u_int8_t      ski[SKI_LENGTH];
-  u_int32_t     asn;
-  u_int8_t      algoID;
-  int           noUpdates;
-  SRxUpdateID*  updateID;
+  uint8_t      ski[SKI_LENGTH];
+  uint32_t     asn;
+  uint8_t      algoID;
+  int          noUpdates;
+  SRxUpdateID* updateID;
 } TEST_SKI_DATA;
 
 /** The RPKI Queue */
@@ -58,7 +60,7 @@ RPKI_QUEUE* rpki_queue = NULL;
 /** The Test Data */
 TEST_SKI_DATA** testData;
 /** The number of elements to be generated*/
-u_int8_t noElements = 0;
+uint8_t noElements = 0;
 
 /** Specifies the verbose setting. */
 bool verbose = false;
@@ -148,9 +150,9 @@ SCA_BGP_PathAttribute* bgp_BGPsec_PATH[2] = {NULL, NULL};
 // MUST be 64496, and 65536
 // A: append, Ih: insert header, Im: Insert middle/in between, -: do nothing
 //                                      A      A:U1   Ih -  -  A  A  A:U2         
-u_int32_t arrASN[MAX_NO_ELEMENTS]    = {64496, 65536, 1, 1, 1, 1, 3, 0x00020000};
+uint32_t arrASN[MAX_NO_ELEMENTS]    = {64496, 65536, 1, 1, 1, 1, 3, 0x00020000};
 //                                      A          -  -  A  Im -  -  -
-u_int8_t  arrAlgoID[MAX_NO_ELEMENTS] = {1,         1, 1, 3, 2, 1, 1, 1};
+uint8_t  arrAlgoID[MAX_NO_ELEMENTS] = {1,         1, 1, 3, 2, 1, 1, 1};
 // zero value means no update
 SRxUpdateID arrUpdateID[MAX_NO_ELEMENTS][MAX_NO_UPDATE_IDS] = {
    {0xab11, 0xab10, 0xab01, 0, 0},
@@ -203,7 +205,7 @@ static bool checkVerbose(const char* func)
 static void printDataElement(TEST_SKI_DATA* data, char* prefix)
 {
   int idx;
-  u_int8_t* bNum = (u_int8_t*)data->ski;
+  uint8_t* bNum = (uint8_t*)data->ski;
   if (prefix == NULL)
   {
     prefix = "\0";
@@ -297,8 +299,8 @@ static void assert_info (SKI_CACHE_INFO* info_1, SKI_CACHE_INFO* info_2,
  * @param noUpdates number of updates (0..255)
  * @param updateIDs The array of update IDs (NULL if noUpdates = 0)
  */
-static TEST_SKI_DATA* createData(u_int32_t asn, char* skiStr, u_int8_t algoID, 
-                  u_int8_t noUpdates, SRxUpdateID* updateIDs)
+static TEST_SKI_DATA* createData(uint32_t asn, char* skiStr, uint8_t algoID, 
+                  uint8_t noUpdates, SRxUpdateID* updateIDs)
 {  
   TEST_SKI_DATA* tdElem = malloc(sizeof(TEST_SKI_DATA));
   memset(tdElem, 0, sizeof(TEST_SKI_DATA));
@@ -435,7 +437,7 @@ static void createTestData(bool useUpdates)
         }
       }      
       printf ("BGPsec_PATH %i:\n  ", idx);
-      u_int8_t* bgpsecPath = (u_int8_t*)bgp_BGPsec_PATH[idx];
+      uint8_t* bgpsecPath = (uint8_t*)bgp_BGPsec_PATH[idx];
       for (idx2 = 0; idx2 < lenU[idx]; idx2++, bgpsecPath++)
       {
         if (idx2 != 0)

@@ -1,3 +1,14 @@
+ChangeLog for Version 0.6.2.1
+- Added PDU check (syntax and erorr) to ASPA PDU processing
+- Changed data types from u_int... to uint... which follows C99
+- Fixed End Of Data PDU to comply to RFC8210
+- Updated rpki_router_client callback function definitions according to 
+  RFC8210-bis14
+- Fixed segmentation fault in rpkirtr_client when receiving ASPA PDUs.
+- Fixed segmentation fault when starting srx_server with no available 
+  configuration file.
+- Renamed RPKIRouterClient.user into RPKIRouterClient.rpkiHandler to remove 
+  confusion about the context of the field.
 ChangeLog for Version 0.6.2.0
 - Updated to draft RFC8210-bis13 and removed AFI from ASPA PDU.
 ChangeLog for Version 0.6.1.3

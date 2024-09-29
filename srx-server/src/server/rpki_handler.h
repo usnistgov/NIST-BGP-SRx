@@ -20,10 +20,16 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.5.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/08 - oborchert
+ *            * To reduce confusion and errors in the code, all "void* user" 
+ *              declarations are chaned into "RPKIHandler* rpkihandler". That is 
+ *              what they are used anyhow.
+ * 0.6.0.0  - 2021/02/26 - kyehwanl
+ *            * Extended RPKIHandler to include ASPA components
  * 0.5.0.0  - 2017/07/09 - oborchert
  *            * Removed define PUB_KEY_OCTET and replaced it with define 
  *              ECDSA_PUB_KEY_DER_LENGTH from srxcryptoapi.h

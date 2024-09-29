@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.6.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/08/24 - oborchert
+ *            * Added defines to replace in code hardcoded strings.
  * 0.6.0.0  - 2021/06/26 - kyehwanl
  *            * Added as_relationship_data to configuration
  * 0.5.0.0  - 2017/07/05 - oborchert
@@ -55,8 +57,9 @@
 #include "config.h"
 #endif /* HAVE_CONFIG_H */
 
-//@TODO: Remove line below
-//static char* DEFAULT_CONSOLE_PASSWORD = "SRxSERVER";
+#define SRX_DEF_CONSOLE_PASSWORD "x"
+#define SRX_DEF_PORT             17900
+#define SRX_DEF_CONSOLE_PORT     17901
 
 #define MAX_PROXY_MAPPINGS 256
 

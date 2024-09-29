@@ -1,6 +1,6 @@
-This folder contains NIST BGP-SRx Software Suite V6.3.1
+This folder contains NIST BGP-SRx Software Suite V6.3.2
  * quagga-srx V0.99.22.srx.0.6.0.4_release
- * srx-server V0.6.2.0_release
+ * srx-server V0.6.2.1_release
  * srx-crypto-api V0.3.0.6_release
  * bgpsec-io version_0.2.2.1
  * examples 0.6.3.1_release
@@ -17,7 +17,7 @@ Comments for this software package:
   - requires libconfig-devel
   - requires uthash-devel
   - requires readline-devel
-* srx-server 0.6.2.0_release developed and tested under CentOS.
+* srx-server 0.6.2.1_release developed and tested under CentOS.
   Use telnet for login into the srx-server!
   - SRx-Crypto-API (srxcryptoapi)
   - requires gcc
@@ -57,4 +57,4 @@ Comments for this software package:
   - optional python3
 
 -------------------------------------------------------------------------------
-Packaged by BGP-SRx Software Suite Bundler V8.1.7
+Packaged by BGP-SRx Software Suite Bundler V8.2.0

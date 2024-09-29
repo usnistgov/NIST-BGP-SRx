@@ -29,10 +29,12 @@
  * binary stream or extract the BGPsec_PATH from a BGP UPDATE and possible
  * other functions related to BGPsec.
  * 
- * @version 0.1.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.1.0.0 - 2017/06/27 - oborchert 
  *           * File created
  */
@@ -52,7 +54,7 @@
  * @return  The buffer containing the BGPsec_PATH attribute. Must be frees 
  *          by caller.
  */
-u_int8_t* util_getBGPsec_PATH(char* updateStr, u_int32_t* buffLen);
+uint8_t* util_getBGPsec_PATH(char* updateStr, uint32_t* buffLen);
 
 
 #endif /* BGPSEC_UTIL_H */

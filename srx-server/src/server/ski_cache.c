@@ -85,10 +85,12 @@
  * 
  * [    ]      Struct Element
  * 
- * @version 0.5.0.1
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.1 - 2017/08/25 - oborchert
  *           * Modified ski parameter from char* to u_int8_t* in function
  *             ___ski_createCacheData to resolve compiler warnings.
@@ -131,7 +133,7 @@ typedef struct _ski_cache_updateid
   /** The update id. */
   SRxUpdateID updateID;  
   /** A counter allowing multiple registrations. */
-  u_int16_t   counter;
+  uint16_t    counter;
 } _SKI_CACHE_UPDATEID;
 
 /** This struct represents a single ski cache data element. One for each triplet
@@ -142,13 +144,13 @@ typedef struct _ski_cache_data
   struct _ski_cache_data* next;
   /** number of keys received that use this particular ski and algo and asn 
    * combination (should be very rare). */
-  u_int8_t    counter;
+  uint8_t     counter;
   /** The ASN of this cache data element */
-  u_int32_t   asn;
+  uint32_t    asn;
   /** The SKI of this element */
-  u_int8_t    ski[SKI_LENGTH];
+  uint8_t     ski[SKI_LENGTH];
   /** The algorithm ID */
-  u_int8_t    algoID;
+  uint8_t     algoID;
   /** List of updates assigned to this data element */
   _SKI_CACHE_UPDATEID* cacheUID;  
 } _SKI_CACHE_DATA ;
@@ -158,7 +160,7 @@ typedef struct _ski_cache_algo_id {
   /** Next algorithm ID */
   struct _ski_cache_algo_id* next;
   /** The algorithm ID*/
-  u_int8_t         algoID;  
+  uint8_t          algoID;  
   /** The ski cache data */
   _SKI_CACHE_DATA* cacheData;
 } _SKI_CACHE_ALGO_ID;
@@ -169,7 +171,7 @@ typedef struct _ski_cache_node {
   /** The next node. The value of next is larger than the value if this. */
   struct _ski_cache_node* next;  
   /** The left most 2 bytes of the AN number must match this node. */
-  u_int16_t upper;
+  uint16_t upper;
   /** */
   _SKI_CACHE_ALGO_ID* as2[_SKI_AS2_ARRAY_SIZE];
 } _SKI_CACHE_NODE;
@@ -187,7 +189,7 @@ typedef struct {
   _SKI_CACHE_NODE*    cNode;
   /** as an additional helper, the position in the as2 array that points to the
    * first cAlgo instance. */
-  u_int32_t           as2;
+  uint32_t            as2;
   /** The AlgoID node - contains the algorithm ID */
   _SKI_CACHE_ALGO_ID* cAlgoID;
   /** The Data Node   - This is the leaf and contains all information */
@@ -202,15 +204,15 @@ typedef struct {
   /** The parsing result */
   e_Upd_RegRes status;
   /** The number of segments. */
-  u_int16_t   nrSegments;
+  uint16_t     nrSegments;
   /** Number of signature blocks. */
-  u_int16_t   nrSigBlocks;
+  uint16_t     nrSigBlocks;
   /** An array of as numbers (size if number of segments */
-  u_int32_t*  asn;
+  uint32_t*    asn;
   /** This array contains the algorithm ids (max 2).*/
-  u_int8_t algoID[_SKI_MAX_ALGOIDS];
+  uint8_t      algoID[_SKI_MAX_ALGOIDS];
   /** An array of SKIs (array size is nrSigBlocks * nrSegments * SKI_LENGTH) */
-  u_int8_t*   ski;
+  uint8_t*     ski;
 } _SKI_TMP_UPD_INFO;
 
 /** The internal SKI cache. */
@@ -312,7 +314,7 @@ static _SKI_CACHE_ALGO_ID* ___ski_freeCacheAlgoID(_SKI_CACHE_ALGO_ID* cAlgoID)
  *
  * @return the algorithm ID
  */
-static _SKI_CACHE_ALGO_ID* ___ski_createCacheAlgoID(u_int8_t algoID)
+static _SKI_CACHE_ALGO_ID* ___ski_createCacheAlgoID(uint8_t algoID)
 {
   _SKI_CACHE_ALGO_ID* cAlgoID = malloc(sizeof(_SKI_CACHE_ALGO_ID));
   
@@ -359,8 +361,8 @@ static _SKI_CACHE_DATA* ___ski_freeCacheData(_SKI_CACHE_DATA* cData)
  *
  * @return the SKI cache data
  */
-static _SKI_CACHE_DATA* ___ski_createCacheData(u_int32_t asn, 
-                                               u_int8_t* ski, u_int8_t algoID, 
+static _SKI_CACHE_DATA* ___ski_createCacheData(uint32_t asn, 
+                                               uint8_t* ski, uint8_t algoID, 
                                                SRxUpdateID* updateID)
 {
   _SKI_CACHE_DATA* cData = malloc(sizeof(_SKI_CACHE_DATA));
@@ -416,7 +418,7 @@ static _SKI_CACHE_NODE* ___ski_freeCacheNode(_SKI_CACHE_NODE* cNode)
  * 
  * @return The cache node.
  */
-static _SKI_CACHE_NODE* ___ski_createCacheNode(u_int16_t upper)
+static _SKI_CACHE_NODE* ___ski_createCacheNode(uint16_t upper)
 {
   _SKI_CACHE_NODE* cNode = malloc(sizeof(_SKI_CACHE_NODE));
   
@@ -582,7 +584,7 @@ bool ___ski_clean_cNode(_SKI_CACHE_NODE* cNode, e_SKI_clean type)
  * 
  * @return The cache node or NULL if none is found.
  */
-static _SKI_CACHE_NODE* __ski_getCacheNode(_SKI_CACHE* sCache, u_int16_t upper, 
+static _SKI_CACHE_NODE* __ski_getCacheNode(_SKI_CACHE* sCache, uint16_t upper, 
                                            bool create)
 {
   /** The cache node. */
@@ -733,7 +735,7 @@ static void __ski_addUpdateCacheUID(_SKI_CACHE_DATA* cacheData,
  * @return The algorithm identifier or NULL is none is found.
  */
 static _SKI_CACHE_ALGO_ID* __ski_getCacheAlgoID(_SKI_CACHE_NODE* cacheNode, 
-                                                 u_int16_t as2, u_int8_t algoID, 
+                                                 uint16_t as2, uint8_t algoID, 
                                                  bool create)
 {
   /** The Cache algorithm identifier */
@@ -879,14 +881,14 @@ static bool _ski_unlock(_SKI_CACHE* sCache)
  * 
  * @return the cache data object or NULL.
  */
-static _SKI_CACHE_DATA* _ski_getCacheData(_SKI_CACHE* sCache, u_int32_t asn,
-                                          u_int8_t* ski, u_int8_t algoID, 
+static _SKI_CACHE_DATA* _ski_getCacheData(_SKI_CACHE* sCache, uint32_t asn,
+                                          uint8_t* ski, uint8_t algoID, 
                                           bool create)
 {
   /** The left most 2 bytes as unsigned word value. */
-  u_int16_t upper = asn >> 16;
+  uint16_t upper = asn >> 16;
   /** The right most 2 bytes as unsigned word value (former AS2 number). */
-  u_int16_t as2  = asn & 0xFFFF;
+  uint16_t as2  = asn & 0xFFFF;
   
   /** Initialize the helper memory */
   _SKI_TMP_HELPER* tHlp = &sCache->tmpHelper;
@@ -998,7 +1000,7 @@ static void _ski_initializeUpdInfo(_SKI_TMP_UPD_INFO* tmpBGPsecInfo)
   if (tmpBGPsecInfo->asn != NULL)
   {
     // wipe the memory
-    memset(tmpBGPsecInfo->asn, 0, tmpBGPsecInfo->nrSegments * sizeof(u_int32_t));
+    memset(tmpBGPsecInfo->asn, 0, tmpBGPsecInfo->nrSegments * sizeof(uint32_t));
     // free the list memory
     free(tmpBGPsecInfo->asn);
   }
@@ -1038,7 +1040,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
   SCA_BGPSEC_SignatureBlock*    sigBlocks[_BGPSEC_MAX_SIG_BLOCKS] = {NULL, NULL};
   SCA_BGPSEC_SignatureSegment*  sigSement   = NULL;
  
-  u_int8_t*   stream = NULL;  
+  uint8_t*    stream = NULL;  
   SRxUpdateID updateID;
   
   _ski_initializeUpdInfo(updInfo);
@@ -1050,11 +1052,11 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
   
   if (pathAttr != NULL)
   {
-    stream = (u_int8_t*)pathAttr;
+    stream = (uint8_t*)pathAttr;
     // Now figure out the type of path information  
     stream += sizeof(SCA_BGP_PathAttribute);
     // Contains the length of SecurePath and all Signature blocks.
-    u_int16_t remainder = 0;  
+    uint16_t  remainder = 0;  
     if ((pathAttr->flags & SCA_BGP_UPD_A_FLAGS_EXT_LENGTH) == 0)
     {
       remainder = *stream;
@@ -1063,7 +1065,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
     else
     {
       // Extended message length (2 bytes)
-      remainder = ntohs(*((u_int16_t*)stream));
+      remainder = ntohs(*((uint16_t*)stream));
       stream    += 2;
     }    
     if (remainder <= 0) { return; }
@@ -1126,7 +1128,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
     updInfo->status = REGVAL_INVALID;
     
     int idx = 0;
-    int size = sizeof(u_int32_t) * updInfo->nrSegments;
+    int size = sizeof(uint32_t) * updInfo->nrSegments;
     //allocate the asn list
     updInfo->asn = malloc(size);
     memset(updInfo->asn, 0, size);
@@ -1144,7 +1146,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
     // Now create the ski array
     updInfo->ski = malloc(updInfo->nrSigBlocks * updInfo->nrSegments 
                           * SKI_LENGTH);
-    u_int8_t* skiStream = updInfo->ski;
+    uint8_t* skiStream = updInfo->ski;
     
     // Do this for each signature block
     int blockIdx = 0;
@@ -1152,7 +1154,7 @@ static void _ski_parseBGPsec_PATH (_SKI_TMP_UPD_INFO* updInfo,
     {
       updInfo->algoID[blockIdx] = sigBlocks[blockIdx]->algoID;
       // Move the stream to the signature block
-      stream = (u_int8_t*)sigBlocks[blockIdx];
+      stream = (uint8_t*)sigBlocks[blockIdx];
       // Move the stream to the next signature segment
       stream += sizeof(SCA_BGPSEC_SignatureBlock);
       for (idx = 0; idx < updInfo->nrSegments; idx ++)
@@ -1298,9 +1300,9 @@ e_Upd_RegRes ski_registerUpdate(SKI_CACHE* cache, SRxUpdateID* updateID,
     {
       _SKI_CACHE_DATA* cData  = NULL;
 
-      u_int32_t asn;
-      u_int8_t* ski;
-      u_int8_t  algoID;
+      uint32_t asn;
+      uint8_t* ski;
+      uint8_t  algoID;
 
       if (bgpsec != NULL)
       {
@@ -1397,9 +1399,9 @@ bool ski_unregisterUpdate(SKI_CACHE* cache, SRxUpdateID* updateID,
           // The ski position offset
           int       skiOffset = 0;
           // SKI
-          u_int8_t* ski    = NULL;
-          u_int32_t asn    = 0;
-          u_int8_t  algoID = 0;
+          uint8_t* ski    = NULL;
+          uint32_t asn    = 0;
+          uint8_t  algoID = 0;
           _SKI_CACHE_DATA* cData = NULL;
           for (sbIdx = 0; sbIdx < sCache->tmpBGPsecInfo.nrSigBlocks; sbIdx++)
           {
@@ -1526,8 +1528,8 @@ bool ski_unregisterUpdate(SKI_CACHE* cache, SRxUpdateID* updateID,
  * 
  * @return false if an error occurred, otherwise true
  */
-bool ski_registerKey(SKI_CACHE* cache, u_int32_t asn, 
-                     u_int8_t* ski, u_int8_t algoID)
+bool ski_registerKey(SKI_CACHE* cache, uint32_t asn, 
+                     uint8_t* ski, uint8_t algoID)
 {
   char* errMSG = NULL;
 
@@ -1592,8 +1594,8 @@ bool ski_registerKey(SKI_CACHE* cache, u_int32_t asn,
  * 
  * @return false if an error occurred, otherwise true
  */
-bool ski_unregisterKey(SKI_CACHE* cache, u_int32_t asn, 
-                       u_int8_t* ski, u_int8_t algoID)
+bool ski_unregisterKey(SKI_CACHE* cache, uint32_t asn, 
+                       uint8_t* ski, uint8_t algoID)
 {
   char* errMSG = NULL;
 

@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required
  * by this software.
  *
- * @version 0.6.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/08/24 - oborchert
+ *           * Fixed segmentation fault in _duplicateString
  * 0.6.0.0 - 2021/02/16 - oborchert
  *           * Added RPKI-Router-Protocol Version 2
  * 0.5.1.1 - 2020/07/22 - oborchert
@@ -217,9 +219,14 @@ static const char* _USAGE_TEXT =
  */
 void initConfiguration(Configuration* self)
 {
+  // Initialize the configuration to be all 0 to prevent segmentation faults
+  // due to random data.
+  memset (self, 0, sizeof(Configuration));
+
   // Determine and set default configFileName.
-  char* fName = fileIsReadable(LOC_CFG_FILE) ? LOC_CFG_FILE
-                         : fileIsReadable(SYS_CFG_FILE) ? SYS_CFG_FILE : NULL;
+  char* fName = fileIsReadable(LOC_CFG_FILE) 
+                ? LOC_CFG_FILE : fileIsReadable(SYS_CFG_FILE) 
+                                 ? SYS_CFG_FILE : NULL;
   self->configFileName = _duplicateString(fName, &self->configFileName,
                                           "Configuration filename");
 
@@ -229,9 +236,9 @@ void initConfiguration(Configuration* self)
   self->msgDest = MSG_DEST_STDERR;
   self->msgDestFilename = NULL;
 
-  self->server_port  = 17900;
-  self->console_port = 17901;
-  self->console_password = NULL;
+  self->server_port      = SRX_DEF_PORT;
+  self->console_port     = SRX_DEF_CONSOLE_PORT;
+  self->console_password = SRX_DEF_CONSOLE_PASSWORD;
 
   self->rpki_host = NULL;
   self->rpki_port = -1;
@@ -298,7 +305,8 @@ void releaseConfiguration(Configuration* self)
  */
 static char* _duplicateString(char* src, char** dest, const char* err)
 {
-  int strLen = strlen(src);
+  int strLen = src != NULL ? strlen(src) : 0; // fixed segmentation fault
+
   char* resultStr = NULL;
   if (dest)
   {
@@ -390,6 +398,7 @@ int parseProgramArgs(Configuration* self, int argc, const char** argv,
         case CFG_PARAM_MODE_NO_SEND_QUEUE:
         case CFG_PARAM_MODE_NO_RCV_QUEUE:
           optc = -1;
+          break;
         default:
           printf("Use '-h' for help!\n");
           return -2;
@@ -838,19 +847,25 @@ bool isCompleteConfiguration(Configuration* self)
       return false; \
     }
 
+#define STOP_IF_TRUE(COND, FMT, ...) \
+    if (COND) { \
+      printf(FMT, ## __VA_ARGS__); printf("\n\n"); \
+      exit(1); \
+    }
+
   ERROR_IF_TRUE(self->msgDest == MSG_DEST_FILENAME
                 && self->msgDestFilename == NULL,
                 "Logfile not specified given!");
   ERROR_IF_TRUE(self->console_port <= 0,
                 "Invalid console port '%d'!", self->console_port);
-  ERROR_IF_TRUE(self->console_password == NULL,
+  STOP_IF_TRUE(self->console_password == NULL,
                 "Console password is not set!");
   ERROR_IF_TRUE(self->server_port <= 0,
                 "Invalid server port '%d'!", self->server_port);
-  ERROR_IF_TRUE(self->rpki_host == NULL,
-                "Host name of validation cache is not set!");
-  ERROR_IF_TRUE(self->rpki_port <= 0,
-                "Port number of validation cache is not set or invalid!");
+  STOP_IF_TRUE(self->rpki_host == NULL,
+               "Host name of validation cache is not set!");
+  STOP_IF_TRUE(self->rpki_port <= 0,
+               "Port number of validation cache is not set or invalid!");
   ERROR_IF_TRUE(self->defaultKeepWindow <= 0,
                 "The keep-window time can not be negative!");
   ERROR_IF_TRUE(self->defaultKeepWindow > 0xFFFF,

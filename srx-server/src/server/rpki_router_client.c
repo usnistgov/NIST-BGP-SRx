@@ -22,10 +22,21 @@
  *
  * Provides the code for the SRX-RPKI router client connection.
  *
- * @version 0.6.1.3
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/20 - oborchert
+ *           * Added PDU check into handlePDUASPA and send error to cache in 
+ *             case of an error.
+ *           * Added proper return value to handlePDUASPA
+ *         - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
+ *           * Added timing parameters from End Of Data PDU processing.
+ * 0.6.2.1 - 2024/08/27 - oborchert
+ *           * Fixed debuging output in function sendErrorReport
+ *           * Updated ASPA PDU handling. This included rewriting handlePDUASPA
+ *             according to he latest specifications. 
  * 0.6.1.3 - 2024/06/12 - oborchert
  *           * Moved int g_rpki_single_thread_client_fd into the .c file and 
  *             declared it as extern in the .h file.
@@ -162,7 +173,7 @@ static bool handleIPv4Prefix(RPKIRouterClient* client,
 
   /* Pass the information to the callback */
   client->params->prefixCallback(clientID, sessionID, isAnn, &prefix,
-                                 hdr->maxLen, ntohl(hdr->as), client->user);
+                                 hdr->maxLen, ntohl(hdr->as), client->rpkiHandler);
   return true;
 }
 
@@ -194,7 +205,7 @@ static bool handleIPv6Prefix(RPKIRouterClient* client,
   /* Pass the information to the callback */
   client->params->prefixCallback(clientID, sessionID,
                                  isAnn, &prefix, hdr->maxLen, ntohl(hdr->as),
-                                 client->user);
+                                 client->rpkiHandler);
   return true;
 }
 
@@ -218,7 +229,7 @@ static int handleErrorReport(RPKIRouterClient* client,
   // Retrieve the messageLen
   uint32_t  msgLen = ntohl(*(uint32_t*)messagePtr);
   char      errorStr[msgLen+1];
-  u_int16_t error_number = ntohs(hdr->error_number);
+  uint16_t error_number = ntohs(hdr->error_number);
   
   // all except RPKI_EC_NO_DATA_AVAILABLE (2) are fatal!
   int returnVal = (error_number == RPKI_EC_NO_DATA_AVAILABLE) ? 0 : 1; 
@@ -232,7 +243,7 @@ static int handleErrorReport(RPKIRouterClient* client,
   {
     // Pass the code and message to the error callback of this connection
     returnVal = (client->params->errorCallback(error_number, errorStr, 
-                                               client->user)) ? 0 : 1;
+                                               client->rpkiHandler)) ? 0 : 1;
   }
   else
   {
@@ -269,10 +280,10 @@ static bool handlePDURouterKey(RPKIRouterClient* client,
   keyInfo   = hdr->keyInfo;
 
   client->params->routerKeyCallback(clientID, sessionID, isAnn, ntohl(hdr->as),
-                                    (char*)ski, (char*)keyInfo, client->user);
+                                    (char*)ski, (char*)keyInfo, 
+                                    client->rpkiHandler);
   return true;
 }
-
 
 /**
  * Processes the ASPA PDU
@@ -280,17 +291,16 @@ static bool handlePDURouterKey(RPKIRouterClient* client,
  * @param client The client connection
  * @param hdr The header with the information
  *
- * @return true
+ * @return true if the PDU was processed, false if an error was detected!
  */
-/*
 static bool handlePDUASPA(RPKIRouterClient* client,
                           RPKIASPAHeader* hdr)
 {
+  bool      retVal = true;
   bool      isAnn;
-  uint32_t  clientID;
-  uint16_t  sessionID;
+  uint32_t  valCacheID = client->routerClientID;
+  uint16_t  sessionID  = client->sessionID;
 
-  uint8_t  afi;
   uint32_t customerAS;
   uint16_t providerCount;
   uint8_t* providerASBuffer;
@@ -299,12 +309,9 @@ static bool handlePDUASPA(RPKIRouterClient* client,
   uint32_t* providerAS;
   int idx = 0;
 
-  isAnn         = (hdr->flags & PREFIX_FLAG_ANNOUNCEMENT);
-  afi           = (hdr->flags & PREFIX_FLAG_AFI_V6);
-  clientID      = client->routerClientID;
-  sessionID     = client->sessionID;
-  customerAS    = ntohl(hdr->customer_asn);
-  providerCount = ntohs(hdr->provider_as_count);
+  isAnn            = (hdr->flags & PREFIX_FLAG_ANNOUNCEMENT);
+  customerAS       = ntohl(hdr->customer_asn);
+  providerCount    = ntohs(hdr->provider_as_count);
   providerASBuffer = malloc(providerCount * 4);
   srcPtr           = (uint8_t*)hdr + sizeof(RPKIASPAHeader);
 
@@ -315,14 +322,37 @@ static bool handlePDUASPA(RPKIRouterClient* client,
     *providerAS = ntohl(*srcData);
   }
 
-  client->params->aspaCallback(clientID, sessionID, isAnn, afi, customerAS,
-                               providerCount, (uint32_t*)providerASBuffer,
-                               client->user);
-  return true;
+  if (!isAnn && providerCount != 0)
+  {
+    // Withdrawals MUST NOT have providers attached!
+    retVal = false;
+    sendErrorReport(client, RPKI_EC_CORRUPT_DATA, (uint8_t*)hdr, 
+                    ntohl(hdr->length), RPKI_ESTR_CORRUPT_DATA, 
+                    strlen(RPKI_ESTR_CORRUPT_DATA));
+  } else if (isAnn && providerCount == 0)
+  {
+    // Announcements MUST have at least one provider
+    LOG(LEVEL_ERROR, "[ASPA] %s (valCacheID=0x%08X sessionID=0x%04X): cs=%u, "
+                     "pct=%i, error='%s'\n", "Announced",
+                     valCacheID, sessionID, customerAS, providerCount, 
+                     RPKI_ESTR_ASPA_PROVIDER_LIST_ERROR);
+    sendErrorReport(client, RPKI_EC_ASPA_PROVIDER_LIST_ERROR, (uint8_t*)hdr, 
+                    ntohl(hdr->length), RPKI_ESTR_ASPA_PROVIDER_LIST_ERROR, 
+                    strlen(RPKI_ESTR_ASPA_PROVIDER_LIST_ERROR));
+    retVal = false;
+  }
+  else
+  {
+    LOG(LEVEL_DEBUG, "[ASPA] %s (valCacheID=0x%08X sessionID=0x%04X): cs=%u, "
+                     "pct=%i\n", isAnn ? "Ann" : "Withdr",
+                     valCacheID, sessionID, customerAS, providerCount);
+    client->params->aspaCallback(valCacheID, sessionID, isAnn, customerAS,
+                                providerCount, (uint32_t*)providerASBuffer,
+                                client->rpkiHandler);
+  }
+
+  return retVal;
 }
-
-*/
-
 
 /**
  * Process the End Of Data PDU
@@ -333,15 +363,35 @@ static bool handlePDUASPA(RPKIRouterClient* client,
  * @since 0.5.0.0
  */
 static void handleEndOfData(RPKIRouterClient* client,
-                             RPKIEndOfDataHeader* hdr)
+                            RPKIEndOfDataHeader* hdr)
 {
-  uint32_t  clientID;
-  uint16_t  sessionID;
+  uint32_t clientID;
+  uint16_t sessionID;
+  uint32_t length = ntohl(hdr->length);
+  uint32_t refreshInterval = 0;
+  uint32_t retryInterval   = 0;
+  uint32_t expireInterval  = 0;
 
   clientID  = client->routerClientID;
   sessionID = client->sessionID;
   
-  client->params->endOfDataCallback(clientID, sessionID, client->user);
+  if (hdr->version > 1)
+  {
+    if (length == 24)
+    {
+      RPKIEndOfDataHeader_2* hdr2 = (RPKIEndOfDataHeader_2*)hdr;
+      client->params->refreshInterval = ntohl(hdr2->expire_interval);
+      client->params->retryInterval   = ntohl(hdr2->retry_interval);
+      client->params->expireInterval  = ntohl(hdr2->expire_interval);
+    }
+    else
+    {
+      sendErrorReport(client, RPKI_EC_CORRUPT_DATA, (uint8_t*)hdr, 
+                      length, "Length MUST be 24 octets.", 25);
+    }
+  }
+
+  client->params->endOfDataCallback(clientID, sessionID, client->rpkiHandler);
 }
 
 /**
@@ -357,7 +407,7 @@ static void handleEndOfData(RPKIRouterClient* client,
  * 
  * @since 0.5.0.3
  */
-static bool checkVersion(RPKIRouterClient* client, u_int8_t version)
+static bool checkVersion(RPKIRouterClient* client, uint8_t version)
 {
   if (client->version != version)
   {
@@ -431,7 +481,7 @@ static bool checkSessionID(RPKIRouterClient* client, uint32_t sessionID)
  * 
  * @return 0 or the number of bytes received (can be less then the PDU length).
  */
-static u_int32_t _getPacket(RPKIRouterClient* client, int* errCode, 
+static uint32_t _getPacket(RPKIRouterClient* client, int* errCode, 
                             uint8_t** buffer, uint32_t* buffSize)
 {
   uint32_t pduLen       = 0;
@@ -641,7 +691,7 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
     }
         
     // Handle the data depending on the type
-    u_int32_t sessionID = 0;
+    uint32_t sessionID = 0;
     switch (hdr->type)
     {
       case PDU_TYPE_SERIAL_NOTIFY :
@@ -713,7 +763,8 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
         break;
       case PDU_TYPE_CACHE_RESET:
         // Reset our cache
-        client->params->resetCallback(client->routerClientID, client->user);
+        client->params->resetCallback(client->routerClientID, 
+                                      client->rpkiHandler);
         // Respond with a cache reset
         sendResetQuery(client);
         break;
@@ -725,9 +776,10 @@ static bool receivePDUs(RPKIRouterClient* client, bool returnAterEndOfData,
       case PDU_TYPE_ASPA :
         if (client->version > 1)
         {
-          LOG(LEVEL_INFO, FILE_LINE_INFO "ASPA PDU received from Rpki rtr server");
+          LOG(LEVEL_DEBUG, FILE_LINE_INFO "ASPA PDU received from Rpki rtr server");
           // ASPA validation  
-          handleReceiveAspaPdu(client, (RPKIASPAHeader*)byteBuffer, pduLen);
+          handlePDUASPA(client,  (RPKIASPAHeader*)byteBuffer);
+          //handleReceiveAspaPdu(client, (RPKIASPAHeader*)byteBuffer, pduLen);
         }
         else
         {
@@ -947,7 +999,7 @@ static void* manageConnection (void* clientPtr)
     // Should we try to reconnect
     sec = (client->params->connectionCallback == NULL)
               ? -1
-              : client->params->connectionCallback(client->user);
+              : client->params->connectionCallback(client->rpkiHandler);
 
 
     if (sec == -1)
@@ -1038,7 +1090,7 @@ uint32_t createRouterClientID(RPKIRouterClient* self)
  */
 bool createRPKIRouterClient (RPKIRouterClient* self,
                              RPKIRouterClientParams* params,
-                             void* user)
+                             void* rpkiHandler)
 {
   int ret;
 
@@ -1067,8 +1119,8 @@ bool createRPKIRouterClient (RPKIRouterClient* self,
     closeClientSocket(&self->clSock);
   }
 
-  // User data
-  self->user = user;
+  // The RPKI Handler
+  self->rpkiHandler = rpkiHandler;
 
   // Create a thread which handles the receipt of PDUs
   self->params = params;
@@ -1212,38 +1264,44 @@ bool sendResetQuery (RPKIRouterClient* self)
  * 
  * @since 0.5.0.3
  */
-bool sendErrorReport(RPKIRouterClient* self, u_int16_t errCode,
-                     u_int8_t* erronPDU, u_int32_t lenErronPDU,
-                     char* errText, u_int32_t lenErrText)
+bool sendErrorReport(RPKIRouterClient* self, uint16_t errCode,
+                     uint8_t* erronPDU, uint32_t lenErronPDU,
+                     char* errText, uint32_t lenErrText)
 {
-  u_int32_t totalLen = sizeof(RPKIErrorReportHeader) + lenErronPDU
+  uint32_t totalLen = sizeof(RPKIErrorReportHeader) + lenErronPDU
                        + (4 + lenErrText);  // 4 byte for length field + text
   bool  succ = false;
 
   if (self->clSock.clientFD != -1)
   {
-    u_int8_t* buff = malloc(totalLen);
+    uint8_t* buff = malloc(totalLen);
     memset(buff, 0, totalLen);
-    u_int32_t* hdr_len_err_txt = NULL;
+    uint32_t* hdr_len_err_txt = NULL;
     RPKIErrorReportHeader* hdr = (RPKIErrorReportHeader*)buff;
     hdr->version      = self->version;
     hdr->type         = PDU_TYPE_ERROR_REPORT;
     hdr->error_number = htons(errCode);
     hdr->length       = htonl(totalLen);
     hdr->len_enc_pdu  = htonl(lenErronPDU);
-    // Move buffer to position of error PDU
+    // Move buffer to position of error PDU 
     buff += sizeof(RPKIErrorReportHeader);
-    memcpy(buff, erronPDU, lenErronPDU);
-    buff += lenErronPDU;
-    hdr_len_err_txt  = (u_int32_t*)buff;
+    if (lenErronPDU != 0)
+    {
+      memcpy(buff, erronPDU, lenErronPDU);
+      buff += lenErronPDU;
+    }
+    hdr_len_err_txt  = (uint32_t*)buff;
     *hdr_len_err_txt = htonl(lenErrText);
-    buff += sizeof(u_int32_t);
-    memcpy(buff, errText, lenErrText); 
+    buff += sizeof(uint32_t);
+    if (lenErrText != 0)
+    {
+      memcpy(buff, errText, lenErrText); 
+    }
     // Set buffer back to start of header; 
-    buff = (u_int8_t*)hdr;
-
+    buff = (uint8_t*)hdr;
+    
     lockMutex(&self->writeMutex);
-    LOG(LEVEL_DEBUG, HDR "Sending Serial Query...\n", pthread_self());
+    LOG(LEVEL_DEBUG, HDR "Sending Error Report...\n", pthread_self());
 
     succ  = _sendPDU(self, (RPKICommonHeader*)hdr); 
     unlockMutex(&self->writeMutex);
@@ -1311,6 +1369,16 @@ void generalSignalProcess(void)
 }
 
 
+/**
+ * This function pre processes the ASPA pdu and then calls the registered 
+ * PDU handler.
+ * 
+ * @param client The Router client implementation
+ * @param hdr The PDU
+ * @param pduLen lenght of the PDU
+ * 
+ * @return always true
+ */
 bool handleReceiveAspaPdu(RPKIRouterClient* client, RPKIASPAHeader* hdr, 
                           uint32_t pduLen)
 {
@@ -1321,14 +1389,13 @@ bool handleReceiveAspaPdu(RPKIRouterClient* client, RPKIASPAHeader* hdr,
   //     2. memcpy for providerASNs if providerAsCount is greater than 1
   //     3. inside hdr, there might have multiple provider asns
   //
-
+  
   uint32_t customerAsn = ntohl(hdr->customer_asn);
   uint16_t providerAsCount = ntohs(hdr->provider_as_count);
   uint32_t *providerAsns;
   uint8_t  flags = hdr->flags;
 
-  uint8_t announce       = flags & 0x01; // bit 0: 1 == announce, 0 == withdraw
-  uint8_t addrFamilyType = flags & 0x02; // bit 1: AFI (IPv4 == 0, IPv6 == 1)
+  uint8_t  announce       = flags & 0x01; // bit 0: 1 == announce, 0 == withdraw
 
   uint8_t *byteHdr = (uint8_t*)hdr;
   uint32_t *startp_providerAsns = (uint32_t*)(byteHdr + sizeof(RPKIASPAHeader));
@@ -1338,25 +1405,25 @@ bool handleReceiveAspaPdu(RPKIRouterClient* client, RPKIASPAHeader* hdr,
 
   providerAsns = (uint32_t*)calloc(providerAsCount, sizeof(uint32_t));
 
-  LOG(LEVEL_INFO, "---" FILE_LINE_INFO " receive ASPA Object PDU from rpki cache ---");
-  LOG(LEVEL_INFO, "customer asn: %d", customerAsn);
-  LOG(LEVEL_INFO, "provider as count: %d", providerAsCount);
+  LOG(LEVEL_DEBUG, "---" FILE_LINE_INFO 
+                  " receive ASPA Object PDU from rpki cache ---");
+  LOG(LEVEL_DEBUG, "* customer asn: %d", customerAsn);
+  LOG(LEVEL_DEBUG, "* provider as count: %d", providerAsCount);
 
   // 3. inside hdr, there might have multiple provider ASNs
   for (idx = 0; idx < providerAsCount; idx++)
   {
     providerAsns[idx] = ntohl(startp_providerAsns[idx]);
-    LOG(LEVEL_INFO, "provider asn[%d]: %d", idx, providerAsns[idx]);
+    LOG(LEVEL_DEBUG, "provider asn[%d]: %d", idx, providerAsns[idx]);
   }
 
-  LOG(LEVEL_INFO, "afi : %d (0 == AFI_IP, 1 == AFI_IP6)", addrFamilyType);
-  LOG(LEVEL_INFO, "flag: %s ", announce == 1 ? "Announce": 
-                              (announce == 0 ? "Withdraw": "None"));
+  LOG(LEVEL_DEBUG, "flag: %s ", announce != 0 ? "Announce": "Withdraw");
 
   // this calls 'handleAspaPdu()' in rpki_handler module
-  client->params->cbHandleAspaPdu(client->user, customerAsn, providerAsCount, 
-                                  providerAsns, addrFamilyType, announce); 
+  client->params->aspaCallback(client->routerClientID, client->sessionID, 
+                               announce, customerAsn, 
+                               providerAsCount, providerAsns, 
+                               client->rpkiHandler);
+
   return true;
 }
-
-

@@ -21,10 +21,12 @@
  * by this software.
  *
  *
- * @version 0.5.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.0  - 2017/07/08 - oborchert
  *            * Added some more memory housekeeping to validateSignature
  *          - 2017/07/05 - oborchert
@@ -78,14 +80,14 @@ bool loadPrivateKey(BGPSecHandler* self, const char* filename)
  */
 uint8_t validateSignature(BGPSecHandler* self, UC_UpdateData* update)
 {
-  u_int8_t retVal = SRx_RESULT_DONOTUSE;
+  uint8_t retVal = SRx_RESULT_DONOTUSE;
   
   /* making Validation pdu */
   SCA_BGPSecValidationData valdata;
   memset(&valdata, 0, sizeof(SCA_BGPSecValidationData));
   valdata.myAS             = update->myAS;
   valdata.status           = API_STATUS_OK;
-  valdata.bgpsec_path_attr = (u_int8_t*)update->bgpsec_path;
+  valdata.bgpsec_path_attr = (uint8_t*)update->bgpsec_path;
   valdata.nlri             = &update->nlri;
 
   /* call API's validate call */

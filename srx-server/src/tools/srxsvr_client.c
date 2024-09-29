@@ -1434,7 +1434,7 @@ void doVerify(bool log, char** argPtr)
   };
 #endif // USE_GRPC
 
-  if (bgpsecInput == '\0')
+  if (*bgpsecInput == '\0')
   {
     bgpsec.numberHops = 0;
     bgpsec.asPath = NULL;
@@ -1447,7 +1447,6 @@ void doVerify(bool log, char** argPtr)
     bgpsec.asPath = NULL;
     bgpsec.attr_length = strlen(bgpsecInput)+1;
     bgpsec.bgpsec_path_attr = (uint8_t*)bgpsecInput;
-
   }
   
   

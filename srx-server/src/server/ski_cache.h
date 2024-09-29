@@ -20,10 +20,12 @@
  * other licenses. Please refer to the licenses of all libraries required 
  * by this software.
  *
- * @version 0.1.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.0 - 2017/06/30 - oborchert
  *           * added count_updates to SKI_CACHE_INFO
  *           * modified the function ski_clean and removed ski_gc - clean does
@@ -92,19 +94,19 @@ typedef enum {
 typedef struct {
   /** Number of CACHE Nodes, each CACHE Node represents the upper two bytes of
    * an ASN */
-  u_int32_t count_cNode;
+  uint32_t count_cNode;
   /** Number of 2 byte AS numbers. */
-  u_int32_t count_AS2;
+  uint32_t count_AS2;
   /** Number of Algorithm ID nodes, Min 1 per ASN*/
-  u_int32_t count_cAlgoID;
+  uint32_t count_cAlgoID;
   /** Number of SKI data leafs (same as counter of SKIs) */
-  u_int32_t count_cData;
+  uint32_t count_cData;
   /** Number of update IDs stored. (Not Unique)*/
-  u_int32_t count_cUID;
+  uint32_t count_cUID;
   /** Number of keys registered (sum of cNode->counter). */
-  u_int32_t count_keys;
+  uint32_t count_keys;
   /** Numbers of updates registered (count of cUID->counter.)*/
-  u_int32_t count_updates;
+  uint32_t count_updates;
 } SKI_CACHE_INFO;
 
 /** The SKI_CACHE type */
@@ -201,8 +203,8 @@ bool ski_unregisterUpdate(SKI_CACHE* cache, SRxUpdateID* updateID,
  * 
  * @return false if an error occurred, otherwise true
  */
-bool ski_registerKey(SKI_CACHE* cache, u_int32_t asn, 
-                     u_int8_t* ski, u_int8_t algoID);
+bool ski_registerKey(SKI_CACHE* cache, uint32_t asn, 
+                     uint8_t* ski, uint8_t algoID);
 
 /** 
  * Remove the key counter from the <SKI, algo-id> tuple. This might trigger 
@@ -215,8 +217,8 @@ bool ski_registerKey(SKI_CACHE* cache, u_int32_t asn,
  * 
  * @return false if an error occurred, otherwise true
  */
-bool ski_unregisterKey(SKI_CACHE* cache, u_int32_t asn, 
-                       u_int8_t* ski, u_int8_t algoID);
+bool ski_unregisterKey(SKI_CACHE* cache, uint32_t asn, 
+                       uint8_t* ski, uint8_t algoID);
 
 /**
  * Examine given SKI Cache. This function also allows to print the cache in 

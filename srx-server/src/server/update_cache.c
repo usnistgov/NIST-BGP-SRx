@@ -25,10 +25,12 @@
  * value. The other is a list, that allows to scan through all updates. Both
  * MUST be maintained the same.
  *
- * @version 0.5.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.0  - 2017/07/11 - kyehwanl
  *            * Fixed BZ1190 - added missing initialization for cEntry->pathData
  *          - 2017/07/08 - oborchert
@@ -1382,15 +1384,15 @@ bool detectCollision(UpdateCache* self, SRxUpdateID* updateID, IPPrefix* prefix,
         idx = 0;
         // Now check the BGP4 path - only if  not already collided
         length = data->hops * 4;
-        u_int8_t* d1 = (u_int8_t*)data->asn_path;
-        u_int8_t* d2 = (u_int8_t*)bgpsecData->asPath;
+        uint8_t* d1 = (uint8_t*)data->asn_path;
+        uint8_t* d2 = (uint8_t*)bgpsecData->asPath;
         collision = memcmp(d1, d2, length);
 
         // Now check the BGPsec_PATH
         if (!collision)
         {
-          u_int8_t* d1 = (u_int8_t*)data->bgpsec_path;
-          u_int8_t* d2 = bgpsecData->bgpsec_path_attr;
+          uint8_t* d1 = (uint8_t*)data->bgpsec_path;
+          uint8_t* d2 = bgpsecData->bgpsec_path_attr;
           collision = memcmp(d1, d2, data->length);
         }
       }

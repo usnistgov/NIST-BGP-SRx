@@ -77,7 +77,7 @@ bool au_checkSTDIN(int sec, int msec)
  * 
  * @return The value read from standard in or the configured NULL value.
  */
-char au_getchar(bool* stop, char nullValue)
+char au_getchar(bool stop, char nullValue)
 {
   char retVal = nullValue;
   
@@ -85,13 +85,13 @@ char au_getchar(bool* stop, char nullValue)
   // ready to be read.
   while (!au_checkSTDIN(0, 100))
   {
-    if (*stop)
+    if (stop)
     {
       break;
     }
   }
   
-  if (!*stop)
+  if (!stop)
   {
     // We reached here because data is available
     retVal = getchar();

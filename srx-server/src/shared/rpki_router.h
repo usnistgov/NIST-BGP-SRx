@@ -22,10 +22,15 @@
  *
  * RPKI/Router definitions.
  *
- * @version 0.6.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/11 - oborchert
+ *            * Added timing parameter defines used since version 2
+ *            * Changed names of Cache Port defines from default to TCP and TLS.
+ *          - 2024/09/03 - oborchert
+ *            * Added error code 9 for invalid AS provider list.
  * 0.6.0.0  - 2021/03/30 - oborchert
  *            * Changed version label 0.5.2.0 to 0.6.0.0 (0.5.2.0 was skipped)
  *            * Cleaned up some merger left overs and synchronized with naming 
@@ -84,11 +89,35 @@
 
 /** The current protocol implementation. */
 #define RPKI_RTR_PROTOCOL_VERSION 2
-/** Bit number 2 specifies the Address Family, 0 for IPv4, 1 for IPv6*/
-#define PREFIX_FLAG_AFI_V6        0x02
 
-/** The default RPKI server port */
-#define RPKI_DEFAULT_CACHE_PORT 323
+/** Timing refresh min field Ranges 1 sec */
+#define RPKI_RTR_REFRESH_MIN 1
+/** Timing refresh def field Ranges 1 hour */
+#define RPKI_RTR_REFRESH_DEF 3600
+/** Timing refresh max field Ranges 1 day */
+#define RPKI_RTR_REFRESH_MAX 86400  
+
+/** Timing retry min field Ranges 1 sec */
+#define RPKI_RTR_RETRY_MIN   1
+/** Timing retry def field Ranges 10 Min */
+#define RPKI_RTR_RETRY_DEF   600
+/** Timing retry max field Ranges 2 hours */
+#define RPKI_RTR_RETRY_MAX   7200
+
+/** Timing expire min field Ranges 10 Min */
+#define RPKI_RTR_EXPIRE_MIN  600
+/** Timing expire def field Ranges 2 hours */
+#define RPKI_RTR_EXPIRE_DEF  7200
+/** Timing expire max field Ranges 2 days */
+#define RPKI_RTR_EXPIRE_MAX  172800
+
+/** Bit number 2 specifies the Address Family, 0 for IPv4, 1 for IPv6 */
+#define PREFIX_FLAG_AFI_V6   0x02
+
+/** The default TCP RPKI server port */
+#define RPKI_CACHE_PORT_TCP 323
+/** The default TLS RPKI server port */
+#define RPKI_CACHE_PORT_TLS 324
 /** The default address for a RPKI validation cache */
 #define RPKI_DEFAULT_CACHE "localhost"
 /** The default connection attempt timeout after 10 seconds. */
@@ -136,6 +165,7 @@ typedef enum {
     RPKI_EC_UNKNOWN_WITHDRAWL           = 6,
     RPKI_EC_DUPLICATE_ANNOUNCEMENT      = 7,
     RPKI_EC_UNEXPECTED_PROTOCOL_VERSION = 8,   // NEW IN RFC8210
+    RPKI_EC_ASPA_PROVIDER_LIST_ERROR    = 9,   // NEW IN RFC8210bis-15
     RPKI_EC_RESERVED                    = 255  //
 } RPKIErrorCode;
 
@@ -149,6 +179,7 @@ typedef enum {
 #define RPKI_ESTR_UNKNOWN_WITHDRAWL           "Unknown Withdrawal\0"
 #define RPKI_ESTR_DUPLICATE_ANNOUNCEMENT      "Duplicate Announcement\0"
 #define RPKI_ESTR_UNEXPECTED_PROTOCOL_VERSION "Unexpected Protocol Version\0"
+#define RPKI_ESTR_ASPA_PROVIDER_LIST_ERROR    "ASPA Provider List Error\0"
 #define RPKI_ESTR_RESERVED                    "Reserved\0"
 
 //
@@ -245,10 +276,8 @@ typedef struct {
                                                  // bytes DER
 } __attribute__((packed)) RPKIRouterKeyHeader;
 
-
-
 /**
- * PDU EndOfData
+ * PDU EndOfData (contains only verson 1)
  */
 typedef struct {
   uint8_t     version;     // Version
@@ -257,6 +286,16 @@ typedef struct {
   uint32_t    length;      // 12 Bytes
   uint32_t    serial;      // Serial number
 } __attribute__((packed)) RPKIEndOfDataHeader;
+
+/** 
+ * PDU EndOfData version 2 (with version one embedded in v1)
+ */
+typedef struct {
+  RPKIEndOfDataHeader v1;
+  uint32_t    refresh_interval; // See RFC8210
+  uint32_t    retry_interval;   // See RFC8210
+  uint32_t    expire_interval;  // See RFC8210
+} __attribute__((packed)) RPKIEndOfDataHeader_2;
 
 /**
  * PDU Cache Reset

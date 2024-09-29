@@ -23,11 +23,20 @@
  * Provides a printer for RPKI Router to Cache Protocol Packages. 
  * Supports RFC6810 and RFC8210 package formats.
  *
- * @version 0.6.0.0
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.6.0.0  - 2021/03/30 - oborchert
+ *  0.6.2.1 - 2024/09/20 - oborchert
+ *            * Fixed print bug in _doPrintHex and ERRON PDU printing.
+ *          - 2024/09/10 - oborchert
+ *            * Changed data types from u_int... to uint... which follows C99
+ *            * Fixed printing of End Of Data depending on version.
+ *          - 2021/09/03 - oborchert
+ *            * Added RPKI_EC_ASPA_PROVIDER_LIST_ERROR
+ *            * Removed isASPA from _printFlags.
+ *            * USed RPKI_ECSTR_... defines rather than hard coded messages.
+ *  0.6.0.0 - 2021/03/30 - oborchert
  *            * Renamed version labeled as version 0.5.2.0 to 0.6.0.0 
  *              (0.5.2.0 was skipped)
  *            * Cleaned up some merger left overs and synchronized with naming 
@@ -59,7 +68,7 @@
  * @param data the data
  * @param line2Tab A string for the line 2 tab.
  */
-static void _doPrintHex(int len, u_int8_t* data, char* line2Tab)
+static void _doPrintHex(int len, uint8_t* data, char* line2Tab)
 {
   char* tab = (line2Tab != NULL) ? line2Tab : "";
   int idx = 0;
@@ -78,6 +87,7 @@ static void _doPrintHex(int len, u_int8_t* data, char* line2Tab)
       if ((col % 16) == 0)
       {
         col = 0;
+        row++;
         printf("\n");
         if (idx+1 < len)
         {
@@ -94,8 +104,11 @@ static void _doPrintHex(int len, u_int8_t* data, char* line2Tab)
       }
     }
   }
-  if (col != 0)
+  // col != 0  -> Stuff was printed and '\n' was not called
+  // idx == 0 -> Nothing at all was printed
+  if (col != 0 || idx == 0)
   {
+    // assure last print is '\n' as specified
     printf("\n");    
   }
 }
@@ -110,12 +123,12 @@ static void _doPrintHex(int len, u_int8_t* data, char* line2Tab)
  *               successful reading of the buffer.
  * @return 
  */
-static bool _u32(u_int8_t** ptr, u_int32_t* result32, u_int32_t* length)
+static bool _u32(uint8_t** ptr, uint32_t* result32, uint32_t* length)
 {
   bool retVal = false;
   if (*length >= 4)
   {
-    *result32 = *(u_int32_t*)*ptr; 
+    *result32 = *(uint32_t*)*ptr; 
     *ptr     += 4;
     *length  -= 4;
     retVal    = true;
@@ -134,12 +147,12 @@ static bool _u32(u_int8_t** ptr, u_int32_t* result32, u_int32_t* length)
  * @return 
  */
 
-static bool _u16(u_int8_t** ptr, u_int16_t* result16, u_int32_t* length)
+static bool _u16(uint8_t** ptr, uint16_t* result16, uint32_t* length)
 {
   bool retVal = false;
   if (*length >= 2)
   {
-    *result16 = *(u_int16_t*)*ptr; 
+    *result16 = *(uint16_t*)*ptr; 
     *ptr     += 2;
     *length  -= 2;
     retVal    = true;
@@ -158,12 +171,12 @@ static bool _u16(u_int8_t** ptr, u_int16_t* result16, u_int32_t* length)
  * @return 
  */
 
-static bool _u8(u_int8_t** ptr, u_int8_t* result8, u_int32_t* length)
+static bool _u8(uint8_t** ptr, uint8_t* result8, uint32_t* length)
 {
   bool retVal = false;
   if (*length >= 1)
   {
-    *result8 = *(u_int8_t*)*ptr; 
+    *result8 = *(uint8_t*)*ptr; 
     *ptr    += 1;
     *length -= 1;
     retVal   = true;
@@ -176,12 +189,11 @@ static bool _u8(u_int8_t** ptr, u_int8_t* result8, u_int32_t* length)
  * 
  * @param tab The tab character to be used for each line
  * @param u8 The one octet flag value
- * @param isASPA Indicates if this flag belongs to the ASPA PDU
  */
-static void _printFlags(char* tab, u_int8_t u8, bool isASPA)
+static void _printFlags(char* tab, uint8_t u8)
 {
-  #define  U_ZERO   (u_int8_t)0
-  #define  U_ONE    (u_int8_t)1
+  #define  U_ZERO   (uint8_t)0
+  #define  U_ONE    (uint8_t)1
   #define  _UNKNOWN_ZERO ""
   #define  _UNKNOWN_ONE  "(UNDEFINED)"
 
@@ -220,8 +232,7 @@ static void _printFlags(char* tab, u_int8_t u8, bool isASPA)
   printf ("%s|     .... .%u.. %s\n", tab, (u8 & 0x04) ? U_ONE : U_ZERO, 
                                     (u8 & 0x04) ? T4_FLAG_04_1 : T4_FLAG_04_0);
   printf ("%s|     .... ..%u. %s\n", tab, (u8 & 0x02) ? U_ONE : U_ZERO, 
-                          !isASPA ? (u8 & 0x02) ? T4_FLAG_02_1 : T4_FLAG_02_0
-                                  : (u8 & 0x02) ? TA_FLAG_02_1 : TA_FLAG_02_0);
+                                    (u8 & 0x02) ? T4_FLAG_02_1 : T4_FLAG_02_0);
   printf ("%s|     .... ...%u %s\n", tab, (u8 & 0x01) ? U_ONE : U_ZERO, 
                                     (u8 & 0x01) ? T4_FLAG_01_1 : T4_FLAG_01_0);
 }
@@ -241,7 +252,7 @@ static void _printFlags(char* tab, u_int8_t u8, bool isASPA)
  * 
  * @return false is an error occurred, otherwise true. 
  */
-static bool _printField(u_int8_t **pduPtr, u_int8_t octets, u_int32_t* remaining,
+static bool _printField(uint8_t **pduPtr, uint8_t octets, uint32_t* remaining,
                         char* tab, char* name, bool useHex, bool convert)
 {
   bool retVal = false;
@@ -250,23 +261,23 @@ static bool _printField(u_int8_t **pduPtr, u_int8_t octets, u_int32_t* remaining
   // Contains the tab for hex printing.
   char dTab[255];
   // Used for the correct data retrieval
-  u_int8_t  u8;
-  u_int16_t u16;
-  u_int32_t u32;
+  uint8_t  u8;
+  uint16_t u16;
+  uint32_t u32;
   
   // prepare the tree element heading
   snprintf (text, 255, "%s+---%s: ", tab, name);
   
   switch (octets)
   {
-    case 1:  // u_int8_t
+    case 1:  // uint8_t
       retVal = _u8(pduPtr, &u8, remaining); if (!retVal) { break; }
       if (useHex)
         printf ("%s 0x%02x (%u)\n", text, u8, u8);
       else
         printf ("%s %u\n", text, u8);
       break;
-    case 2:  // u_int16_t
+    case 2:  // uint16_t
       retVal = _u16(pduPtr, &u16, remaining); if (!retVal) { break; }
       if (convert) u16 = ntohs(u16);
       if (useHex)
@@ -274,7 +285,7 @@ static bool _printField(u_int8_t **pduPtr, u_int8_t octets, u_int32_t* remaining
       else
         printf ("%s %u\n", text, u16);
       break;
-    case 4:  // u_int4_t
+    case 4:  // uint4_t
       retVal = _u32(pduPtr, &u32, remaining); if (!retVal) { break; }
       if (convert) u32 = ntohs(u32);
       if (useHex)
@@ -306,8 +317,8 @@ static bool _printField(u_int8_t **pduPtr, u_int8_t octets, u_int32_t* remaining
  */
 bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
 {
-  u_int32_t length = ntohl(pdu->length);
-  u_int8_t* pduPtr = (u_int8_t*)pdu;
+  uint32_t length = ntohl(pdu->length);
+  uint8_t* pduPtr = (uint8_t*)pdu;
   
   printf ("rpki-rtr-protocol\n");
   printf (" +---version: %u\n", pdu->version);
@@ -315,10 +326,10 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
   pduPtr += 2;
   length -= 2;
   
-  u_int8_t  u8;
-  u_int16_t u16;
-  u_int32_t u32;
-  u_int16_t provASCount = 0;
+  uint8_t  u8;
+  uint16_t u16;
+  uint32_t u32;
+  uint16_t provASCount = 0;
   bool  retVal    = false;
   char* typeName  = NULL;
   char* mixedName = NULL;
@@ -365,7 +376,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
       printf (" +---Length: %u\n", ntohl(u32));      
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
-      _printFlags(" ", u8, false);
+      _printFlags(" ", u8);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
       printf (" +---Prefix Length: %u\n", u8);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
@@ -377,31 +388,31 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
         retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
         u32 = ntohl(u32);
         printf (" +---IPv4 Prefix: %u.%u.%u.%u (0x%08x)\n", 
-                                                          (u_int8_t)(u32 >> 24), 
-                                                          (u_int8_t)(u32 >> 16),
-                                                          (u_int8_t)(u32 >> 8),
-                                                          (u_int8_t)(u32), u32);
+                                                          (uint8_t)(u32 >> 24), 
+                                                          (uint8_t)(u32 >> 16),
+                                                          (uint8_t)(u32 >> 8),
+                                                          (uint8_t)(u32), u32);
       }
       else
       {
         printf (" +---IPv6 Prefix: ");
         retVal = _u32(&pduPtr, &u32, &length);if(!retVal){printf ("\n");break;};
         u32 = ntohl(u32);
-        printf ("%04x:%04x:", (u_int16_t)(u32 >> 16), (u_int16_t)u32);
+        printf ("%04x:%04x:", (uint16_t)(u32 >> 16), (uint16_t)u32);
         retVal = _u32(&pduPtr, &u32, &length);if(!retVal){printf ("\n");break;};
         u32 = ntohl(u32);
-        printf ("%04x:%04x:", (u_int16_t)(u32 >> 16), (u_int16_t)u32);
+        printf ("%04x:%04x:", (uint16_t)(u32 >> 16), (uint16_t)u32);
         retVal = _u32(&pduPtr, &u32, &length);if(!retVal){printf ("\n");break;};
         u32 = ntohl(u32);
-        printf ("%04x:%04x:", (u_int16_t)(u32 >> 16), (u_int16_t)u32);
+        printf ("%04x:%04x:", (uint16_t)(u32 >> 16), (uint16_t)u32);
         retVal = _u32(&pduPtr, &u32, &length);if(!retVal){printf ("\n");break;};
         u32 = ntohl(u32);
-        printf ("%04x:%04x\n", (u_int16_t)(u32 >> 16), (u_int16_t)u32);
+        printf ("%04x:%04x\n", (uint16_t)(u32 >> 16), (uint16_t)u32);
       }
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
       u32 = ntohl(u32);
-      printf (" +---AS Number: %u (%u.%u)\n", u32, (u_int16_t)(u32 >> 16), 
-                                                   (u_int32_t)u32);
+      printf (" +---AS Number: %u (%u.%u)\n", u32, (uint16_t)(u32 >> 16), 
+                                                   (uint32_t)u32);
       break;
       
     case PDU_TYPE_END_OF_DATA:
@@ -412,18 +423,21 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       printf (" +---Length: %u\n", ntohl(u32));      
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
       printf (" +---Serial Number: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
-      retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
-      printf (" +---Refresh Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
-      retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
-      printf (" +---Retry Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
-      retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
-      printf (" +---Expire Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+      if (pdu->version > 1)
+      {
+        retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+        printf (" +---Refresh Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+        retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+        printf (" +---Retry Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+        retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
+        printf (" +---Expire Interval: %u (0x%08x)\n", ntohl(u32), ntohl(u32));
+      }
       break;
 
     case PDU_TYPE_ROUTER_KEY:
       printf (" +---type: %u (%s)\n", pdu->type, "Router Key");
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
-      _printFlags(" ", u8, false);
+      _printFlags(" ", u8);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
       printf (" +---zero: 0x%02x\n", u8);
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
@@ -443,8 +457,8 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       printf("\n");
       retVal = _u32(&pduPtr, &u32, &length); if (!retVal) break;
       u32 = ntohl(u32);
-      printf (" +---AS Number: %u (%u.%u)\n", u32, (u_int16_t)(u32 >> 16), 
-                                                   (u_int32_t)u32);
+      printf (" +---AS Number: %u (%u.%u)\n", u32, (uint16_t)(u32 >> 16), 
+                                                   (uint32_t)u32);
       printf (" +---SPKI: ");
       _doPrintHex(length, pduPtr, "           ");
       // move pointer to the end
@@ -459,31 +473,34 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       switch (u16)
       {
         case RPKI_EC_CORRUPT_DATA:
-          codeName = "CORRUPT_DATA\0";
+          codeName = RPKI_ESTR_CORRUPT_DATA;
           break;
         case RPKI_EC_INTERNAL_ERROR:
-          codeName = "INTERNAL_ERROR\0";
+          codeName = RPKI_ESTR_INTERNAL_ERROR;
           break;
         case RPKI_EC_NO_DATA_AVAILABLE:
-          codeName = "NO_DATA_AVAILABLE\0";
+          codeName = RPKI_ESTR_NO_DATA_AVAILABLE;
           break;
         case RPKI_EC_INVALID_REQUEST:
-          codeName = "INVALID_REQUEST\0";
+          codeName = RPKI_ESTR_INVALID_REQUEST;
           break;
         case RPKI_EC_UNSUPPORTED_PROT_VER:
-          codeName = "UNSUPPORTED_PROT_VER\0";
+          codeName = RPKI_ESTR_UNEXPECTED_PROTOCOL_VERSION;
           break;
         case RPKI_EC_UNSUPPORTED_PDU:
-          codeName = "UNSUPPORTED_PDU\0";
+          codeName = RPKI_ESTR_UNSUPPORTED_PDU;
           break;
         case RPKI_EC_UNKNOWN_WITHDRAWL:
-          codeName = "UNKNOWN_WITHDRAWL\0";
+          codeName = RPKI_ESTR_UNKNOWN_WITHDRAWL;
           break;
         case RPKI_EC_DUPLICATE_ANNOUNCEMENT:
-          codeName = "DUPLICATE_ANNOUNCEMENT\0";
+          codeName = RPKI_ESTR_DUPLICATE_ANNOUNCEMENT;
+          break;
+        case RPKI_EC_ASPA_PROVIDER_LIST_ERROR:
+          codeName = RPKI_ESTR_ASPA_PROVIDER_LIST_ERROR;
           break;
         case RPKI_EC_RESERVED:
-          codeName = "RESERVED\0";
+          codeName = RPKI_ESTR_RESERVED;
           break;
         default:
           codeName = "N/A\0";
@@ -503,7 +520,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       }
       else
       {
-        printf ("(Malformed)\n");
+        printf (" (Malformed)");
         retVal = false;
         break;
       }
@@ -537,7 +554,7 @@ bool doPrintRPKI_to_RTR_PDU(void* user, RPKICommonHeader* pdu)
       printf (" +---Length: %u\n", ntohl(u32));      
       // Flags
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
-      _printFlags(" ", u8, true);
+      _printFlags(" ", u8);
       retVal = _u8(&pduPtr, &u8, &length); if (!retVal) break;
       printf (" +---zero: 0x%02x\n", u8);
       retVal = _u16(&pduPtr, &u16, &length); if (!retVal) break;

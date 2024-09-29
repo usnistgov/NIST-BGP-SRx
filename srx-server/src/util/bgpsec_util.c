@@ -29,10 +29,12 @@
  * binary stream or extract the BGPsec_PATH from a BGP UPDATE and possible
  * other functions related to BGPsec.
  * 
- * @version 0.5.0.1
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.1 - 2017/08/25 - 
  *           * Fixed compiler warnings.
  * 0.5.0.0 - 2017/06/27 - oborchert 
@@ -58,25 +60,25 @@
  * 
  * @return The BGPsec_PATH attribute or NULL if not found.
  */
-static u_int8_t* _parseBGP_PATHAttr(u_int8_t* bgpAttr, u_int16_t* parsed)
+static uint8_t* _parseBGP_PATHAttr(uint8_t* bgpAttr, uint16_t* parsed)
 {
   *parsed = 0;
-  u_int8_t*  bgpsec = NULL;
-  u_int16_t* pWord  = NULL;
-  u_int8_t*  ptr    = bgpAttr;
+  uint8_t*  bgpsec = NULL;
+  uint16_t* pWord  = NULL;
+  uint8_t*  ptr    = bgpAttr;
   
   // Read the attribute header
-  u_int8_t  flags = *ptr;
+  uint8_t   flags = *ptr;
   ptr++;
-  u_int8_t  type  = *ptr;
+  uint8_t   type  = *ptr;
   ptr++;
-  u_int16_t length = 0;
+  uint16_t  length = 0;
   *parsed += 2;
 
   if ((flags & 0x10) != 0)
   {
     // Extended Length
-    pWord  = (u_int16_t*)ptr;
+    pWord  = (uint16_t*)ptr;
     length   = ntohs(*pWord);
     ptr += 2;
     *parsed += 2;
@@ -110,15 +112,15 @@ static u_int8_t* _parseBGP_PATHAttr(u_int8_t* bgpAttr, u_int16_t* parsed)
  * @return  The buffer containing the BGPsec_PATH attribute. Must be frees 
  *          by caller.
  */
-u_int8_t* util_getBGPsec_PATH(char* updateStr, u_int32_t* buffLen)
+uint8_t* util_getBGPsec_PATH(char* updateStr, uint32_t* buffLen)
 {
   int size = strlen(updateStr) / 2;
-  u_int8_t* byteStream = malloc(size);
-  u_int8_t* bgpsec     = NULL;
-  u_int8_t* ptr        = byteStream;
-  u_int16_t* pWord     = NULL;
+  uint8_t* byteStream = malloc(size);
+  uint8_t* bgpsec     = NULL;
+  uint8_t* ptr        = byteStream;
+  uint16_t* pWord     = NULL;
   // Only used if buffLen is NULL
-  u_int32_t tmpLen     = 0;
+  uint32_t tmpLen     = 0;
   if (buffLen == NULL)
   {
     buffLen = &tmpLen;
@@ -140,27 +142,27 @@ u_int8_t* util_getBGPsec_PATH(char* updateStr, u_int32_t* buffLen)
   // Jump over the marker
   ptr += 16;
   // Reached length field
-  pWord = (u_int16_t*)ptr;
-  u_int16_t updLen = ntohs(*pWord);
-  u_int16_t remainder = updLen - 16;
+  pWord = (uint16_t*)ptr;
+  uint16_t updLen = ntohs(*pWord);
+  uint16_t remainder = updLen - 16;
   // Move to type field
   ptr += 2;
   remainder -= 2;
-  u_int8_t type = *ptr;
+  uint8_t type = *ptr;
   if (type == 2) // UPDATE TYPE
   {
     // Move to Withdrawn Routes Length
     ptr++;
     remainder--;
-    pWord = (u_int16_t*)ptr;
-    u_int16_t lenWithdrawnRoutes = ntohs(*pWord);
+    pWord = (uint16_t*)ptr;
+    uint16_t lenWithdrawnRoutes = ntohs(*pWord);
     // now move to the withdrawn routes
     ptr += 2;
     remainder -= 2;
     
     while (lenWithdrawnRoutes != 0)
     {
-      u_int8_t length = *ptr != 0 ? ((*ptr / 8) + 1) : 0;            
+      uint8_t length = *ptr != 0 ? ((*ptr / 8) + 1) : 0;            
       ptr++;
       remainder--;
       // Now jump over the prefix itself
@@ -171,15 +173,15 @@ u_int8_t* util_getBGPsec_PATH(char* updateStr, u_int32_t* buffLen)
     
     // Now read the total length pf the path attributes and then move to the 
     // first attribute.
-    pWord = (u_int16_t*)ptr;
-    u_int16_t totalPathAttrLen = ntohs(*pWord);
+    pWord = (uint16_t*)ptr;
+    uint16_t totalPathAttrLen = ntohs(*pWord);
     ptr += 2;
     remainder -= 2;
        
     // If attributes are available 
     if (totalPathAttrLen <= remainder)
     {
-      u_int16_t attrLen = 0;
+      uint16_t attrLen = 0;
       while (remainder > 0 && bgpsec == NULL)
       {
         bgpsec = _parseBGP_PATHAttr(ptr, &attrLen);

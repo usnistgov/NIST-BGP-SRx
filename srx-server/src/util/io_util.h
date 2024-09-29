@@ -50,7 +50,7 @@ bool au_checkSTDIN(int sec, int msec);
  * 
  * @return The value read from standard in or the configured NULL value.
  */
-char au_getchar(bool* stopper, char nullValue);
+char au_getchar(bool stopper, char nullValue);
 
 #endif /* IO_UTIL_H */
 

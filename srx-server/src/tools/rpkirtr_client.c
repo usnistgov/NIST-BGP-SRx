@@ -22,10 +22,15 @@
  * Connects to an RPKI/Router Protocol server and prints all received
  * information on stdout.
  *
- * @version 0.6.1.1
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/20 - oborchert
+ *            * Removed PDU check from handleASPAPDU - it is now implemented in
+ *              the rpki_router_client.
+ *          - 2024/09/10 - oborchert
+ *            * Changed data types from u_int... to uint... which follows C99
  * 0.6.1.1  - 2021/10/27 - oborchert
  *            * Removed label ANTD
  * 0.6.0.0  - 2021/03/30 - oborchert
@@ -83,6 +88,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include "shared/rpki_router.h"
+#include "server/rpki_handler.h"
 #include "server/rpki_packet_printer.h"
 #include "server/rpki_router_client.h"
 #include "util/log.h"
@@ -151,10 +157,11 @@ static char st_del_format[256] = {DEF_FMT_WD "\n\0"};
 
 /*
  * RPKI/Router client handlers
+ * @param rpkiHandler The RPKI Handler or NULL
  */
-void handlePrefix(uint32_t valCacheID, uint16_t sessionID,
+void demo_handlePrefix(uint32_t valCacheID, uint16_t sessionID,
                   bool isAnn, IPPrefix* prefix, uint16_t maxLen, uint32_t oas,
-                  void* _u)
+                  void* rpkiHandler)
 {
   char prefixBuf[MAX_PREFIX_STR_LEN_V6];
 
@@ -179,7 +186,7 @@ void handlePrefix(uint32_t valCacheID, uint16_t sessionID,
 /**
  * Only adds a log entry
  */
-void handleReset()
+void demo_handleReset()
 {
   LOG(LEVEL_INFO, "Received a Cache Reset");
 }
@@ -192,7 +199,7 @@ void handleReset()
  * 
  * @since 0.5.0.0
  */
-static void printHex(int len, u_int8_t* buff)
+static void printHex(int len, uint8_t* buff)
 {
   int idx;
   for (idx = 0; idx < len; idx++, buff++)
@@ -206,76 +213,106 @@ static void printHex(int len, u_int8_t* buff)
   printf("\n");
 }
 
-  /**
-   * This function is called for each prefix announcement / withdrawal received
-   * from the RPKI validation cache.
-   * 
-   * Here it just prints out the information received.
-   *
-   * @param valCacheID  This Id represents the cache. It is used to be able to
-   *                    later on identify the white-list / ROA entry in case the
-   *                    cache state changes.
-   * @param sessionID   The cache sessionID entry for this data. It is be useful
-   *                    for sessionID changes in case SRx is implementing a
-   *                    performance driven approach.
-   * @param isAnn       Indicates if this in an announcement or not.
-   * @param oas         The as number in network format
-   * @param ski         the ski buffer
-   * @param keyInfo     Pointer to the key in DER format.
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
-   */
-void handleRouterKey(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
-                     uint32_t oas, const char* ski, const char* keyInfo,
-                     void* _u)
+/**
+ * This function is called for each prefix announcement / withdrawal received
+ * from the RPKI validation cache.
+ * 
+ * Here it just prints out the information received.
+ *
+ * @param valCacheID  This Id represents the cache. It is used to be able to
+ *                    later on identify the white-list / ROA entry in case the
+ *                    cache state changes.
+ * @param sessionID   The cache sessionID entry for this data. It is be useful
+ *                    for sessionID changes in case SRx is implementing a
+ *                    performance driven approach.
+ * @param isAnn       Indicates if this in an announcement or not.
+ * @param oas         The as number in network format
+ * @param ski         the ski buffer
+ * @param keyInfo     Pointer to the key in DER format.
+ * @param rpkiClient The RPKIHandler instance
+ */
+void demo_handleRouterKey(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
+                          uint32_t oas, const char* ski, const char* keyInfo,
+                          void* rpkiHandler)
 {
   LOG(LEVEL_DEBUG, "[Prefix] %s (vcd=0x%08X sessionID=0x%04X): "
       "as=%u", (isAnn ? "Ann" : "Wd"), valCacheID, sessionID,
       ntohl(oas));
 
   printf(" ski[%p]: ", ski);
-  printHex(20, (u_int8_t*)ski);
+  printHex(20, (uint8_t*)ski);
   printf("\n");
 
   printf(" keyInfo[%p]: ", keyInfo);
-  printHex(91, (u_int8_t*)keyInfo);
+  printHex(91, (uint8_t*)keyInfo);
 }
 
-  /**
-   * This function is called for each prefix announcement / withdrawal received
-   * from the RPKI validation cache.
-   * 
-   * Here it just prints out the information received.
-   *
-   * @param valCacheID  This Id represents the cache. It is used to be able to
-   *                    later on identify the white-list / ROA entry in case the
-   *                    cache state changes.
-   * @param sessionID   The cache sessionID entry for this data. It is be useful
-   *                    for sessionID changes in case SRx is implementing a
-   *                    performance driven approach.
-   * @param isAnn       Indicates if this in an announcement or not.
-   * @param oas         The as number in network format
-   * @param ski         the ski buffer
-   * @param keyInfo     Pointer to the key in DER format.
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
-   */
-void handleASPA(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
-                uint8_t afi, uint32_t customerAS, uint16_t providerCt, 
-                uint32_t* providerASList, void* _u)
+/**
+ * This function is called for each ASPA announcement / withdrawal received
+ * from the RPKI validation cache. The data is given in host notation.
+ * 
+ * Here it just prints out the information received.
+ *
+ * @param valCacheID  This Id represents the cache. It is used to be able to
+ *                    later on identify the white-list / ROA entry in case the
+ *                    cache state changes.
+ * @param sessionID   The cache sessionID entry for this data. It is be useful
+ *                    for sessionID changes in case SRx is implementing a
+ *                    performance driven approach.
+ * @param isAnn       Indicates if this in an announcement or not.
+ * @param customerAS  The ASN of the customer.
+ * @param providerCt  The number of providers.
+ * @param providerASList Printer to the memory contsining the providers.
+ * @param rpkiHandler The RPKIHandler instance
+ */
+void demo_handleASPA(uint32_t valCacheID, uint16_t sessionID, bool isAnn,
+                     uint32_t customerAS, uint16_t providerCt, 
+                     uint32_t* providerASList, void* rpkiHandler)
 {
-  
+  if (rpkiHandler != NULL)
+  {
+    char strBuffer[512];
+    char *buffPtr = strBuffer;
+    memset(strBuffer, 0, 512);
+
+    RPKIHandler* handler = (RPKIHandler*)rpkiHandler;
+    RPKIRouterClient* rpkiRtrClient = &(handler->rrclInstance);
+
+    for (uint32_t idx= 0; idx < providerCt; idx++)
+    {
+      buffPtr += sprintf(buffPtr, idx != 0 ? " %d" : "%d", providerASList[idx]);
+      if ((buffPtr-strBuffer) > 501) //buffer needs at least 11 bytes for an ASn 
+      {
+        // possibly not enough memory for the ASN
+        break;
+      }
+    }
+
+    LOG(LEVEL_INFO, "[ASPA] %s (valCacheID=0x%08X sessionID=0x%04X): cs=%u, "
+                    "pct=%i, pl='%s'\n", (isAnn ? "Announced" : "Withdrawn"),
+                    valCacheID, sessionID, customerAS, providerCt, 
+                    strBuffer);
+  }
+  else
+  {
+    LOG(LEVEL_ERROR, "No RPKI Handler provided!");
+  }
 }
 
 /**
  * Just an empty shell. Here nothing is to do.
  * 
- * @param valCacheID The Validation Cache ID
- * @param sessionID The Session ID
+ * @param valCacheID The Validation Cache ID.
+ * @param sessionID The Session ID.
  * @param user The user.
  * 
  * @since 0.5.0.0
  */
-void handleEndOfData(uint32_t valCacheID, uint16_t sessionID, void* user)
-{}
+void demo_handleEndOfData(uint32_t valCacheID, uint16_t sessionID, 
+                          void* rpkiHandler)
+{
+  LOG(LEVEL_DEBUG, "[EndOfData] %s (vcd=0x%08X sessionID=0x%04X)");
+}
 
 /**
  * Print the error code and message. Returns true for keeping the connection
@@ -283,11 +320,11 @@ void handleEndOfData(uint32_t valCacheID, uint16_t sessionID, void* user)
  *
  * @param errNo The error code received
  * @param msg The message associated with the error
- * @param _u come parameter (ignored)
+ * @param rpkiClient The RPKIHandler instance
  * @return true for keeping the connection active only for non fatal Error
  * "No Data Available".
  */
-bool handleError(uint16_t errNo, const char* msg, void* _u)
+bool demo_handleError(uint16_t errNo, const char* msg, void* rpkiHandler)
 {
   LOG(LEVEL_ERROR, "Received an error [%u], msg='%s'", errNo, msg);
   return errNo == RPKI_EC_NO_DATA_AVAILABLE; // Keep the connection only if not 
@@ -297,11 +334,11 @@ bool handleError(uint16_t errNo, const char* msg, void* _u)
 /**
  * Is called when the connection is lost.
  *
- * @param _u
+ * @param rpkiClient The RPKIHandler instance
  *
  * @return the number of seconds to sleep while continuous connection attempts
  */
-int handleConnection(void* _u)
+int demo_handleConnection(void* rpkiClient)
 {
   LOG(LEVEL_INFO, "Establish connection");
   return 10; // seconds
@@ -313,7 +350,7 @@ int handleConnection(void* _u)
  * @param valCacheID The ID of the validation cache
  * @param newSessionID The new session ID
  */
-void sessionIDChanged(uint32_t valCacheID, uint16_t newSessionID)
+void demo_sessionIDChanged(uint32_t valCacheID, uint16_t newSessionID)
 {
   LOG(LEVEL_INFO, "SessionID changed, update internal data for cache 0x%08X "
                   "with new sessionID 0x%04X", valCacheID, newSessionID);
@@ -324,7 +361,7 @@ void sessionIDChanged(uint32_t valCacheID, uint16_t newSessionID)
  * @param valCacheID The ID of the validation cache
  * @param newSessionID The new session ID
  */
-void sessionIDEstablished (uint32_t valCacheID, uint16_t newSessionID)
+void demo_sessionIDEstablished (uint32_t valCacheID, uint16_t newSessionID)
 {
   LOG(LEVEL_INFO, "New SessionID 0x%04X established for cache 0x%08X",
                   newSessionID, valCacheID);
@@ -400,6 +437,19 @@ bool parseParams(int argc, char** argv, RPKIRouterClientParams* params,
   params->serverPort = 0;
   // The protocol version to be used
   params->version    = RPKI_RTR_PROTOCOL_VERSION;
+
+  if (params->version > 0)
+  {
+    params->refreshInterval = RPKI_RTR_REFRESH_DEF;
+    params->retryInterval   = RPKI_RTR_RETRY_DEF;
+    params->expireInterval  = RPKI_RTR_EXPIRE_DEF;
+  }
+  else
+  {
+    params->refreshInterval = RPKI_RTR_REFRESH_DEF;
+    params->retryInterval   = RPKI_RTR_REFRESH_DEF * 2;
+    params->expireInterval  = 0;
+  }
 
   for (idx = 1; (idx < argc) && !doHelp && !*exitVal; idx++)
   {
@@ -542,7 +592,7 @@ bool parseParams(int argc, char** argv, RPKIRouterClientParams* params,
     }
     if (params->serverPort == 0)
     {
-      params->serverPort = RPKI_DEFAULT_CACHE_PORT;
+      params->serverPort = RPKI_CACHE_PORT_TCP;
     }
   }
 
@@ -554,21 +604,23 @@ bool parseParams(int argc, char** argv, RPKIRouterClientParams* params,
  */
 int main(int argc, const char* argv[])
 {
-  RPKIRouterClientParams params;
-  RPKIRouterClient client;
-
   int cmd     = 0;
   int exitVal = 0;
 
-  memset (&client, 0, sizeof(RPKIRouterClient));
-  memset (&params, 0, sizeof(RPKIRouterClientParams));
+  RPKIHandler rpkiHandler;
+  memset(&rpkiHandler, 0, sizeof(RPKIHandler));
+  RPKIRouterClientParams* params = &(rpkiHandler.rrclParams);
+  RPKIRouterClient*       client = &(rpkiHandler.rrclInstance);
 
-  if (!parseParams(argc, (char**)argv, &params, &exitVal))
+//  memset (&client, 0, sizeof(RPKIRouterClient));
+//  memset (&params, 0, sizeof(RPKIRouterClientParams));
+
+  if (!parseParams(argc, (char**)argv, params, &exitVal))
   {
     return exitVal;
   }
 
-  client.stopAfterEndOfData = st_single_request;
+  client->stopAfterEndOfData = st_single_request;
 
   // Retrieve program name out of the first program argument
   char* realNamePtr = (char*)argv[0];
@@ -589,12 +641,12 @@ int main(int argc, const char* argv[])
   if (st_verbose)
   {
     printf ("Use Configuration RPKT/RTR:\n");
-    printf (" - Server.........: %s\n", params.serverHost);
-    printf (" - Port...........: %i\n", params.serverPort);
-    printf (" - Version........: %i\n", params.version);
-    if (params.version > 0)
+    printf (" - Server.........: %s\n", params->serverHost);
+    printf (" - Port...........: %i\n", params->serverPort);
+    printf (" - Version........: %i\n", params->version);
+    if (params->version > 0)
     {
-      printf (" - Can Downgrade..: %s\n", params.allowDowngrade ? "on\0" 
+      printf (" - Can Downgrade..: %s\n", params->allowDowngrade ? "on\0" 
                                                                 : "off\0");
     }
   }
@@ -605,22 +657,22 @@ int main(int argc, const char* argv[])
   setLogLevel(st_debug ? LEVEL_DEBUG : LEVEL_INFO);
   
   // Create a new client (establish connection, "Reset Query")
-  params.prefixCallback               = handlePrefix;
-  params.resetCallback                = handleReset;
-  params.errorCallback                = handleError;
-  params.routerKeyCallback            = handleRouterKey;
-  //params.aspaCallback                 = handleASPA;
-  params.connectionCallback           = handleConnection;
-  params.endOfDataCallback            = handleEndOfData;
-  params.sessionIDChangedCallback     = sessionIDChanged;
-  params.sessionIDEstablishedCallback = sessionIDEstablished;
+  params->prefixCallback               = demo_handlePrefix;
+  params->resetCallback                = demo_handleReset;
+  params->errorCallback                = demo_handleError;
+  params->routerKeyCallback            = demo_handleRouterKey;
+  params->aspaCallback                 = demo_handleASPA;
+  params->connectionCallback           = demo_handleConnection;
+  params->endOfDataCallback            = demo_handleEndOfData;
+  params->sessionIDChangedCallback     = demo_sessionIDChanged;
+  params->sessionIDEstablishedCallback = demo_sessionIDEstablished;
   // The following is a default PDU printer.
-  params.debugRecCallback             = st_print_receive 
-                                        ? doPrintRPKI_to_RTR_PDU : NULL;
-  params.debugSendCallback            = st_print_send
-                                        ? doPrintRPKI_to_RTR_PDU : NULL;
+  params->debugRecCallback             = st_print_receive 
+                                         ? doPrintRPKI_to_RTR_PDU : NULL;
+  params->debugSendCallback            = st_print_send
+                                         ? doPrintRPKI_to_RTR_PDU : NULL;
 
-  if (!createRPKIRouterClient(&client, &params, NULL))
+  if (!createRPKIRouterClient(client, params, &rpkiHandler))
   {
     return 3;
   }
@@ -631,11 +683,11 @@ int main(int argc, const char* argv[])
   exitVal = 0;
   while(doRun)
   {
-    while (client.clSock.clientFD < 0)
+    while (client->clSock.clientFD < 0)
     {
       sleep(1);
       timeoutCt--;
-      if (client.clSock.clientFD < 0)
+      if (client->clSock.clientFD < 0)
       {
         if (timeoutCt <= 0)
         {
@@ -653,7 +705,7 @@ int main(int argc, const char* argv[])
     }
     if (!st_single_request)
     {
-      char* line = readline(">> ");
+      char* line = readline("(h=help) >> ");
       if (line != NULL)
       {
         cmd = line[0];
@@ -665,7 +717,7 @@ int main(int argc, const char* argv[])
     {
       do
       {
-        cmd = au_getchar(&client.stop, 0);
+        cmd = au_getchar(client->stop, 0);
       } while (cmd == '\n');
       printf ("\n");
     }
@@ -674,11 +726,11 @@ int main(int argc, const char* argv[])
     {
       case CMD_SERIAL_QUERY:
         printf ("\n");
-        sendSerialQuery(&client);
+        sendSerialQuery(client);
         break;
       case CMD_RESET_QUERY:
         printf ("\n");
-        sendResetQuery(&client);
+        sendResetQuery(client);
         break;
       case CMD_QUIT_CLIENT:
         doRun = false;
@@ -687,26 +739,26 @@ int main(int argc, const char* argv[])
         printf("Not implemented yet!\n");
         break;
       case CMD_DEBUG_REC:
-        if (params.debugRecCallback != NULL)
+        if (params->debugRecCallback != NULL)
         {
-          params.debugRecCallback = NULL;
+          params->debugRecCallback = NULL;
           printf ("Disabled debugging receiving PDUs\n");
         }
         else
         {
-          params.debugRecCallback = doPrintRPKI_to_RTR_PDU;
+          params->debugRecCallback = doPrintRPKI_to_RTR_PDU;
           printf ("Enable debugging receiving PDUs\n");          
         }
         break;
       case CMD_DEBUG_SND:
-        if (params.debugSendCallback != NULL)
+        if (params->debugSendCallback != NULL)
         {
-          params.debugSendCallback = NULL;
+          params->debugSendCallback = NULL;
           printf ("Disabled debugging sending PDUs\n");
         }
         else
         {
-          params.debugSendCallback = doPrintRPKI_to_RTR_PDU;
+          params->debugSendCallback = doPrintRPKI_to_RTR_PDU;
           printf ("Enable debugging sending PDUs\n");          
         }
         break;
@@ -722,12 +774,12 @@ int main(int argc, const char* argv[])
         printf ("%c = Send the last received PDU as error.\n",
                 CMD_SEND_ERR_LAST_PD);
         printf ("%c = Toggle Printing of received messages (currently %s)\n",
-                CMD_DEBUG_REC, params.debugRecCallback != NULL ? "on"  : "off");
+                CMD_DEBUG_REC, params->debugRecCallback != NULL ? "on" : "off");
         printf ("%c = Toggle Printing of send messages (currently %s)\n",
-               CMD_DEBUG_SND, params.debugSendCallback != NULL ? "on"  : "off");
+               CMD_DEBUG_SND, params->debugSendCallback != NULL ? "on" : "off");
         printf ("\n");
       default:
-        if (client.stop)
+        if (client->stop)
         {
           doRun = false;
         }
@@ -736,7 +788,7 @@ int main(int argc, const char* argv[])
 
   }
   // Close the connection
-  releaseRPKIRouterClient(&client);
+  releaseRPKIRouterClient(client);
 
   return exitVal;
 }

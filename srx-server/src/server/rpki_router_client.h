@@ -25,10 +25,24 @@
  *
  * Uses log.h for error reporting
  *
- * @version 0.6.1.3
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
+ *           * Added timing parameters for protocol version 2 to 
+ *             RPKIRouterClientParams
+ *         - 2024/09/09 - oborchert
+ *           * Removed deprecated handleAspaPdu function.
+ *           * endOfDataCallback added 3 more parameters.
+ *         - 2024/09/05 - oborchert
+ *           * Renamed RPKIRouterClient.client into RPKIRouterClient.rpkiHandler
+ *             to prevent confusion in coding.
+ *         - 2024/08/27 - oborchert
+ *           * Added aspaCallback back into the code and deprecated 
+ *             cbHandleAspaPDU.
+ *           * Modified aspaCallback to comply with 8210-bis14 requirements.
  * 0.6.1.3 - 2024/06/12 - oborchert
  *           * Moved int g_rpki_single_thread_client_fd into the .c file and 
  *             declared it as extern in the .h file.
@@ -122,11 +136,11 @@ typedef struct {
    * @param prefix      The prefix itself. Contains the information of v4/v6
    * @param maxLen      the maximum length this white-list / ROA entry covers.
    * @param oas         The origin AS for this entry in host format.
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   * @param rpkiHandler An instance of the RPKIHandler.
    */
   void (*prefixCallback)(uint32_t valCacheID, uint16_t sessionID,
                          bool isAnn, IPPrefix* prefix, uint16_t maxLen,
-                         uint32_t oas, void* user);
+                         uint32_t oas, void* rpkiHandler);
 
   /**
    * This function is called for each prefix announcement / withdrawal received
@@ -142,15 +156,16 @@ typedef struct {
    * @param asn         The as number in host format
    * @param ski         the ski buffer
    * @param keyInfo     Pointer to the key in DER format.
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   * @param rpkiHandler An instance of the RPKIHandler.
    */
   void (*routerKeyCallback)(uint32_t valCacheID, uint16_t sessionID,
                             bool isAnn, uint32_t asn, const char* ski,
-                            const char* keyInfo, void* user);
+                            const char* keyInfo, void* rpkiHandler);
   
   /**
    * This function is called for each prefix announcement / withdrawal received
-   * from the RPKI validation cache.
+   * from the RPKI validation cache. Values must be passed in host mode, no 
+   * translation from network to host is needed.
    *
    * @param valCacheID  This Id represents the cache. It is used to be able to
    *                    later on identify the white-list / ROA entry in case the
@@ -159,22 +174,20 @@ typedef struct {
    *                    for sessionID changes in case SRx is implementing a
    *                    performance driven approach.
    * @param isAnn       Indicates if this in an announcement or not.
-   * @param afi         (afi: 0=IPv4, 1=IPv6
    * @param customerAS  The ASn of the customer.
    * @param providerCt  Number of Providers in the providerList
    * @param providerASList List of providerASs
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   * @param rpkiHandler An instance of the RPKIHandler.
    */
-  /*
   void (*aspaCallback)(uint32_t valCacheID, uint16_t sessionID, bool isAnn, 
-                       uint8_t afi, uint32_t customerAS, uint16_t providerCt, 
-                       uint32_t* providerASList, void* user);
-  */
+                       uint32_t customerAS, uint16_t providerCt, 
+                       uint32_t* providerASList, void* rpkiHandler);
   
   /**
    * This function is called each time end of data is received. This allows to
    * trigger all necessary processing after data was received. (i.e. dequeueing
-   * the RPKI QUEUE)
+   * the RPKI QUEUE). For version 2 the additional patrameters are stored in the
+   * RPKI handler.
    *
    * @param valCacheID  This Id represents the cache. It is used to be able to
    *                    later on identify the white-list / ROA entry in case the
@@ -182,10 +195,10 @@ typedef struct {
    * @param sessionID   The cache sessionID entry for this data. It is be useful
    *                    for sessionID changes in case SRx is implementing a
    *                    performance driven approach.
-   * @param user        Some user data. (might be deleted later on)             // THIS MIGHT BE DELETED LATER ON
+   * @param rpkiHandler The RPKIHandler.
    */
-  void (*endOfDataCallback)(uint32_t valCacheID, uint16_t sessionID, 
-                            void* user);
+  void (*endOfDataCallback)(uint32_t valCacheID, uint16_t sessionID,
+                            void* rpkiHandler);
 
   /**
    * The cache/server sent a reset response. Usually, the client should reset
@@ -194,10 +207,13 @@ typedef struct {
    * @note There is no need to send a reset query - this was done already
    * The cache though can reestablish the connection similar to a cache session
    * id change.
-   *
-   * @param user User data
+   * 
+   * @param valCacheID  This Id represents the cache. It is used to be able to
+   *                    later on identify the white-list / ROA entry in case the
+   *                    cache state changes.
+   * @param rpkiHandler An instance of the RPKIHandler.
    */
-  void (*resetCallback)(uint32_t valCacheID,  void* user);
+  void (*resetCallback)(uint32_t valCacheID,  void* rpkiHandler);
 
   /**
    * This method is called in case of a cache session id change. This normally
@@ -238,10 +254,11 @@ typedef struct {
    *
    * @param errNo Error number all except 2 are fatal
    * @param msg Error message
-   * @param user User data
+   * @param rpkiHandler An instance of the RPKIHandler.
    * @return \c true = keep the connection, \c false = close connection
    */
-  bool (*errorCallback)(uint16_t errNo, const char* msg, void* user);
+  bool (*errorCallback)(uint16_t errNo, const char* msg, 
+                        void* rpkiHandler);
   
   /**
    * An erroneous PDU was received.
@@ -250,24 +267,25 @@ typedef struct {
    * 
    * @param len Length of the erroneous PDU
    * @param erronPDU The erroneus PDU
-   * @param user USer Data
+   * @param rpkiHandler An instance of the RPKIHandler.
    * 
    * @return true = keep the connection, false = close the connection
    * 
    * @since 0.5.0.3
    */
-  bool (*erronPDUCallback)(u_int32_t len, u_int8_t* erronPDU, void* user);
+  bool (*erronPDUCallback)(uint32_t len, uint8_t* erronPDU, 
+                           void* rpkiHandler);
 
   /**
    * The connections was lost. The client will try to reconnect.
    *
    * @note Optional - can be NULL
    *
-   * @param user User data
+   * @param rpkiHandler An instance of the RPKIHandler.
    * @return -1 = do not reconnect, otherwise wait sec and then try to
    *      reconnect to the server
    */
-  int (*connectionCallback)(void* user);
+  int (*connectionCallback)(void* rpkiHandler);
   // Server connection
   
   /**
@@ -303,15 +321,43 @@ typedef struct {
   /** Set this variable to the server port number. */
   int         serverPort;
   /** rtr-to-cache version info */
-  u_int8_t    version;
+  uint8_t     version;
   /** Allow downgrading to lower version number if signaled during session 
    * negotiation. 
    * @since 0.5.0.3 */
   bool        allowDowngrade;
-
-  int (*cbHandleAspaPdu)(void* user, uint32_t cusAsn, uint16_t provAsCount, 
-                         uint32_t* provAsns, uint8_t addrFamilyType, uint8_t announce);
-
+  /** 
+   * This parameter tells the router how long to wait before next attempting to
+   * poll the cache and between subsequent attempts, using a Serial Query or
+   * Reset Query PDU. The router SHOULD NOT poll the cache sooner than indicated
+   * by this parameter. Note that receipt of a Serial Notify PDU overrides this
+   * interval and suggests that the router issue an immediate query without 
+   * waiting for the Refresh Interval to expire. Countdown for this timer starts
+   * upon receipt of the containing End Of Data PDU.
+   * (min: 1 sec), (max: 86400 sec -> 1 day), (def: 3600 sec -> 1 hour)
+   * @since 0.6.2.1 */
+  uint32_t refreshInterval;
+  /**
+   * This parameter tells the router how long to wait before retrying a failed 
+   * Serial Query or Reset Query. The router SHOULD NOT retry sooner than 
+   * indicated by this parameter. Note that a protocol version mismatch 
+   * overrides this interval: if the router needs to downgrade to a lower 
+   * protocol version number, it MAY send the first Serial Query or Reset Query
+   * immediately. Countdown for this timer starts upon failure of the query and
+   * restarts after each subsequent failure until a query succeeds.
+   * (min: 1 sec), (max: 7200 sec -> 2 hours), (def: 600 sec -> 10 min)
+   * @since 0.6.2.1 */
+  uint32_t retryInterval;
+  /**
+   * This parameter tells the router how long it can continue to use the current
+   * version of the data while unable to perform a successful subsequent query.
+   * The router MUST NOT retain the data past the time indicated by this 
+   * parameter. Countdown for this timer starts upon receipt of the containing
+   * End Of Data PDU.
+   * (min: 600 sec -> 10 min), (max: 172800 sec -> 2 days), 
+   * (def: 7200 sec -> 2 hours)
+   * @since 0.6.2.1 */
+  uint32_t expireInterval;
 } RPKIRouterClientParams;
 
 /**
@@ -326,8 +372,8 @@ typedef struct {
 
   /** The Parameters of this client */
   RPKIRouterClientParams* params;
-  /** */
-  void*                   user;
+  /** Contains the RPKIHandler. */
+  void*                   rpkiHandler;
 
   /** The socket information. */
   ClientSocket            clSock;
@@ -383,12 +429,12 @@ uint32_t createRouterClientID(RPKIRouterClient* self);
  * @param self Client variable that will be initialized.
  * @param params Pre-set parameters.
  * @param routerClientID an ID that will be assigned to this RPKIRouterClient.
- * @param user User data - will be passed to the callback functions
+ * @param user The RPKI handler
  * @return \c true = successful, \c false = something failed
  */
 bool createRPKIRouterClient(RPKIRouterClient* client,
                             RPKIRouterClientParams* params,
-                            void* user);
+                            void* rpkiHandler);
 
 /**
  * Closes the connection, and releases all used resources.
@@ -400,7 +446,7 @@ void releaseRPKIRouterClient(RPKIRouterClient* client);
 /**
  * Sends a reset query.
  *
- * @param client Client instance
+ * @param client The RPKI router client instance
  * @return true = PDU sent, false = sending failed
  */
 bool sendResetQuery(RPKIRouterClient* client);
@@ -408,7 +454,7 @@ bool sendResetQuery(RPKIRouterClient* client);
 /**
  * Sends a serial query. This request all new and all expired prefixes.
  *
- * @param client Client instance
+ * @param client The RPKI router client instance
  * @return true = PDU sent, false = sending failed
  */
 bool sendSerialQuery(RPKIRouterClient* client);
@@ -416,7 +462,7 @@ bool sendSerialQuery(RPKIRouterClient* client);
 /**
  * Send an error report to the server.
  * 
- * @param self the instance of RPKI router client.
+ * @param client The RPKI router client instance
  * @param errCode The error code to be used.
  * @param erronPDU The PDU containing the error.
  * @param lenErronPDU Length of the erroneous PDU.
@@ -427,19 +473,9 @@ bool sendSerialQuery(RPKIRouterClient* client);
  * 
  * @since 0.5.0.3
  */
-bool sendErrorReport(RPKIRouterClient* self, u_int16_t errCode,
-                     u_int8_t* erronPDU, u_int32_t lenErronPDU,
-                     char* errText, u_int32_t lenErrText);
-
-/**
- * 
- * @param client
- * @param hdr
- * @param length
- * @return 
- */
-bool handleReceiveAspaPdu(RPKIRouterClient* client,
-                          RPKIASPAHeader* hdr, uint32_t length);
+bool sendErrorReport(RPKIRouterClient* client, uint16_t errCode,
+                     uint8_t* erronPDU, uint32_t lenErronPDU,
+                     char* errText, uint32_t lenErrText);
 
 // @TODO: fix this not so nice work around
 // In ROCKY this throws a linker error. The solution is to declare it extern here and then

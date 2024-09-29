@@ -25,7 +25,7 @@
  * In this version the SRX server only can connect to once RPKI VALIDATION CACHE
  * MULTI CACHE will be part of a later release.
  *
- * @version 0.6.0.0
+ * @version 0.6.2.1
  *
  * EXIT Values:
  *
@@ -39,6 +39,8 @@
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/03 - oborchert
+ *            * Fixed issues if started with no configuration file.
  * 0.6.0.0  - 2021/03/30 - oborchert
  *            * Changed SRXPROXY_GOODBYE->zero to SRXPROXY_GOODBYE->zero32
  * 0.5.1.1  - 2020/07/22 - oborchert
@@ -216,7 +218,8 @@ static void handleUpdateResultChange (SRxValidationResult* valResult)
  * @param argc Contains the number of arguments passed
  * @param argv The array containing the parameters
  *
- * @return 1 if the configuration is created successful, 0 if errors occurred,
+ * @return  1 if the configuration is created successful, 
+ *          0 if errors occurred,
  *         -1 if the configuration was manually stopped (example: -h).
  *
  * @see initConfiguration, parseProgramArgs
@@ -240,20 +243,26 @@ static int setupConfiguration (int argc, const char* argv[])
   }
 
   // Try to read only if the file exists
-  if (fileIsReadable(config.configFileName))
+  if (config.configFileName != NULL)
   {
-    if (!readConfigFile(&config, config.configFileName))
+    if (fileIsReadable(config.configFileName))
     {
-      printf("Cannot apply configuration \'%s\'\n", config.configFileName);
+      if (!readConfigFile(&config, config.configFileName))
+      {
+        printf("Cannot apply configuration \'%s\'\n", config.configFileName);
+        return 0;
+      }
+    }
+    else
+    {
+      // Check if configuration file is located in installed etc folder
+      printf("Cannot access \'%s\'\n", config.configFileName);
       return 0;
     }
   }
   else
   {
-    // Check if configuration file is located in installed etc folder
-
-    printf("Cannot access \'%s\'\n", config.configFileName);
-    return 0;
+    printf("Start without configuration file!\n");
   }
 
   // Handle the command-line

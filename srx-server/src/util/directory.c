@@ -21,11 +21,14 @@
  * by this software.
  *
  *
- * @version 0.3.0.10
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
- * 0.3.0.10 - 2015/11/09 - oborchert
+ * 0.6.2.1  - 2024/08/29 - oborchert
+ *            * Added documentation.
+ *            * Added check if path is null
+ß * 0.3.0.10 - 2015/11/09 - oborchert
  *            * Added Changelog
  *            * Fixed speller in documentation header
  * 0.1.0    - 2010/04/26 -pgleichm
@@ -38,10 +41,18 @@
 #endif
 #include "util/directory.h"
 
+/**
+ * Checks if a file is readable.
+ *
+ * @param path Path pointing to the file
+ * 
+ * @return true = is readable, false = does not exist / is not readable
+ */
 bool fileIsReadable(const char* path) 
 {
+  bool readable = (path != NULL);
 #ifdef unix
-  return (access(path, R_OK) == 0);
+  readable = (access(path, R_OK) == 0);
 #else
   FILE* fh;
   bool  readable;
@@ -49,7 +60,7 @@ bool fileIsReadable(const char* path)
   fh = fopen(path, "r");
   readable = (fh != NULL);
   fclose(fh);
-  return readable;
 #endif
+  return readable;
 }
 

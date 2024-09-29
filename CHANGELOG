@@ -1,5 +1,11 @@
 For more detailed CHANGELOG information check each module folder.
 
+Version 6.3.2
+ * quagga-srx V0.99.22.srx.0.6.0.4_release
+ * srx-server V0.6.2.1_release
+ * srx-crypto-api V0.3.0.6_release
+ * bgpsec-io version_0.2.2.1
+ * examples 0.6.3.1_release
 Version 6.3.1
  * Updated INSTALL.md and fixed bootstrap (install.sh) script for  Rocky 9
  * Updated build script

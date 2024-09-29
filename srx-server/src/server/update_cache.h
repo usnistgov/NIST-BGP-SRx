@@ -25,10 +25,12 @@
  * value. The other is a list, that allows to scan through all updates. Both 
  * MUST be maintained the same.
  * 
- * @version 0.5.0.0
+ * @version 0.6.2.1
  * 
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1  - 2024/09/10 - oborchert
+ *            * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.0  - 2017/07/06 - oborchert
  *            * Renamed getUpdateData into getUpdateStats
  *            * Modified function modifyUpdateResult and added parameter
@@ -133,13 +135,13 @@ typedef struct {
 typedef struct {
   // BGP4 - Origin Validation
   /** Number of as numbers in the as path in host format*/
-  u_int16_t              hops;
+  uint16_t               hops;
   /** The BGP4 as path - list of as numbers */
-  u_int32_t*             asn_path;
+  uint32_t*              asn_path;
   
   // BGPsec usage only (All fields can be null / 0 if no BGPsec is used)
   /** The own AS number - required for validation. NETWORK FORMAT*/
-  u_int32_t              myAS;
+  uint32_t               myAS;
   /** The announced prefix of this update. NETWROK FORMAT*/
   SCA_Prefix             nlri;    
   /** Length in bytes of the BGPsec_PATH attribute in host format. */

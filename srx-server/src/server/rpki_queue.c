@@ -28,10 +28,12 @@
  * file. Therefore no additional checking is needed is some provided values
  * are NULL. entry functions specified in the header file do take cate of that.
  * 
- * @version 0.5.0.1
+ * @version 0.6.2.1
  *
  * Changelog:
  * -----------------------------------------------------------------------------
+ * 0.6.2.1 - 2024/09/10 - oborchert
+ *           * Changed data types from u_int... to uint... which follows C99
  * 0.5.0.1  - 2017/08/25 - oborchert
  *            * BZ1224: Function __rq_createQueueElem did not return the 
  *              generated object. (fixed)
@@ -60,7 +62,7 @@ typedef struct {
   /** The queues head element */
   _RPKI_QUEUE_LIST_ELEM* head;
   /** Count the number of elements in the queue. */
-  u_int32_t size;
+  uint32_t size;
   /** For thread safety */
   sem_t semaphore;
 } _RPKI_QUEUE;
